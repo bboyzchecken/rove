@@ -1,0 +1,32 @@
+@import 'tailwindcss';
+@import './brand.css';
+
+/* Map the brand tokens into Tailwind v4's theme so `bg-surface`,
+ * `text-muted`, `rounded-brand` etc. work everywhere. */
+@theme inline {
+  --color-bg: hsl(var(--brand-bg));
+  --color-surface: hsl(var(--brand-surface));
+  --color-primary: hsl(var(--brand-primary));
+  --color-primary-fg: hsl(var(--brand-primary-fg));
+  --color-accent: hsl(var(--brand-accent));
+  --color-muted: hsl(var(--brand-muted));
+  --color-border: hsl(var(--brand-border));
+  --color-success: hsl(var(--brand-success));
+  --color-warning: hsl(var(--brand-warning));
+  --color-danger: hsl(var(--brand-danger));
+
+  --radius-brand: var(--brand-radius);
+  --font-sans: var(--brand-font-sans);
+}
+
+html,
+body {
+  background-color: var(--color-bg);
+  color: var(--color-primary);
+  font-family: var(--font-sans);
+}
+
+/* Mobile-first: the trip room is used on a phone, standing in a station. */
+body {
+  -webkit-tap-highlight-color: transparent;
+}

@@ -1,0 +1,34 @@
+# secrets
+.env
+.env.local
+*.pem
+
+# go
+apps/api/bin/
+apps/api/tmp/
+*.test
+*.out
+
+# node
+node_modules/
+.pnpm-store/
+apps/web/.next/
+apps/web/out/
+apps/web/next-env.d.ts
+*.tsbuildinfo
+
+# tooling
+.turbo/
+coverage/
+playwright-report/
+test-results/
+
+# os / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# local data
+docker/volumes/

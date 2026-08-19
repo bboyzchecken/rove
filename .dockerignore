@@ -1,0 +1,13 @@
+.git
+.github
+node_modules
+**/node_modules
+apps/web/.next
+apps/api/tmp
+apps/api/bin
+.env
+.env.local
+*.md
+!apps/api/data/**/*.md
+docs
+deploy

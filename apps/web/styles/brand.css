@@ -1,0 +1,39 @@
+/* ============================================================================
+ * BRAND TOKENS — DEV_SPEC §15
+ *
+ * These values are INTENTIONALLY a neutral placeholder. The brand has not been
+ * decided yet, and nothing in the app may hardcode a colour, a font or the
+ * product name. Everything reads from here (or from NEXT_PUBLIC_BRAND_NAME).
+ *
+ * When the brand lands: change only this file.
+ * ==========================================================================*/
+
+:root {
+  /* hsl channels, consumed as hsl(var(--brand-primary)) */
+  --brand-primary: 220 14% 20%;
+  --brand-primary-fg: 0 0% 100%;
+  --brand-accent: 220 14% 45%;
+  --brand-bg: 0 0% 100%;
+  --brand-surface: 220 14% 96%;
+  --brand-muted: 220 9% 46%;
+  --brand-border: 220 13% 91%;
+
+  /* semantic */
+  --brand-success: 142 71% 45%;
+  --brand-warning: 38 92% 50%;
+  --brand-danger: 0 72% 51%;
+
+  --brand-radius: 0.75rem;
+  --brand-font-sans: system-ui, -apple-system, 'Noto Sans Thai', 'Segoe UI', sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --brand-bg: 220 14% 10%;
+    --brand-surface: 220 14% 15%;
+    --brand-primary: 0 0% 98%;
+    --brand-primary-fg: 220 14% 10%;
+    --brand-muted: 220 9% 65%;
+    --brand-border: 220 13% 24%;
+  }
+}

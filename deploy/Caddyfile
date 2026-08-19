@@ -1,0 +1,15 @@
+# Caddy terminates TLS (auto Let's Encrypt) and routes to the two apps.
+# Replace the placeholders once the domain is registered — DEV_SPEC §15 / A0.10.
+
+{$API_DOMAIN:api.localhost} {
+	encode gzip zstd
+	reverse_proxy api:5000 {
+		# SSE must not be buffered or the trip room goes silent.
+		flush_interval -1
+	}
+}
+
+{$WEB_DOMAIN:localhost} {
+	encode gzip zstd
+	reverse_proxy web:3000
+}

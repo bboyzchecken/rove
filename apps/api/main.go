@@ -1,0 +1,196 @@
+package main
+
+import (
+	"context"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
+	"go.uber.org/fx"
+	"gorm.io/gorm"
+
+	"github.com/bboyzchecken/rove/apps/api/pkg/core"
+	handlers "github.com/bboyzchecken/rove/apps/api/pkg/handlers/api"
+	"github.com/bboyzchecken/rove/apps/api/pkg/logger"
+	memberstore "github.com/bboyzchecken/rove/apps/api/pkg/store/member"
+	poistore "github.com/bboyzchecken/rove/apps/api/pkg/store/poi"
+	tripstore "github.com/bboyzchecken/rove/apps/api/pkg/store/trip"
+	userstore "github.com/bboyzchecken/rove/apps/api/pkg/store/user"
+)
+
+func main() {
+	// Local runs read the monorepo root .env; under docker compose the same
+	// values arrive as real environment variables and this is a no-op.
+	_ = godotenv.Load("../../.env", ".env")
+	viper.AutomaticEnv()
+
+	cfg := loadConfig()
+	log := logger.Init(cfg.Environment)
+
+	switch command() {
+	case "up":
+		runMigrate(cfg)
+	case "seed":
+		runSeed(cfg)
+	default:
+		log.WithField("env", cfg.Environment).Infof("starting rove api on :%s", cfg.Port)
+		runServer(cfg)
+	}
+}
+
+func command() string {
+	if len(os.Args) > 1 {
+		return os.Args[1]
+	}
+	return ""
+}
+
+func loadConfig() core.Config {
+	viper.SetDefault("PORT", "5000")
+	viper.SetDefault("ENV", "development")
+	viper.SetDefault("MYSQL_PORT", "3306")
+	viper.SetDefault("REDIS_PORT", "6379")
+	viper.SetDefault("AI_MAX_TOKENS", 8000)
+	viper.SetDefault("AUTH_COOKIE_NAME", "rove_token")
+	viper.SetDefault("OPEN_METEO_BASE", "https://api.open-meteo.com")
+
+	return core.Config{
+		Environment:    viper.GetString("ENV"),
+		Commit:         viper.GetString("COMMIT"),
+		Port:           viper.GetString("PORT"),
+		JwtSecret:      viper.GetString("JWT_SECRET_KEY"),
+		AdminEmails:    splitCSV(viper.GetString("ADMIN_EMAILS")),
+		AuthCookieName: viper.GetString("AUTH_COOKIE_NAME"),
+		AppBaseURL:     viper.GetString("APP_BASE_URL"),
+		WebBaseURL:     viper.GetString("WEB_BASE_URL"),
+		OpenMeteoBase:  viper.GetString("OPEN_METEO_BASE"),
+
+		MySQL: core.MySQLConfig{
+			Host:     viper.GetString("MYSQL_HOST"),
+			Port:     viper.GetString("MYSQL_PORT"),
+			Username: viper.GetString("MYSQL_USERNAME"),
+			Password: viper.GetString("MYSQL_PASSWORD"),
+			Database: viper.GetString("MYSQL_DATABASE"),
+		},
+		Redis: core.RedisConfig{
+			Host:     viper.GetString("REDIS_HOST"),
+			Port:     viper.GetString("REDIS_PORT"),
+			Password: viper.GetString("REDIS_PASSWORD"),
+		},
+		R2: core.R2Config{
+			Endpoint:     viper.GetString("R2_ENDPOINT"),
+			Region:       viper.GetString("R2_REGION"),
+			AccessKey:    viper.GetString("R2_ACCESS_KEY"),
+			SecretKey:    viper.GetString("R2_SECRET_KEY"),
+			ExportBucket: viper.GetString("R2_EXPORT_BUCKET"),
+			ImageBucket:  viper.GetString("R2_IMAGE_BUCKET"),
+		},
+		Anthropic: core.AnthropicConfig{
+			ApiKey:          viper.GetString("ANTHROPIC_API_KEY"),
+			ModelPlanner:    viper.GetString("AI_MODEL_PLANNER"),
+			ModelFast:       viper.GetString("AI_MODEL_FAST"),
+			MaxTokens:       viper.GetInt("AI_MAX_TOKENS"),
+			DailyCostCapUSD: viper.GetFloat64("AI_DAILY_COST_CAP_USD"),
+		},
+		Google: core.GoogleConfig{
+			MapsServerKey:     viper.GetString("GOOGLE_MAPS_SERVER_KEY"),
+			OAuthClientID:     viper.GetString("GOOGLE_OAUTH_CLIENT_ID"),
+			OAuthClientSecret: viper.GetString("GOOGLE_OAUTH_CLIENT_SECRET"),
+		},
+		Line: core.LineConfig{
+			LoginChannelID:     viper.GetString("LINE_LOGIN_CHANNEL_ID"),
+			LoginChannelSecret: viper.GetString("LINE_LOGIN_CHANNEL_SECRET"),
+			MessagingToken:     viper.GetString("LINE_MESSAGING_TOKEN"),
+		},
+		FX: core.FXConfig{
+			ApiURL: viper.GetString("FX_API_URL"),
+			ApiKey: viper.GetString("FX_API_KEY"),
+		},
+		Affiliate: map[string]string{
+			"agoda":      viper.GetString("AFFILIATE_AGODA_ID"),
+			"booking":    viper.GetString("AFFILIATE_BOOKING_AID"),
+			"klook":      viper.GetString("AFFILIATE_KLOOK_AID"),
+			"kkday":      viper.GetString("AFFILIATE_KKDAY_ID"),
+			"rentalcars": viper.GetString("AFFILIATE_RENTALCARS_ID"),
+			"airalo":     viper.GetString("AFFILIATE_AIRALO_ID"),
+		},
+	}
+}
+
+func splitCSV(s string) []string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// storeModules is the one place a new store gets registered.
+func storeModules() fx.Option {
+	return fx.Options(
+		userstore.Module,
+		tripstore.Module,
+		memberstore.Module,
+		poistore.Module,
+	)
+}
+
+func runServer(cfg core.Config) {
+	app := fx.New(
+		fx.Supply(cfg),
+		fx.Provide(core.NewDatabase, core.NewRedis),
+		storeModules(),
+		handlers.Module,
+		fx.Invoke(migrateOnBoot),
+		fx.Invoke(startHTTP),
+		fx.WithLogger(fxLogger),
+	)
+	app.Run()
+}
+
+// migrateOnBoot keeps a fresh environment one command away from working; the
+// same migrations are runnable standalone via `go run . up`.
+func migrateOnBoot(db *gorm.DB) error {
+	if err := core.Migrate(db); err != nil {
+		return err
+	}
+	logger.L().Info("migrations up to date")
+	return nil
+}
+
+func startHTTP(lc fx.Lifecycle, s *handlers.Server) {
+	lc.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			go func() {
+				if err := s.Start(); err != nil {
+					logger.L().WithError(err).Info("http server stopped")
+				}
+			}()
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			defer cancel()
+			return s.Shutdown(ctx)
+		},
+	})
+}
+
+func runMigrate(cfg core.Config) {
+	db, err := core.NewDatabase(cfg)
+	if err != nil {
+		logger.L().WithError(err).Fatal("connect mysql")
+	}
+	if err := core.Migrate(db); err != nil {
+		logger.L().WithError(err).Fatal("migrate")
+	}
+	logger.L().Info("migrations complete")
+}

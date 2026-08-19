@@ -1,0 +1,20 @@
+# air — Go hot reload for local development
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/api ."
+  entrypoint = "./tmp/api"
+  include_ext = ["go", "tpl", "tmpl", "html", "md"]
+  exclude_dir = ["tmp", "data", "migrations", "bin"]
+  exclude_regex = ["_test\\.go"]
+  delay = 300
+  stop_on_error = false
+  send_interrupt = true
+  kill_delay = 2000
+
+[log]
+  time = true
+
+[misc]
+  clean_on_exit = true

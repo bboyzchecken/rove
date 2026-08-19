@@ -1,0 +1,70 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: api (go)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/api/go.mod
+          cache-dependency-path: apps/api/go.sum
+      - run: go build ./...
+      - run: go vet ./...
+      # pkg/domain is pure logic and must always be covered (DEV_SPEC §17).
+      - run: go test ./... -race
+
+  web:
+    name: web (next)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+
+  compose:
+    name: stack boots
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The promise in the README is one command — prove it on every PR.
+      - run: cp .env.example .env
+      - run: docker compose up --build -d
+      - name: wait for /readyz
+        run: |
+          for i in $(seq 1 40); do
+            if curl -fsS http://localhost:5050/readyz | grep -q '"ready":true'; then
+              echo "api ready"; exit 0
+            fi
+            sleep 5
+          done
+          docker compose logs --tail=100
+          exit 1
+      - name: web responds
+        run: curl -fsS -o /dev/null http://localhost:3000/
+      - if: always()
+        run: docker compose down -v

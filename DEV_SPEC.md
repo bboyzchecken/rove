@@ -14,7 +14,10 @@
 - ทุก task ที่เสร็จ ติ๊ก `[x]` ในไฟล์นี้ + commit message อ้าง task id เช่น `feat(api): T3.4 wishlist coverage endpoint`
 - การตัดสินใจนอกสเปค → บันทึก §16 Decision Log ก่อนทำ
 - ห้ามเพิ่ม feature นอก Phase ปัจจุบัน แม้จะ "ทำได้ง่าย"
-- **Repo แยก 2 ตัว**: `xxx-api` (Go) และ `xxx-web` (Next.js) — dev คนละ checklist ได้ ขนานกันได้ตาม §9
+- ~~**Repo แยก 2 ตัว**: `xxx-api` (Go) และ `xxx-web` (Next.js)~~ → **เปลี่ยนเป็น monorepo**
+  `rove/apps/api` + `rove/apps/web`, `.env` เดียวที่ root, รันด้วย `docker compose up --build -d`
+  คำสั่งเดียว (ADR [0001](docs/adr/0001-monorepo-single-env.md), §16)
+  checklist ยังแยก A*/W* เหมือนเดิม ทำขนานกันได้
 
 ---
 
@@ -517,35 +520,41 @@ Lightsail Ubuntu 2 vCPU / 2 GB / 60 GB SSD  ($12/mo)  + static IP (ฟรีเ�
 
 ## 9. Phase 0 — Setup & Validate
 
+> **สถานะ 2026-08-19:** โครง monorepo วางเสร็จแล้ว — `docker compose up --build -d`
+> ขึ้นครบ 4 service, migration รันอัตโนมัติ, `/readyz` เขียว, `go test` + `tsc` ผ่าน
+> โครงสร้างไฟล์/แพ็กเกจครบตาม §3 แล้ว ที่ยังไม่ติ๊กคือของที่ต้องต่อของจริง
+> (OAuth key, rate limit, Lightsail instance, POI data)
+
+
 ### API (`xxx-api`)
-- [ ] A0.1 init repo ตาม template: main.go + FX + Echo + GORM + Viper + Logrus + validator
-- [ ] A0.2 `docker-compose.yml` (mysql 8 + redis) สำหรับ local, `.env.example` ครบ §6.1
-- [ ] A0.3 gormigrate migration แรก: users, trips, trip_members, pois (AutoMigrate)
+- [x] A0.1 init repo ตาม template: main.go + FX + Echo + GORM + Viper + Logrus + validator
+- [x] A0.2 `docker-compose.yml` (mysql 8 + redis) สำหรับ local, `.env.example` ครบ §6.1
+- [x] A0.3 gormigrate migration แรก: users, trips, trip_members, pois (AutoMigrate)
 - [ ] A0.4 Auth: JWT HS256 + `JwtMiddleware` + `OptionalJwt` + `IsAdmin` (ตาม template) + `TripRoleMiddleware`
 - [ ] A0.5 OAuth LINE Login + Google → สร้าง/ผูก user → ออก JWT
-- [ ] A0.6 `pkg/store/store.go` pagination + `pkg/utils/*` ตาม template
+- [x] A0.6 `pkg/store/store.go` pagination + `pkg/utils/*` ตาม template
 - [ ] A0.7 Redis client + rate limit middleware + cache helper
-- [ ] A0.8 `/healthz`, `/readyz`, request logger, CORS (allow WebBaseURL), Recover, Secure
-- [ ] A0.9 Dockerfile multi-stage + GitHub Actions (test/build/push GHCR)
+- [x] A0.8 `/healthz`, `/readyz`, request logger, CORS (allow WebBaseURL), Recover, Secure
+- [x] A0.9 Dockerfile multi-stage + GitHub Actions (test/build/push GHCR)
 - [ ] A0.10 `deploy/` (compose.prod, Caddyfile, deploy.sh) + สร้าง Lightsail instance + domain + TLS ผ่านจริง
 
 ### Web (`xxx-web`)
-- [ ] W0.1 `pnpm create next-app@latest` (App Router, TS strict) + บันทึกเวอร์ชันใน Decision Log
+- [x] W0.1 `pnpm create next-app@latest` (App Router, TS strict) + บันทึกเวอร์ชันใน Decision Log
 - [ ] W0.2 Tailwind + shadcn/ui + lucide + `styles/brand.css` (placeholder §15)
-- [ ] W0.3 TanStack Query provider + devtools + default options §7.1
-- [ ] W0.4 `lib/api-client.ts` (fetch wrapper: base url, auth, error → typed) + `features/` skeleton
+- [x] W0.3 TanStack Query provider + devtools + default options §7.1
+- [x] W0.4 `lib/api-client.ts` (fetch wrapper: base url, auth, error → typed) + `features/` skeleton
 - [ ] W0.5 Auth flow: LINE/Google button → callback route → set httpOnly cookie → `useMe()`
 - [ ] W0.6 Zustand store สำหรับ UI state + next-intl + PostHog + flags
 - [ ] W0.7 Vercel (หรือ container) deploy preview ต่อ PR
 
 ### Data / Ops
-- [ ] D0.1 zone codes ญี่ปุ่นใน `pkg/domain/zones.go` (tokyo_east/west/bay, yokohama, kamakura, fuji, kawagoe, …)
+- [x] D0.1 zone codes ญี่ปุ่นใน `pkg/domain/zones.go` (tokyo_east/west/bay, yokohama, kamakura, fuji, kawagoe, …)
 - [ ] D0.2 `data/poi/jp.csv` + validator + import command (`go run main.go seed:poi`)
 - [ ] D0.3 seed POI ทุกจุดจาก `index.html` (Disney, DisneySea, Tsukiji, Sensoji, Skytree, Ueno NM, Ameyoko, Akihabara, Kawagoe, Ikebukuro, Shinjuku, TeamLab Planets, Tokyo Tower/Shiba, Takeshita, Shibuya Sky/Hachiko, Roppongi, Kamakura crossing, Enoshima, Cup Noodles, Red Brick, Chureito, Honcho St, Oishi Park, Oshino Hakkai, Kani Doraku, Yakiniku Bou-ya, Hotel Mifujien) + เติมให้ ≥ 300 จุด
 - [ ] D0.4 enrich จาก Google Places (place_id, lat/lng, open_hours) + cache
 - [ ] D0.5 `data/templates/` 3 แพลนต้นแบบ (Tokyo Base, Yokohama Base, +1)
 - [ ] D0.6 สมัคร affiliate (Agoda, Booking, Klook, KKday, Rentalcars, Airalo) + seed `affiliate_partners`
-- [ ] D0.7 ADR แรก: stack, id strategy, deploy target
+- [x] D0.7 ADR แรก: stack, id strategy, deploy target
 
 ---
 
@@ -827,7 +836,15 @@ AUTH_COOKIE_DOMAIN=
 | — | Realtime | SSE + Redis pubsub (ไม่ใช้ WebSocket) | อ่านอย่างเดียวพอ, ผ่าน proxy ง่าย, ต้นทุนต่ำ |
 | — | Server state | TanStack Query เท่านั้น, Zustand เฉพาะ UI | กัน state ซ้ำซ้อน |
 | — | Deploy | Lightsail instance เดียว + Docker Compose | ต้นทุน ≤ $25/mo ใน Phase 1 |
-| — | Next.js version | (บันทึกเวอร์ชันจริงตอน init) | สเปคไม่ผูกเลขเวอร์ชัน |
+| 2026-08-19 | Repo layout | **Monorepo** `apps/api` + `apps/web`, `.env` เดียวที่ root แทน 2 repo | prototype ทำคนเดียวเพื่อทดสอบตลาด — 2 repo/2 env ทำให้ช้าและ drift ([ADR 0001](docs/adr/0001-monorepo-single-env.md)) — ย้อนกลับไปแยกทีหลังได้ |
+| 2026-08-19 | Local dev | ทุกอย่างรันด้วย `docker compose up --build -d` คำสั่งเดียว (mysql + redis + api + web, hot reload ทั้งคู่) | ลด setup friction เหลือศูนย์ ตอนมีคนที่ 2 เข้าทีม |
+| 2026-08-19 | Next.js version | **16.3.1** (App Router, Turbopack, output standalone) + React 19.2.8 | ([ADR 0002](docs/adr/0002-phase-0-stack-versions.md)) |
+| 2026-08-19 | Go version | **1.25** (จาก 1.23 — `go mod tidy` ยกให้ตาม transitive requirement) | base image `golang:1.25-alpine` |
+| 2026-08-19 | TypeScript | **5.9.3** ไม่ขึ้น 7.x | TS 7 ออกแล้วแต่ toolchain รอบข้าง (eslint-config-next, types) ยังไม่นิ่ง — ไม่คุ้มเสี่ยงตอนวางฐาน |
+| 2026-08-19 | ESLint | **ค้างที่ 9.39.5** | `eslint-config-next@16` → `eslint-plugin-react@7.x` พังบน ESLint 10 (`context.getFilename` ถูกถอด) |
+| 2026-08-19 | air (hot reload) | **pin v1.67.0** | `air@latest` ต้องการ Go 1.26 |
+| 2026-08-19 | Tailwind | **v4** — config อยู่ใน CSS (`@theme` ใน `styles/globals.css`) ไม่มี `tailwind.config.js` | brand token อยู่ที่ `styles/brand.css` ที่เดียวตาม §15 |
+| 2026-08-19 | Host port (dev) | API map host **5050** → container 5000 (`API_EXPOSED_PORT`) | macOS AirPlay Receiver จอง 5000 ไว้ |
 | — | PDF renderer | chromedp หรือ gotenberg (เลือกใน T10.4) | |
 | — | Affiliate approve status | (บันทึกเมื่อสมัครแต่ละเจ้า) | |
 
