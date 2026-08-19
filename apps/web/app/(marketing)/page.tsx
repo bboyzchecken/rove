@@ -259,6 +259,14 @@ export default function LandingPage() {
       <footer className="border-border border-t">
         <div className="text-muted mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-8 text-xs">
           <RoveLogo size="sm" tone="mono" />
+          <nav className="flex flex-wrap items-center gap-4">
+            <Link href="/terms" className="hover:text-espresso">
+              เงื่อนไขการใช้งาน
+            </Link>
+            <Link href="/privacy" className="hover:text-espresso">
+              นโยบายความเป็นส่วนตัว
+            </Link>
+          </nav>
           <p>ต้นแบบสำหรับนำเสนอ · ข้อมูลในหน้าจอเป็นตัวอย่าง</p>
         </div>
       </footer>

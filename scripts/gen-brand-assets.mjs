@@ -25,7 +25,7 @@ const SEED = 70_000; // fixed so re-runs stay in the same visual family
 /** One paragraph, appended to every prompt — this is what keeps separate
  *  generations looking like one set (DEV_SPEC §15 Visual Direction). */
 const STYLE =
-  'Bold flat vector illustration, bright playful palette using terracotta #D4614A, espresso brown #2C1A0E, matcha green #8BC99A, sky blue #A8D4F0, sun yellow #F0E06B, lavender #C4B8E8 and pure white. Chunky geometric shapes with generously rounded corners, thick confident forms, crisp flat colour fills, no outlines, no gradients, no drop shadows, no texture, no text or lettering anywhere. Modern sticker-app illustration style, clean and graphic, consistent series look.';
+  'Bold flat vector illustration, bright playful palette using terracotta #D9714E, espresso brown #3D2B24, matcha green #8BC99A, sky blue #A8D4F0, sun yellow #F0E06B, lavender #C4B8E8 and pure white. Chunky geometric shapes with generously rounded corners, thick confident forms, crisp flat colour fills, no outlines, no gradients, no drop shadows, no texture, no text or lettering anywhere. Modern sticker-app illustration style, clean and graphic, consistent series look.';
 
 /** Each character sits on its own flat colour tile, so the avatar is a colour
  *  block in the UI without needing transparency (FLUX cannot output alpha).
@@ -142,6 +142,36 @@ const scenes = [
     prompt: `A small empty-state illustration: three empty circular avatar frames drawn as dashed outlines, with one small plus sign badge. Lots of empty space, very simple, centered, pure white background. ${STYLE}`,
   },
   {
+    name: 'status-404',
+    width: 1024,
+    height: 1024,
+    prompt: `A small illustration for a "page not found" screen: a folded paper map with a dotted route that curls into a question mark, a signpost beside it whose three arrow boards are blank and point different ways, one map pin lying on its side. Lots of empty space, centered, pure white background. ${STYLE}`,
+  },
+  {
+    name: 'status-error',
+    width: 1024,
+    height: 1024,
+    prompt: `A small illustration for an "something went wrong" screen: an open suitcase tipped onto its side with a camera, a sock and a guidebook spilling out, a compass lying nearby with its needle bent. Calm and gently funny, not alarming. Lots of empty space, centered, pure white background. ${STYLE}`,
+  },
+  {
+    name: 'status-maintenance',
+    width: 1024,
+    height: 1024,
+    prompt: `A small illustration for a "service temporarily unavailable" screen: a stack of two rounded server boxes with a wrench and a screwdriver resting against them, a small cloud above with an unplugged power cord dangling, three little sleep marks. Calm, reassuring, not alarming. Lots of empty space, centered, pure white background. ${STYLE}`,
+  },
+  {
+    name: 'status-terms',
+    width: 1024,
+    height: 1024,
+    prompt: `A small illustration for a terms of service page: an open document sheet with a few text lines and a checklist of three ticked boxes, a pen resting diagonally across it, a small round stamp beside it. Lots of empty space, centered, pure white background. ${STYLE}`,
+  },
+  {
+    name: 'status-privacy',
+    width: 1024,
+    height: 1024,
+    prompt: `A small illustration for a privacy policy page: a rounded padlock standing in front of a small suitcase, a shield outline behind them, one little key lying flat in front. Lots of empty space, centered, pure white background. ${STYLE}`,
+  },
+  {
     name: 'og-default',
     width: 1200,
     height: 630,
@@ -191,6 +221,7 @@ const PLACEMENT = [
   { match: /^char-/, dir: 'public/characters', width: 320, height: 320 },
   { match: /^cover-/, dir: 'public/brand/covers', width: 1200 },
   { match: /^empty-/, dir: 'public/brand/empty', width: 480 },
+  { match: /^status-/, dir: 'public/brand/status', width: 480 },
   { match: /^hero-/, dir: 'public/brand', width: 1440 },
   { match: /^og-/, dir: 'public/brand', width: 1200, format: 'png' },
 ];
@@ -215,7 +246,9 @@ async function optimise() {
     return;
   }
 
+  const wanted = new Set(jobs.map((job) => `${job.name}.png`));
   for (const file of await fs.readdir(RAW)) {
+    if (!wanted.has(file)) continue;
     const rule = PLACEMENT.find((p) => p.match.test(file));
     if (!rule) continue;
 
@@ -247,8 +280,19 @@ if (!KEY) {
 const only = process.argv.includes('--only')
   ? process.argv[process.argv.indexOf('--only') + 1]
   : null;
-const jobs =
-  only === 'characters' ? characters : only === 'scenes' ? scenes : [...characters, ...scenes];
+/** `--match status-` re-cuts one family without paying for the whole set. */
+const match = process.argv.includes('--match')
+  ? new RegExp(process.argv[process.argv.indexOf('--match') + 1])
+  : null;
+
+const jobs = (
+  only === 'characters' ? characters : only === 'scenes' ? scenes : [...characters, ...scenes]
+).filter((job) => !match || match.test(job.name));
+
+if (jobs.length === 0) {
+  console.error('nothing matched — check --only / --match');
+  process.exit(1);
+}
 
 await fs.mkdir(RAW, { recursive: true });
 

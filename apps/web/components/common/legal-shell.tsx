@@ -1,0 +1,123 @@
+import Image from 'next/image';
+import Link from 'next/link';
+import { ArrowLeft, TriangleAlert } from 'lucide-react';
+
+import { RoveLogo } from '@/components/brand/rove-logo';
+import { Card } from '@/components/ui/card';
+
+/**
+ * Shared shell for the terms and privacy pages.
+ *
+ * Sections are data rather than markup so both documents stay typographically
+ * identical and a lawyer's edits land in one list per page instead of being
+ * threaded through JSX.
+ */
+export interface LegalSection {
+  heading: string;
+  /** A string is a paragraph; an array of strings is a bullet list. */
+  body: (string | string[])[];
+}
+
+export function LegalPage({
+  image,
+  title,
+  updated,
+  intro,
+  sections,
+  contact,
+}: {
+  image: string;
+  title: string;
+  /** Human-readable, e.g. "19 สิงหาคม 2569". */
+  updated: string;
+  intro: string;
+  sections: LegalSection[];
+  contact: React.ReactNode;
+}) {
+  return (
+    <div className="mx-auto max-w-2xl px-5 py-6">
+      <div className="flex items-center justify-between">
+        <Link href="/" aria-label="ROVE">
+          <RoveLogo size="sm" />
+        </Link>
+        <Link href="/" className="text-muted inline-flex items-center gap-1 text-xs font-semibold">
+          <ArrowLeft className="size-3.5" /> กลับหน้าแรก
+        </Link>
+      </div>
+
+      <header className="mt-8 flex items-start gap-4">
+        <Image
+          src={image}
+          alt=""
+          width={480}
+          height={480}
+          className="size-20 shrink-0 object-contain"
+        />
+        <div>
+          <h1 className="font-display text-espresso text-3xl font-extrabold tracking-tight">
+            {title}
+          </h1>
+          <p className="text-muted mt-1 text-xs">อัปเดตล่าสุด {updated}</p>
+        </div>
+      </header>
+
+      {/* This is the part a reader must not miss, so it is not a footnote. */}
+      <Card accent="sun" className="mt-5 p-4">
+        <div className="flex items-start gap-2.5">
+          <TriangleAlert className="text-espresso mt-0.5 size-4 shrink-0" />
+          <p className="text-espresso text-xs leading-relaxed">
+            <span className="font-bold">ฉบับร่างสำหรับต้นแบบ</span> — เอกสารนี้เขียนไว้ให้เห็นโครง
+            ยังไม่ผ่านการตรวจโดยที่ปรึกษากฎหมาย และยังไม่มีผลผูกพันทางกฎหมาย
+            ข้อความในวงเล็บเหลี่ยมคือช่องที่ต้องเติมเมื่อจดทะเบียนนิติบุคคลเรียบร้อย
+          </p>
+        </div>
+      </Card>
+
+      <p className="text-muted mt-6 leading-relaxed">{intro}</p>
+
+      <div className="mt-8 space-y-7">
+        {sections.map((section, i) => (
+          <section key={section.heading}>
+            <h2 className="font-display text-espresso text-base font-bold">
+              <span className="text-primary nums mr-2">{i + 1}.</span>
+              {section.heading}
+            </h2>
+
+            <div className="mt-2 space-y-2.5">
+              {section.body.map((block, j) =>
+                Array.isArray(block) ? (
+                  <ul key={j} className="space-y-1.5">
+                    {block.map((point) => (
+                      <li key={point} className="text-muted flex gap-2 text-sm leading-relaxed">
+                        <span className="text-primary shrink-0">•</span>
+                        {point}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p key={j} className="text-muted text-sm leading-relaxed">
+                    {block}
+                  </p>
+                ),
+              )}
+            </div>
+          </section>
+        ))}
+      </div>
+
+      <Card className="mt-10 p-5">
+        <p className="font-display text-espresso font-bold">ติดต่อเรา</p>
+        <div className="text-muted mt-2 space-y-1 text-sm leading-relaxed">{contact}</div>
+      </Card>
+
+      <footer className="text-muted mt-8 flex flex-wrap gap-4 text-xs">
+        <Link href="/terms" className="hover:text-espresso">
+          เงื่อนไขการใช้งาน
+        </Link>
+        <Link href="/privacy" className="hover:text-espresso">
+          นโยบายความเป็นส่วนตัว
+        </Link>
+      </footer>
+    </div>
+  );
+}
