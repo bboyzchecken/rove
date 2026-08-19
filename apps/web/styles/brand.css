@@ -1,39 +1,58 @@
 /* ============================================================================
- * BRAND TOKENS — DEV_SPEC §15
+ * BRAND TOKENS — ROVE (DEV_SPEC §15)
  *
- * These values are INTENTIONALLY a neutral placeholder. The brand has not been
- * decided yet, and nothing in the app may hardcode a colour, a font or the
- * product name. Everything reads from here (or from NEXT_PUBLIC_BRAND_NAME).
+ * This file is the ONLY place a brand colour, radius or font family is written
+ * down. Nothing else in the app may hardcode one. Change the brand → change
+ * this file, nothing else.
  *
- * When the brand lands: change only this file.
+ * Values are hsl channels, consumed as `hsl(var(--brand-primary))`.
  * ==========================================================================*/
 
 :root {
-  /* hsl channels, consumed as hsl(var(--brand-primary)) */
-  --brand-primary: 220 14% 20%;
-  --brand-primary-fg: 0 0% 100%;
-  --brand-accent: 220 14% 45%;
-  --brand-bg: 0 0% 100%;
-  --brand-surface: 220 14% 96%;
-  --brand-muted: 220 9% 46%;
-  --brand-border: 220 13% 91%;
+  /* --- Primary: cha thai terracotta — actions and highlights only --------- */
+  --brand-primary: 19 62% 56%; /* #D4614A */
+  --brand-primary-light: 16 52% 67%; /* #E8906B */
+  --brand-primary-fg: 0 0% 100%; /* white on terracotta */
 
-  /* semantic */
-  --brand-success: 142 71% 45%;
-  --brand-warning: 38 92% 50%;
-  --brand-danger: 0 72% 51%;
+  /* --- Base -------------------------------------------------------------- */
+  --brand-espresso: 24 53% 16%; /* #2C1A0E — ALL type is this colour */
+  --brand-bg: 0 0% 100%; /* white page */
+  --brand-surface: 30 10% 96%; /* neutral card on white */
+  --brand-muted: 22 18% 43%; /* #6B5B4E secondary text */
+  --brand-border: 30 8% 90%;
 
-  --brand-radius: 0.75rem;
-  --brand-font-sans: system-ui, -apple-system, 'Noto Sans Thai', 'Segoe UI', sans-serif;
+  /* --- Accent palette ----------------------------------------------------
+   * The colour blocks. Components tint these over white rather than using a
+   * second set of pastel hexes, so there is exactly one value per colour. */
+  --brand-matcha: 137 36% 65%; /* #8BC99A success / nature */
+  --brand-sky: 207 68% 81%; /* #A8D4F0 info / calm */
+  --brand-sun: 52 82% 68%; /* #F0E06B warning / happy */
+  --brand-joyfull: 260 37% 80%; /* #C4B8E8 playful / secondary */
+
+  /* --- Semantic ----------------------------------------------------------- */
+  --brand-success: 137 40% 36%;
+  --brand-warning: 32 78% 42%;
+  --brand-danger: 4 68% 50%;
+
+  /* --- Shape & type ------------------------------------------------------- */
+  --brand-radius: 1.5rem; /* 24px — chunky friendly blocks */
+  --brand-radius-sm: 0.875rem;
+  --brand-radius-lg: 2rem;
+
+  /* Inter for everything. It carries no Thai glyphs, so Thai text falls
+   * through to Noto Sans Thai — matched for x-height and weight. */
+  --brand-font-sans: var(--font-inter), var(--font-noto-thai), system-ui, sans-serif;
+  --brand-font-display: var(--brand-font-sans);
+  --brand-font-mono: var(--brand-font-sans);
+
+  /* --- Elevation ----------------------------------------------------------
+   * Flat by default: separation comes from colour blocks, not shadow. Only
+   * things that float above the page (dialogs, sheets) get a real shadow. */
+  --brand-shadow-sm: 0 1px 2px rgba(44, 26, 14, 0.04);
+  --brand-shadow: 0 6px 20px rgba(44, 26, 14, 0.08);
+  --brand-shadow-lg: 0 16px 40px rgba(44, 26, 14, 0.14);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --brand-bg: 220 14% 10%;
-    --brand-surface: 220 14% 15%;
-    --brand-primary: 0 0% 98%;
-    --brand-primary-fg: 220 14% 10%;
-    --brand-muted: 220 9% 65%;
-    --brand-border: 220 13% 24%;
-  }
-}
+/* A dark theme is a Phase 2 decision (§16) — the product is a white canvas
+ * with colour blocks on it, and inverting that is a redesign, not a token
+ * swap. */

@@ -23,6 +23,30 @@ export function formatTripTime(iso: string, pattern = 'HH:mm') {
   return formatInTimeZone(parseISO(iso), TRIP_TIMEZONE, pattern);
 }
 
+/** Thai users read dates in the Buddhist era — "15 พ.ย. 2569", not 2026. */
+export function formatThaiDate(iso: string, opts: Intl.DateTimeFormatOptions = {}) {
+  return new Intl.DateTimeFormat('th-TH-u-ca-buddhist', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    ...opts,
+  }).format(parseISO(iso));
+}
+
+/** "15–22 พ.ย. 2569" — collapses the shared month and year. */
+export function formatThaiRange(startIso: string, endIso: string) {
+  const start = parseISO(startIso);
+  const end = parseISO(endIso);
+  const sameMonth =
+    start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+
+  if (sameMonth) {
+    const day = new Intl.DateTimeFormat('th-TH-u-ca-buddhist', { day: 'numeric' }).format(start);
+    return `${day}–${formatThaiDate(endIso)}`;
+  }
+  return `${formatThaiDate(startIso, { year: undefined })} – ${formatThaiDate(endIso)}`;
+}
+
 export function formatDuration(minutes: number) {
   if (minutes < 60) return `${minutes} นาที`;
   const h = Math.floor(minutes / 60);

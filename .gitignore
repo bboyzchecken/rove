@@ -32,3 +32,6 @@ Thumbs.db
 
 # local data
 docker/volumes/
+
+# raw FLUX output — only the optimised copies in apps/web/public are committed
+.assets-raw/

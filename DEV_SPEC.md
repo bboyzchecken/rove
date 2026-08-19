@@ -1077,6 +1077,10 @@ AUTH_COOKIE_DOMAIN=rove.app
 | — | Expense Tracking phase | Phase 1 (กลาง — ดีกว่ารอ V2) | ROVE ให้ความสำคัญชัดเจน, ใช้งานระหว่างทริปจริง |
 | — | Stats + Calendar phase | Phase 1 lightweight (M17) | ง่าย + เพิ่ม reason to return ให้ app |
 | — | Photo/Document phase | Phase 2 (V1) | ต้องออกแบบ UX ละเอียด + R2 bucket เพิ่ม + gotenberg |
+| 19 ส.ค. 2569 | Logo asset | Wordmark = React component (Prompt ExtraBold + SVG mark) ไม่ใช่ไฟล์ภาพ; mark = เข็มทิศ 8 แขน ปลายมน hand-authored SVG | ต้องคมทุกขนาดรวม favicon 16px — FLUX เจนตัวอักษรออกมาแล้ว trace เป็น SVG ไม่ได้ |
+| 19 ส.ค. 2569 | Illustration assets | เจนด้วย FLUX (`flux-2-pro`, seed คงที่) → `scripts/gen-brand-assets.mjs` | ได้ 20 characters + hero + empty states + covers + texture ที่เป็นสไตล์เดียวกัน และ regenerate ซ้ำได้ |
+| 19 ส.ค. 2569 | UI prototype | ทำบน route จริงตาม §3.2 โดยอ่านข้อมูลจาก `apps/web/lib/mock/` แทน API | พอ Go API พร้อม สลับเป็น `features/*/queries.ts` ได้โดยไม่ต้องรื้อ component |
+| 19 ส.ค. 2569 | Dark theme | ยังไม่ทำ — brand.css มีเฉพาะ light | cream linen paper คือตัวแบรนด์เอง ค่อยออกแบบ dark ใน Phase 2 |
 
 ---
 
