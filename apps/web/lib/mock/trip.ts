@@ -672,6 +672,12 @@ export const AI_CREDITS = {
   pointsPerReferral: 150,
 };
 
+/**
+ * What a paid draft can be paid with. Listed in the paywall so nobody has to
+ * tap "ซื้อ" to find out whether their method is accepted.
+ */
+export const AI_PAY_CHANNELS = ['บัตรเครดิต/เดบิต', 'พร้อมเพย์ (QR)', 'TrueMoney Wallet'];
+
 /* ---------------------------------------------------------------- budget -- */
 
 export const BUDGET: BudgetLine[] = [

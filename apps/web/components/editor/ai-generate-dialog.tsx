@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Check, Gift, Sparkles, UserPlus, Wallet, X } from 'lucide-react';
+import { Check, CreditCard, Gift, Sparkles, UserPlus, Wallet, X } from 'lucide-react';
 
 import { RoveMark } from '@/components/brand/rove-mark';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { AI_CREDITS, OPEN_QUESTIONS, planStats, WISHLIST } from '@/lib/mock';
+import { AI_CREDITS, AI_PAY_CHANNELS, OPEN_QUESTIONS, planStats, WISHLIST } from '@/lib/mock';
 import { cn } from '@/lib/utils';
 
 /**
@@ -51,7 +51,7 @@ export function AiGenerateDialog({
   const freeLeft = Math.max(0, AI_CREDITS.freePerTrip - usedAtOpen);
 
   const [payment, setPayment] = useState<'free' | 'points' | 'purchase' | null>(
-    freeLeft > 0 ? 'free' : null
+    freeLeft > 0 ? 'free' : null,
   );
   const started = payment !== null;
 
@@ -70,6 +70,10 @@ export function AiGenerateDialog({
     const timer = setTimeout(() => setStep((s) => s + 1), step === 0 ? 700 : 1_100);
     return () => clearTimeout(timer);
   }, [started, step]);
+
+  // Preselect whichever option the user can actually complete right now.
+  const canUsePoints = points >= AI_CREDITS.pointsPerRun;
+  const [choice, setChoice] = useState<'points' | 'purchase'>(canUsePoints ? 'points' : 'purchase');
 
   function unlock(method: 'points' | 'purchase') {
     onSpend(method);
@@ -114,51 +118,61 @@ export function AiGenerateDialog({
 
         {/* ------------------------------------------------------ paywall */}
         {!started ? (
-          <div className="space-y-2.5">
-            <Card accent="sun" className="p-4">
-              <div className="flex items-start gap-3">
-                <Wallet className="text-espresso mt-0.5 size-5 shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-espresso text-sm font-semibold">
-                    ใช้ {AI_CREDITS.pointsPerRun} แต้ม ร่างอีกครั้ง
-                  </p>
-                  <p className="text-muted mt-1 text-xs leading-relaxed">
-                    ตอนนี้มี <span className="nums">{points.toLocaleString('th-TH')}</span> แต้ม —
-                    ร่างได้อีก {Math.floor(points / AI_CREDITS.pointsPerRun)} ครั้ง
-                    โดยไม่ต้องจ่ายเงิน
-                  </p>
-                </div>
-              </div>
-              <Button
-                block
-                className="mt-3"
-                disabled={points < AI_CREDITS.pointsPerRun}
-                onClick={() => unlock('points')}
-              >
-                <Sparkles className="size-4" /> ใช้แต้มร่างเลย
-              </Button>
-            </Card>
+          <div>
+            <p className="section-label mb-2">เลือกวิธีร่างต่อ</p>
 
-            <Card className="p-4">
-              <p className="text-espresso text-sm font-semibold">
-                หรือซื้อเพิ่มครั้งละ ฿{AI_CREDITS.priceThb}
-              </p>
-              <p className="text-muted mt-1 text-xs leading-relaxed">
-                จ่ายครั้งเดียว ใช้กับทริปนี้ ไม่ผูกมัดรายเดือน
-              </p>
-              <Button variant="outline" block className="mt-3" onClick={() => unlock('purchase')}>
-                ซื้อ 1 ครั้ง ฿{AI_CREDITS.priceThb}
-              </Button>
-            </Card>
+            <div className="space-y-2" role="radiogroup" aria-label="วิธีจ่ายค่าร่างแพลน">
+              <PayOption
+                selected={choice === 'points'}
+                disabled={!canUsePoints}
+                onSelect={() => setChoice('points')}
+                icon={<Wallet className="size-4" />}
+                title="ใช้แต้ม ROVE"
+                price={`${AI_CREDITS.pointsPerRun} แต้ม`}
+                note={
+                  canUsePoints
+                    ? `มีอยู่ ${points.toLocaleString('th-TH')} แต้ม — พอร่างได้อีก ${Math.floor(
+                        points / AI_CREDITS.pointsPerRun,
+                      )} ครั้ง`
+                    : `มีอยู่ ${points.toLocaleString('th-TH')} แต้ม ยังไม่พอ ขาดอีก ${(
+                        AI_CREDITS.pointsPerRun - points
+                      ).toLocaleString('th-TH')} แต้ม`
+                }
+                badge={canUsePoints ? 'ไม่ต้องจ่ายเงิน' : undefined}
+              />
 
-            <Card accent="matcha" className="p-4">
+              <PayOption
+                selected={choice === 'purchase'}
+                onSelect={() => setChoice('purchase')}
+                icon={<CreditCard className="size-4" />}
+                title="จ่ายเงินครั้งเดียว"
+                price={`฿${AI_CREDITS.priceThb}`}
+                note="ใช้กับทริปนี้ ไม่ผูกมัดรายเดือน ไม่ตัดเงินอัตโนมัติ"
+                channels={AI_PAY_CHANNELS}
+              />
+            </div>
+
+            <Button
+              block
+              size="lg"
+              className="mt-4"
+              disabled={choice === 'points' && !canUsePoints}
+              onClick={() => unlock(choice)}
+            >
+              <Sparkles className="size-4" />
+              {choice === 'points'
+                ? `ใช้ ${AI_CREDITS.pointsPerRun} แต้มแล้วร่างเลย`
+                : `จ่าย ฿${AI_CREDITS.priceThb} แล้วร่างเลย`}
+            </Button>
+
+            <Card accent="matcha" className="mt-3 p-4">
               <div className="flex items-start gap-3">
                 <Gift className="text-espresso mt-0.5 size-5 shrink-0" />
                 <div>
-                  <p className="text-espresso text-sm font-semibold">ได้แต้มฟรีจากการชวนเพื่อน</p>
+                  <p className="text-espresso text-sm font-semibold">อยากได้แต้มเพิ่มแบบไม่จ่าย?</p>
                   <p className="text-muted mt-1 text-xs leading-relaxed">
                     ชวนเพื่อนมาใช้ ROVE ได้ {AI_CREDITS.pointsPerReferral} แต้มต่อคน
-                    และได้อีกเมื่อมีคนจองตามทริปที่เปิดสาธารณะไว้
+                    และได้อีกทุกครั้งที่มีคนจองตามทริปที่คุณเปิดสาธารณะไว้
                   </p>
                   <Button variant="soft" size="sm" className="mt-2.5">
                     <UserPlus className="size-3.5" /> คัดลอกลิงก์ชวนเพื่อน
@@ -239,12 +253,94 @@ export function AiGenerateDialog({
               <Sparkles className="size-4" /> ดูแพลนที่ร่างให้
             </Button>
             <p className="text-muted mt-2 text-center text-[11px]">
-              เหลือสิทธิ์ร่างฟรีอีก {Math.max(0, AI_CREDITS.freePerTrip - usedAtOpen - 1)} ครั้ง · มี{' '}
-              <span className="nums">{points.toLocaleString('th-TH')}</span> แต้มไว้ร่างต่อ
+              เหลือสิทธิ์ร่างฟรีอีก {Math.max(0, AI_CREDITS.freePerTrip - usedAtOpen - 1)} ครั้ง ·
+              มี <span className="nums">{points.toLocaleString('th-TH')}</span> แต้มไว้ร่างต่อ
             </p>
           </div>
         ) : null}
       </div>
     </div>
+  );
+}
+
+/**
+ * One payment choice. The price sits on the same line as the name, and the
+ * accepted channels are printed rather than hidden behind the next screen —
+ * finding out your method is not supported after committing is the failure
+ * this row exists to prevent.
+ */
+function PayOption({
+  selected,
+  disabled = false,
+  onSelect,
+  icon,
+  title,
+  price,
+  note,
+  badge,
+  channels,
+}: {
+  selected: boolean;
+  disabled?: boolean;
+  onSelect: () => void;
+  icon: React.ReactNode;
+  title: string;
+  price: string;
+  note: string;
+  badge?: string;
+  channels?: string[];
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      disabled={disabled}
+      onClick={onSelect}
+      className={cn(
+        'rounded-brand w-full border-2 p-3.5 text-left transition',
+        selected ? 'border-primary bg-primary/8' : 'border-border bg-surface hover:border-muted/40',
+        disabled && 'cursor-not-allowed opacity-55',
+      )}
+    >
+      <div className="flex items-center gap-3">
+        <span
+          className={cn(
+            'flex size-5 shrink-0 items-center justify-center rounded-full border-2',
+            selected ? 'border-primary' : 'border-muted/40',
+          )}
+          aria-hidden="true"
+        >
+          {selected ? <span className="bg-primary size-2.5 rounded-full" /> : null}
+        </span>
+
+        <span className="text-espresso flex min-w-0 flex-1 items-center gap-1.5 text-sm font-semibold">
+          {icon}
+          {title}
+          {badge ? (
+            <Badge tone="matcha" className="ml-1">
+              {badge}
+            </Badge>
+          ) : null}
+        </span>
+
+        <span className="text-espresso nums shrink-0 text-sm font-bold">{price}</span>
+      </div>
+
+      <p className="text-muted mt-1.5 pl-8 text-xs leading-relaxed">{note}</p>
+
+      {channels ? (
+        <div className="mt-2 flex flex-wrap gap-1.5 pl-8">
+          {channels.map((channel) => (
+            <span
+              key={channel}
+              className="bg-bg text-muted rounded-full px-2 py-0.5 text-[11px] font-medium"
+            >
+              {channel}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </button>
   );
 }

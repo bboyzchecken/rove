@@ -10,11 +10,11 @@ import {
   Lightbulb,
   Map,
   Plus,
-  Sparkles,
   Ticket,
   TrainFront,
 } from 'lucide-react';
 
+import { AiCreditPanel } from '@/components/editor/ai-credit-panel';
 import { RouteMap } from '@/components/editor/route-map';
 import { AiGenerateDialog } from '@/components/editor/ai-generate-dialog';
 import { Badge } from '@/components/ui/badge';
@@ -62,13 +62,13 @@ export function PlanBoard() {
   const [runsUsed, setRunsUsed] = useState(AI_CREDITS.used);
   const [points, setPoints] = useState(CURRENT_USER.points);
 
-  const freeLeft = Math.max(0, AI_CREDITS.freePerTrip - runsUsed);
-
   const day = DAYS.find((d) => d.id === dayId)!;
   const dayCostJpy = day.items.reduce((sum, i) => sum + (i.costJpy ?? 0), 0);
 
   return (
     <div className="space-y-4">
+      <AiCreditPanel runsUsed={runsUsed} points={points} onStart={() => setGenerating(true)} />
+
       {/* day strip ----------------------------------------------------- */}
       <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4">
         {DAYS.map((d) => {
@@ -130,12 +130,6 @@ export function PlanBoard() {
           </Button>
           <Button size="sm" variant="soft" onClick={() => setShowWhy((v) => !v)}>
             <Lightbulb className="size-3.5" /> ทำไมจัดแบบนี้
-          </Button>
-          <Button size="sm" onClick={() => setGenerating(true)}>
-            <Sparkles className="size-3.5" /> ให้ AI ร่างใหม่
-            <span className="text-primary-fg/75 text-[11px] font-medium">
-              {freeLeft > 0 ? `ฟรีอีก ${freeLeft} ครั้ง` : `${AI_CREDITS.pointsPerRun} แต้ม`}
-            </span>
           </Button>
         </div>
       </Card>
