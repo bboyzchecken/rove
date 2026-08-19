@@ -56,13 +56,13 @@ const FEATURES = [
   {
     emoji: '🤖',
     title: 'AI ที่บอกเหตุผล',
-    text: 'ไม่ใช่แค่ร่างมาให้ แต่บอกว่าทำไมถึงจัดแบบนี้ และถามกลับเมื่อไม่แน่ใจ',
+    text: 'ร่างฟรี 2 ครั้งต่อทริป บอกด้วยว่าทำไมถึงจัดแบบนี้ และถามกลับเมื่อไม่แน่ใจ',
     accent: 'sky',
   },
   {
     emoji: '🧾',
-    title: 'หารเงินให้จบในทริป',
-    text: 'แยกของกลางกับของส่วนตัว รู้เลยว่าใครจ่ายไปเท่าไหร่ ใครต้องคืนใคร',
+    title: 'น้องหาร',
+    text: 'แยกของกลางกับของส่วนตัว บอกเลยว่าใครจ่ายไปเท่าไหร่ ใครต้องคืนใครกี่บาท',
     accent: 'sun',
   },
   {
@@ -73,8 +73,8 @@ const FEATURES = [
   },
   {
     emoji: '⭐',
-    title: 'ที่อยากไปในอนาคต',
-    text: 'เก็บลิงก์ที่เลื่อนเจอไว้ก่อน พอถึงเวลาก็กดเริ่มแพลนจากอันนั้นได้เลย',
+    title: 'ชวนเพื่อนแล้วได้แต้ม',
+    text: 'แต้มจากการชวนเพื่อนและจากทริปที่เปิดสาธารณะ เอามาแลกเป็นการร่างของ AI ได้',
     accent: 'primary',
   },
   {
@@ -86,18 +86,19 @@ const FEATURES = [
 ] as const;
 
 /** Destinations are not a fixed list — these are just what the demo shows. */
-const DESTINATIONS: { label: string; accent: 'primary' | 'matcha' | 'sky' | 'sun' | 'joyfull' }[] = [
-  { label: 'โตเกียว', accent: 'primary' },
-  { label: 'โซล', accent: 'sky' },
-  { label: 'ไทเป', accent: 'matcha' },
-  { label: 'ดานัง', accent: 'sun' },
-  { label: 'บาหลี', accent: 'joyfull' },
-  { label: 'ลิสบอน', accent: 'matcha' },
-  { label: 'เรคยาวิก', accent: 'sky' },
-  { label: 'เมลเบิร์น', accent: 'sun' },
-  { label: 'เม็กซิโกซิตี', accent: 'primary' },
-  { label: 'มาร์ราเกช', accent: 'joyfull' },
-];
+const DESTINATIONS: { label: string; accent: 'primary' | 'matcha' | 'sky' | 'sun' | 'joyfull' }[] =
+  [
+    { label: 'โตเกียว', accent: 'primary' },
+    { label: 'โซล', accent: 'sky' },
+    { label: 'ไทเป', accent: 'matcha' },
+    { label: 'ดานัง', accent: 'sun' },
+    { label: 'บาหลี', accent: 'joyfull' },
+    { label: 'ลิสบอน', accent: 'matcha' },
+    { label: 'เรคยาวิก', accent: 'sky' },
+    { label: 'เมลเบิร์น', accent: 'sun' },
+    { label: 'เม็กซิโกซิตี', accent: 'primary' },
+    { label: 'มาร์ราเกช', accent: 'joyfull' },
+  ];
 
 export default function LandingPage() {
   return (

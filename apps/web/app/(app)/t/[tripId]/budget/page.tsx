@@ -100,7 +100,7 @@ export default function BudgetPage() {
 
           <div className="bg-espresso text-bg grid grid-cols-[1fr_auto_auto] items-center gap-3 px-4 py-3">
             <span className="font-display text-sm font-bold">รวม</span>
-            <span className="w-24 text-right nums text-xs">
+            <span className="nums w-24 text-right text-xs">
               ¥{budgetTotals.totalJpy.toLocaleString('en-US')}
             </span>
             <span className="font-display w-24 text-right text-sm font-extrabold">

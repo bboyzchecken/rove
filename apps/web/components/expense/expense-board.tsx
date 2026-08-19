@@ -140,7 +140,7 @@ function AddExpenseSheet({ onClose }: { onClose: () => void }) {
           <div className="grid grid-cols-[1fr_auto] gap-2">
             <Field label="จำนวนเงิน">
               <input
-                className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 nums text-sm outline-none"
+                className="bg-surface text-espresso nums w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
                 placeholder="0"
                 inputMode="decimal"
               />

@@ -44,7 +44,7 @@ export function CharacterAvatar({
         square ? 'rounded-brand-sm' : 'rounded-full',
         s.box,
         ring && 'ring-bg ring-2',
-        className
+        className,
       )}
       title={character.name}
     >

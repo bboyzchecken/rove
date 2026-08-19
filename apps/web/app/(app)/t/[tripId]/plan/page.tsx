@@ -4,7 +4,7 @@ import { PlanBoard } from '@/components/editor/plan-board';
 import { SectionHeader, Stat } from '@/components/common/section';
 import { Card } from '@/components/ui/card';
 import { formatDuration } from '@/lib/format';
-import { planStats } from '@/lib/mock';
+import { AI_CREDITS, planStats } from '@/lib/mock';
 
 /** Plan tab (M4 + M5). */
 export const metadata = { title: 'แพลน' };
@@ -21,6 +21,11 @@ export default function PlanPage() {
             <Stat value={formatDuration(planStats.travelMinutes)} label="เวลาเดินทางรวม" />
             <Stat value={`${planStats.booked}/${planStats.bookable}`} label="จองแล้ว" />
           </div>
+
+          <p className="text-muted mt-3 text-xs">
+            ทริปนี้ให้ AI ร่างฟรีได้ {AI_CREDITS.freePerTrip} ครั้ง · ใช้ไปแล้ว {AI_CREDITS.used}{' '}
+            ครั้ง — ครั้งถัดไปใช้แต้มหรือซื้อเพิ่มก็ได้
+          </p>
 
           {planStats.warnings > 0 ? (
             <p className="text-warning mt-3 flex items-center gap-1.5 text-xs font-medium">

@@ -134,7 +134,7 @@ export function NewTripFlow() {
                   onChange={(e) => setTicket(e.target.value)}
                   rows={6}
                   placeholder="วางอีเมลยืนยันตั๋ว หรือข้อความจากสายการบินได้เลย"
-                  className="bg-surface text-espresso w-full rounded-2xl p-3.5 nums text-xs outline-none"
+                  className="bg-surface text-espresso nums w-full rounded-2xl p-3.5 text-xs outline-none"
                 />
                 <Button variant="soft" size="sm" onClick={() => setTicket(SAMPLE_TICKET)}>
                   ใส่ตัวอย่างให้ดู

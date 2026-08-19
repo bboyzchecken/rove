@@ -10,12 +10,12 @@
 
 :root {
   /* --- Primary: cha thai terracotta — actions and highlights only --------- */
-  --brand-primary: 19 62% 56%; /* #D4614A */
-  --brand-primary-light: 16 52% 67%; /* #E8906B */
+  --brand-primary: 15 65% 58%; /* #D9714E */
+  --brand-primary-light: 15 65% 70%; /* #E49A81 */
   --brand-primary-fg: 0 0% 100%; /* white on terracotta */
 
   /* --- Base -------------------------------------------------------------- */
-  --brand-espresso: 24 53% 16%; /* #2C1A0E — ALL type is this colour */
+  --brand-espresso: 17 26% 19%; /* #3D2B24 — ALL type is this colour */
   --brand-bg: 0 0% 100%; /* white page */
   --brand-surface: 30 10% 96%; /* neutral card on white */
   --brand-muted: 22 18% 43%; /* #6B5B4E secondary text */
@@ -48,9 +48,9 @@
   /* --- Elevation ----------------------------------------------------------
    * Flat by default: separation comes from colour blocks, not shadow. Only
    * things that float above the page (dialogs, sheets) get a real shadow. */
-  --brand-shadow-sm: 0 1px 2px rgba(44, 26, 14, 0.04);
-  --brand-shadow: 0 6px 20px rgba(44, 26, 14, 0.08);
-  --brand-shadow-lg: 0 16px 40px rgba(44, 26, 14, 0.14);
+  --brand-shadow-sm: 0 1px 2px rgba(61, 43, 36, 0.05);
+  --brand-shadow: 0 6px 20px rgba(61, 43, 36, 0.1);
+  --brand-shadow-lg: 0 16px 40px rgba(61, 43, 36, 0.16);
 }
 
 /* A dark theme is a Phase 2 decision (§16) — the product is a white canvas

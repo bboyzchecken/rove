@@ -221,9 +221,7 @@ export default function HomePage() {
               <div key={i} className="flex flex-1 flex-col items-center gap-1">
                 <div
                   className={
-                    days > 0
-                      ? 'bg-primary w-full rounded-t-md'
-                      : 'bg-surface w-full rounded-t-md'
+                    days > 0 ? 'bg-primary w-full rounded-t-md' : 'bg-surface w-full rounded-t-md'
                   }
                   style={{ height: `${8 + (days / maxMonthDays) * 40}px` }}
                   title={`${MONTHS[i]} · ${days} วัน`}

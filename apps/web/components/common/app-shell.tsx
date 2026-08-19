@@ -40,9 +40,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 href={item.href}
                 className={cn(
                   'font-display rounded-full px-3.5 py-1.5 text-sm font-semibold transition',
-                  isActive(item.href)
-                    ? 'bg-espresso text-bg'
-                    : 'text-muted hover:bg-surface',
+                  isActive(item.href) ? 'bg-espresso text-bg' : 'text-muted hover:bg-surface',
                 )}
               >
                 {item.label}

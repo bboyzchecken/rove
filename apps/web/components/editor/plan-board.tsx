@@ -22,7 +22,16 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
 import { formatMoney } from '@/lib/format';
-import { DAYS, jpyToThb, MEMBERS, RATIONALES, type ItemType, type PlanItem } from '@/lib/mock';
+import {
+  AI_CREDITS,
+  CURRENT_USER,
+  DAYS,
+  jpyToThb,
+  MEMBERS,
+  RATIONALES,
+  type ItemType,
+  type PlanItem,
+} from '@/lib/mock';
 import { cn } from '@/lib/utils';
 
 /**
@@ -48,6 +57,12 @@ export function PlanBoard() {
   const [view, setView] = useState<'timeline' | 'map'>('timeline');
   const [generating, setGenerating] = useState(false);
   const [showWhy, setShowWhy] = useState(false);
+  // Metered AI (§16): held here so a second draft in the same session hits the
+  // paywall, which is what the demo needs to show.
+  const [runsUsed, setRunsUsed] = useState(AI_CREDITS.used);
+  const [points, setPoints] = useState(CURRENT_USER.points);
+
+  const freeLeft = Math.max(0, AI_CREDITS.freePerTrip - runsUsed);
 
   const day = DAYS.find((d) => d.id === dayId)!;
   const dayCostJpy = day.items.reduce((sum, i) => sum + (i.costJpy ?? 0), 0);
@@ -118,6 +133,9 @@ export function PlanBoard() {
           </Button>
           <Button size="sm" onClick={() => setGenerating(true)}>
             <Sparkles className="size-3.5" /> ให้ AI ร่างใหม่
+            <span className="text-primary-fg/75 text-[11px] font-medium">
+              {freeLeft > 0 ? `ฟรีอีก ${freeLeft} ครั้ง` : `${AI_CREDITS.pointsPerRun} แต้ม`}
+            </span>
           </Button>
         </div>
       </Card>
@@ -155,7 +173,17 @@ export function PlanBoard() {
         </div>
       )}
 
-      {generating ? <AiGenerateDialog onClose={() => setGenerating(false)} /> : null}
+      {generating ? (
+        <AiGenerateDialog
+          runsUsed={runsUsed}
+          points={points}
+          onClose={() => setGenerating(false)}
+          onSpend={(method) => {
+            setRunsUsed((n) => n + 1);
+            if (method === 'points') setPoints((p) => p - AI_CREDITS.pointsPerRun);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -168,9 +196,7 @@ function TimelineCard({ item }: { item: PlanItem }) {
       {/* time rail */}
       <div className="w-12 shrink-0 pt-3.5 text-right">
         <span className="text-espresso nums text-xs font-medium">{item.start}</span>
-        {item.end ? (
-          <span className="text-muted block nums text-[10px]">{item.end}</span>
-        ) : null}
+        {item.end ? <span className="text-muted nums block text-[10px]">{item.end}</span> : null}
       </div>
 
       <div className="relative flex flex-col items-center pt-4">

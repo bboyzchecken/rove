@@ -655,6 +655,23 @@ export const OPEN_QUESTIONS = [
   'จูนยังไม่ได้ใส่ wishlist — รอไหม หรือให้ร่างไปก่อนแล้วค่อยปรับ?',
 ];
 
+/* -------------------------------------------------------------- ai usage -- */
+
+/**
+ * AI drafting is metered (§16). Every trip gets two free drafts; after that a
+ * draft is paid for with ROVE points — which members earn by inviting friends
+ * and by publishing trips others book from — or bought outright.
+ */
+export const AI_CREDITS = {
+  freePerTrip: 2,
+  /** Drafts already spent on this trip. */
+  used: 1,
+  pointsPerRun: 300,
+  priceThb: 39,
+  /** Points a member earns when someone they invited joins their first trip. */
+  pointsPerReferral: 150,
+};
+
 /* ---------------------------------------------------------------- budget -- */
 
 export const BUDGET: BudgetLine[] = [

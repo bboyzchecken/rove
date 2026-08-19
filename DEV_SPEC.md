@@ -251,7 +251,7 @@ index: `(country, city, area)`, FULLTEXT `(name_th, name_en, name_ja)`
 **expense_entries** *(actual spending — แยกจาก Budget estimate)* — `id, trip_id, day_id(null), paid_by_user_id, title, amount DECIMAL(12,2), currency, category('food'|'stay'|'transport'|'ticket'|'shopping'|'other'), split_type('shared'|'personal'), participants_json JSON (user_ids ที่หาร — ใช้เมื่อ shared), fx_rate_snapshot DECIMAL(10,4), note, created_at`
 index: `(trip_id, day_id)`, `(trip_id, paid_by_user_id)`
 
-> `split_type='shared'` → คิดแบบ "ขุนทอง" หารตาม participants_json
+> `split_type='shared'` → **"น้องหาร"** (ชื่อฟีเจอร์หารบิลของ ROVE) หารตาม participants_json
 > `split_type='personal'` → ค่าใช้จ่ายส่วนตัวของ paid_by_user_id เท่านั้น
 > FX rate ใช้ snapshot ณ วันที่บันทึก (cache รายวันจาก API) — แสดง label "อัตราโดยประมาณ"
 
@@ -998,48 +998,53 @@ AUTH_COOKIE_DOMAIN=rove.app
 - **Wordmark:** `R✳VE` — ตัว O แทนด้วย asterisk 8 กลีบ (เข็มทิศ + ดอกไม้)
 - **Logo file:** `public/brand/logo.svg` (custom SVG — ห้ามใช้ Unicode ✳ เพราะ render ไม่คม)
 - **Logo variants:** 3 สี — ใช้ variant ตามพื้นหลัง:
-  - Default (light bg): espresso body `#2C1A0E` + terracotta asterisk `#D4614A`
+  - Default (light bg): espresso body `#3D2B24` + terracotta asterisk `#D9714E`
   - Dark bg: white body + terracotta asterisk
   - Monochrome: espresso ทั้งหมด
 - **App icon / favicon:** asterisk เดี่ยว terracotta บน cream circle
+- **รูปทรงจริงที่ใช้:** เข็มทิศ 8 แขน **ปลายมน** (แขนแนวตั้ง/แนวนอนยาวกว่าแนวทแยง เพื่อให้อ่านเป็นเข็มทิศ ไม่ใช่เกล็ดหิมะ)
+- **Implementation:** wordmark เป็น React component (`components/brand/rove-logo.tsx`) = ตัวอักษร Inter ExtraBold + mark SVG — ไม่ใช่ไฟล์ภาพ จะได้คมทุกขนาด
 - **Gimmick:** 8 ทิศ = infinite directions = การเดินทางที่ไม่ตายตัว
 
 ### Color Tokens (`styles/brand.css`)
 ```css
 :root {
-  /* Primary */
-  --brand-primary:        19 62% 56%;   /* #D4614A cha thai terracotta */
-  --brand-primary-light:  16 52% 67%;   /* #E8906B terracotta light */
+  /* Primary — ใช้เฉพาะ action / highlight เท่านั้น ไม่ใช่สีพื้น */
+  --brand-primary:        15 65% 58%;   /* #D9714E cha thai terracotta */
+  --brand-primary-light:  15 65% 70%;   /* #E49A81 terracotta light */
   --brand-primary-fg:     0  0%  100%;  /* white text on primary */
 
   /* Base */
-  --brand-espresso:       24 53% 16%;   /* #2C1A0E logo / headings */
-  --brand-bg:             38 27% 91%;   /* #F0EDE6 cream linen (textured) */
-  --brand-surface:        0  0%  100%;  /* #FFFFFF white cards */
-  --brand-muted:          22 18% 43%;   /* #6B5B4E gray body text */
+  --brand-espresso:       17 26% 19%;   /* #3D2B24 black coffee — ตัวอักษรทั้งหมด */
+  --brand-bg:             0  0%  100%;  /* white page */
+  --brand-surface:        30 10% 96%;   /* neutral card บนพื้นขาว */
+  --brand-muted:          22 18% 43%;   /* #6B5B4E secondary text */
+  --brand-border:         30 8%  90%;
 
-  /* Accent palette (category colors, badges) */
+  /* Accent palette — colour block ของ component (tint ทับขาวเอา ไม่มี hex ชุดสอง) */
   --brand-matcha:         137 36% 65%;  /* #8BC99A success / nature */
   --brand-sky:            207 68% 81%;  /* #A8D4F0 info / calm */
   --brand-sun:            52  82% 68%;  /* #F0E06B warning / happy */
   --brand-joyfull:        260 37% 80%;  /* #C4B8E8 playful / secondary */
 }
 ```
+> Card ใช้ accent tint ที่ `/55` (matcha/sky/sun/joyfull) และ `/12` สำหรับ primary — ห้ามเขียน pastel hex ชุดใหม่
 > Shadcn CSS vars mapping: ตั้งค่าใน `globals.css` ให้ `--primary` = `--brand-primary`, `--background` = `--brand-bg` ฯลฯ
 
 ### Typography
-- **Display / Headings:** Prompt (Google Fonts) — Bold/ExtraBold, Uppercase สำหรับ section headers
-- **Body:** Noto Sans Thai (Google Fonts) — Regular/Medium, อ่านสบาย
-- **Mono / Data:** JetBrains Mono — ใช้ใน code snippet, tracking id
-- **Type scale:** ยึด Tailwind default (`text-xs` → `text-4xl`) + Prompt สำหรับ display
+- **ทั้งเว็บใช้ Inter** (Google Fonts) — Regular → ExtraBold ทั้ง heading และ body
+- **ภาษาไทย:** Inter ไม่มี glyph ไทย → fallback เป็น **Noto Sans Thai** (จับคู่ x-height/น้ำหนักแล้ว) — stack อยู่ใน `--brand-font-sans`
+- **ตัวเลข:** ใช้ Inter + `.nums` (`font-variant-numeric: tabular-nums`) ทุกที่ที่เป็นเงิน/เวลา/จำนวน — ไม่มี mono font แยก
+- **Type scale:** ยึด Tailwind default (`text-xs` → `text-5xl`)
 
 ### Visual Direction
-- **Mood:** Cozy · Warm · Playful · Inviting — ไม่ใช่ corporate dashboard
-- **Background:** Cream linen texture — ให้รู้สึกเหมือนสมุดบันทึกการเดินทาง
-- **Border radius:** 16-24px (rounded-2xl / rounded-3xl) สำหรับ cards — friendly, ไม่ sharp
-- **Cards:** Colored blocks ใช้สีจาก accent palette แทน border — แต่ละ category ใช้คนละสี
-- **Icons:** Rounded filled style (lucide-react rounded variant) — ไม่ใช่ outline เท่านั้น
-- **Shadows:** Soft, warm-tinted shadow `rgba(44,26,14,0.10)` แทน neutral gray
+- **Mood:** Bright · Playful · Colorful — สะอาดตา อ่านง่าย ไม่ใช่ corporate dashboard และไม่ใช่กระดาษสา
+- **Background:** **ขาวล้วน** — ความต่างของพื้นที่มาจาก colour block ไม่ใช่ texture
+- **Border radius:** 24px (`--brand-radius`) สำหรับ card, pill เต็มวงสำหรับปุ่ม/ชิป
+- **Cards:** Colour block จาก accent palette — แต่ละหมวด/แต่ละ stat คนละสี ไม่ใช้ border
+- **Icons:** lucide-react เส้นหนา (`strokeWidth` 2–2.5) วางบน colour block
+- **Shadows:** แทบไม่ใช้ — เฉพาะ dialog/sheet ที่ลอยเหนือหน้า (`rgba(61,43,36,0.10)`)
+- **Illustration:** flat vector บนพื้นขาว สีจาก palette เดียวกัน — ปลายทางทั่วโลก ไม่ผูกกับญี่ปุ่น
 
 ### Tone of Voice
 - **ภาษาไทยเป็นหลัก** — เป็นกันเอง ไม่ทางการ ใช้คำสั้น ตรงใจ
@@ -1081,6 +1086,13 @@ AUTH_COOKIE_DOMAIN=rove.app
 | 19 ส.ค. 2569 | Illustration assets | เจนด้วย FLUX (`flux-2-pro`, seed คงที่) → `scripts/gen-brand-assets.mjs` | ได้ 20 characters + hero + empty states + covers + texture ที่เป็นสไตล์เดียวกัน และ regenerate ซ้ำได้ |
 | 19 ส.ค. 2569 | UI prototype | ทำบน route จริงตาม §3.2 โดยอ่านข้อมูลจาก `apps/web/lib/mock/` แทน API | พอ Go API พร้อม สลับเป็น `features/*/queries.ts` ได้โดยไม่ต้องรื้อ component |
 | 19 ส.ค. 2569 | Dark theme | ยังไม่ทำ — brand.css มีเฉพาะ light | cream linen paper คือตัวแบรนด์เอง ค่อยออกแบบ dark ใน Phase 2 |
+| 19 ส.ค. 2569 | Visual direction v2 | พื้นขาวล้วน + colour block, ตัด cream linen texture ทิ้ง | ทีมเห็นว่า cozy paper ดูผูกกับญี่ปุ่นเกินไป — ขาว+สีสด อ่านง่ายกว่าและเป็นสากล |
+| 19 ส.ค. 2569 | Typography | ใช้ **Inter** ทั้งเว็บ (ไทย fallback Noto Sans Thai), ตัด Prompt + JetBrains Mono | Inter ไม่มี glyph ไทย จึงต้องมี fallback — ตัวเลขใช้ `tabular-nums` แทน mono font |
+| 19 ส.ค. 2569 | Brand colour | terracotta `#D9714E`, espresso `#3D2B24` (ปรับจาก #D4614A / #2C1A0E) | เจ้าของแบรนด์เคาะค่าจริง |
+| 19 ส.ค. 2569 | ชื่อฟีเจอร์หารบิล | **น้องหาร** | เลี่ยงชื่อ "ขุนทอง" ที่เป็นแบรนด์ของคนอื่น — ความเสี่ยงเครื่องหมายการค้า |
+| 19 ส.ค. 2569 | Scope ปลายทาง (prototype) | UI/copy พูดถึงทั่วโลก ไม่ผูกกับญี่ปุ่น | Phase 1 ยัง **ship ญี่ปุ่นก่อน** ตาม §1 — แต่หน้าจอที่ใช้นำเสนอต้องสื่อว่าโตไปทั่วโลกได้ |
+| 19 ส.ค. 2569 | AI monetisation | ร่างฟรี **2 ครั้ง/ทริป** จากนั้นจ่ายด้วยแต้ม (300) หรือซื้อครั้งละ ฿39 | คุมต้นทุน Anthropic ต่อทริป + ผูกกับ referral/public points ให้เป็นวงจรเดียวกัน |
+| 19 ส.ค. 2569 | แหล่งที่มาของแต้ม | referral (150/คน) + คนจองตามทริป public | เดิมมีแค่ทางที่สอง — referral ทำให้ผู้ใช้ใหม่มีแต้มตั้งต้นไว้ปลดล็อก AI |
 
 ---
 

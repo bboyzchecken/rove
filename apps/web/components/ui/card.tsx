@@ -31,10 +31,7 @@ export function Card({
 
 export function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div
-      className={cn('flex items-start justify-between gap-3 p-4 pb-0', className)}
-      {...props}
-    />
+    <div className={cn('flex items-start justify-between gap-3 p-4 pb-0', className)} {...props} />
   );
 }
 

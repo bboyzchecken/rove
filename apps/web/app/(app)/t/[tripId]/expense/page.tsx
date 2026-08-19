@@ -73,7 +73,7 @@ export default function ExpensePage() {
       </section>
 
       <section>
-        <SectionHeader label="จ่ายคืนกันยังไงให้จบเร็วที่สุด" />
+        <SectionHeader label="น้องหารสรุปให้" />
         <Card accent="matcha" className="p-4">
           <ul className="space-y-2.5">
             {expenseSummary.settlements.map((s, i) => (
@@ -93,7 +93,7 @@ export default function ExpensePage() {
                 <span className="text-espresso text-sm font-semibold">
                   {memberName(s.toMemberId)}
                 </span>
-                <span className="text-espresso ml-auto nums text-sm font-bold">
+                <span className="text-espresso nums ml-auto text-sm font-bold">
                   {formatMoney(s.amountThb, 'THB')}
                 </span>
               </li>
