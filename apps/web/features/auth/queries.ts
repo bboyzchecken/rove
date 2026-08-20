@@ -2,30 +2,34 @@
 
 import { useQuery } from '@tanstack/react-query';
 
-import { api } from '@/lib/api-client';
+import { api, ApiError } from '@/lib/api-client';
 import { queryKeys } from '@/lib/query-keys';
-
-export interface Me {
-  id: string;
-  display_name: string;
-  avatar_url: string;
-  handle: string | null;
-  locale: string;
-  home_currency: string;
-  role: 'user' | 'admin';
-}
+import type { Me } from '@/types/api';
 
 /**
- * The current user. Returns undefined for anonymous visitors rather than
- * throwing, so public pages can call it unconditionally.
- *
- * TODO(W0.5): wire this once /auth/me exists.
+ * The current user. Anonymous visitors get `undefined` rather than an error, so
+ * public pages can call this unconditionally.
  */
 export function useMe() {
   return useQuery({
     queryKey: queryKeys.me(),
-    queryFn: () => api.get<Me>('/auth/me'),
+    queryFn: async () => {
+      try {
+        return await api.get<Me>('/auth/me');
+      } catch (error) {
+        // 401 is the normal state for a logged-out visitor, not a failure.
+        if (error instanceof ApiError && error.isUnauthorized) return null;
+        throw error;
+      }
+    },
     retry: false,
     staleTime: 5 * 60_000,
   });
+}
+
+/** Where to send someone who needs to sign in first. */
+export function loginHref(provider: 'line' | 'google', returnTo?: string) {
+  const params = new URLSearchParams({ provider });
+  if (returnTo) params.set('return_to', returnTo);
+  return `/api/auth/login?${params.toString()}`;
 }

@@ -1,32 +1,103 @@
 @import 'tailwindcss';
 @import './brand.css';
 
-/* Map the brand tokens into Tailwind v4's theme so `bg-surface`,
- * `text-muted`, `rounded-brand` etc. work everywhere. */
+/* Map the brand tokens into Tailwind v4's theme so `bg-surface`, `text-muted`,
+ * `rounded-brand` etc. resolve everywhere without another config file. */
 @theme inline {
   --color-bg: hsl(var(--brand-bg));
   --color-surface: hsl(var(--brand-surface));
   --color-primary: hsl(var(--brand-primary));
+  --color-primary-light: hsl(var(--brand-primary-light));
   --color-primary-fg: hsl(var(--brand-primary-fg));
-  --color-accent: hsl(var(--brand-accent));
+  --color-espresso: hsl(var(--brand-espresso));
   --color-muted: hsl(var(--brand-muted));
   --color-border: hsl(var(--brand-border));
+
+  --color-matcha: hsl(var(--brand-matcha));
+  --color-sky: hsl(var(--brand-sky));
+  --color-sun: hsl(var(--brand-sun));
+  --color-joyfull: hsl(var(--brand-joyfull));
+
   --color-success: hsl(var(--brand-success));
   --color-warning: hsl(var(--brand-warning));
   --color-danger: hsl(var(--brand-danger));
 
   --radius-brand: var(--brand-radius);
+  --radius-brand-lg: var(--brand-radius-lg);
+
+  --shadow-brand: var(--brand-shadow);
+  --shadow-brand-lg: var(--brand-shadow-lg);
+
   --font-sans: var(--brand-font-sans);
+  --font-display: var(--brand-font-display);
+  --font-mono: var(--brand-font-mono);
 }
 
-html,
+html {
+  /* Anchors land below the sticky trip-room header. */
+  scroll-padding-top: 5rem;
+}
+
 body {
   background-color: var(--color-bg);
-  color: var(--color-primary);
+  color: var(--color-espresso);
   font-family: var(--font-sans);
+  /* Cream linen: a barely-there weave so the page reads as paper rather than
+   * a flat panel (§15 Visual Direction). Pure CSS — no image request. */
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      rgb(44 26 14 / 0.012) 0px,
+      rgb(44 26 14 / 0.012) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      rgb(44 26 14 / 0.012) 0px,
+      rgb(44 26 14 / 0.012) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+  /* Mobile-first: the trip room is used on a phone, standing in a station. */
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* Mobile-first: the trip room is used on a phone, standing in a station. */
-body {
-  -webkit-tap-highlight-color: transparent;
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--color-espresso);
+  letter-spacing: -0.01em;
+}
+
+/* Section headers are uppercase display type (§15 Typography). */
+.section-label {
+  font-family: var(--font-display);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: hsl(var(--brand-muted));
+}
+
+/* Keyboard focus has to stay visible against a warm background. */
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid hsl(var(--brand-primary));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Respect a user who asked the OS to stop animating things. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

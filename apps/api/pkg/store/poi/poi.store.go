@@ -64,3 +64,44 @@ func (s *store) Count(ctx context.Context) (int64, error) {
 	err := s.db.WithContext(ctx).Model(&models.POI{}).Count(&n).Error
 	return n, err
 }
+
+func (s *store) ListByIDs(ctx context.Context, ids []string) ([]models.POI, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var pois []models.POI
+	err := s.db.WithContext(ctx).Where("id IN ?", ids).Find(&pois).Error
+	return pois, err
+}
+
+func (s *store) GetByPlaceID(ctx context.Context, placeID string) (*models.POI, error) {
+	var p models.POI
+	err := s.db.WithContext(ctx).Where("google_place_id = ?", placeID).First(&p).Error
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
+func (s *store) List(ctx context.Context, city, category string, limit, offset int) ([]models.POI, int64, error) {
+	q := s.db.WithContext(ctx).Model(&models.POI{})
+	if city != "" {
+		q = q.Where("city = ?", city)
+	}
+	if category != "" {
+		q = q.Where("category = ?", category)
+	}
+
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var pois []models.POI
+	err := q.Order("quality_score DESC, name_th ASC").Limit(limit).Offset(offset).Find(&pois).Error
+	return pois, total, err
+}
+
+func (s *store) Update(ctx context.Context, p *models.POI) error {
+	return s.db.WithContext(ctx).Save(p).Error
+}

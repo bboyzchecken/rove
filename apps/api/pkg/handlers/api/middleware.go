@@ -119,7 +119,9 @@ func (s *Server) TripRoleMiddleware(minRole string) echo.MiddlewareFunc {
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			tripID := c.Param("tripId")
+			// Either the route carries :tripId, or ResolveTrip already worked
+			// it out from a child id (see below).
+			tripID := request.TripID(c)
 			if tripID == "" {
 				return request.BadRequest(c, "trip id is required")
 			}
@@ -160,4 +162,72 @@ func httpErrorHandler(err error, c echo.Context) {
 		}
 	}
 	_ = c.JSON(status, request.ErrorResponse{Error: msg})
+}
+
+// Several routes in DEV_SPEC §5 are addressed by a child id rather than a trip
+// id — /plans/:planId, /items/:itemId, /expense/:id. They still need the exact
+// same membership check, so each one resolves its owning trip first and then
+// runs TripRoleMiddleware against it.
+//
+// The resolver returns ONLY an id, never content, so a wrong guess leaks
+// nothing beyond "this id does not belong to you".
+
+// tripResolver maps a path parameter to the trip that owns it.
+type tripResolver func(c echo.Context, id string) (tripID string, err error)
+
+// ResolveTrip runs resolver on the given path param, stores the trip id where
+// request.TripID can find it, and then applies the role check.
+func (s *Server) ResolveTrip(param, minRole string, resolve tripResolver) echo.MiddlewareFunc {
+	roleCheck := s.TripRoleMiddleware(minRole)
+
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			id := c.Param(param)
+			if id == "" {
+				return request.BadRequest(c, "missing "+param)
+			}
+
+			tripID, err := resolve(c, id)
+			if err != nil || tripID == "" {
+				return request.NotFound(c, "not found")
+			}
+
+			// Publish it through the context store rather than through Echo's
+			// path params: Echo pre-allocates one param-value slice per router
+			// sized to the longest route, so appending a name would land at a
+			// different index than its value and silently read back empty.
+			c.Set(request.CtxTripID, tripID)
+
+			return roleCheck(next)(c)
+		}
+	}
+}
+
+// planTrip / itemTrip / expenseTrip / prepTrip / commentTrip are the resolvers
+// the route table wires in.
+func (s *Server) planTrip(c echo.Context, planID string) (string, error) {
+	return s.plans.GetTripID(c.Request().Context(), planID)
+}
+
+func (s *Server) itemTrip(c echo.Context, itemID string) (string, error) {
+	planID, err := s.items.PlanID(c.Request().Context(), itemID)
+	if err != nil {
+		return "", err
+	}
+	// Stash the plan id: every item handler needs it, and re-deriving it would
+	// mean a second query on the hot edit path.
+	c.Set(request.CtxPlanID, planID)
+	return s.plans.GetTripID(c.Request().Context(), planID)
+}
+
+func (s *Server) expenseTrip(c echo.Context, id string) (string, error) {
+	return s.expenses.TripID(c.Request().Context(), id)
+}
+
+func (s *Server) prepTrip(c echo.Context, id string) (string, error) {
+	return s.preps.TripID(c.Request().Context(), id)
+}
+
+func (s *Server) commentTrip(c echo.Context, id string) (string, error) {
+	return s.comments.TripID(c.Request().Context(), id)
 }

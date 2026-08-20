@@ -84,6 +84,21 @@ services:
       timeout: 3s
       retries: 10
 
+  # PDF rendering for plan export (DEV_SPEC §16 / A10.3). Opt-in: it carries a
+  # headless Chrome and the 2 GB box should only pay for it when GOTENBERG_URL
+  # is set. Start with:  docker compose --profile pdf up -d
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    restart: always
+    profiles: ["pdf"]
+    # Not published: only the API talks to it, over the compose network.
+    expose:
+      - "3000"
+    command:
+      - gotenberg
+      - --chromium-disable-javascript=true
+      - --chromium-allow-list=file:///tmp/.*
+
 volumes:
   mysql_data:
   redis_data:

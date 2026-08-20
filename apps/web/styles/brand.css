@@ -1,39 +1,52 @@
 /* ============================================================================
- * BRAND TOKENS — DEV_SPEC §15
+ * BRAND TOKENS — DEV_SPEC §15 (ROVE)
  *
- * These values are INTENTIONALLY a neutral placeholder. The brand has not been
- * decided yet, and nothing in the app may hardcode a colour, a font or the
- * product name. Everything reads from here (or from NEXT_PUBLIC_BRAND_NAME).
+ * Nothing in the app hardcodes a colour, a font or the product name. Everything
+ * reads from here, or from NEXT_PUBLIC_BRAND_NAME.
  *
- * When the brand lands: change only this file.
+ * Values are hsl channels so Tailwind can compose them with an alpha:
+ *   hsl(var(--brand-primary) / 0.1)
  * ==========================================================================*/
 
 :root {
-  /* hsl channels, consumed as hsl(var(--brand-primary)) */
-  --brand-primary: 220 14% 20%;
+  /* --- primary: cha thai terracotta ------------------------------------- */
+  --brand-primary: 19 62% 56%; /* #D4614A */
+  --brand-primary-light: 16 52% 67%; /* #E8906B */
   --brand-primary-fg: 0 0% 100%;
-  --brand-accent: 220 14% 45%;
-  --brand-bg: 0 0% 100%;
-  --brand-surface: 220 14% 96%;
-  --brand-muted: 220 9% 46%;
-  --brand-border: 220 13% 91%;
 
-  /* semantic */
-  --brand-success: 142 71% 45%;
-  --brand-warning: 38 92% 50%;
-  --brand-danger: 0 72% 51%;
+  /* --- base ------------------------------------------------------------- */
+  --brand-espresso: 24 53% 16%; /* #2C1A0E — logo, headings */
+  --brand-bg: 38 27% 91%; /* #F0EDE6 — cream linen */
+  --brand-surface: 0 0% 100%;
+  --brand-muted: 22 18% 43%; /* #6B5B4E — body text */
+  --brand-border: 32 20% 84%;
 
-  --brand-radius: 0.75rem;
-  --brand-font-sans: system-ui, -apple-system, 'Noto Sans Thai', 'Segoe UI', sans-serif;
+  /* --- accents: one colour per category, used as fills not borders ------- */
+  --brand-matcha: 137 36% 65%; /* #8BC99A success / nature */
+  --brand-sky: 207 68% 81%; /* #A8D4F0 info / calm */
+  --brand-sun: 52 82% 68%; /* #F0E06B warning / happy */
+  --brand-joyfull: 260 37% 80%; /* #C4B8E8 playful / secondary */
+
+  /* --- semantic --------------------------------------------------------- */
+  --brand-success: 137 36% 45%;
+  --brand-warning: 38 82% 48%;
+  --brand-danger: 4 68% 52%;
+
+  /* Cards are friendly, not sharp (§15 Visual Direction). */
+  --brand-radius: 1rem;
+  --brand-radius-lg: 1.5rem;
+
+  /* Warm-tinted shadow, never neutral grey. */
+  --brand-shadow: 0 2px 12px rgb(44 26 14 / 0.1);
+  --brand-shadow-lg: 0 8px 32px rgb(44 26 14 / 0.12);
+
+  --brand-font-display: var(--font-prompt), 'Prompt', system-ui, sans-serif;
+  --brand-font-sans: var(--font-noto-thai), 'Noto Sans Thai', system-ui, sans-serif;
+  --brand-font-mono: var(--font-jetbrains), 'JetBrains Mono', ui-monospace, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --brand-bg: 220 14% 10%;
-    --brand-surface: 220 14% 15%;
-    --brand-primary: 0 0% 98%;
-    --brand-primary-fg: 220 14% 10%;
-    --brand-muted: 220 9% 65%;
-    --brand-border: 220 13% 24%;
-  }
-}
+/*
+ * No dark mode in Phase 1. The whole visual direction is a warm paper
+ * notebook; a dark variant is a second design system, not a colour swap, and
+ * DEV_SPEC does not ask for one. The palette is committed to deliberately.
+ */

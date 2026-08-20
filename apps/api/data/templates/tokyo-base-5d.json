@@ -1,0 +1,75 @@
+{
+  "key": "tokyo-base-5d",
+  "name": "โตเกียว 5 วัน — ครั้งแรกต้องได้ครบ",
+  "key_decision": "ตั้งฐานที่โตเกียวอย่างเดียว ไม่ออกนอกเมือง เพื่อไม่ต้องย้ายที่พัก",
+  "summary": "แพลนสำหรับกลุ่มที่มาโตเกียวครั้งแรก จัดวันละโซนเพื่อไม่ต้องนั่งรถไฟข้ามเมืองไปมา เว้นวันสุดท้ายไว้ช้อปและเผื่อเวลาไปสนามบิน",
+  "party_size": 4,
+  "cities": ["tokyo"],
+  "pros": [
+    "ไม่ต้องย้ายที่พักเลยตลอดทริป",
+    "แต่ละวันอยู่โซนเดียว เดินทางน้อย",
+    "ครบทั้งวัด ตลาด วิว และช้อปปิ้ง"
+  ],
+  "cons": [
+    "ไม่ได้เห็นภูเขาไฟฟูจิ",
+    "วันดิสนีย์กินเวลาทั้งวัน ถ้าไม่ชอบสวนสนุกควรสลับเป็นโยโกฮาม่า"
+  ],
+  "days": [
+    {
+      "day_index": 0,
+      "title": "ถึงโตเกียว + อาซากุสะ",
+      "theme": "tokyo_east",
+      "items": [
+        { "type": "flight",    "title": "ถึงสนามบิน + เข้าเมือง",   "duration_min": 120, "travel_mode": "train", "travel_min": 60 },
+        { "type": "stay",      "title": "เช็กอินที่พัก ฝากกระเป๋า", "duration_min": 45 },
+        { "type": "place",     "title": "วัดเซนโซจิ",              "start_time": "16:00", "duration_min": 90, "travel_min": 20, "travel_mode": "train" },
+        { "type": "place",     "title": "ถนนนากามิเซะ",            "start_time": "17:30", "duration_min": 45 },
+        { "type": "food",      "title": "มื้อเย็นแถวอาซากุสะ",      "start_time": "18:30", "duration_min": 75 }
+      ]
+    },
+    {
+      "day_index": 1,
+      "title": "อุเอโนะ + อากิฮาบาระ",
+      "theme": "tokyo_east",
+      "items": [
+        { "type": "place", "title": "ตลาดอาเมโยโกะ",   "start_time": "10:00", "duration_min": 60 },
+        { "type": "place", "title": "สวนอุเอโนะ",       "start_time": "11:15", "duration_min": 60, "travel_min": 10, "travel_mode": "walk" },
+        { "type": "food",  "title": "มื้อเที่ยงแถวอุเอโนะ", "start_time": "12:30", "duration_min": 60 },
+        { "type": "place", "title": "อากิฮาบาระ",       "start_time": "14:00", "duration_min": 150, "travel_min": 10, "travel_mode": "train" },
+        { "type": "place", "title": "โตเกียวสกายทรี",   "start_time": "17:30", "duration_min": 120, "travel_min": 25, "travel_mode": "train" }
+      ]
+    },
+    {
+      "day_index": 2,
+      "title": "ชิบูย่า + ชินจูกุ",
+      "theme": "tokyo_west",
+      "items": [
+        { "type": "place", "title": "ศาลเจ้าเมจิ",       "start_time": "09:30", "duration_min": 75 },
+        { "type": "place", "title": "ถนนทาเคชิตะ",       "start_time": "11:00", "duration_min": 60, "travel_min": 10, "travel_mode": "walk" },
+        { "type": "food",  "title": "มื้อเที่ยงฮาราจูกุ",  "start_time": "12:15", "duration_min": 60 },
+        { "type": "place", "title": "ห้าแยกชิบูย่า",      "start_time": "14:00", "duration_min": 45, "travel_min": 15, "travel_mode": "train" },
+        { "type": "place", "title": "ชิบูย่าสกาย",        "start_time": "16:30", "duration_min": 90 },
+        { "type": "food",  "title": "โอโมอิเดะโยโกโช",   "start_time": "19:00", "duration_min": 90, "travel_min": 15, "travel_mode": "train" }
+      ]
+    },
+    {
+      "day_index": 3,
+      "title": "ดิสนีย์ซี (ทั้งวัน)",
+      "theme": "tokyo_bay",
+      "items": [
+        { "type": "place", "title": "โตเกียวดิสนีย์ซี", "start_time": "08:30", "duration_min": 660, "travel_min": 45, "travel_mode": "train" }
+      ]
+    },
+    {
+      "day_index": 4,
+      "title": "ช้อปปิ้ง + กลับ",
+      "theme": "tokyo_east",
+      "items": [
+        { "type": "place",  "title": "ตลาดปลาสึกิจิ",      "start_time": "08:00", "duration_min": 90 },
+        { "type": "place",  "title": "ย่านกินซ่า",           "start_time": "10:00", "duration_min": 120, "travel_min": 15, "travel_mode": "walk" },
+        { "type": "place",  "title": "สถานีโตเกียว ซื้อของฝาก", "start_time": "12:30", "duration_min": 90, "travel_min": 10, "travel_mode": "train" },
+        { "type": "flight", "title": "เดินทางไปสนามบิน",    "start_time": "15:00", "duration_min": 90, "travel_min": 60, "travel_mode": "train" }
+      ]
+    }
+  ]
+}

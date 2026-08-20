@@ -85,6 +85,15 @@ services:
     depends_on:
       - api
 
+  # Same opt-in profile as production, so a PDF bug reproduces locally:
+  #   docker compose --profile pdf up -d
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    restart: unless-stopped
+    profiles: ["pdf"]
+    ports:
+      - "${GOTENBERG_EXPOSED_PORT:-3001}:3000"
+
 volumes:
   mysql_data:
   redis_data:
