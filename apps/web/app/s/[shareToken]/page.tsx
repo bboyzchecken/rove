@@ -1,13 +1,13 @@
-/**
- * Read-only view behind an unguessable share token.
- *
- * TODO(W10.x): not implemented — Phase 0 placeholder.
- */
-export default function SharedPlanPage() {
-  return (
-    <main className="mx-auto max-w-2xl px-6 py-16">
-      <h1 className="text-xl font-semibold">แพลนที่แชร์มา</h1>
-      <p className="text-muted mt-2 text-sm">TODO W10.x</p>
-    </main>
-  );
+import { PublicTripView } from '@/components/public/public-trip-view';
+
+/** Read-only view behind an unguessable share token (M10 — W10.2). */
+export const metadata = { title: 'แพลนที่แชร์มา', robots: { index: false, follow: false } };
+
+export default async function SharedPlanPage({
+  params,
+}: {
+  params: Promise<{ shareToken: string }>;
+}) {
+  const { shareToken } = await params;
+  return <PublicTripView tokenOrSlug={shareToken} />;
 }

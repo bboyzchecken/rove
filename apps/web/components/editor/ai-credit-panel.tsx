@@ -5,7 +5,8 @@ import { Sparkles } from 'lucide-react';
 import { RoveMark } from '@/components/brand/rove-mark';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { AI_CREDITS } from '@/lib/mock';
+import { useMe } from '@/features/auth/queries';
+import { useAiCredits } from '@/features/ai/queries';
 import { cn } from '@/lib/utils';
 
 /**
@@ -16,17 +17,18 @@ import { cn } from '@/lib/utils';
  * free drafts are left, and what the next one costs. A quota you only discover
  * by pressing the button is a bad surprise attached to a paid action.
  */
-export function AiCreditPanel({
-  runsUsed,
-  points,
-  onStart,
-}: {
-  runsUsed: number;
-  points: number;
-  onStart: () => void;
-}) {
-  const freeLeft = Math.max(0, AI_CREDITS.freePerTrip - runsUsed);
-  const draftsFromPoints = Math.floor(points / AI_CREDITS.pointsPerRun);
+const POINTS_PER_RUN = 300;
+
+export function AiCreditPanel({ tripId, onStart }: { tripId: string; onStart: () => void }) {
+  const { data: credits } = useAiCredits(tripId);
+  const { data: me } = useMe();
+
+  const included = credits?.included ?? 0;
+  const used = credits?.used ?? 0;
+  const extra = credits?.extra ?? 0;
+  const freeLeft = Math.max(0, included - used);
+  const points = me?.points ?? 0;
+  const draftsFromPoints = Math.floor(points / POINTS_PER_RUN);
 
   return (
     <Card accent={freeLeft > 0 ? 'matcha' : 'sun'} className="p-4 sm:p-5">
@@ -39,26 +41,27 @@ export function AiCreditPanel({
 
           <p className="text-muted mt-1 text-sm leading-relaxed">
             {freeLeft > 0
-              ? `ทริปนี้ยังร่างฟรีได้อีก ${freeLeft} ครั้ง จากทั้งหมด ${AI_CREDITS.freePerTrip} ครั้ง`
-              : `ใช้สิทธิ์ฟรีครบ ${AI_CREDITS.freePerTrip} ครั้งแล้ว — ร่างต่อได้ด้วยแต้มหรือจ่ายเงิน`}
+              ? `ทริปนี้ยังร่างฟรีได้อีก ${freeLeft} ครั้ง จากทั้งหมด ${included} ครั้ง`
+              : extra > 0
+                ? `ใช้สิทธิ์ฟรีครบแล้ว — เหลือสิทธิ์ที่ซื้อไว้ ${Math.max(0, included + extra - used)} ครั้ง`
+                : `ใช้สิทธิ์ฟรีครบ ${included} ครั้งแล้ว — ร่างต่อได้ด้วยแต้มหรือจ่ายเงิน`}
           </p>
 
-          {/* One dot per free draft, filled once it is spent. */}
+          {/* One dot per included draft, emptied once it is spent. */}
           <div className="mt-2.5 flex items-center gap-2">
             <span className="flex items-center gap-1" aria-hidden="true">
-              {Array.from({ length: AI_CREDITS.freePerTrip }, (_, i) => (
+              {Array.from({ length: included }, (_, i) => (
                 <span
                   key={i}
                   className={cn(
                     'size-2.5 rounded-full',
-                    // Spent credits read as empty, remaining ones as filled.
-                    i < runsUsed ? 'border-muted/40 border-2' : 'bg-primary',
+                    i < used ? 'border-muted/40 border-2' : 'bg-primary',
                   )}
                 />
               ))}
             </span>
             <span className="text-muted nums text-[11px]">
-              ใช้ไปแล้ว {Math.min(runsUsed, AI_CREDITS.freePerTrip)}/{AI_CREDITS.freePerTrip}
+              ใช้ไปแล้ว {Math.min(used, included)}/{included}
             </span>
           </div>
         </div>
@@ -72,9 +75,8 @@ export function AiCreditPanel({
           <p className="text-muted mt-2 text-[11px] leading-relaxed">
             {freeLeft > 0 ? (
               <>
-                ครั้งถัดไปหลังใช้สิทธิ์ฟรีหมด{' '}
-                <span className="nums">{AI_CREDITS.pointsPerRun}</span> แต้ม หรือ{' '}
-                <span className="nums">฿{AI_CREDITS.priceThb}</span>
+                ครั้งถัดไปหลังใช้สิทธิ์ฟรีหมด <span className="nums">{POINTS_PER_RUN}</span> แต้ม
+                หรือ <span className="nums">฿{credits?.pricePerDraftThb ?? 39}</span>
               </>
             ) : (
               <>

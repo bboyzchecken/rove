@@ -7,19 +7,24 @@ import { Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
- * Trip room tabs (DEV_SPEC §3.2). The five built for this prototype are links;
- * the rest are shown greyed so the room's full shape is visible without
- * pretending they work.
+ * Trip room tabs (DEV_SPEC §3.2). "วันเดินทาง" comes first because a trip with
+ * no agreed dates cannot meaningfully have a plan or a budget yet — it is the
+ * step the group is actually on.
  */
 const TABS = [
   { segment: '', label: 'ภาพรวม' },
+  { segment: 'dates', label: 'วันเดินทาง' },
   { segment: 'wishlist', label: 'ที่อยากไป' },
   { segment: 'plan', label: 'แพลน' },
   { segment: 'budget', label: 'งบ' },
   { segment: 'expense', label: 'ค่าใช้จ่าย' },
+  { segment: 'prep', label: 'เตรียมตัว' },
+  { segment: 'bookings', label: 'การจอง' },
+  { segment: 'discussion', label: 'คุยกัน' },
 ] as const;
 
-const SOON = ['เตรียมตัว', 'การจอง', 'คุยกัน', 'รูปภาพ'];
+/** Phase 2 lives here so the room's full shape is visible without pretending. */
+const SOON = ['รูปภาพ', 'เอกสาร'];
 
 export function TripTabs({ tripId }: { tripId: string }) {
   const pathname = usePathname();

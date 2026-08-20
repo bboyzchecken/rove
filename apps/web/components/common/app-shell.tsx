@@ -2,34 +2,53 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { CalendarDays, House, Plus, UserRound } from 'lucide-react';
+import { LayoutDashboard, Luggage, Plus, Sparkles, UserRound } from 'lucide-react';
 
+import { ModeBanner } from '@/components/common/mode-banner';
 import { RoveLogo } from '@/components/brand/rove-logo';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
-import { CURRENT_USER } from '@/lib/mock';
+import { useMe } from '@/features/auth/queries';
 import { cn } from '@/lib/utils';
 
 /**
  * App chrome. Mobile-first (§2.1): a thumb-reachable bottom bar on phones, the
  * same destinations as a top bar from `md` up. The trip room draws its own tab
  * strip underneath this.
+ *
+ * Five destinations, with "สร้างทริป" in the middle where the thumb rests.
+ * None of them points at a single trip: with two trips in flight, a "ทริปนี้"
+ * tab cannot say which one it means, so the tab is the *list* and the room is
+ * one tap deeper.
+ *
+ * The logo goes to the public landing page — /home is this user's dashboard,
+ * not the site's front door, and conflating the two is what made the map
+ * confusing.
  */
 const NAV = [
-  { href: '/home', label: 'หน้าแรก', icon: House },
-  { href: '/t/demo', label: 'ทริปนี้', icon: CalendarDays },
+  { href: '/home', label: 'สรุปของฉัน', icon: LayoutDashboard },
+  { href: '/trips', label: 'ทริปของฉัน', icon: Luggage },
   { href: '/new', label: 'สร้างทริป', icon: Plus, accent: true },
+  { href: '/dreams', label: 'ที่อยากไป', icon: Sparkles },
   { href: '/profile', label: 'ฉัน', icon: UserRound },
 ] as const;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const { data: me } = useMe();
+
+  // A trip room lives under /t/:id, which belongs to the "ทริปของฉัน" tab.
+  const isActive = (href: string) => {
+    if (href === '/trips') return pathname.startsWith('/trips') || pathname.startsWith('/t/');
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
 
   return (
     <div className="min-h-dvh pb-20 md:pb-0">
+      <ModeBanner />
+
       <header className="bg-bg/85 sticky top-0 z-30 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
-          <Link href="/home" aria-label="ROVE">
+          <Link href="/" aria-label="ROVE — หน้าแรกของเว็บ">
             <RoveLogo size="sm" />
           </Link>
 
@@ -49,7 +68,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
 
           <Link href="/profile" aria-label="โปรไฟล์">
-            <CharacterAvatar characterId={CURRENT_USER.characterId} size="sm" />
+            <CharacterAvatar characterId={me?.characterId ?? 'shiba'} size="sm" />
           </Link>
         </div>
       </header>
@@ -68,7 +87,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="flex flex-col items-center gap-1 px-3"
+                  className="flex flex-col items-center gap-1 px-2"
                   aria-label={item.label}
                 >
                   <span className="bg-primary text-primary-fg shadow-warm flex size-9 items-center justify-center rounded-full">
@@ -84,7 +103,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex flex-col items-center gap-1 px-3 pt-1',
+                  'flex flex-col items-center gap-1 px-2 pt-1',
                   active ? 'text-primary' : 'text-muted',
                 )}
               >

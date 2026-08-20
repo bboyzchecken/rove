@@ -138,6 +138,8 @@ export interface CalendarTrip {
   daysUntil: number;
   cover: string;
   memberIds: string[];
+  /** Characters of those members, so a card can draw faces without a lookup. */
+  characterIds?: string[];
   weather?: { icon: string; high: number; low: number; text: string };
 }
 
@@ -151,6 +153,7 @@ export interface PastTrip {
   spentThb: number;
   cover: string;
   memberIds: string[];
+  characterIds?: string[];
 }
 
 export interface YearStats {

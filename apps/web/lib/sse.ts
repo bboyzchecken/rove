@@ -3,14 +3,18 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
+import { isMockMode } from './data';
 import { env } from './env';
+import { queryKeys } from './query-keys';
 
 /**
  * Realtime layer. The API publishes to a Redis channel per trip and streams it
  * over SSE; the browser's only job is to invalidate the right query keys
  * (DEV_SPEC §5.9). Deliberately not WebSockets — clients never write here.
+ *
+ * Mock mode has no server to stream from, and no second person to hear about:
+ * the hook simply does nothing rather than opening a connection that will fail.
  */
-
 export type TripEventType =
   | 'trip.updated'
   | 'member.joined'
@@ -19,7 +23,12 @@ export type TripEventType =
   | 'plan.updated'
   | 'item.updated'
   | 'comment.created'
-  | 'ai.progress';
+  | 'ai.progress'
+  | 'dates.changed'
+  | 'dates.locked'
+  | 'expense.changed'
+  | 'prep.changed'
+  | 'booking.changed';
 
 export interface TripEvent {
   type: TripEventType;
@@ -29,17 +38,11 @@ export interface TripEvent {
   ts: string;
 }
 
-/**
- * Subscribes to a trip's event stream and invalidates the affected queries.
- *
- * TODO(W2.6): map each event type to the precise query keys instead of the
- * blanket invalidation below, and refetch everything once on reconnect.
- */
 export function useTripEvents(tripId: string | undefined) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!tripId) return;
+    if (!tripId || isMockMode) return;
 
     const source = new EventSource(`${env.apiUrl}/api/v1/trips/${tripId}/events`, {
       withCredentials: true,
@@ -48,8 +51,9 @@ export function useTripEvents(tripId: string | undefined) {
     source.onmessage = (message) => {
       try {
         const event = JSON.parse(message.data) as TripEvent;
-        void queryClient.invalidateQueries({ queryKey: ['trip', tripId] });
-        void event;
+        for (const key of keysFor(tripId, event.type)) {
+          void queryClient.invalidateQueries({ queryKey: key });
+        }
       } catch {
         // A malformed frame must never take the stream down.
       }
@@ -61,4 +65,56 @@ export function useTripEvents(tripId: string | undefined) {
 
     return () => source.close();
   }, [tripId, queryClient]);
+}
+
+/**
+ * Which caches an event actually invalidates. Refetching the whole room on
+ * every keystroke someone else types would undo the point of caching — and on a
+ * phone on 4G it is the difference between "live" and "laggy".
+ */
+function keysFor(tripId: string, type: TripEventType): readonly (readonly unknown[])[] {
+  switch (type) {
+    case 'dates.changed':
+    case 'dates.locked':
+      return [['trip', tripId, 'dates'], queryKeys.tripOverview(tripId), queryKeys.trip(tripId)];
+
+    case 'wishlist.changed':
+      return [
+        queryKeys.wishlist(tripId),
+        queryKeys.coverage(tripId),
+        queryKeys.tripOverview(tripId),
+      ];
+
+    case 'plan.ready':
+    case 'plan.updated':
+    case 'item.updated':
+      return [
+        queryKeys.planDays(tripId),
+        queryKeys.budget(tripId),
+        queryKeys.coverage(tripId),
+        queryKeys.tripOverview(tripId),
+      ];
+
+    case 'expense.changed':
+      return [queryKeys.expenses(tripId)];
+
+    case 'prep.changed':
+      return [queryKeys.prep(tripId), queryKeys.prepNote(tripId)];
+
+    case 'booking.changed':
+      return [queryKeys.bookings(tripId), queryKeys.tripOverview(tripId)];
+
+    case 'comment.created':
+      return [['trip', tripId, 'comments'], queryKeys.tripActivity(tripId)];
+
+    case 'member.joined':
+      return [queryKeys.tripMembers(tripId), queryKeys.tripOverview(tripId)];
+
+    // The AI job carries its own stream; the plan is refreshed when it lands.
+    case 'ai.progress':
+      return [];
+
+    default:
+      return [queryKeys.tripOverview(tripId), queryKeys.tripActivity(tripId)];
+  }
 }

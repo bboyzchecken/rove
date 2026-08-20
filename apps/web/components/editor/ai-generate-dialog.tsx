@@ -7,77 +7,91 @@ import { RoveMark } from '@/components/brand/rove-mark';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { AI_CREDITS, AI_PAY_CHANNELS, OPEN_QUESTIONS, planStats, WISHLIST } from '@/lib/mock';
+import { useMe } from '@/features/auth/queries';
+import { useAiCredits, useAiDraft, useBuyAiCredits } from '@/features/ai/queries';
+import { useWishlist } from '@/features/wishlist/queries';
+import { mockSkips } from '@/lib/data';
 import { cn } from '@/lib/utils';
 
 /**
  * "ให้ AI ร่างแพลน" (M4 — W4.1) plus the meter in front of it.
  *
- * Two drafts per trip are free; the third onwards is unlocked with points or a
- * purchase (§16). The gate lives inside this dialog rather than on a separate
+ * Drafts are metered (§16): the trip's included runs come first, then points
+ * or a purchase. The gate lives inside this dialog rather than on a separate
  * page, because the moment someone wants another draft is the moment to show
  * what a draft costs — and how to earn it back by inviting friends.
  *
- * The pipeline itself streams these steps over SSE from `ai_jobs`; here they
- * run on a timer so the demo shows the same shape — including the fact that
- * ROVE explains itself and asks back instead of dumping a finished plan.
+ * Progress is the job's own, streamed from the repository (SSE in live mode,
+ * a timer in mock mode). Nothing here is on a fake clock.
  */
-const STEPS = [
-  `อ่านที่อยากไปของทุกคน ${WISHLIST.length} รายการ`,
-  'จัดกลุ่มสถานที่ตามโซน แล้วแบ่งเป็นวัน',
-  'เช็คเวลาเปิด-ปิด ระยะทางจริง และพยากรณ์อากาศ',
-  'ตรวจว่าแพลนเป็นไปได้จริง แล้วซ่อมจุดที่ชนกัน',
-  'เขียนเหตุผลกำกับแต่ละวัน',
-];
+const POINTS_PER_RUN = 300;
+const POINTS_PER_REFERRAL = 150;
 
 export function AiGenerateDialog({
-  runsUsed,
-  points,
+  tripId,
+  open,
   onClose,
-  onSpend,
 }: {
-  /** Drafts already used on this trip, before this one. */
-  runsUsed: number;
-  /** The user's ROVE point balance. */
-  points: number;
+  tripId: string;
+  open: boolean;
   onClose: () => void;
-  /** Called once the draft actually starts, with how it was paid for. */
-  onSpend: (method: 'free' | 'points' | 'purchase') => void;
 }) {
-  // Freeze the count as it was when the dialog opened: `onSpend` bumps the
-  // parent's counter immediately, and reading the live prop would flip this
-  // draft from "free" to "paid" mid-render.
-  const [usedAtOpen] = useState(runsUsed);
-  const freeLeft = Math.max(0, AI_CREDITS.freePerTrip - usedAtOpen);
+  const { data: credits } = useAiCredits(tripId);
+  const { data: me } = useMe();
+  const { data: wishlist = [] } = useWishlist(tripId);
+  const buyCredits = useBuyAiCredits(tripId);
+  const draft = useAiDraft(tripId);
 
-  const [payment, setPayment] = useState<'free' | 'points' | 'purchase' | null>(
-    freeLeft > 0 ? 'free' : null,
-  );
-  const started = payment !== null;
+  const [brief, setBrief] = useState('');
+  const [pace, setPace] = useState<'relaxed' | 'balanced' | 'packed'>('balanced');
+  const [purchaseNote, setPurchaseNote] = useState<string | null>(null);
+  // Frozen when the run starts: the credit count updates the moment the job is
+  // queued, and reading it live would relabel a free draft as a paid one
+  // halfway through its own progress bar.
+  const [freeAtStart, setFreeAtStart] = useState<number | null>(null);
 
-  const [step, setStep] = useState(0);
-  const done = started && step >= STEPS.length;
+  const quota = (credits?.included ?? 0) + (credits?.extra ?? 0);
+  const runsLeft = Math.max(0, quota - (credits?.used ?? 0));
+  const freeLeft = Math.max(0, (credits?.included ?? 0) - (credits?.used ?? 0));
+  const points = me?.points ?? 0;
+  const canUsePoints = points >= POINTS_PER_RUN;
 
-  // A free draft is spent the moment the dialog opens with credit left.
+  // Preselect whichever option the user can actually complete right now, but
+  // let an explicit tap win — derived, so it never fights a re-render.
+  const [chosen, setChosen] = useState<'points' | 'purchase' | null>(null);
+  const choice = chosen ?? (canUsePoints ? 'points' : 'purchase');
+  const setChoice = setChosen;
+
+  // Leaving the dialog abandons the job's UI state, not the job itself: a
+  // finished draft is still applied from the plan board.
   useEffect(() => {
-    if (freeLeft > 0) onSpend('free');
-    // Mount only — re-running this would double-count the draft.
+    if (!open) draft.reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [open]);
 
-  useEffect(() => {
-    if (!started || step >= STEPS.length) return;
-    const timer = setTimeout(() => setStep((s) => s + 1), step === 0 ? 700 : 1_100);
-    return () => clearTimeout(timer);
-  }, [started, step]);
+  if (!open) return null;
 
-  // Preselect whichever option the user can actually complete right now.
-  const canUsePoints = points >= AI_CREDITS.pointsPerRun;
-  const [choice, setChoice] = useState<'points' | 'purchase'>(canUsePoints ? 'points' : 'purchase');
+  const job = draft.job;
+  const steps = job ? Math.round(job.progress * 100) : 0;
 
-  function unlock(method: 'points' | 'purchase') {
-    onSpend(method);
-    setPayment(method);
+  async function unlock() {
+    const channel = choice === 'points' ? `${POINTS_PER_RUN} แต้ม ROVE` : (credits?.payChannels[0] ?? 'บัตรเครดิต');
+    const result = await buyCredits.mutateAsync({ quantity: 1, channel });
+    setPurchaseNote(
+      result.simulated
+        ? `โหมดทดลอง: ยังไม่ได้ตัดเงินจริง (${channel}) — เพิ่มสิทธิ์ร่างให้แล้ว 1 ครั้ง`
+        : `ชำระผ่าน ${channel} เรียบร้อย`,
+    );
+  }
+
+  async function start() {
+    setFreeAtStart(freeLeft);
+    await draft.start({ kind: 'draft', brief: brief.trim() || undefined, pace });
+  }
+
+  async function apply() {
+    await draft.apply.mutateAsync();
+    onClose();
   }
 
   return (
@@ -88,26 +102,30 @@ export function AiGenerateDialog({
         aria-label="ปิด"
       />
 
-      <div className="bg-bg rounded-t-brand-lg sm:rounded-brand-lg shadow-warm-lg animate-rove-rise relative z-10 w-full max-w-lg p-5 pb-8 sm:pb-5">
+      <div className="bg-bg rounded-t-brand-lg sm:rounded-brand-lg shadow-warm-lg animate-rove-rise relative z-10 max-h-[90dvh] w-full max-w-lg overflow-y-auto p-5 pb-8 sm:pb-5">
         <div className="mb-4 flex items-start justify-between">
           <div className="flex items-center gap-2.5">
             <RoveMark
-              className={cn('text-primary size-6', started && !done && 'animate-rove-spin')}
+              className={cn('text-primary size-6', draft.isRunning && 'animate-rove-spin')}
             />
             <div>
               <p className="font-display text-espresso font-bold">
-                {!started
-                  ? 'ใช้สิทธิ์ร่างฟรีครบแล้ว'
-                  : done
-                    ? 'ร่างแพลนเสร็จแล้ว'
-                    : 'กำลังร่างแพลนให้...'}
+                {draft.isDone
+                  ? 'ร่างแพลนเสร็จแล้ว'
+                  : draft.isRunning
+                    ? 'กำลังร่างแพลนให้…'
+                    : runsLeft > 0
+                      ? 'ให้ AI ร่างแพลน'
+                      : 'ใช้สิทธิ์ร่างครบแล้ว'}
               </p>
               <p className="text-muted text-xs">
-                {!started
-                  ? `ทริปนี้ร่างฟรีได้ ${AI_CREDITS.freePerTrip} ครั้ง — ใช้ครบแล้ว`
-                  : done
-                    ? `${planStats.days} วัน · ${planStats.items} รายการ · ใช้เวลา 42 วินาที`
-                    : 'ปกติใช้เวลาไม่เกิน 1 นาที'}
+                {draft.isDone
+                  ? `${job?.result?.days.length ?? 0} วัน · ${job?.result?.days.reduce((n, d) => n + d.items.length, 0) ?? 0} รายการ`
+                  : draft.isRunning
+                    ? (job?.step ?? 'กำลังเริ่ม')
+                    : runsLeft > 0
+                      ? `ร่างได้อีก ${runsLeft} ครั้ง · อ่านที่อยากไป ${wishlist.length} รายการ`
+                      : 'ร่างต่อได้ด้วยแต้มหรือจ่ายเงิน'}
               </p>
             </div>
           </div>
@@ -116,8 +134,63 @@ export function AiGenerateDialog({
           </button>
         </div>
 
+        {/* ------------------------------------------------------- brief */}
+        {!job && runsLeft > 0 ? (
+          <div className="space-y-3.5">
+            <div>
+              <p className="section-label mb-2">อยากให้แพลนเป็นแบบไหน</p>
+              <div className="flex gap-1.5">
+                {(
+                  [
+                    { key: 'relaxed', label: 'ชิล ๆ' },
+                    { key: 'balanced', label: 'กำลังดี' },
+                    { key: 'packed', label: 'อัดแน่น' },
+                  ] as const
+                ).map((option) => (
+                  <button
+                    key={option.key}
+                    onClick={() => setPace(option.key)}
+                    className={cn(
+                      'flex-1 rounded-full px-3 py-2 text-xs font-semibold transition',
+                      pace === option.key ? 'bg-espresso text-bg' : 'bg-surface text-muted',
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <label className="block">
+              <span className="text-muted mb-1.5 block text-[11px] font-semibold">
+                บอกเพิ่มได้ (ไม่ใส่ก็ได้)
+              </span>
+              <textarea
+                value={brief}
+                onChange={(e) => setBrief(e.target.value)}
+                rows={3}
+                placeholder="เช่น ขอเช้าไม่ต้องตื่นก่อน 8 โมง และเผื่อเวลาช้อปวันสุดท้าย"
+                className="bg-surface text-espresso w-full rounded-2xl p-3.5 text-xs outline-none"
+              />
+            </label>
+
+            {mockSkips.aiGeneration ? (
+              <Badge tone="sun" size="md">
+                โหมดทดลอง: ใช้ร่างตัวอย่าง ไม่ได้เรียกโมเดลจริง
+              </Badge>
+            ) : null}
+
+            <Button block size="lg" onClick={() => void start()}>
+              <Sparkles className="size-4" />
+              {freeLeft > 0 ? 'ร่างเลย ใช้สิทธิ์ฟรี' : 'ร่างเลย'}
+            </Button>
+
+            {draft.error ? <p className="text-danger text-xs">{draft.error}</p> : null}
+          </div>
+        ) : null}
+
         {/* ------------------------------------------------------ paywall */}
-        {!started ? (
+        {!job && runsLeft === 0 ? (
           <div>
             <p className="section-label mb-2">เลือกวิธีร่างต่อ</p>
 
@@ -128,15 +201,11 @@ export function AiGenerateDialog({
                 onSelect={() => setChoice('points')}
                 icon={<Wallet className="size-4" />}
                 title="ใช้แต้ม ROVE"
-                price={`${AI_CREDITS.pointsPerRun} แต้ม`}
+                price={`${POINTS_PER_RUN} แต้ม`}
                 note={
                   canUsePoints
-                    ? `มีอยู่ ${points.toLocaleString('th-TH')} แต้ม — พอร่างได้อีก ${Math.floor(
-                        points / AI_CREDITS.pointsPerRun,
-                      )} ครั้ง`
-                    : `มีอยู่ ${points.toLocaleString('th-TH')} แต้ม ยังไม่พอ ขาดอีก ${(
-                        AI_CREDITS.pointsPerRun - points
-                      ).toLocaleString('th-TH')} แต้ม`
+                    ? `มีอยู่ ${points.toLocaleString('th-TH')} แต้ม — พอร่างได้อีก ${Math.floor(points / POINTS_PER_RUN)} ครั้ง`
+                    : `มีอยู่ ${points.toLocaleString('th-TH')} แต้ม ยังไม่พอ ขาดอีก ${(POINTS_PER_RUN - points).toLocaleString('th-TH')} แต้ม`
                 }
                 badge={canUsePoints ? 'ไม่ต้องจ่ายเงิน' : undefined}
               />
@@ -146,9 +215,9 @@ export function AiGenerateDialog({
                 onSelect={() => setChoice('purchase')}
                 icon={<CreditCard className="size-4" />}
                 title="จ่ายเงินครั้งเดียว"
-                price={`฿${AI_CREDITS.priceThb}`}
+                price={`฿${credits?.pricePerDraftThb ?? 39}`}
                 note="ใช้กับทริปนี้ ไม่ผูกมัดรายเดือน ไม่ตัดเงินอัตโนมัติ"
-                channels={AI_PAY_CHANNELS}
+                channels={credits?.payChannels}
               />
             </div>
 
@@ -156,14 +225,18 @@ export function AiGenerateDialog({
               block
               size="lg"
               className="mt-4"
-              disabled={choice === 'points' && !canUsePoints}
-              onClick={() => unlock(choice)}
+              disabled={(choice === 'points' && !canUsePoints) || buyCredits.isPending}
+              onClick={() => void unlock()}
             >
               <Sparkles className="size-4" />
-              {choice === 'points'
-                ? `ใช้ ${AI_CREDITS.pointsPerRun} แต้มแล้วร่างเลย`
-                : `จ่าย ฿${AI_CREDITS.priceThb} แล้วร่างเลย`}
+              {buyCredits.isPending
+                ? 'กำลังดำเนินการ…'
+                : choice === 'points'
+                  ? `ใช้ ${POINTS_PER_RUN} แต้มแล้วร่างเลย`
+                  : `จ่าย ฿${credits?.pricePerDraftThb ?? 39} แล้วร่างเลย`}
             </Button>
+
+            {purchaseNote ? <p className="text-muted mt-2 text-[11px]">{purchaseNote}</p> : null}
 
             <Card accent="matcha" className="mt-3 p-4">
               <div className="flex items-start gap-3">
@@ -171,11 +244,11 @@ export function AiGenerateDialog({
                 <div>
                   <p className="text-espresso text-sm font-semibold">อยากได้แต้มเพิ่มแบบไม่จ่าย?</p>
                   <p className="text-muted mt-1 text-xs leading-relaxed">
-                    ชวนเพื่อนมาใช้ ROVE ได้ {AI_CREDITS.pointsPerReferral} แต้มต่อคน
+                    ชวนเพื่อนมาใช้ ROVE ได้ {POINTS_PER_REFERRAL} แต้มต่อคน
                     และได้อีกทุกครั้งที่มีคนจองตามทริปที่คุณเปิดสาธารณะไว้
                   </p>
-                  <Button variant="soft" size="sm" className="mt-2.5">
-                    <UserPlus className="size-3.5" /> คัดลอกลิงก์ชวนเพื่อน
+                  <Button variant="soft" size="sm" className="mt-2.5" onClick={onClose}>
+                    <UserPlus className="size-3.5" /> ไปหน้าชวนเพื่อน
                   </Button>
                 </div>
               </div>
@@ -184,77 +257,58 @@ export function AiGenerateDialog({
         ) : null}
 
         {/* ----------------------------------------------------- progress */}
-        {started ? (
+        {job && !draft.isDone ? (
           <>
-            {payment === 'free' ? (
-              <Badge tone="matcha" size="md" className="mb-3">
-                ใช้สิทธิ์ฟรีครั้งที่ {usedAtOpen + 1} จาก {AI_CREDITS.freePerTrip}
-              </Badge>
-            ) : payment === 'points' ? (
-              <Badge tone="primary" size="md" className="mb-3">
-                ร่างรอบนี้ใช้ {AI_CREDITS.pointsPerRun} แต้ม
-              </Badge>
-            ) : (
-              <Badge tone="primary" size="md" className="mb-3">
-                ร่างรอบนี้ซื้อเพิ่ม ฿{AI_CREDITS.priceThb}
-              </Badge>
-            )}
+            <Badge tone={(freeAtStart ?? 0) > 0 ? 'matcha' : 'primary'} size="md" className="mb-3">
+              {(freeAtStart ?? 0) > 0
+                ? `ร่างรอบนี้ใช้สิทธิ์ฟรี · เหลืออีก ${freeLeft} ครั้ง`
+                : 'ร่างรอบนี้ใช้สิทธิ์ที่ซื้อไว้'}
+            </Badge>
 
-            <ol className="space-y-2.5">
-              {STEPS.map((label, i) => {
-                const state = i < step ? 'done' : i === step ? 'active' : 'todo';
-                return (
-                  <li key={label} className="flex items-center gap-3">
-                    <span
-                      className={cn(
-                        'flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
-                        state === 'done' && 'bg-matcha text-espresso',
-                        state === 'active' && 'bg-primary text-primary-fg',
-                        state === 'todo' && 'bg-surface text-muted',
-                      )}
-                    >
-                      {state === 'done' ? <Check className="size-3.5" strokeWidth={3} /> : i + 1}
-                    </span>
-                    <span
-                      className={cn(
-                        'text-sm',
-                        state === 'todo' ? 'text-muted/60' : 'text-espresso font-medium',
-                      )}
-                    >
-                      {label}
-                    </span>
-                  </li>
-                );
-              })}
-            </ol>
+            <div className="bg-surface h-2 w-full overflow-hidden rounded-full">
+              <div
+                className="bg-primary h-full rounded-full transition-all"
+                style={{ width: `${steps}%` }}
+              />
+            </div>
+            <p className="text-espresso mt-3 flex items-center gap-2 text-sm font-medium">
+              <span className="bg-primary text-primary-fg flex size-6 items-center justify-center rounded-full text-[10px] font-bold">
+                {Math.max(1, Math.round(job.progress * 5))}
+              </span>
+              {job.step}
+            </p>
+            <p className="text-muted mt-1 text-[11px]">ปกติใช้เวลาไม่เกิน 1 นาที</p>
           </>
         ) : null}
 
-        {done ? (
-          <div className="animate-rove-rise mt-5">
-            <p className="section-label mb-2">ROVE ขอถามกลับ {OPEN_QUESTIONS.length} ข้อ</p>
+        {/* --------------------------------------------------------- done */}
+        {draft.isDone && job?.result ? (
+          <div className="animate-rove-rise mt-1">
+            <Badge tone="matcha" size="md" className="mb-3">
+              <Check className="size-3.5" /> ร่างเสร็จแล้ว
+            </Badge>
+
+            <p className="section-label mb-2">ROVE ขอถามกลับ {job.result.openQuestions.length} ข้อ</p>
             <ul className="space-y-2">
-              {OPEN_QUESTIONS.map((q) => (
-                <li key={q} className="bg-surface rounded-brand-sm p-3">
-                  <p className="text-espresso text-xs leading-relaxed">{q}</p>
-                  <div className="mt-2 flex gap-1.5">
-                    <Button size="sm" variant="soft" className="h-7 px-3 text-[11px]">
-                      ตอบ
-                    </Button>
-                    <Button size="sm" variant="ghost" className="h-7 px-3 text-[11px]">
-                      ข้ามไปก่อน
-                    </Button>
-                  </div>
+              {job.result.openQuestions.map((question) => (
+                <li key={question} className="bg-surface rounded-brand-sm p-3">
+                  <p className="text-espresso text-xs leading-relaxed">{question}</p>
                 </li>
               ))}
             </ul>
 
-            <Button block size="lg" className="mt-4" onClick={onClose}>
-              <Sparkles className="size-4" /> ดูแพลนที่ร่างให้
+            <Button
+              block
+              size="lg"
+              className="mt-4"
+              onClick={() => void apply()}
+              disabled={draft.apply.isPending}
+            >
+              <Sparkles className="size-4" />
+              {draft.apply.isPending ? 'กำลังใส่ลงแพลน…' : 'ใช้ร่างนี้เป็นแพลน'}
             </Button>
             <p className="text-muted mt-2 text-center text-[11px]">
-              เหลือสิทธิ์ร่างฟรีอีก {Math.max(0, AI_CREDITS.freePerTrip - usedAtOpen - 1)} ครั้ง ·
-              มี <span className="nums">{points.toLocaleString('th-TH')}</span> แต้มไว้ร่างต่อ
+              ใส่แล้วยังแก้ไทม์ไลน์เองได้ทุกอย่าง · เหลือสิทธิ์ร่างอีก {runsLeft} ครั้ง
             </p>
           </div>
         ) : null}

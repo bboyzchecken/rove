@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 
+import { initAnalytics } from '@/lib/analytics';
 import { ApiError } from '@/lib/api-client';
 
 /**
@@ -33,6 +34,10 @@ function makeQueryClient() {
 export function Providers({ children }: { children: ReactNode }) {
   // One client per browser session, created lazily so SSR does not share it.
   const [queryClient] = useState(makeQueryClient);
+
+  // Analytics is a browser-only side effect on an external system, which is
+  // exactly what an effect is for.
+  useEffect(() => initAnalytics(), []);
 
   return (
     <QueryClientProvider client={queryClient}>

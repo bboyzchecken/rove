@@ -1,37 +1,9 @@
-import { AlertTriangle } from 'lucide-react';
-
-import { PlanBoard } from '@/components/editor/plan-board';
-import { SectionHeader, Stat } from '@/components/common/section';
-import { Card } from '@/components/ui/card';
-import { formatDuration } from '@/lib/format';
-import { planStats } from '@/lib/mock';
+import { PlanScreen } from '@/components/editor/plan-screen';
 
 /** Plan tab (M4 + M5). */
 export const metadata = { title: 'แพลน' };
 
-export default function PlanPage() {
-  return (
-    <div className="space-y-6">
-      <section>
-        <SectionHeader label="แพลนที่ AI ร่างไว้" />
-        <Card className="p-4">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <Stat value={planStats.days} label="วัน" />
-            <Stat value={planStats.items} label="รายการ" />
-            <Stat value={formatDuration(planStats.travelMinutes)} label="เวลาเดินทางรวม" />
-            <Stat value={`${planStats.booked}/${planStats.bookable}`} label="จองแล้ว" />
-          </div>
-
-          {planStats.warnings > 0 ? (
-            <p className="text-warning mt-3 flex items-center gap-1.5 text-xs font-medium">
-              <AlertTriangle className="size-3.5" />
-              มี {planStats.warnings} จุดที่ควรดูอีกที — ROVE ทำเครื่องหมายไว้ในไทม์ไลน์แล้ว
-            </p>
-          ) : null}
-        </Card>
-      </section>
-
-      <PlanBoard />
-    </div>
-  );
+export default async function PlanPage({ params }: { params: Promise<{ tripId: string }> }) {
+  const { tripId } = await params;
+  return <PlanScreen tripId={tripId} />;
 }

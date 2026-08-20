@@ -1,21 +1,26 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertCircle, Check, CircleDashed, Plus } from 'lucide-react';
+import { AlertCircle, Check, CircleDashed, Plus, Trash2 } from 'lucide-react';
 
 import { EmptyState } from '@/components/common/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
-import { MEMBERS, WISHLIST, type CoverageState, type WishKind } from '@/lib/mock';
+import { Sheet } from '@/components/ui/sheet';
+import { useMe } from '@/features/auth/queries';
+import { useTripMembers } from '@/features/trip/queries';
+import { useAddWish, useRemoveWish, useWishlist } from '@/features/wishlist/queries';
+import type { CoverageState, WishKind } from '@/lib/data';
 import { cn } from '@/lib/utils';
 
 /**
  * Wishlist editor + Coverage Board in one surface (M3 — W3.2, W3.3).
  *
  * The coverage state is the whole point of the screen: it answers "is my thing
- * actually in the plan?", which is what starts group arguments.
+ * actually in the plan?", which is what starts group arguments. Everyone may
+ * add to their own list; only the owner deletes someone else's.
  */
 const KIND_META: Record<WishKind, { label: string; tone: 'primary' | 'sky' | 'neutral' }> = {
   must: { label: 'ต้องไป', tone: 'primary' },
@@ -32,15 +37,23 @@ const COVERAGE_META: Record<
   uncovered: { label: 'ยังไม่ได้ใส่', icon: CircleDashed, className: 'text-danger' },
 };
 
-export function WishlistBoard() {
+export function WishlistBoard({ tripId }: { tripId: string }) {
+  const { data: items = [], isLoading } = useWishlist(tripId);
+  const { data: members = [] } = useTripMembers(tripId);
+  const { data: me } = useMe();
+  const removeWish = useRemoveWish(tripId);
+
   const [memberFilter, setMemberFilter] = useState<string>('all');
   const [kindFilter, setKindFilter] = useState<WishKind | 'all'>('all');
+  const [adding, setAdding] = useState(false);
 
-  const items = WISHLIST.filter(
+  const visible = items.filter(
     (w) =>
       (memberFilter === 'all' || w.memberId === memberFilter) &&
       (kindFilter === 'all' || w.kind === kindFilter),
   );
+
+  const isOwner = members.find((m) => m.id === me?.id)?.role === 'owner';
 
   return (
     <div className="space-y-4">
@@ -49,7 +62,7 @@ export function WishlistBoard() {
         <FilterChip active={memberFilter === 'all'} onClick={() => setMemberFilter('all')}>
           ทุกคน
         </FilterChip>
-        {MEMBERS.map((m) => (
+        {members.map((m) => (
           <FilterChip
             key={m.id}
             active={memberFilter === m.id}
@@ -74,15 +87,22 @@ export function WishlistBoard() {
 
       {/* list ---------------------------------------------------------- */}
       <div className="space-y-2">
-        {items.map((item) => {
-          const member = MEMBERS.find((m) => m.id === item.memberId)!;
+        {isLoading
+          ? [0, 1, 2].map((i) => (
+              <div key={i} className="rounded-brand bg-surface h-24 animate-pulse" />
+            ))
+          : null}
+
+        {visible.map((item) => {
+          const member = members.find((m) => m.id === item.memberId);
           const cov = COVERAGE_META[item.coverage];
           const CovIcon = cov.icon;
+          const mine = item.memberId === me?.id;
 
           return (
             <Card key={item.id} className="p-3.5">
               <div className="flex items-start gap-3">
-                <CharacterAvatar characterId={member.characterId} size="sm" />
+                <CharacterAvatar characterId={member?.characterId ?? 'shiba'} size="sm" />
 
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -122,12 +142,22 @@ export function WishlistBoard() {
                     ) : null}
                   </div>
                 </div>
+
+                {mine || isOwner ? (
+                  <button
+                    aria-label={`ลบ ${item.title}`}
+                    onClick={() => removeWish.mutate(item.id)}
+                    className="text-muted hover:text-danger hover:bg-surface -mt-1 flex size-8 shrink-0 items-center justify-center rounded-full"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                ) : null}
               </div>
             </Card>
           );
         })}
 
-        {items.length === 0 ? (
+        {!isLoading && visible.length === 0 ? (
           <EmptyState
             image="/brand/empty/empty-wishlist.webp"
             title="ยังไม่มีอะไรตรงนี้"
@@ -136,10 +166,112 @@ export function WishlistBoard() {
         ) : null}
       </div>
 
-      <Button variant="outline" block size="lg">
+      <Button variant="outline" block size="lg" onClick={() => setAdding(true)}>
         <Plus className="size-4" /> เพิ่มที่อยากไปของฉัน
       </Button>
+
+      <AddWishDialog tripId={tripId} open={adding} onClose={() => setAdding(false)} />
     </div>
+  );
+}
+
+function AddWishDialog({
+  tripId,
+  open,
+  onClose,
+}: {
+  tripId: string;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const { data: me } = useMe();
+  const addWish = useAddWish(tripId);
+  const [title, setTitle] = useState('');
+  const [kind, setKind] = useState<WishKind>('must');
+  const [tags, setTags] = useState('');
+  const [note, setNote] = useState('');
+
+  async function save() {
+    if (!title.trim() || !me) return;
+    await addWish.mutateAsync({
+      memberId: me.id,
+      kind,
+      title: title.trim(),
+      tags: tags
+        .split(/[,\s]+/)
+        .map((t) => t.replace(/^#/, '').trim())
+        .filter(Boolean),
+      note: note.trim() || undefined,
+    });
+    setTitle('');
+    setTags('');
+    setNote('');
+    onClose();
+  }
+
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="เพิ่มที่อยากไป"
+      description="เขียนสั้น ๆ ได้เลย — AI จะไปหาสถานที่จริงให้ตอนร่างแพลน"
+      footer={
+        <Button block size="lg" onClick={() => void save()} disabled={addWish.isPending || !title.trim()}>
+          {addWish.isPending ? 'กำลังเพิ่ม…' : 'เพิ่มลงรายการ'}
+        </Button>
+      }
+    >
+      <div className="space-y-3.5">
+        <label className="block">
+          <span className="text-muted mb-1.5 block text-[11px] font-semibold">อยากไปไหน / อยากทำอะไร</span>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="เช่น กินซูชิที่ตลาดปลา"
+            className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
+          />
+        </label>
+
+        <div>
+          <span className="text-muted mb-1.5 block text-[11px] font-semibold">สำคัญแค่ไหน</span>
+          <div className="flex gap-1.5">
+            {(Object.keys(KIND_META) as WishKind[]).map((option) => (
+              <button
+                key={option}
+                onClick={() => setKind(option)}
+                className={cn(
+                  'flex-1 rounded-full px-3 py-2 text-xs font-semibold transition',
+                  kind === option ? 'bg-espresso text-bg' : 'bg-surface text-muted',
+                )}
+              >
+                {KIND_META[option].label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <label className="block">
+          <span className="text-muted mb-1.5 block text-[11px] font-semibold">แท็ก (ไม่ใส่ก็ได้)</span>
+          <input
+            value={tags}
+            onChange={(e) => setTags(e.target.value)}
+            placeholder="ของกิน ถ่ายรูป"
+            className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-muted mb-1.5 block text-[11px] font-semibold">โน้ตถึงเพื่อน</span>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={3}
+            placeholder="เช่น ขอเป็นเช้า ๆ คนจะได้ไม่เยอะ"
+            className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
+          />
+        </label>
+      </div>
+    </Sheet>
   );
 }
 
