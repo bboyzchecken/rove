@@ -1,0 +1,19 @@
+<!-- App icon / favicon: the asterisk alone, terracotta on a cream circle. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="ROVE">
+  <circle cx="32" cy="32" r="32" fill="#F0EDE6" />
+  <g transform="translate(32 32)" fill="#D4614A">
+    <g>
+      <rect x="-3.6" y="-23" width="7.2" height="19" rx="3.6" />
+      <rect x="-3.6" y="4" width="7.2" height="19" rx="3.6" />
+      <rect x="-23" y="-3.6" width="19" height="7.2" rx="3.6" />
+      <rect x="4" y="-3.6" width="19" height="7.2" rx="3.6" />
+    </g>
+    <g transform="rotate(45)">
+      <rect x="-3" y="-21" width="6" height="17" rx="3" />
+      <rect x="-3" y="4" width="6" height="17" rx="3" />
+      <rect x="-21" y="-3" width="17" height="6" rx="3" />
+      <rect x="4" y="-3" width="17" height="6" rx="3" />
+    </g>
+    <circle cx="0" cy="0" r="4.8" fill="#2C1A0E" />
+  </g>
+</svg>
