@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { test } from '@playwright/test';
 
 /**
  * X5.1 — drag and drop on a real phone.

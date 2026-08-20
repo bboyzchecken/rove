@@ -54,10 +54,26 @@ func (s *store) Get(ctx context.Context, planID, itemID string) (*models.Item, e
 
 // PlanID resolves the owning plan for an /items/:itemId route. Like
 // PlanStore.GetTripID it returns only the id, never content.
+//
+// A deleted item still has to resolve: undo-of-delete is addressed by the id of
+// a row that no longer exists, so the version history is the fallback. The
+// snapshot is scoped to a plan exactly as the item was, so this widens nothing.
 func (s *store) PlanID(ctx context.Context, itemID string) (string, error) {
 	var planID string
 	err := s.db.WithContext(ctx).Model(&models.Item{}).
 		Where("id = ?", itemID).
+		Pluck("plan_id", &planID).Error
+	if err != nil {
+		return "", err
+	}
+	if planID != "" {
+		return planID, nil
+	}
+
+	err = s.db.WithContext(ctx).Model(&models.ItemVersion{}).
+		Where("item_id = ?", itemID).
+		Order("created_at DESC").
+		Limit(1).
 		Pluck("plan_id", &planID).Error
 	if err != nil {
 		return "", err

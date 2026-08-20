@@ -182,7 +182,9 @@ type PlanStore interface {
 type ItemStore interface {
 	Create(ctx context.Context, planID string, it *Item) error
 	Get(ctx context.Context, planID, itemID string) (*Item, error)
-	// PlanID resolves the owning plan for an /items/:itemId route.
+	// PlanID resolves the owning plan for an /items/:itemId route. It falls
+	// back to item_versions when the row is gone, so undo-of-delete can still
+	// be authorized against the plan the item belonged to.
 	PlanID(ctx context.Context, itemID string) (string, error)
 	Update(ctx context.Context, planID string, it *Item, actorID, source string) error
 	Move(ctx context.Context, planID, itemID, dayID string, position int, actorID string) error

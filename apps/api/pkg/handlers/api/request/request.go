@@ -49,11 +49,13 @@ func TripRole(c echo.Context) string {
 	return r
 }
 
+// TripID is the trip the current request acts on: either the :tripId path
+// param, or the trip a child id resolved to (see Server.ResolveTrip).
 func TripID(c echo.Context) string {
-	id, _ := c.Get(CtxTripID).(string)
-	if id == "" {
-		id = c.Param("tripId")
+	if id := c.Param("tripId"); id != "" {
+		return id
 	}
+	id, _ := c.Get(CtxTripID).(string)
 	return id
 }
 

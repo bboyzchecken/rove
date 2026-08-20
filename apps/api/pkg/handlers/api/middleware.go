@@ -119,7 +119,9 @@ func (s *Server) TripRoleMiddleware(minRole string) echo.MiddlewareFunc {
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			tripID := c.Param("tripId")
+			// Either the route carries :tripId, or ResolveTrip already worked
+			// it out from a child id (see below).
+			tripID := request.TripID(c)
 			if tripID == "" {
 				return request.BadRequest(c, "trip id is required")
 			}
@@ -190,10 +192,11 @@ func (s *Server) ResolveTrip(param, minRole string, resolve tripResolver) echo.M
 				return request.NotFound(c, "not found")
 			}
 
-			// TripRoleMiddleware reads c.Param("tripId"); set it so one
-			// implementation serves both route shapes.
-			c.SetParamNames(append(c.ParamNames(), "tripId")...)
-			c.SetParamValues(append(c.ParamValues(), tripID)...)
+			// Publish it through the context store rather than through Echo's
+			// path params: Echo pre-allocates one param-value slice per router
+			// sized to the longest route, so appending a name would land at a
+			// different index than its value and silently read back empty.
+			c.Set(request.CtxTripID, tripID)
 
 			return roleCheck(next)(c)
 		}
