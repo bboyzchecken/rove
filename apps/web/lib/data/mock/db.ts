@@ -22,6 +22,7 @@ import type {
   CurrentUser,
   DreamItem,
   ExpenseEntry,
+  FlightLeg,
   LockedDates,
   Member,
   PlanDay,
@@ -44,7 +45,7 @@ import type {
  * Never imported outside lib/data/mock.
  */
 
-const STORAGE_KEY = 'rove.mock.v3';
+const STORAGE_KEY = 'rove.mock.v4';
 
 export interface TripRecord {
   trip: Trip;
@@ -57,6 +58,8 @@ export interface TripRecord {
   months: string[];
   locked: LockedDates | null;
   destinationId: string | null;
+  /** The booked route (M1 — A1.3). The frame above is derived from it. */
+  flights: FlightLeg[];
   wishlist: WishlistItem[];
   days: PlanDay[];
   budgetLines: BudgetLine[];
@@ -136,6 +139,48 @@ function seedDemoTrip(): TripRecord {
       memberIds: MEMBERS.map((m) => m.id),
     },
     destinationId: 'japan',
+    // The demo trip has its tickets: 15 Nov out, 22 Nov back.
+    flights: [
+      {
+        id: 'fl-demo-out',
+        direction: 'out',
+        mode: 'flight',
+        flightNo: 'TG682',
+        from: 'BKK',
+        to: 'HND',
+        depDate: TRIP.startDate,
+        depTime: '23:59',
+        arrDate: TRIP.startDate,
+        arrTime: '07:05',
+      },
+      {
+        // Tokyo → Osaka by shinkansen. A ground leg is still a leg: without it
+        // the route would give Tokyo all seven nights and the plan would put
+        // Kyoto in the wrong half of the trip. Ground legs are named by the
+        // airport that serves the city they end in.
+        id: 'fl-demo-inter',
+        direction: 'inter',
+        mode: 'ground',
+        from: 'HND',
+        to: 'KIX',
+        depDate: '2026-11-19',
+        depTime: '09:20',
+        arrDate: '2026-11-19',
+        arrTime: '11:45',
+      },
+      {
+        id: 'fl-demo-back',
+        direction: 'back',
+        mode: 'flight',
+        flightNo: 'TG673',
+        from: 'KIX',
+        to: 'BKK',
+        depDate: TRIP.endDate,
+        depTime: '12:20',
+        arrDate: TRIP.endDate,
+        arrTime: '16:30',
+      },
+    ],
     wishlist: structuredClone(WISHLIST),
     days: structuredClone(DAYS),
     budgetLines: structuredClone(BUDGET),
@@ -209,6 +254,8 @@ function seedDateTrip(): TripRecord {
     months: ['2026-12-01', '2027-01-01'],
     locked: null,
     destinationId: null,
+    // No dates yet means no tickets yet — this is the date-board trip.
+    flights: [],
     wishlist: [],
     days: [],
     budgetLines: [],
@@ -239,7 +286,7 @@ function seedDateTrip(): TripRecord {
 
 export function seedDb(): MockDb {
   return {
-    version: 3,
+    version: 4,
     user: {
       id: CURRENT_USER.id,
       name: CURRENT_USER.name,
@@ -286,7 +333,7 @@ export function loadDb(): MockDb {
         const parsed = JSON.parse(raw) as MockDb;
         // A seed change bumps the version; an old blob is thrown away rather
         // than migrated — this is demo data, not anyone's real trip.
-        if (parsed.version === 3) {
+        if (parsed.version === 4) {
           memory = parsed;
           return memory;
         }

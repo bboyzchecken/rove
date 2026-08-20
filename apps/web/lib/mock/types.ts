@@ -74,6 +74,97 @@ export interface PlanDay {
   items: PlanItem[];
 }
 
+/* ------------------------------------------------------ airports (M1) --- */
+
+/**
+ * One row of the worldwide airport index (A1.3).
+ *
+ * A destination is an airport now, not a typed city name. "NRT" is one place in
+ * one country, so "ไปกี่ประเทศ" has an answer before anyone has to ask.
+ */
+export interface Airport {
+  iata: string;
+  name: string;
+  /** Thai name, for the airports a Thai traveller actually flies to. */
+  nameTh?: string;
+  city: string;
+  cityTh?: string;
+  countryCode: string;
+  country: string;
+  countryTh: string;
+  timezone: string;
+  lat: number;
+  lon: number;
+  /** A large international airport — ranked above the regional field next door. */
+  major: boolean;
+}
+
+/** How the group covers a leg. A train between two cities is a leg too. */
+export type LegMode = 'flight' | 'ground';
+
+/** out = leaving home, inter = between destinations, back = coming home. */
+export type LegDirection = 'out' | 'inter' | 'back';
+
+/**
+ * One leg of the route: "BKK→NRT 4 ธ.ค. ถึง 08:05".
+ *
+ * Date and time are separate because that is how they arrive: the date is on
+ * the ticket months before anyone checks what time the plane leaves, and the
+ * arrival time is the fact day one of the plan is built on.
+ */
+export interface FlightLeg {
+  id: string;
+  direction: LegDirection;
+  mode: LegMode;
+  airline?: string;
+  flightNo?: string;
+  from: string;
+  to: string;
+  depDate: string;
+  depTime?: string;
+  arrDate?: string;
+  arrTime?: string;
+  note?: string;
+}
+
+/** What the client sends; the server assigns the id and the order. */
+export type FlightLegInput = Omit<FlightLeg, 'id'>;
+
+/** One place the group actually stays, with the nights the legs give it. */
+export interface RouteStop {
+  airport: string;
+  city: string;
+  countryCode: string;
+  country: string;
+  arriveDate: string;
+  arriveTime?: string;
+  departDate?: string;
+  departTime?: string;
+  nights: number;
+  /** No leg leaves here yet — a one-way route, or one still being filled in. */
+  open: boolean;
+}
+
+export interface CountryStay {
+  code: string;
+  name: string;
+  cities: string;
+  nights: number;
+}
+
+/** The legs plus everything derived from them. */
+export interface TripRoute {
+  flights: FlightLeg[];
+  stops: RouteStop[];
+  countries: CountryStay[];
+  homeAirport: string;
+  startDate: string;
+  endDate: string;
+  days: number;
+  nights: number;
+  roundTrip: boolean;
+}
+
 export interface Trip {
   id: string;
   title: string;
@@ -90,6 +181,11 @@ export interface Trip {
   fxRate: number;
   fxAsOf: string;
   budgetPerPersonThb: number;
+  /**
+   * The legs the trip is built on, when the caller loaded them (M1 — A1.3).
+   * Absent on the list endpoints, which do not pay for the join.
+   */
+  route?: TripRoute;
 }
 
 export interface BudgetLine {

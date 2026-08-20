@@ -23,10 +23,70 @@ export interface TripDto {
   fx_rate_at: string | null;
   budget_per_person_thb: number;
   visibility: 'private' | 'link' | 'public';
+  /** Present on the endpoints that load the route: get, create and overview. */
+  route?: RouteDto;
   role?: 'owner' | 'editor' | 'viewer';
   member_ids?: string[];
   member_character_ids?: string[];
   days_until?: number;
+}
+
+/* ----------------------------------------------------------------- route -- */
+
+export interface AirportDto {
+  iata: string;
+  name: string;
+  name_th?: string;
+  city: string;
+  city_th?: string;
+  country_code: string;
+  country: string;
+  country_th: string;
+  timezone: string;
+  lat: number;
+  lon: number;
+  major: boolean;
+}
+
+export interface FlightDto {
+  id: string;
+  seq: number;
+  direction: 'out' | 'inter' | 'back';
+  mode: 'flight' | 'ground';
+  airline: string;
+  flight_no: string;
+  dep_airport: string;
+  arr_airport: string;
+  dep_date: string;
+  dep_time: string;
+  arr_date: string;
+  arr_time: string;
+  note: string;
+}
+
+export interface RouteStopDto {
+  airport: string;
+  city: string;
+  country_code: string;
+  country: string;
+  arrive_date: string;
+  arrive_time: string;
+  depart_date: string;
+  depart_time: string;
+  nights: number;
+  open: boolean;
+}
+
+export interface RouteDto {
+  flights: FlightDto[];
+  stops: RouteStopDto[];
+  countries: { code: string; name: string; cities: string; nights: number }[];
+  home_airport: string;
+  start_date: string;
+  end_date: string;
+  days: number;
+  nights: number;
+  round_trip: boolean;
 }
 
 export interface MemberDto {

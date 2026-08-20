@@ -11,6 +11,7 @@
 import type {
   BudgetLine,
   ExpenseEntry,
+  FlightLegInput,
   Member,
   PlanDay,
   PlanItem,
@@ -22,14 +23,20 @@ import type {
 } from '@/lib/mock/types';
 
 export type {
+  Airport,
   BudgetLine,
   CalendarTrip,
+  CountryStay,
   Character,
   CoverageState,
   DreamItem,
   ExpenseEntry,
   ExpenseScope,
+  FlightLeg,
+  FlightLegInput,
   ItemType,
+  LegDirection,
+  LegMode,
   Member,
   PastTrip,
   PlanDay,
@@ -37,8 +44,10 @@ export type {
   RecapDecision,
   RecapDecisionKind,
   RecapSpend,
+  RouteStop,
   Settlement,
   Trip,
+  TripRoute,
   TripStatus,
   WishKind,
   WishlistItem,
@@ -394,9 +403,15 @@ export interface TripOverview {
 }
 
 export interface CreateTripInput {
-  entryType: 'date' | 'city' | 'ticket' | 'clone';
+  /**
+   * Which door the trip came through (M1). "route" is the one for a group that
+   * already knows where it is flying; "date" is dates first, destination later.
+   */
+  entryType: 'route' | 'date' | 'clone';
   title: string;
   cities?: string[];
+  /** The booked route. When present it decides the dates and the destinations. */
+  flights?: FlightLegInput[];
   startDate?: string;
   endDate?: string;
   partySize?: number;

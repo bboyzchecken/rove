@@ -23,6 +23,7 @@ import (
 	"github.com/bboyzchecken/rove/apps/api/pkg/models"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/affiliate"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/ai"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/airports"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/places"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/weather"
@@ -32,6 +33,7 @@ import (
 	collabstore "github.com/bboyzchecken/rove/apps/api/pkg/store/collab"
 	datestore "github.com/bboyzchecken/rove/apps/api/pkg/store/dates"
 	expensestore "github.com/bboyzchecken/rove/apps/api/pkg/store/expense"
+	flightstore "github.com/bboyzchecken/rove/apps/api/pkg/store/flight"
 	invitestore "github.com/bboyzchecken/rove/apps/api/pkg/store/invite"
 	memberstore "github.com/bboyzchecken/rove/apps/api/pkg/store/member"
 	planstore "github.com/bboyzchecken/rove/apps/api/pkg/store/plan"
@@ -54,13 +56,13 @@ var allModels = []any{
 	&models.ItemVersion{}, &models.ExpenseEntry{}, &models.Settlement{},
 	&models.PrepTask{}, &models.PrepNote{}, &models.Booking{}, &models.BookingClick{},
 	&models.Comment{}, &models.Vote{}, &models.Activity{},
-	&models.AIJob{}, &models.AICredit{},
+	&models.AIJob{}, &models.AICredit{}, &models.TripFlight{},
 }
 
 // allTables is the drop order — children before parents.
 var allTables = []string{
 	"ai_credits", "ai_jobs", "activity_logs", "votes", "comments",
-	"booking_clicks", "bookings", "prep_notes", "prep_tasks",
+	"booking_clicks", "bookings", "trip_flights", "prep_notes", "prep_tasks",
 	"expense_settlements", "expense_entries", "item_versions", "plan_items",
 	"plan_days", "plans", "wishlist_items", "trip_availability_submissions",
 	"trip_availability", "invites", "dream_items", "user_points", "characters",
@@ -92,10 +94,14 @@ func newParams(cfg core.Config, db *gorm.DB) handlers.ServerParams {
 		Expenses:   expensestore.New(db),
 		Prep:       prepstore.New(db),
 		Bookings:   bookingstore.New(db),
+		Flights:    flightstore.New(db),
 		Collab:     collabstore.New(db),
 		AIJobs:     aijobstore.New(db),
 
-		Hub:       stubHub{},
+		Hub: stubHub{},
+		// The airport index is embedded data with no I/O — the real one is the
+		// simplest one to run.
+		Airports:  airports.New(),
 		FX:        stubFX{},
 		Weather:   stubWeather{},
 		Affiliate: stubAffiliate{},

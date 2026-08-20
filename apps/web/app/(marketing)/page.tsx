@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, CalendarDays, MapPin, Ticket } from 'lucide-react';
+import { ArrowRight, CalendarDays, CalendarSearch, Plane } from 'lucide-react';
 
 import { RoveLogo } from '@/components/brand/rove-logo';
 import { RoveMark } from '@/components/brand/rove-mark';
@@ -17,24 +17,24 @@ import { CHARACTERS } from '@/lib/mock';
  */
 const ENTRIES = [
   {
-    key: 'date',
-    icon: CalendarDays,
-    title: 'เริ่มจากวัน',
-    hint: 'รู้วันลาแล้ว เหลือแค่ไม่รู้จะไปไหน',
-    accent: 'sky',
-  },
-  {
-    key: 'city',
-    icon: MapPin,
-    title: 'เริ่มจากเมือง',
-    hint: 'รู้ปลายทางแล้ว แต่ยังไม่รู้ว่าควรกี่วัน',
+    key: 'route',
+    icon: Plane,
+    title: 'รู้เที่ยวบินแล้ว',
+    hint: 'ใส่สนามบินกับวันบิน — BKK→NRT 4 ธ.ค. ถึง 08:05 — ที่เหลือ ROVE จัดให้',
     accent: 'matcha',
   },
   {
-    key: 'ticket',
-    icon: Ticket,
-    title: 'วางข้อความตั๋ว',
-    hint: 'ตั๋วจองแล้ว วางอีเมลมา เดี๋ยวอ่านให้',
+    key: 'date',
+    icon: CalendarDays,
+    title: 'รู้วันแล้ว',
+    hint: 'ลาไว้แล้ว เหลือแค่ไม่รู้จะไปไหน',
+    accent: 'sky',
+  },
+  {
+    key: 'coordinate',
+    icon: CalendarSearch,
+    title: 'ยังไม่รู้วัน',
+    hint: 'ให้ทุกคนแตะวันว่าง แล้วหาช่วงที่ตรงกันก่อน',
     accent: 'sun',
   },
 ] as const;
@@ -134,7 +134,8 @@ export default function LandingPage() {
             <ButtonLink href="/new" size="lg">
               เริ่มทริปแรก <ArrowRight className="size-4" />
             </ButtonLink>
-            <ButtonLink href="/t/demo" variant="outline" size="lg">
+            {/* The seeded demo room — a dynamic route, so typedRoutes needs the cast. */}
+            <ButtonLink href={'/t/demo' as never} variant="outline" size="lg">
               ดูทริปตัวอย่าง
             </ButtonLink>
           </div>

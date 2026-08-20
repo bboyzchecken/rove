@@ -32,6 +32,7 @@ export function TripFrameDialog({
   const [cities, setCities] = useState(trip.cities.join(', '));
 
   const nights = startDate && endDate ? Math.max(0, daysBetween(startDate, endDate) - 1) : 0;
+  const hasRoute = (trip.route?.flights.length ?? 0) > 0;
 
   async function save() {
     await update.mutateAsync({
@@ -102,6 +103,15 @@ export function TripFrameDialog({
             className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
           />
         </Field>
+
+        {/* With a route on the trip these fields are derived, so say so rather
+            than let someone type a city the next leg edit will overwrite. */}
+        {hasRoute ? (
+          <p className="text-muted -mt-1 text-[11px]">
+            ทริปนี้มีเที่ยวบินอยู่แล้ว — วันเดินทางและเมืองจะถูกตั้งใหม่ตามเส้นทางทุกครั้งที่แก้เที่ยวบิน
+            แก้ที่ &ldquo;เส้นทาง&rdquo; ในหน้าภาพรวมจะตรงกว่า
+          </p>
+        ) : null}
 
         <div className="grid grid-cols-2 gap-2">
           <Field label="ไปกันกี่คน">

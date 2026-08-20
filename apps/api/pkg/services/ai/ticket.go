@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/airports"
 )
 
 // Reading a pasted booking e-mail without a model (M1 — A1.2 fallback).
@@ -27,13 +29,18 @@ var monthByAbbrev = map[string]time.Month{
 	"oct": time.October, "nov": time.November, "dec": time.December,
 }
 
-// cityByIATA covers the Phase 1 destinations. An unknown code simply does not
-// contribute a city — better an empty field than a wrong one.
-var cityByIATA = map[string]string{
-	"HND": "โตเกียว", "NRT": "โตเกียว", "KIX": "โอซาก้า", "ITM": "โอซาก้า",
-	"CTS": "ซัปโปโร", "FUK": "ฟุกุโอกะ", "ICN": "โซล", "GMP": "โซล",
-	"TPE": "ไทเป", "HKG": "ฮ่องกง", "HAN": "ฮานอย", "SGN": "โฮจิมินห์",
-	"DAD": "ดานัง",
+// cityByIATA resolves an airport code through the worldwide index (M1 — A1.3).
+// It used to be a thirteen-entry map of the Phase 1 destinations, which meant a
+// ticket to anywhere else parsed into a trip with no destination at all.
+func cityByIATA(code string) (string, bool) {
+	found := airports.New().Get(code)
+	if found == nil {
+		return "", false
+	}
+	if found.CityTH != "" {
+		return found.CityTH, true
+	}
+	return found.City, true
 }
 
 func parseTicketHeuristic(text string) *ParsedTicket {
@@ -89,7 +96,7 @@ func parseTicketHeuristic(text string) *ParsedTicket {
 	out.EndDate = maxString(dates)
 
 	// The destination of the outbound leg is what the trip is named after.
-	if city, ok := cityByIATA[out.Flights[0].ArrAirport]; ok {
+	if city, ok := cityByIATA(out.Flights[0].ArrAirport); ok {
 		year, _ := strconv.Atoi(out.StartDate[:4])
 		out.SuggestedTitle = fmt.Sprintf("%s %d", city, year+543)
 	}
@@ -104,7 +111,7 @@ func TicketCities(t *ParsedTicket) []string {
 	out := make([]string, 0, 2)
 
 	for _, f := range t.Flights {
-		city, ok := cityByIATA[f.ArrAirport]
+		city, ok := cityByIATA(f.ArrAirport)
 		if !ok || seen[city] {
 			continue
 		}

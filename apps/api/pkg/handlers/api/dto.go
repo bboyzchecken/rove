@@ -78,11 +78,14 @@ type tripDTO struct {
 	Visibility         string   `json:"visibility"`
 	DestinationID      string   `json:"destination_id"`
 
+	// Present on the endpoints that load the route: get and overview.
+	Route *routeDTO `json:"route,omitempty"`
+
 	// Only present on the list endpoint.
-	Role              string   `json:"role,omitempty"`
-	MemberIDs         []string `json:"member_ids,omitempty"`
+	Role               string   `json:"role,omitempty"`
+	MemberIDs          []string `json:"member_ids,omitempty"`
 	MemberCharacterIDs []string `json:"member_character_ids,omitempty"`
-	DaysUntil         *int     `json:"days_until,omitempty"`
+	DaysUntil          *int     `json:"days_until,omitempty"`
 }
 
 func toTripDTO(t models.Trip) tripDTO {
@@ -694,13 +697,13 @@ type tripRecapDTO struct {
 }
 
 type yearStatsDTO struct {
-	Year       int     `json:"year"`
-	Trips      int     `json:"trips"`
-	Days       int     `json:"days"`
-	Countries  int     `json:"countries"`
-	Places     int     `json:"places"`
-	SpentTHB   float64 `json:"spent_thb"`
-	MonthlyDays []int  `json:"monthly_days"`
+	Year        int     `json:"year"`
+	Trips       int     `json:"trips"`
+	Days        int     `json:"days"`
+	Countries   int     `json:"countries"`
+	Places      int     `json:"places"`
+	SpentTHB    float64 `json:"spent_thb"`
+	MonthlyDays []int   `json:"monthly_days"`
 }
 
 type inviteDTO struct {
@@ -720,12 +723,12 @@ type checklistDTO struct {
 }
 
 type overviewCountsDTO struct {
-	WishlistItems         int `json:"wishlist_items"`
-	PlanDays              int `json:"plan_days"`
-	PlanItems             int `json:"plan_items"`
+	WishlistItems          int `json:"wishlist_items"`
+	PlanDays               int `json:"plan_days"`
+	PlanItems              int `json:"plan_items"`
 	MembersWithoutWishlist int `json:"members_without_wishlist"`
-	Bookings              int `json:"bookings"`
-	OpenPrep              int `json:"open_prep"`
+	Bookings               int `json:"bookings"`
+	OpenPrep               int `json:"open_prep"`
 }
 
 type tripOverviewDTO struct {
@@ -736,6 +739,38 @@ type tripOverviewDTO struct {
 	Activity  []activityDTO     `json:"activity"`
 	Counts    overviewCountsDTO `json:"counts"`
 	Locked    *lockedDatesDTO   `json:"locked"`
+}
+
+/* ---------------------------------------------------------------- route -- */
+
+type flightDTO struct {
+	ID         string `json:"id"`
+	Seq        int    `json:"seq"`
+	Direction  string `json:"direction"`
+	Mode       string `json:"mode"`
+	Airline    string `json:"airline"`
+	FlightNo   string `json:"flight_no"`
+	DepAirport string `json:"dep_airport"`
+	ArrAirport string `json:"arr_airport"`
+	DepDate    string `json:"dep_date"`
+	DepTime    string `json:"dep_time"`
+	ArrDate    string `json:"arr_date"`
+	ArrTime    string `json:"arr_time"`
+	Note       string `json:"note"`
+}
+
+// routeDTO is the legs plus everything derived from them, so a client never has
+// to re-derive the night counts the server already computed.
+type routeDTO struct {
+	Flights     []flightDTO          `json:"flights"`
+	Stops       []domain.Stop        `json:"stops"`
+	Countries   []domain.CountryStay `json:"countries"`
+	HomeAirport string               `json:"home_airport"`
+	StartDate   string               `json:"start_date"`
+	EndDate     string               `json:"end_date"`
+	Days        int                  `json:"days"`
+	Nights      int                  `json:"nights"`
+	RoundTrip   bool                 `json:"round_trip"`
 }
 
 /* ---------------------------------------------------------------- ticket -- */

@@ -108,6 +108,21 @@ make seed          # import data/poi/jp.csv
 make sh- api        # shell into the api container
 ```
 
+### Reference data
+
+The worldwide airport index behind the "รู้เที่ยวบินแล้ว" entry point and
+`GET /api/v1/airports` is generated, not hand-maintained:
+
+```bash
+node scripts/gen-airports.mjs   # → apps/api/data/airports.json + apps/web/lib/data/airports.data.json
+```
+
+It keeps every airport with a IATA code, scheduled service and a large/medium
+classification (~3.6k), which is the set a flight-booking search offers. The API
+embeds its copy with `go:embed`; the web app loads its copy on demand so mock
+mode can search offline. Both files are committed — the script only needs
+running when the data should be refreshed.
+
 ---
 
 ## Conventions

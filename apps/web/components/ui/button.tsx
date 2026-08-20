@@ -33,15 +33,17 @@ export function Button({ className, variant, size, block, ...props }: ButtonProp
 
 /**
  * Same styling for navigation — the prototype is mostly links, not handlers.
- * Generic in the href so `typedRoutes` can still check the destination through
- * the wrapper.
+ *
+ * `next/link` stopped being generic in its href in Next 16, so the wrapper
+ * takes Link's own props: `typedRoutes` still checks the destination, it just
+ * does it inside Link rather than through a type parameter here.
  */
-export function ButtonLink<T extends string>({
+export function ButtonLink({
   className,
   variant,
   size,
   block,
   ...props
-}: React.ComponentProps<typeof Link<T>> & VariantProps<typeof button>) {
+}: React.ComponentProps<typeof Link> & VariantProps<typeof button>) {
   return <Link className={cn(button({ variant, size, block }), className)} {...props} />;
 }

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -71,6 +72,8 @@ func (s *Server) handleListTrips(c echo.Context) error {
 }
 
 type createTripRequest struct {
+	// route | date | coordinate | clone — analytics only; what the trip
+	// actually becomes is decided by the fields below.
 	EntryType          string   `json:"entry_type"`
 	Title              string   `json:"title" validate:"required"`
 	DestinationCities  []string `json:"destination_cities"`
@@ -82,6 +85,10 @@ type createTripRequest struct {
 	// point of the date board (M2.5).
 	CoordinateDates bool   `json:"coordinate_dates"`
 	SourceTripID    string `json:"source_trip_id"`
+	// The route the group already booked (M1 — A1.3). When it is present it
+	// wins: the dates, the destinations and the country all come from the legs
+	// rather than from anything typed alongside them.
+	Flights []flightRequest `json:"flights"`
 }
 
 func (s *Server) handleCreateTrip(c echo.Context) error {
@@ -118,6 +125,16 @@ func (s *Server) handleCreateTrip(c echo.Context) error {
 		}
 	}
 
+	// A route decides the frame before the row is written, so the trip is never
+	// stored with dates that disagree with the tickets.
+	legs := make([]models.TripFlight, 0, len(req.Flights))
+	for _, in := range req.Flights {
+		legs = append(legs, toFlightModel(in))
+	}
+	if len(legs) > 0 {
+		s.applyRouteToTrip(trip, legs, userID)
+	}
+
 	// The rate is snapshotted at creation so the budget does not drift day to
 	// day underneath the group (A7.2).
 	if rate, err := s.fx.Rate(ctx, "JPY", "THB"); err == nil {
@@ -138,17 +155,36 @@ func (s *Server) handleCreateTrip(c echo.Context) error {
 		return request.Internal(c, "เพิ่มเจ้าของทริปไม่สำเร็จ")
 	}
 
+	if len(legs) > 0 {
+		if err := s.flights.ReplaceAll(ctx, trip.ID, legs); err != nil {
+			return request.Internal(c, "บันทึกเส้นทางไม่สำเร็จ")
+		}
+	}
+
 	_ = s.collab.Log(ctx, &models.Activity{TripID: trip.ID, UserID: userID, Text: "สร้างห้องทริป"})
 
-	return c.JSON(http.StatusCreated, toTripDTO(*trip))
+	return c.JSON(http.StatusCreated, s.withRoute(ctx, toTripDTO(*trip), trip.ID))
 }
 
 func (s *Server) handleGetTrip(c echo.Context) error {
-	trip, err := s.trips.GetByID(c.Request().Context(), request.TripID(c))
+	ctx := c.Request().Context()
+	trip, err := s.trips.GetByID(ctx, request.TripID(c))
 	if err != nil {
 		return request.NotFound(c, "ไม่พบทริป")
 	}
-	return c.JSON(http.StatusOK, toTripDTO(*trip))
+	return c.JSON(http.StatusOK, s.withRoute(ctx, toTripDTO(*trip), trip.ID))
+}
+
+// withRoute attaches the legs to a trip DTO. It is best effort: a route that
+// fails to load must not take the trip room down with it.
+func (s *Server) withRoute(ctx context.Context, dto tripDTO, tripID string) tripDTO {
+	flights, err := s.flights.ListByTrip(ctx, tripID)
+	if err != nil {
+		return dto
+	}
+	route := s.toRouteDTO(flights)
+	dto.Route = &route
+	return dto
 }
 
 type updateTripRequest struct {
@@ -214,7 +250,7 @@ func (s *Server) handleUpdateTrip(c echo.Context) error {
 	}
 
 	s.track(c, tripID, "แก้กรอบทริป", events.TypeTripUpdated, "trip", tripID)
-	return c.JSON(http.StatusOK, toTripDTO(*trip))
+	return c.JSON(http.StatusOK, s.withRoute(ctx, toTripDTO(*trip), tripID))
 }
 
 func (s *Server) handleDeleteTrip(c echo.Context) error {
@@ -393,7 +429,7 @@ func (s *Server) handleTripOverview(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, tripOverviewDTO{
-		Trip:      toTripDTO(*trip),
+		Trip:      s.withRoute(ctx, toTripDTO(*trip), tripID),
 		Members:   roster.dtos(),
 		Coverage:  toCoverageDTO(coverage),
 		Checklist: checklist,

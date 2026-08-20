@@ -158,6 +158,7 @@ rove-api/
     │   └── <domain>/<domain>.store.go
     ├── services/
     │   ├── ai/                 # claude client, prompts, schemas, pipeline, tools
+    │   ├── airports/           # ดัชนีสนามบินทั้งโลก (embed data/airports.json) — ค้น IATA/เมือง/ประเทศ
     │   ├── places/             # google places + distance (+ redis cache)
     │   ├── weather/            # open-meteo
     │   ├── fx/                 # exchange rate (fetch API, cache 24h)
@@ -167,7 +168,7 @@ rove-api/
     │   ├── events/             # SSE hub (redis pubsub)
     │   ├── jobs/               # redis queue + worker pool
     │   └── photobook/          # Phase 2: compile photos → PDF/Ebook via chromedp/gotenberg
-    ├── domain/                 # pure logic (ไม่มี DB): budget, expense, coverage, validate, match, points
+    ├── domain/                 # pure logic (ไม่มี DB): budget, expense, coverage, route, validate, match, points
     ├── logger/
     └── utils/{dateutil,hashutil,str,validator}
 ```
@@ -231,7 +232,10 @@ index: `(user_id, sort_order)`
 
 **trip_invites** — `id, trip_id, token(uniq), role, expires_at, created_by, used_count, max_uses`
 
-**trip_flights** — `id, trip_id, direction('out'|'return'), airline, flight_no, dep_airport, arr_airport, dep_at, arr_at, raw_text`
+**trip_flights** — `id, trip_id, seq, direction('out'|'inter'|'back'), mode('flight'|'ground'), airline, flight_no, dep_airport, arr_airport, dep_date, dep_time, arr_date, arr_time, raw_text, note`
+> ต่างจากสเปคเดิมสามจุด: (1) `inter` = ขาระหว่างเมือง และ `mode` รองรับรถไฟ/รถ เพราะทริปสองประเทศต้องบอกได้ว่าข้ามยังไง
+> (2) วันกับเวลาแยกคอลัมน์ — กลุ่มรู้ "4 ธ.ค. ถึง 08:05" ก่อนรู้เวลาออกหลายเดือน และเวลาเป็น wall clock ของสนามบินตัวเอง ไม่ใช่ UTC
+> (3) `seq` ให้ลำดับ leg คงที่ · frame ของทริป (start/end date, destination_cities, destination_country) **derive จากตารางนี้**
 
 **member_profiles** — `trip_id, user_id (PK รวม), visited_before, pace('chill'|'normal'|'packed'), walk_level, can_drive, has_idp, budget_min, budget_max, dietary(JSON), traveling_with(JSON), notes`
 
@@ -338,12 +342,16 @@ GET    /api/v1/users/me/points/history           transactions (cursor)
 
 ### 5.3 Trip
 ```
-POST   /api/v1/trips                          สร้างทริป {entry_type, title?, start_date?, end_date?, cities[], party_size}
+POST   /api/v1/trips                          สร้างทริป {entry_type, title?, start_date?, end_date?, cities[], party_size, flights[]}
 GET    /api/v1/trips                          ทริปของฉัน (paginated)
 GET    /api/v1/trips/:tripId                  overview (trip + members + counts + flags)
 PATCH  /api/v1/trips/:tripId                  แก้ frame            [editor]
 DELETE /api/v1/trips/:tripId                                        [owner]
-POST   /api/v1/trips/:tripId/flights          เพิ่ม/แก้เที่ยวบิน    [editor]
+GET    /api/v1/trips/:tripId/flights          legs + stops/countries/nights ที่ derive แล้ว
+POST   /api/v1/trips/:tripId/flights          เพิ่มหนึ่ง leg        [editor]
+PUT    /api/v1/trips/:tripId/flights          แทนที่ทั้งเส้นทาง     [editor]
+PATCH  /api/v1/trips/:tripId/flights/:flightId แก้ leg              [editor]
+DELETE /api/v1/trips/:tripId/flights/:flightId ลบ leg               [editor]
 POST   /api/v1/trips/:tripId/invites          สร้างลิงก์เชิญ        [owner]
 POST   /api/v1/invites/:token/accept          join
 GET    /api/v1/trips/:tripId/members
@@ -358,6 +366,17 @@ POST   /api/v1/trips/:tripId/clone            → new trip
 **หมายเหตุจากของที่ทำจริง:** join คือ `POST /api/v1/invites/:token/join` (ไม่ใช่ `/accept`)
 และมี `GET /api/v1/invites/:token` สำหรับหน้า preview ก่อนล็อกอิน · overview อยู่ที่
 `GET /api/v1/trips/:tripId/overview` ส่วน `GET /api/v1/trips/:tripId` คืน trip เปล่า
+
+### 5.3b Airports — ค้นสนามบินทั้งโลก (M1 / A1.3)
+```
+GET    /api/v1/airports?q=&limit=   ค้นด้วยรหัส IATA / เมือง / ชื่อสนามบิน / ประเทศ (ไทย+อังกฤษ)
+GET    /api/v1/airports/:iata       หนึ่งสนามบิน
+```
+สาธารณะทั้งคู่ (อยู่ใน allowlist ของ `routes_test.go`) เพราะ entry flow ต้องค้นได้ก่อนล็อกอิน เหมือนเว็บจองตั๋ว ·
+ข้อมูลถูก **embed** ไว้ใน binary (`data/airports.json`, `//go:embed`) ~3.6k สนามบินทั่วโลกที่มีรหัส IATA +
+เที่ยวบินประจำ + ขนาด large/medium — ไม่ต้องใช้ key, ไม่มีโควตา, ทำงานได้ทั้ง mock และ live ·
+สร้างใหม่ด้วย `node scripts/gen-airports.mjs` (ที่มา: OurAirports + OpenFlights + i18n-iso-countries ผ่าน npm) ·
+ฝั่งเว็บมีสำเนาเดียวกันที่ `lib/data/airports.data.json` โหลดแบบ dynamic import เฉพาะตอนเปิด picker
 
 ### 5.3a Dates — นัดวัน (ทำเกินสเปคเดิม)
 ```
@@ -701,14 +720,30 @@ Lightsail Ubuntu 2 vCPU / 2 GB / 60 GB SSD  ($12/mo)  + static IP (ฟรีเ�
 **DoD:** กลุ่ม 4 คนสร้างทริปญี่ปุ่น ใส่ wishlist ทุกคน กด AI ร่างแพลน แก้ timeline ร่วมกัน เห็น **Budget ประมาณการ** และ **Expense จริงแบบ Shared/Personal** export/แชร์ลิงก์ กดปุ่มจองแล้ว track ได้ — ผู้ใช้มี character ประจำตัว มี dream list ส่วนตัว เห็น stats รวม — ทำงานจริงบน Lightsail
 
 ### M1 Entry Points
-- [x] A1.1 `POST /trips` รองรับ entry_type ('date'|'city'|'ticket'|'clone')  ·  **หมายเหตุ:** 5 แบบ: date | city | ticket | clone | **coordinate** (ตัวหลังเพิ่มจาก M2.5)
-- [x] A1.2 `POST /ai/parse-ticket` → flights + suggested frame
-- [x] W1.1 Landing 3 การ์ด (เริ่มจากวัน / เมือง / วางข้อความตั๋ว)
-- [x] W1.2 Flow วัน: date range → เมือง (optional) → party size → create → redirect
-- [x] W1.3 Flow เมือง: chips เมือง → แนะนำจำนวนวัน → วัน → create
-- [x] W1.4 Flow ตั๋ว: textarea → preview flights → confirm → create
+
+**ปรับใหม่ (route-first):** เดิมมี 4 ประตูและซ้ำกันเอง — "เริ่มจากเมือง" กับ "วางข้อความตั๋ว" ถามเรื่องเดียวกัน
+และคำตอบแบบ chips เมือง ("โซล" + "อูเอโนะ") ตอบไม่ได้ว่ากี่ประเทศ กี่คืนต่อที่ และข้ามระหว่างกันยังไง —
+แพลนจึงวางวันไม่ได้ ตอนนี้เหลือ **3 ประตูที่ไม่ทับกัน** เรียงตามสิ่งที่ผู้ใช้รู้แล้วจริง ๆ:
+
+1. **รู้เที่ยวบินแล้ว (`route`)** — ใส่สนามบิน/วันบิน/เวลาถึง เช่น `BKK→NRT 4 ธ.ค. ถึง 08:05`,
+   `NRT→BKK 10 ธ.ค. ถึง 22:05` แล้วค่อย ๆ เติมรายละเอียดทีหลัง · การวางอีเมลตั๋วเป็น **ทางลัดในประตูนี้**
+   (เติม legs ชุดเดียวกัน) ไม่ใช่ประตูแยก
+2. **รู้วันแล้ว (`date`)** — มีวันลาแล้ว ยังไม่รู้ปลายทาง → แนะนำปลายทางทีหลัง
+3. **ยังไม่รู้วัน (`coordinate`)** — เข้า date board หาวันที่ตรงกันก่อน (M2.5)
+
+- [x] A1.1 `POST /trips` รองรับ entry_type ('route'|'date'|'clone') + `flights[]`  ·  **หมายเหตุ:** analytics ยังนับ `coordinate` แยกจาก `date`; ถ้าส่ง `flights[]` มา frame (วัน/ปลายทาง/ประเทศ) มาจาก legs เสมอ
+- [x] A1.2 `POST /ai/parse-ticket` → flights + suggested frame  ·  **หมายเหตุ:** เมืองปลายทางมาจาก airport index ทั้งโลกแล้ว ไม่ใช่ map 13 เมืองเดิม
+- [x] **A1.3 airport index + route:** `GET /airports?q=` (สาธารณะ — ค้นทั้งโลกด้วยรหัส IATA / เมือง / ประเทศ ทั้งไทยและอังกฤษ), `GET /airports/:iata`, และ `GET|POST|PUT|PATCH|DELETE /trips/:id/flights` · frame ของทริป derive จาก legs (`pkg/domain/route.go` ↔ `lib/data/route.ts`)
+- [x] W1.1 Landing 3 การ์ด (รู้เที่ยวบิน / รู้วัน / ยังไม่รู้วัน)
+- [x] W1.2 Flow วัน: date range → party size → create → redirect
+- [x] W1.3 Flow เที่ยวบิน: airport picker (ค้นทั้งโลก) → วันบิน/เวลาถึง → สรุปกี่คืนกี่ประเทศ → create
+- [x] W1.4 วางข้อความตั๋ว: ทางลัดในประตู `route` — parse แล้วเติม legs ให้แก้ต่อได้
 - [x] W1.5 Onboarding checklist ใน Overview (ชวนเพื่อน / ใส่ wishlist / กด AI)
 - [x] X1.1 e2e: ทุก entry ได้ทริปใน ≤ 3 หน้าจอ  ·  **หมายเหตุ:** `e2e/trip-flow.spec.ts` ยืนยัน ≤ 3 หน้าจอ
+
+**ทริปหลายประเทศ:** ทุก leg ที่ลงจอดเปิด "stop" หนึ่งจุด และ leg ถัดไปปิดมัน — จำนวนคืนต่อเมือง/ประเทศ
+จึงคำนวณได้เสมอ ถ้ามีช่วงที่ไม่มี leg คร่อม (ลง ICN แต่เที่ยวถัดไปออกจาก NRT) UI จะเตือนให้เพิ่มขาระหว่างเมือง
+ซึ่งเป็น **เที่ยวบินหรือ "ไปเอง (รถไฟ/รถ)"** ก็ได้ — ทั้งคู่นับเป็น leg เท่ากัน
 
 ### M2 Trip Room
 - [x] A2.1 trip CRUD + flights + overview payload (counts, flags)

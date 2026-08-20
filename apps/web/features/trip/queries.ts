@@ -6,6 +6,7 @@ import { track } from '@/lib/analytics';
 import { repo } from '@/lib/data';
 import type {
   CreateTripInput,
+  FlightLegInput,
   ShareState,
   TripOverview,
   TripVisibility,
@@ -60,6 +61,37 @@ export function useTripActivity(tripId: string) {
     queryKey: queryKeys.tripActivity(tripId),
     queryFn: () => repo.collab.activity(tripId),
     enabled: Boolean(tripId),
+  });
+}
+
+/** The legs of a trip and everything derived from them (M1 — A1.3). */
+export function useTripRoute(tripId: string) {
+  return useQuery({
+    queryKey: queryKeys.tripRoute(tripId),
+    queryFn: () => repo.trips.route(tripId),
+    enabled: Boolean(tripId),
+  });
+}
+
+/**
+ * Saving a route moves the trip frame with it — dates and destinations both —
+ * so this invalidates the whole room rather than just the route.
+ */
+export function useSetTripRoute(tripId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (legs: FlightLegInput[]) => repo.trips.setRoute(tripId, legs),
+    onSuccess: (route) => {
+      queryClient.setQueryData(queryKeys.tripRoute(tripId), route);
+      track('route_built', {
+        legs: route.flights.length,
+        countries: route.countries.length,
+        source: 'manual',
+      });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.trip(tripId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tripOverview(tripId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.trips() });
+    },
   });
 }
 

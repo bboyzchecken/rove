@@ -73,7 +73,7 @@ export function DreamList() {
             className="mt-3"
             onClick={() =>
               router.push(
-                `/new?from=city&city=${encodeURIComponent(cityOf(dream.destination))}` as never,
+                `/new?from=route&city=${encodeURIComponent(cityOf(dream.destination))}` as never,
               )
             }
           >

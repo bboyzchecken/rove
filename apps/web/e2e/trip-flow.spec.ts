@@ -32,14 +32,47 @@ test('X1.1 — "ยังไม่รู้วัน" reaches a trip room in thr
   await expect(page.getByText('ใส่วันว่างของฉัน')).toBeVisible();
 });
 
-test('a pasted ticket becomes a trip frame', async ({ page }) => {
+test('a pasted ticket fills in the route', async ({ page }) => {
+  // The ticket door folded into the route door (M1): pasting is a shortcut that
+  // fills the same legs someone would otherwise type.
   await page.goto('/new?from=ticket');
 
+  await page.getByRole('button', { name: /วางมาเลย/ }).click();
   await page.getByRole('button', { name: /ใส่ตัวอย่างให้ดู/ }).click();
 
-  await expect(page.getByText('อ่านออกมาได้แบบนี้')).toBeVisible();
-  await expect(page.getByText(/TG682/)).toBeVisible();
-  await expect(page.getByText(/8 วัน 7 คืน/)).toBeVisible();
+  await expect(page.getByText(/อ่านได้ 2 เที่ยวบิน/)).toBeVisible();
+  await expect(page.getByText('ทริปนี้จะเป็นแบบนี้')).toBeVisible();
+  await expect(page.getByText(/7 วัน 6 คืน/)).toBeVisible();
+});
+
+/** The picker only answers once React owns the field, so open it first. */
+async function pickAirport(page: Page, index: number, query: string, option: RegExp) {
+  const field = page.getByPlaceholder('พิมพ์รหัสสนามบิน เมือง หรือประเทศ').nth(index);
+  await field.click();
+  await expect(page.getByText('ที่คนไทยไปบ่อย').first()).toBeVisible();
+
+  await field.fill(query);
+  await page.getByRole('button', { name: option }).first().click();
+}
+
+test('the route door searches airports worldwide and counts the nights', async ({ page }) => {
+  await page.goto('/new?from=route');
+
+  // Search by IATA code, the way a booking site works.
+  await pickAirport(page, 0, 'NRT', /Narita/);
+
+  await expect(page.getByText('ทริปนี้จะเป็นแบบนี้')).toBeVisible();
+  await expect(page.getByText(/โตเกียว/).first()).toBeVisible();
+});
+
+test('two countries in one route are spelled out', async ({ page }) => {
+  await page.goto('/new?from=route&to=ICN');
+
+  // Seoul is already the destination; add a hop to Tokyo after it.
+  await page.getByRole('button', { name: /เพิ่มเมือง\/ประเทศระหว่างทาง/ }).click();
+  await pickAirport(page, 0, 'NRT', /Narita/);
+
+  await expect(page.getByText(/ข้าม 2 ประเทศ/)).toBeVisible();
 });
 
 test('a wish added shows up on the coverage board', async ({ page }) => {

@@ -1,6 +1,7 @@
 import type {
   ActivityEvent,
   AiCredits,
+  Airport,
   AiJob,
   AvailabilityBoard,
   AvailabilityEntry,
@@ -16,6 +17,8 @@ import type {
   ExpenseEntry,
   ExpenseSummary,
   ExportResult,
+  FlightLeg,
+  FlightLegInput,
   InviteLink,
   LockedDates,
   Member,
@@ -30,6 +33,7 @@ import type {
   Trip,
   TripOverview,
   TripRecap,
+  TripRoute,
   TripSummary,
   Vote,
   WishlistItem,
@@ -37,6 +41,7 @@ import type {
 } from '../types';
 import type {
   ActivityDto,
+  AirportDto,
   AiCreditsDto,
   AiJobDto,
   AvailabilityBoardDto,
@@ -53,12 +58,14 @@ import type {
   ExpenseEntryDto,
   ExpenseSummaryDto,
   ExportDto,
+  FlightDto,
   InviteDto,
   LockedDatesDto,
   MemberDto,
   ParsedTicketDto,
   PastTripDto,
   PlanDayDto,
+  RouteDto,
   PlanItemDto,
   PlanVersionDto,
   PoiDto,
@@ -95,6 +102,85 @@ export function toTrip(dto: TripDto): Trip {
     fxRate: dto.fx_rate ?? 0.235,
     fxAsOf: (dto.fx_rate_at ?? '').slice(0, 10),
     budgetPerPersonThb: dto.budget_per_person_thb,
+    route: dto.route ? toRoute(dto.route) : undefined,
+  };
+}
+
+/* ----------------------------------------------------------------- route -- */
+
+export function toAirport(dto: AirportDto): Airport {
+  return {
+    iata: dto.iata,
+    name: dto.name,
+    nameTh: dto.name_th || undefined,
+    city: dto.city,
+    cityTh: dto.city_th || undefined,
+    countryCode: dto.country_code,
+    country: dto.country,
+    countryTh: dto.country_th,
+    timezone: dto.timezone,
+    lat: dto.lat,
+    lon: dto.lon,
+    major: dto.major,
+  };
+}
+
+export function toFlightLeg(dto: FlightDto): FlightLeg {
+  return {
+    id: dto.id,
+    direction: dto.direction,
+    mode: dto.mode,
+    airline: dto.airline || undefined,
+    flightNo: dto.flight_no || undefined,
+    from: dto.dep_airport,
+    to: dto.arr_airport,
+    depDate: dto.dep_date,
+    depTime: dto.dep_time || undefined,
+    arrDate: dto.arr_date || undefined,
+    arrTime: dto.arr_time || undefined,
+    note: dto.note || undefined,
+  };
+}
+
+export function toRoute(dto: RouteDto): TripRoute {
+  return {
+    flights: (dto.flights ?? []).map(toFlightLeg),
+    stops: (dto.stops ?? []).map((stop) => ({
+      airport: stop.airport,
+      city: stop.city,
+      countryCode: stop.country_code,
+      country: stop.country,
+      arriveDate: stop.arrive_date,
+      arriveTime: stop.arrive_time || undefined,
+      departDate: stop.depart_date || undefined,
+      departTime: stop.depart_time || undefined,
+      nights: stop.nights,
+      open: stop.open,
+    })),
+    countries: dto.countries ?? [],
+    homeAirport: dto.home_airport,
+    startDate: dto.start_date,
+    endDate: dto.end_date,
+    days: dto.days,
+    nights: dto.nights,
+    roundTrip: dto.round_trip,
+  };
+}
+
+/** What the API expects back for one leg. */
+export function fromFlightLeg(leg: FlightLegInput) {
+  return {
+    direction: leg.direction,
+    mode: leg.mode,
+    airline: leg.airline ?? '',
+    flight_no: leg.flightNo ?? '',
+    dep_airport: leg.from,
+    arr_airport: leg.to,
+    dep_date: leg.depDate,
+    dep_time: leg.depTime ?? '',
+    arr_date: leg.arrDate ?? '',
+    arr_time: leg.arrTime ?? '',
+    note: leg.note ?? '',
   };
 }
 

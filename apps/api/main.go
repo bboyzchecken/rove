@@ -16,6 +16,7 @@ import (
 	"github.com/bboyzchecken/rove/apps/api/pkg/logger"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/affiliate"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/ai"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/airports"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
 	fxsvc "github.com/bboyzchecken/rove/apps/api/pkg/services/fx"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/places"
@@ -27,6 +28,7 @@ import (
 	collabstore "github.com/bboyzchecken/rove/apps/api/pkg/store/collab"
 	datestore "github.com/bboyzchecken/rove/apps/api/pkg/store/dates"
 	expensestore "github.com/bboyzchecken/rove/apps/api/pkg/store/expense"
+	flightstore "github.com/bboyzchecken/rove/apps/api/pkg/store/flight"
 	invitestore "github.com/bboyzchecken/rove/apps/api/pkg/store/invite"
 	memberstore "github.com/bboyzchecken/rove/apps/api/pkg/store/member"
 	planstore "github.com/bboyzchecken/rove/apps/api/pkg/store/plan"
@@ -169,6 +171,7 @@ func storeModules() fx.Option {
 		expensestore.Module,
 		prepstore.Module,
 		bookingstore.Module,
+		flightstore.Module,
 		collabstore.Module,
 		aijobstore.Module,
 	)
@@ -182,6 +185,7 @@ func serviceModules() fx.Option {
 	return fx.Options(
 		events.Module,
 		fxsvc.Module,
+		airports.Module,
 		weather.Module,
 		places.Module,
 		affiliate.Module,
