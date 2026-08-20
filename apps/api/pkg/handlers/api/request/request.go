@@ -17,7 +17,19 @@ const (
 	CtxUserRole = "user_role"
 	CtxTripID   = "trip_id"
 	CtxTripRole = "trip_role"
+	// CtxPlanID is set by the item resolver so item handlers do not have to
+	// look the plan up a second time.
+	CtxPlanID = "plan_id"
 )
+
+// PlanID returns the plan resolved for an /items/:itemId route.
+func PlanID(c echo.Context) string {
+	id, _ := c.Get(CtxPlanID).(string)
+	if id == "" {
+		id = c.Param("planId")
+	}
+	return id
+}
 
 // UserID returns the authenticated user id, or "" for anonymous requests that
 // came through OptionalJwt.
@@ -82,6 +94,15 @@ func NotFound(c echo.Context, msg string) error     { return Error(c, http.Statu
 func Internal(c echo.Context, msg string) error {
 	return Error(c, http.StatusInternalServerError, msg)
 }
+
+func Conflict(c echo.Context, msg string) error { return Error(c, http.StatusConflict, msg) }
+
+// NoContent is the response for a successful delete.
+func NoContent(c echo.Context) error { return c.NoContent(http.StatusNoContent) }
+
+// OK and Created cover the two success shapes used across the API.
+func OK(c echo.Context, payload any) error      { return c.JSON(http.StatusOK, payload) }
+func Created(c echo.Context, payload any) error { return c.JSON(http.StatusCreated, payload) }
 
 // BindAndValidate is the first line of nearly every handler.
 func BindAndValidate(c echo.Context, dst any) error {

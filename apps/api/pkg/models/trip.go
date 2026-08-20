@@ -46,6 +46,30 @@ type Trip struct {
 	Summary            string         `gorm:"type:text" json:"summary"`
 	CloneCount         int            `gorm:"not null;default:0" json:"clone_count"`
 	ViewCount          int            `gorm:"not null;default:0" json:"view_count"`
+	// Expense is never exposed on a public trip. The column exists so the
+	// intent is auditable, but the public payload builder ignores its value
+	// and always hides expense (DEV_SPEC §4.3).
+	PublicHideExpense bool `gorm:"not null;default:true" json:"public_hide_expense"`
+}
+
+// Nights is the number of hotel nights the trip spans, used by per_night costs.
+func (t Trip) Nights() int {
+	if t.StartDate == nil || t.EndDate == nil {
+		return 0
+	}
+	n := int(t.EndDate.Sub(*t.StartDate).Hours() / 24)
+	if n < 0 {
+		return 0
+	}
+	return n
+}
+
+// Days is the inclusive day count (a 3-night trip is 4 days).
+func (t Trip) Days() int {
+	if t.StartDate == nil || t.EndDate == nil {
+		return 0
+	}
+	return t.Nights() + 1
 }
 
 func (Trip) TableName() string { return "trips" }
@@ -57,4 +81,14 @@ type TripStore interface {
 	ListForUser(ctx context.Context, userID string, limit, offset int) ([]Trip, int64, error)
 	Update(ctx context.Context, t *Trip) error
 	Delete(ctx context.Context, tripID string) error
+
+	GetByShareToken(ctx context.Context, token string) (*Trip, error)
+	GetBySlug(ctx context.Context, slug string) (*Trip, error)
+	IncrementView(ctx context.Context, tripID string) error
+	IncrementClone(ctx context.Context, tripID string) error
+	// ListForStats returns every trip the user belongs to, unpaginated, for the
+	// aggregate on /users/me/stats (A17.1).
+	ListForStats(ctx context.Context, userID string) ([]Trip, error)
+	Upcoming(ctx context.Context, userID string, from time.Time, limit int) ([]Trip, error)
+	CountSince(ctx context.Context, since time.Time) (int64, error)
 }

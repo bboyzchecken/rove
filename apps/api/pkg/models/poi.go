@@ -42,4 +42,18 @@ type POIStore interface {
 	Search(ctx context.Context, q, city, area string, limit int) ([]POI, error)
 	Upsert(ctx context.Context, p *POI) error
 	Count(ctx context.Context) (int64, error)
+	ListByIDs(ctx context.Context, ids []string) ([]POI, error)
+	GetByPlaceID(ctx context.Context, placeID string) (*POI, error)
+	// List is the admin table view; Search is the user-facing one.
+	List(ctx context.Context, city, category string, limit, offset int) ([]POI, int64, error)
+	Update(ctx context.Context, p *POI) error
+}
+
+// Zone maps a POI to a planning zone via its area, falling back to city.
+// Kept on the model because both the AI frame builder and the validator need it.
+func (p POI) ZoneKey() string {
+	if p.Area != "" {
+		return p.Area
+	}
+	return p.City
 }
