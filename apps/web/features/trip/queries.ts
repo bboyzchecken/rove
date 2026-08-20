@@ -38,6 +38,15 @@ export function useTripOverview(tripId: string) {
   });
 }
 
+/** The read-only archive of a finished trip (M17 — W17.5). */
+export function useTripRecap(tripId: string) {
+  return useQuery({
+    queryKey: queryKeys.tripRecap(tripId),
+    queryFn: () => repo.trips.recap(tripId),
+    enabled: Boolean(tripId),
+  });
+}
+
 export function useTripMembers(tripId: string) {
   return useQuery({
     queryKey: queryKeys.tripMembers(tripId),
@@ -170,6 +179,11 @@ export function useSetVisibility(tripId: string) {
       if (visibility !== 'private') track('share_link_created', { visibility });
       if (visibility === 'public') track('trip_published', { has_points_incentive: true });
       queryClient.setQueryData(queryKeys.share(tripId), state);
+      // The recap carries its own copy of the share state, and publishing from
+      // there moves the points balance the profile reads.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tripRecap(tripId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tripsPast() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
     },
   });
 }

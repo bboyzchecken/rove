@@ -148,12 +148,39 @@ export interface PastTrip {
   title: string;
   cities: string[];
   dateLabel: string;
+  /** The day it ended — what "ทริปที่ผ่านมา" is sorted by. */
+  endDate: string;
   days: number;
   places: number;
   spentThb: number;
   cover: string;
   memberIds: string[];
   characterIds?: string[];
+  /** Whether the recap is already public — the publish nudge reads this. */
+  visibility?: 'private' | 'link' | 'public';
+  publicSlug?: string | null;
+}
+
+/**
+ * What a finished trip leaves behind (M17 — W17.5): the choices the group made,
+ * kept in one list so "ทำไมตอนนั้นเราเลือกแบบนี้" has an answer months later.
+ */
+export type RecapDecisionKind =
+  'dates' | 'destination' | 'budget' | 'plan' | 'rationale' | 'booking' | 'vote';
+
+export interface RecapDecision {
+  id: string;
+  kind: RecapDecisionKind;
+  title: string;
+  detail: string;
+  decidedAt?: string;
+  /** Member id, when the record names who did it. */
+  decidedBy?: string;
+}
+
+export interface RecapSpend {
+  category: string;
+  amountThb: number;
 }
 
 export interface YearStats {

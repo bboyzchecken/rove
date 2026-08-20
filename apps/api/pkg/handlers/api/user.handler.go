@@ -196,16 +196,19 @@ func (s *Server) handlePastTrips(c echo.Context) error {
 			Title:              trip.Title,
 			Cities:             citiesOf(trip),
 			DateLabel:          dateLabel(trip),
+			EndDate:            trip.EndDate.Format("2006-01-02"),
 			Days:               days,
 			Places:             len(items),
 			SpentTHB:           spent,
 			CoverImageURL:      trip.CoverImageURL,
 			MemberIDs:          roster.ids(),
 			MemberCharacterIDs: roster.characterIDs(),
+			Visibility:         trip.Visibility,
+			PublicSlug:         trip.Slug,
 		})
 	}
 
-	sort.SliceStable(out, func(a, b int) bool { return out[a].DateLabel > out[b].DateLabel })
+	sort.SliceStable(out, func(a, b int) bool { return out[a].EndDate > out[b].EndDate })
 	return c.JSON(http.StatusOK, out)
 }
 

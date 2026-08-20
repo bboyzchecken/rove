@@ -29,6 +29,7 @@ import type {
   ShareState,
   Trip,
   TripOverview,
+  TripRecap,
   TripSummary,
   Vote,
   WishlistItem,
@@ -65,6 +66,7 @@ import type {
   ShareStateDto,
   TripDto,
   TripOverviewDto,
+  TripRecapDto,
   VoteDto,
   WishlistItemDto,
   YearStatsDto,
@@ -614,12 +616,48 @@ export function toPastTrip(dto: PastTripDto): PastTrip {
     title: dto.title,
     cities: dto.cities ?? [],
     dateLabel: dto.date_label,
+    endDate: dto.end_date,
     days: dto.days,
     places: dto.places,
     spentThb: dto.spent_thb,
     cover: dto.cover_image_url,
     memberIds: dto.member_ids ?? [],
     characterIds: dto.member_character_ids ?? [],
+    visibility: dto.visibility,
+    publicSlug: dto.public_slug,
+  };
+}
+
+export function toTripRecap(dto: TripRecapDto): TripRecap {
+  const trip = toTrip(dto.trip);
+  return {
+    tripId: trip.id,
+    title: trip.title,
+    cities: trip.cities,
+    dateLabel: dto.date_label,
+    cover: trip.cover,
+    days: dto.days,
+    places: dto.places,
+    spentThb: dto.spent_thb,
+    budgetPerPersonThb: dto.budget_per_person_thb,
+    members: (dto.members ?? []).map(toMember),
+    itinerary: (dto.itinerary ?? []).map(toPlanDay),
+    decisions: (dto.decisions ?? []).map((d) => ({
+      id: d.id,
+      kind: d.kind,
+      title: d.title,
+      detail: d.detail,
+      decidedAt: d.decided_at ?? undefined,
+      decidedBy: d.decided_by ?? undefined,
+    })),
+    spending: (dto.spending ?? []).map((s) => ({
+      category: s.category,
+      amountThb: s.amount_thb,
+    })),
+    activity: (dto.activity ?? []).map(toActivity),
+    share: toShareState(dto.share),
+    pointsPerPublish: dto.points_per_publish,
+    canPublish: dto.can_publish,
   };
 }
 

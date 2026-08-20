@@ -22,6 +22,7 @@ func (s *Server) registerTripRoutes(g *echo.Group) {
 
 	g.GET("/:tripId", s.handleGetTrip, s.TripRoleMiddleware(models.TripRoleViewer))
 	g.GET("/:tripId/overview", s.handleTripOverview, s.TripRoleMiddleware(models.TripRoleViewer))
+	g.GET("/:tripId/recap", s.handleTripRecap, s.TripRoleMiddleware(models.TripRoleViewer))
 	g.PATCH("/:tripId", s.handleUpdateTrip, s.TripRoleMiddleware(models.TripRoleEditor))
 	g.DELETE("/:tripId", s.handleDeleteTrip, s.TripRoleMiddleware(models.TripRoleOwner))
 	g.POST("/:tripId/clone", s.handleCloneTrip, s.TripRoleMiddleware(models.TripRoleViewer))

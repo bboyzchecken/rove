@@ -180,6 +180,7 @@ rove-web/
 │   ├── (app)/
 │   │   ├── home/               # NEW: home dashboard (stats, calendar, dream, points)
 │   │   ├── t/[tripId]/         # trip room: overview|wishlist|plan|budget|expense|prep|bookings|discussion|photos
+│   │   ├── recap/[tripId]/     # NEW: บันทึกทริปที่จบแล้ว (อ่านอย่างเดียว + ชวนเปิด public)
 │   │   └── profile/            # NEW: user profile (character, stats, dream, points history)
 │   ├── p/[slug]/               # public plan (ISR)
 │   ├── s/[shareToken]/         # private share view
@@ -331,6 +332,10 @@ GET    /api/v1/users/me/points                   {balance, lifetime_earned}
 GET    /api/v1/users/me/points/history           transactions (cursor)
 ```
 
+**หมายเหตุจากของที่ทำจริง:** calendar แยกเป็น `GET /users/me/trips/upcoming` + `GET /users/me/trips/past`
+· past trip แต่ละใบพก `end_date` + `visibility` + `public_slug` มาด้วย เพื่อให้การ์ดลิงก์ไปหน้าบันทึกทริป
+(`/recap/:tripId`) และรู้ว่าเปิด public ไปแล้วหรือยัง
+
 ### 5.3 Trip
 ```
 POST   /api/v1/trips                          สร้างทริป {entry_type, title?, start_date?, end_date?, cities[], party_size}
@@ -345,6 +350,7 @@ GET    /api/v1/trips/:tripId/members
 PATCH  /api/v1/trips/:tripId/members/:userId  เปลี่ยน role          [owner]
 DELETE /api/v1/trips/:tripId/members/:userId                        [owner]
 GET    /api/v1/trips/:tripId/activity         feed (cursor)
+GET    /api/v1/trips/:tripId/recap            บันทึกทริปที่จบแล้ว: decisions + itinerary + spending + share  [viewer]
 PATCH  /api/v1/trips/:tripId/visibility       {visibility, privacy_opts}  [owner]
 POST   /api/v1/trips/:tripId/clone            → new trip
 ```
@@ -851,6 +857,9 @@ Lightsail Ubuntu 2 vCPU / 2 GB / 60 GB SSD  ($12/mo)  + static IP (ฟรีเ�
 - [x] W17.2 Stats widget: ปีนี้ไปกี่ทริป / กี่วัน / กี่ประเทศ / ใช้เงินรวมเท่าไหร่ (THB โดยประมาณ)
 - [x] W17.3 Calendar view: trip bars บน calendar + weather ปลายทาง  ·  **หมายเหตุ:** เป็น calendar strip พร้อมอากาศ ยังไม่ใช่ตารางปฏิทินเต็มเดือน
 - [x] W17.4 Points balance display + history link
+- [x] A17.4 `GET /trips/:tripId/recap` — บันทึกทริปที่จบแล้ว: decisions (วันที่ล็อก, ปลายทาง, งบ, เหตุผลที่ AI จัดแบบนั้น, สิ่งที่จองจริง, ผลโหวต) + itinerary + spending แยกหมวด + share state · derive จากตารางเดิมทั้งหมด ไม่เก็บสำเนา
+- [x] W17.5 `/recap/[tripId]` — หน้าอ่านอย่างเดียว: การ์ดทริปที่ผ่านมาใน `/home` และ `/trips` กดเข้าได้
+- [x] W17.6 ปุ่ม "เปิดเป็นสาธารณะ" บนหน้าบันทึกทริป พร้อมอธิบายแต้ม/ส่วนลด (§6.5) — ทริปที่เปิดแล้วโชว์ลิงก์ `/p/[slug]` + ยอดดู/ยอดก๊อป แทนการชวนซ้ำ
 
 ### Cross-cutting
 - [ ] X.1 e2e: create → invite 2 users → wishlist → generate → edit → budget → add expense → share → book click  ·  **หมายเหตุ:** `e2e/trip-flow.spec.ts` ครอบ create → wishlist → generate → budget → expense → share → prep แล้ว — **ยังขาด invite 2 คน, edit timeline, book click** และรันบน mock mode ไม่ใช่ API จริง
@@ -950,7 +959,8 @@ Lightsail Ubuntu 2 vCPU / 2 GB / 60 GB SSD  ($12/mo)  + static IP (ฟรีเ�
 `expense_added {split_type,category}`, `expense_summary_viewed`,
 `photo_uploaded {from_item}`, `photobook_export_started {format}`, `photobook_downloaded`,
 `document_uploaded {category}`,
-`points_earned {amount}`, `points_balance_viewed`, `home_dashboard_viewed`, `calendar_viewed`
+`points_earned {amount}`, `points_balance_viewed`, `home_dashboard_viewed`, `calendar_viewed`,
+`trip_recap_viewed {has_decisions}`
 
 **Funnels:**
 - Core: `trip_created → wishlist_item_added(≥1) → ai_generate_finished → item_moved(≥1) → share_link_created|trip_published → booking_click`
@@ -1144,6 +1154,8 @@ AUTH_COOKIE_DOMAIN=rove.app
 | 20 ส.ค. 2569 | สอง branch ที่ทำ Phase 1 ทับกัน | ยึด `feat/ui-prototype` เป็น tree ตั้งต้นทั้งก้อน แล้วยกเฉพาะชุดเทสต์ security ตามมา — merge commit ปกติ ไม่ rewrite ประวัติ | ui-prototype มีภาพที่เจนแล้ว (characters 20 + covers + empty states) และ mock/live layer ที่ demo ได้โดยไม่ต้องมี API · เลือกทับทั้ง tree ดีกว่าไล่ merge 111 ไฟล์ที่ชนกันทีละไฟล์ |
 | 20 ส.ค. 2569 | สร้างลิงก์เชิญ | **owner เท่านั้น** (เดิม ui-prototype ให้ editor ทำได้) | editor ที่ออกลิงก์เชิญได้ = ขยายสิทธิ์เขียนในทริปของคนอื่นโดยเจ้าของไม่รู้ · ตรงกับสัญญาใน §5.3 อยู่แล้ว |
 | 20 ส.ค. 2569 | DB ของ integration test | `glebarez/sqlite` (pure Go) in-memory | `go test ./...` รันได้โดยไม่ต้องมี cgo และไม่ต้องยก container — เทสต์ security จึงรันทุก PR ไม่ใช่เฉพาะตอนมี MySQL |
+| 20 ส.ค. 2569 | ทริปที่จบแล้ว | เพิ่มหน้า **บันทึกทริป** (`/recap/:id`) แยกจากห้องทริป และ derive ทุกอย่างจากตารางเดิม | ห้องทริปออกแบบมาเพื่อ "แก้" ทริปที่จบแล้วต้องการแค่ "อ่าน" — และคำถามที่คนกลับมาถามคือ *ตอนนั้นตัดสินใจยังไง* ไม่ใช่ timeline ดิบ · ถ้าเก็บ snapshot แยกจะมีวันที่ไม่ตรงกับห้อง |
+| 20 ส.ค. 2569 | จุดที่ชวนเปิด public | ชวนบนหน้าบันทึกทริป ไม่ใช่ตอนกำลังวางแผน | ทริปที่ไปมาแล้วคือทริปที่คนอื่นอยากตามรอย และเป็นจังหวะที่อธิบายวงจรแต้ม→ส่วนลดได้ตรงที่สุด (§6.5) · share dialog ยังตั้ง public ได้เหมือนเดิม |
 | 20 ส.ค. 2569 | ขอบเขตของเทสต์ authorization | ยอมรับทั้ง 404 และ 403 ว่า "ปฏิเสธแล้ว" | §4.3 อยากได้ 404 เพื่อไม่ยืนยันว่า id มีอยู่จริง แต่ route ไหนตอบอะไรขึ้นกับว่า membership หรือ role พังก่อน · สิ่งที่เทสต์คุมคือ "เข้าไม่ได้" ไม่ใช่เลขสถานะ |
 
 ---

@@ -642,12 +642,55 @@ type pastTripDTO struct {
 	Title              string   `json:"title"`
 	Cities             []string `json:"cities"`
 	DateLabel          string   `json:"date_label"`
+	EndDate            string   `json:"end_date"`
 	Days               int      `json:"days"`
 	Places             int      `json:"places"`
 	SpentTHB           float64  `json:"spent_thb"`
 	CoverImageURL      string   `json:"cover_image_url"`
 	MemberIDs          []string `json:"member_ids"`
 	MemberCharacterIDs []string `json:"member_character_ids"`
+	// The recap card says whether this one is already public, because the
+	// publish nudge must not keep offering points that were already paid.
+	Visibility string  `json:"visibility"`
+	PublicSlug *string `json:"public_slug"`
+}
+
+/* ----------------------------------------------------------------- recap -- */
+
+// The archive a finished trip leaves behind (A17.4). Everything here is derived
+// from the room's own tables — see recap.handler.go.
+// Kind is one of: dates | destination | budget | plan | rationale | booking | vote
+type recapDecisionDTO struct {
+	ID        string  `json:"id"`
+	Kind      string  `json:"kind"`
+	Title     string  `json:"title"`
+	Detail    string  `json:"detail"`
+	DecidedAt *string `json:"decided_at"`
+	DecidedBy *string `json:"decided_by"`
+}
+
+type recapSpendDTO struct {
+	Category  string  `json:"category"`
+	AmountTHB float64 `json:"amount_thb"`
+}
+
+type tripRecapDTO struct {
+	Trip               tripDTO            `json:"trip"`
+	Members            []memberDTO        `json:"members"`
+	DateLabel          string             `json:"date_label"`
+	Days               int                `json:"days"`
+	Places             int                `json:"places"`
+	SpentTHB           float64            `json:"spent_thb"`
+	BudgetPerPersonTHB float64            `json:"budget_per_person_thb"`
+	Itinerary          []planDayDTO       `json:"itinerary"`
+	Decisions          []recapDecisionDTO `json:"decisions"`
+	Spending           []recapSpendDTO    `json:"spending"`
+	Activity           []activityDTO      `json:"activity"`
+	Share              shareStateDTO      `json:"share"`
+	// What opening the trip to the public is worth, so the nudge quotes the
+	// ledger's own rate rather than a number typed into the copy (§6.5).
+	PointsPerPublish int  `json:"points_per_publish"`
+	CanPublish       bool `json:"can_publish"`
 }
 
 type yearStatsDTO struct {

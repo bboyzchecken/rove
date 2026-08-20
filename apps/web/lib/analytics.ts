@@ -45,6 +45,8 @@ export interface AnalyticsEvents {
   expense_summary_viewed: Record<string, never>;
   expense_settled: Record<string, never>;
 
+  trip_recap_viewed: { has_decisions: boolean };
+
   export: { format: 'pdf' | 'ics' | 'json' | 'html' };
   share_link_created: { visibility: 'link' | 'public' };
   trip_published: { has_points_incentive: boolean };
