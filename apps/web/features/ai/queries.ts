@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api-client';
+import { track } from '@/lib/analytics';
 import { queryKeys } from '@/lib/query-keys';
 import { aiStepLabel, type TripEvent } from '@/lib/sse';
 import type { AIJob, ParsedTicket, RefineOutput } from '@/types/api';
@@ -26,7 +27,10 @@ const aiApi = {
 };
 
 export function useGeneratePlan(tripId: string) {
-  return useMutation({ mutationFn: (hints?: string) => aiApi.generate(tripId, hints) });
+  return useMutation({
+    mutationFn: (hints?: string) => aiApi.generate(tripId, hints),
+    onSuccess: () => track({ name: 'ai_generate_started' }),
+  });
 }
 
 export function useNormalizeWishlist(tripId: string) {
@@ -42,7 +46,8 @@ export function useApplyDiff(tripId: string, planId: string) {
   return useMutation({
     mutationFn: ({ jobId, accepted }: { jobId: string; accepted: number[] | 'all' }) =>
       aiApi.applyDiff(planId, jobId, accepted),
-    onSuccess: () => {
+    onSuccess: (result) => {
+      track({ name: 'ai_refine_applied', props: { diff_count: result.applied } });
       void queryClient.invalidateQueries({ queryKey: queryKeys.plan(planId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.planBudget(planId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.coverage(tripId) });
@@ -85,20 +90,27 @@ export interface AIProgress {
  */
 export function useAIProgress(jobId: string | undefined, lastEvent: TripEvent | null): AIProgress | null {
   const { data: job } = useAIJob(jobId);
-  const [fromStream, setFromStream] = useState<AIProgress | null>(null);
 
-  useEffect(() => {
-    if (!jobId || !lastEvent) return;
-    if (lastEvent.type !== 'ai.progress' || lastEvent.target_id !== jobId) return;
+  // Remember the newest progress event for THIS job. Adjusting state during
+  // render is the supported pattern for deriving from a changed prop; an effect
+  // here would render once with stale progress before correcting itself.
+  const [seen, setSeen] = useState<{ event: TripEvent; progress: AIProgress } | null>(null);
 
-    const step = typeof lastEvent.meta?.step === 'string' ? lastEvent.meta.step : '';
-    const status = typeof lastEvent.meta?.status === 'string' ? lastEvent.meta.status : 'running';
-    setFromStream({
-      step,
-      label: aiStepLabel(step),
-      status: status as AIProgress['status'],
+  const relevant =
+    jobId && lastEvent?.type === 'ai.progress' && lastEvent.target_id === jobId
+      ? lastEvent
+      : null;
+
+  if (relevant && relevant !== seen?.event) {
+    const step = typeof relevant.meta?.step === 'string' ? relevant.meta.step : '';
+    const status = typeof relevant.meta?.status === 'string' ? relevant.meta.status : 'running';
+    setSeen({
+      event: relevant,
+      progress: { step, label: aiStepLabel(step), status: status as AIProgress['status'] },
     });
-  }, [jobId, lastEvent]);
+  }
+
+  const fromStream = seen?.progress ?? null;
 
   if (!jobId) return null;
 

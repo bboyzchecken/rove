@@ -7,6 +7,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 
+import { track } from '@/lib/analytics';
 import { queryKeys } from '@/lib/query-keys';
 import type { TripOverview } from '@/types/api';
 
@@ -36,7 +37,10 @@ export function useCreateTrip() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateTripInput) => tripApi.create(input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.trips() }),
+    onSuccess: (_trip, input) => {
+      track({ name: 'trip_created', props: { entry_type: input.entry_type } });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.trips() });
+    },
   });
 }
 
@@ -108,6 +112,7 @@ export function useCreateInvite(tripId: string) {
   return useMutation({
     mutationFn: (body: { role?: 'editor' | 'viewer'; expire_in_days?: number; email?: string }) =>
       tripApi.createInvite(tripId, body),
+    onSuccess: (_data, body) => track({ name: 'member_invited', props: { role: body.role } }),
   });
 }
 
@@ -116,8 +121,13 @@ export function useSetVisibility(tripId: string) {
   return useMutation({
     mutationFn: (visibility: 'private' | 'link' | 'public') =>
       tripApi.setVisibility(tripId, visibility),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: queryKeys.tripOverview(tripId) }),
+    onSuccess: (_data, visibility) => {
+      track({ name: 'share_link_created', props: { visibility } });
+      if (visibility === 'public') {
+        track({ name: 'trip_published', props: { has_points_incentive: true } });
+      }
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tripOverview(tripId) });
+    },
   });
 }
 
@@ -145,6 +155,7 @@ export function useExportPlan(tripId: string) {
   return useMutation({
     mutationFn: ({ format, planId }: { format: 'html' | 'pdf'; planId?: string }) =>
       tripApi.export(tripId, format, planId),
+    onSuccess: (_data, { format }) => track({ name: 'export', props: { format } }),
   });
 }
 
@@ -152,6 +163,9 @@ export function useCloneTrip() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (tripId: string) => tripApi.clone(tripId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.trips() }),
+    onSuccess: () => {
+      track({ name: 'trip_cloned' });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.trips() });
+    },
   });
 }

@@ -1,13 +1,36 @@
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+
+import { PublicPlanView } from '@/components/public/public-plan-view';
+import { fetchPublicPlan } from '@/features/public/api';
+import { env } from '@/lib/env';
+
 /**
- * Read-only view behind an unguessable share token.
+ * W10.2 — the share link page.
  *
- * TODO(W10.x): not implemented — Phase 0 placeholder.
+ * noindex: a link-shared trip is "anyone with the link", not "anyone with a
+ * search engine". The public slug route (/p/[slug]) is the indexable one.
  */
-export default function SharedPlanPage() {
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
+
+export default async function SharePage({
+  params,
+}: {
+  params: Promise<{ shareToken: string }>;
+}) {
+  const { shareToken } = await params;
+  const plan = await fetchPublicPlan(shareToken);
+
+  if (!plan) notFound();
+
   return (
-    <main className="mx-auto max-w-2xl px-6 py-16">
-      <h1 className="text-xl font-semibold">แพลนที่แชร์มา</h1>
-      <p className="text-muted mt-2 text-sm">TODO W10.x</p>
+    <main>
+      <PublicPlanView plan={plan} cloneHref={`/?clone=${plan.trip_id}`} />
+      <p className="pb-8 text-center text-xs text-muted">
+        แชร์ผ่านลิงก์จาก {env.brandName}
+      </p>
     </main>
   );
 }

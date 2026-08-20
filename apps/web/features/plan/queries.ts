@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api-client';
+import { track } from '@/lib/analytics';
 import { queryKeys } from '@/lib/query-keys';
 import type { Collection, Day, Issue, Item, Plan, PlanDetail } from '@/types/api';
 
@@ -103,6 +104,7 @@ export function useFreezePlan(tripId: string) {
   return useMutation({
     mutationFn: (planId: string) => planApi.freeze(planId),
     onSuccess: (_data, planId) => {
+      track({ name: 'plan_frozen' });
       void queryClient.invalidateQueries({ queryKey: queryKeys.plans(tripId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.plan(planId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.tripOverview(tripId) });
@@ -118,7 +120,10 @@ export function useCreateItem(tripId: string, planId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: ItemInput) => planApi.createItem(planId, input),
-    onSuccess: () => invalidatePlan(queryClient, tripId, planId),
+    onSuccess: () => {
+      track({ name: 'item_added', props: { source: 'user' } });
+      invalidatePlan(queryClient, tripId, planId);
+    },
   });
 }
 
@@ -185,7 +190,10 @@ export function useMoveItem(tripId: string, planId: string) {
 
     // The server returns the whole plan after a move, so take it verbatim
     // rather than refetching a second time.
-    onSuccess: (fresh) => queryClient.setQueryData(key, fresh),
+    onSuccess: (fresh) => {
+      track({ name: 'item_moved', props: { source: 'user' } });
+      queryClient.setQueryData(key, fresh);
+    },
 
     onSettled: () => invalidatePlan(queryClient, tripId, planId),
   });
@@ -240,6 +248,8 @@ export function useDeleteItem(tripId: string, planId: string) {
     onError: (_error, _itemId, context) => {
       if (context?.previous) queryClient.setQueryData(key, context.previous);
     },
+
+    onSuccess: () => track({ name: 'item_deleted', props: { source: 'user' } }),
 
     onSettled: () => invalidatePlan(queryClient, tripId, planId),
   });

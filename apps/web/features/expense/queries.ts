@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api, type Paginated } from '@/lib/api-client';
+import { track } from '@/lib/analytics';
 import { queryKeys } from '@/lib/query-keys';
 import type { ExpenseEntry, ExpenseSummary } from '@/types/api';
 
@@ -62,7 +63,13 @@ export function useCreateExpense(tripId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: ExpenseInput) => expenseApi.create(tripId, input),
-    onSuccess: () => invalidateExpense(queryClient, tripId),
+    onSuccess: (_entry, input) => {
+      track({
+        name: 'expense_added',
+        props: { split_type: input.split_type ?? 'shared', category: input.category ?? 'other' },
+      });
+      invalidateExpense(queryClient, tripId);
+    },
   });
 }
 

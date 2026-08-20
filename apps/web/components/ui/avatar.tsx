@@ -54,10 +54,12 @@ export function Avatar({
   );
 
   if (avatarUrl) {
-    // eslint-disable-next-line @next/next/no-img-element -- OAuth avatars come
-    // from arbitrary hosts; allowlisting every provider in next.config is worse
-    // than skipping the optimiser for a 36px circle.
-    return <img src={avatarUrl} alt={name} className={cn(shell, 'object-cover')} />;
+    // OAuth avatars come from arbitrary hosts; allowlisting every provider in
+    // next.config is worse than skipping the optimiser for a 36px circle.
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={avatarUrl} alt={name} className={cn(shell, 'object-cover')} />
+    );
   }
 
   if (character) {

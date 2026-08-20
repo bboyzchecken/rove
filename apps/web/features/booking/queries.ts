@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api-client';
+import { track } from '@/lib/analytics';
 import { queryKeys } from '@/lib/query-keys';
 import type { BookingClick, Collection, Item } from '@/types/api';
 
@@ -33,7 +34,8 @@ export function useBookingLink(tripId: string, planId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (itemId: string) => bookingApi.link(itemId),
-    onSuccess: () => {
+    onSuccess: (result) => {
+      track({ name: 'booking_click', props: { partner: result.partner.key, item_type: 'item' } });
       void queryClient.invalidateQueries({ queryKey: queryKeys.plan(planId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.bookings(tripId) });
     },
@@ -45,7 +47,8 @@ export function useBookingStatus(tripId: string, planId: string) {
   return useMutation({
     mutationFn: ({ itemId, status }: { itemId: string; status: Item['booking_status'] }) =>
       bookingApi.setStatus(itemId, status),
-    onSuccess: () => {
+    onSuccess: (_item, { status }) => {
+      track({ name: 'booking_marked', props: { status } });
       void queryClient.invalidateQueries({ queryKey: queryKeys.plan(planId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.planBudget(planId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.bookings(tripId) });

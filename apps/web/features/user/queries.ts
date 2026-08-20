@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api, type Paginated } from '@/lib/api-client';
+import { track } from '@/lib/analytics';
 import { queryKeys } from '@/lib/query-keys';
 import type {
   CalendarEntry,
@@ -55,7 +56,8 @@ export function useSetCharacter() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (characterId: number) => userApi.setCharacter(characterId),
-    onSuccess: () => {
+    onSuccess: (_data, characterId) => {
+      track({ name: 'character_selected', props: { character_id: characterId } });
       void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
       // The character is the member avatar everywhere, so every trip's member
       // list is now stale.
@@ -80,7 +82,10 @@ export function useCreateDream() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: userApi.createDream,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.dreams() }),
+    onSuccess: () => {
+      track({ name: 'dream_item_added' });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dreams() });
+    },
   });
 }
 

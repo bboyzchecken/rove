@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/lib/api-client';
+import { track } from '@/lib/analytics';
 import { queryKeys } from '@/lib/query-keys';
 import type {
   Collection,
@@ -51,7 +52,10 @@ export function useCreateWish(tripId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: WishInput) => wishlistApi.create(tripId, input),
-    onSuccess: () => invalidateWishlist(queryClient, tripId),
+    onSuccess: (_wish, input) => {
+      track({ name: 'wishlist_item_added', props: { kind: input.kind ?? 'nice' } });
+      invalidateWishlist(queryClient, tripId);
+    },
   });
 }
 
@@ -111,7 +115,8 @@ export function useSaveProfile(tripId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (profile: Partial<MemberProfile>) => wishlistApi.saveProfile(tripId, profile),
-    onSuccess: () => {
+    onSuccess: (saved) => {
+      track({ name: 'profile_completed', props: { pace: saved.pace } });
       void queryClient.invalidateQueries({ queryKey: queryKeys.profile(tripId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.tripOverview(tripId) });
     },
