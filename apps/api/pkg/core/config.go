@@ -11,6 +11,13 @@ type Config struct {
 	JwtSecret   string
 	AdminEmails []string
 
+	// MockMode keeps the API fully functional without any third party: the
+	// database is still real and every write still lands in MySQL, but the
+	// providers that need a key or a bill (Anthropic, Google, FX, weather,
+	// storage, e-mail) are replaced by deterministic stand-ins. It is what UAT
+	// runs on, and it is never on in production.
+	MockMode bool
+
 	// Name of the httpOnly cookie the Next.js BFF sets; the API accepts it as
 	// an alternative to the Authorization header.
 	AuthCookieName string
@@ -81,6 +88,11 @@ type FXConfig struct {
 }
 
 func (c Config) IsProduction() bool { return c.Environment == "production" }
+
+// UseMock reports whether a provider should be stubbed. Production always
+// wins: MOCK_MODE=true in a production environment is a misconfiguration, not
+// an instruction.
+func (c Config) UseMock() bool { return c.MockMode && !c.IsProduction() }
 func (c Config) IsDevelopment() bool {
 	return c.Environment == "" || c.Environment == "development" || c.Environment == "local"
 }

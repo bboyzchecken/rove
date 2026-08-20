@@ -51,3 +51,39 @@ func (s *store) Update(ctx context.Context, t *models.Trip) error {
 func (s *store) Delete(ctx context.Context, tripID string) error {
 	return s.db.WithContext(ctx).Where("id = ?", tripID).Delete(&models.Trip{}).Error
 }
+
+func (s *store) GetBySlug(ctx context.Context, slug string) (*models.Trip, error) {
+	var t models.Trip
+	if err := s.db.WithContext(ctx).Where("slug = ?", slug).First(&t).Error; err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
+func (s *store) GetByShareToken(ctx context.Context, token string) (*models.Trip, error) {
+	var t models.Trip
+	if err := s.db.WithContext(ctx).Where("share_token = ?", token).First(&t).Error; err != nil {
+		return nil, err
+	}
+	return &t, nil
+}
+
+// BumpViewCount increments in SQL rather than read-modify-write: two people
+// opening a shared link at the same moment must not lose a view.
+func (s *store) BumpViewCount(ctx context.Context, tripID string) error {
+	return s.db.WithContext(ctx).Model(&models.Trip{}).
+		Where("id = ?", tripID).
+		UpdateColumn("view_count", gorm.Expr("view_count + 1")).Error
+}
+
+func (s *store) BumpCloneCount(ctx context.Context, tripID string) error {
+	return s.db.WithContext(ctx).Model(&models.Trip{}).
+		Where("id = ?", tripID).
+		UpdateColumn("clone_count", gorm.Expr("clone_count + 1")).Error
+}
+
+func (s *store) Count(ctx context.Context) (int64, error) {
+	var n int64
+	err := s.db.WithContext(ctx).Model(&models.Trip{}).Count(&n).Error
+	return n, err
+}

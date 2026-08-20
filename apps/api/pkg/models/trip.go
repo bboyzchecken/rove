@@ -46,6 +46,31 @@ type Trip struct {
 	Summary            string         `gorm:"type:text" json:"summary"`
 	CloneCount         int            `gorm:"not null;default:0" json:"clone_count"`
 	ViewCount          int            `gorm:"not null;default:0" json:"view_count"`
+
+	// The group's own target, in their home currency. The Budget tab compares
+	// its estimate against this line and nothing else.
+	BudgetPerPersonTHB float64 `gorm:"type:decimal(12,2);not null;default:0" json:"budget_per_person_thb"`
+
+	// Date coordination (M2.5). A trip may exist with no dates at all: that is
+	// the whole point of the date board. `DatesLockedAt` is what separates
+	// "we agreed on these days" from "someone typed a guess into the frame".
+	DatesLockedAt *time.Time `json:"dates_locked_at"`
+	DatesLockedBy *string    `gorm:"type:char(36)" json:"dates_locked_by"`
+	// Which suggestion the group picked, if they came through the date board.
+	DestinationID string `gorm:"type:varchar(40)" json:"destination_id"`
+}
+
+// Nights is derived, never stored: two columns that must agree are one column
+// too many.
+func (t Trip) Nights() int {
+	if t.StartDate == nil || t.EndDate == nil {
+		return 0
+	}
+	d := int(t.EndDate.Sub(*t.StartDate).Hours() / 24)
+	if d < 0 {
+		return 0
+	}
+	return d
 }
 
 func (Trip) TableName() string { return "trips" }
@@ -57,4 +82,11 @@ type TripStore interface {
 	ListForUser(ctx context.Context, userID string, limit, offset int) ([]Trip, int64, error)
 	Update(ctx context.Context, t *Trip) error
 	Delete(ctx context.Context, tripID string) error
+	GetBySlug(ctx context.Context, slug string) (*Trip, error)
+	GetByShareToken(ctx context.Context, token string) (*Trip, error)
+	// Counters are bumped without reading the row first — two people opening a
+	// shared link at once must not lose a view.
+	BumpViewCount(ctx context.Context, tripID string) error
+	BumpCloneCount(ctx context.Context, tripID string) error
+	Count(ctx context.Context) (int64, error)
 }

@@ -35,6 +35,11 @@ type User struct {
 	IsCreator    bool    `gorm:"not null;default:false" json:"is_creator"`
 	Locale       string  `gorm:"type:varchar(10);not null;default:'th'" json:"locale"`
 	HomeCurrency string  `gorm:"type:varchar(3);not null;default:'THB'" json:"home_currency"`
+	// The little animal that stands in for this person everywhere in the app
+	// (M14 — A14.3). Nullable: a brand-new account has not picked one yet.
+	CharacterID *string `gorm:"type:varchar(40);index" json:"character_id"`
+	// Who invited them, so a referral can be paid out once they join a trip.
+	ReferredBy  *string `gorm:"type:char(36)" json:"referred_by"`
 }
 
 func (User) TableName() string { return "users" }
@@ -47,4 +52,8 @@ type UserStore interface {
 	GetByEmail(ctx context.Context, email string) (*User, error)
 	GetByProvider(ctx context.Context, provider, providerUID string) (*User, error)
 	Update(ctx context.Context, u *User) error
+	// ListByIDs hydrates a member list in one query instead of N.
+	ListByIDs(ctx context.Context, ids []string) ([]User, error)
+	GetByHandle(ctx context.Context, handle string) (*User, error)
+	Count(ctx context.Context) (int64, error)
 }

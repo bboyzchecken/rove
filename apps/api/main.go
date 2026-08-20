@@ -14,10 +14,28 @@ import (
 	"github.com/bboyzchecken/rove/apps/api/pkg/core"
 	handlers "github.com/bboyzchecken/rove/apps/api/pkg/handlers/api"
 	"github.com/bboyzchecken/rove/apps/api/pkg/logger"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/affiliate"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/ai"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
+	fxsvc "github.com/bboyzchecken/rove/apps/api/pkg/services/fx"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/places"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/storage"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/weather"
+	aijobstore "github.com/bboyzchecken/rove/apps/api/pkg/store/aijob"
+	bookingstore "github.com/bboyzchecken/rove/apps/api/pkg/store/booking"
+	characterstore "github.com/bboyzchecken/rove/apps/api/pkg/store/character"
+	collabstore "github.com/bboyzchecken/rove/apps/api/pkg/store/collab"
+	datestore "github.com/bboyzchecken/rove/apps/api/pkg/store/dates"
+	expensestore "github.com/bboyzchecken/rove/apps/api/pkg/store/expense"
+	invitestore "github.com/bboyzchecken/rove/apps/api/pkg/store/invite"
 	memberstore "github.com/bboyzchecken/rove/apps/api/pkg/store/member"
+	planstore "github.com/bboyzchecken/rove/apps/api/pkg/store/plan"
 	poistore "github.com/bboyzchecken/rove/apps/api/pkg/store/poi"
+	pointsstore "github.com/bboyzchecken/rove/apps/api/pkg/store/points"
+	prepstore "github.com/bboyzchecken/rove/apps/api/pkg/store/prep"
 	tripstore "github.com/bboyzchecken/rove/apps/api/pkg/store/trip"
 	userstore "github.com/bboyzchecken/rove/apps/api/pkg/store/user"
+	wishliststore "github.com/bboyzchecken/rove/apps/api/pkg/store/wishlist"
 )
 
 func main() {
@@ -61,6 +79,7 @@ func loadConfig() core.Config {
 		Commit:         viper.GetString("COMMIT"),
 		Port:           viper.GetString("PORT"),
 		JwtSecret:      viper.GetString("JWT_SECRET_KEY"),
+		MockMode:       viper.GetBool("MOCK_MODE"),
 		AdminEmails:    splitCSV(viper.GetString("ADMIN_EMAILS")),
 		AuthCookieName: viper.GetString("AUTH_COOKIE_NAME"),
 		AppBaseURL:     viper.GetString("APP_BASE_URL"),
@@ -140,6 +159,35 @@ func storeModules() fx.Option {
 		tripstore.Module,
 		memberstore.Module,
 		poistore.Module,
+		characterstore.Module,
+		pointsstore.Module,
+		invitestore.Module,
+		invitestore.DreamModule,
+		datestore.Module,
+		wishliststore.Module,
+		planstore.Module,
+		expensestore.Module,
+		prepstore.Module,
+		bookingstore.Module,
+		collabstore.Module,
+		aijobstore.Module,
+	)
+}
+
+// serviceModules registers everything that talks to the outside world. Each of
+// them degrades to a deterministic stand-in when MOCK_MODE is on or its key is
+// missing, which is what lets UAT run the real API against a real database
+// without a single third-party account.
+func serviceModules() fx.Option {
+	return fx.Options(
+		events.Module,
+		fxsvc.Module,
+		weather.Module,
+		places.Module,
+		affiliate.Module,
+		storage.Module,
+		ai.Module,
+		ai.RunnerModule,
 	)
 }
 
@@ -148,6 +196,7 @@ func runServer(cfg core.Config) {
 		fx.Supply(cfg),
 		fx.Provide(core.NewDatabase, core.NewRedis),
 		storeModules(),
+		serviceModules(),
 		handlers.Module,
 		fx.Invoke(migrateOnBoot),
 		fx.Invoke(startHTTP),

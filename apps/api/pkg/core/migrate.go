@@ -44,6 +44,69 @@ func Migrate(db *gorm.DB) error {
 				return tx.Exec("ALTER TABLE pois DROP INDEX ft_poi_names").Error
 			},
 		},
+		{
+			// Phase 1 — every table the MVP needs, in one migration because they
+			// ship together: a half-migrated database has no useful state.
+			ID: "202601020000_phase1_core",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.AutoMigrate(
+					&models.Character{},
+					&models.UserPoints{},
+					&models.Invite{},
+					&models.DreamItem{},
+					&models.Availability{},
+					&models.AvailabilitySubmission{},
+					&models.WishlistItem{},
+					&models.Plan{},
+					&models.PlanDay{},
+					&models.PlanItem{},
+					&models.ItemVersion{},
+					&models.ExpenseEntry{},
+					&models.Settlement{},
+					&models.PrepTask{},
+					&models.PrepNote{},
+					&models.Booking{},
+					&models.BookingClick{},
+					&models.Comment{},
+					&models.Vote{},
+					&models.Activity{},
+					&models.AIJob{},
+					&models.AICredit{},
+				)
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return tx.Migrator().DropTable(
+					"ai_credits", "ai_jobs", "activity_logs", "votes", "comments",
+					"booking_clicks", "bookings", "prep_notes", "prep_tasks",
+					"expense_settlements", "expense_entries", "item_versions",
+					"plan_items", "plan_days", "plans", "wishlist_items",
+					"trip_availability_submissions", "trip_availability",
+					"dream_items", "invites", "user_points", "characters",
+				)
+			},
+		},
+		{
+			// The columns Phase 1 adds to tables that already existed.
+			ID: "202601020001_phase1_trip_user_columns",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.AutoMigrate(&models.Trip{}, &models.User{})
+			},
+			Rollback: func(tx *gorm.DB) error {
+				for _, col := range []string{
+					"budget_per_person_thb", "dates_locked_at", "dates_locked_by", "destination_id",
+				} {
+					if err := tx.Migrator().DropColumn(&models.Trip{}, col); err != nil {
+						return err
+					}
+				}
+				for _, col := range []string{"character_id", "referred_by"} {
+					if err := tx.Migrator().DropColumn(&models.User{}, col); err != nil {
+						return err
+					}
+				}
+				return nil
+			},
+		},
 	})
 
 	return m.Migrate()
