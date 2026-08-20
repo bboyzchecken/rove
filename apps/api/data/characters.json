@@ -1,0 +1,22 @@
+[
+  { "id": 1,  "name": "แมวนักเดินทาง",    "emoji": "🐱", "image_url": "", "is_active": true },
+  { "id": 2,  "name": "หมาน้อยขี้ตื่นเต้น", "emoji": "🐶", "image_url": "", "is_active": true },
+  { "id": 3,  "name": "หมีขั้วโลกสายชิล",  "emoji": "🐻‍❄️", "image_url": "", "is_active": true },
+  { "id": 4,  "name": "แพนด้ากินไม่หยุด",  "emoji": "🐼", "image_url": "", "is_active": true },
+  { "id": 5,  "name": "จิ้งจอกวางแผน",     "emoji": "🦊", "image_url": "", "is_active": true },
+  { "id": 6,  "name": "กระต่ายตื่นเช้า",    "emoji": "🐰", "image_url": "", "is_active": true },
+  { "id": 7,  "name": "เพนกวินเดินตาม",    "emoji": "🐧", "image_url": "", "is_active": true },
+  { "id": 8,  "name": "นกฮูกสายดึก",       "emoji": "🦉", "image_url": "", "is_active": true },
+  { "id": 9,  "name": "กบสายกิน",          "emoji": "🐸", "image_url": "", "is_active": true },
+  { "id": 10, "name": "ชิบะคุมงบ",          "emoji": "🐕", "image_url": "", "is_active": true },
+  { "id": 11, "name": "โคอาลาสายนอน",      "emoji": "🐨", "image_url": "", "is_active": true },
+  { "id": 12, "name": "เสือสายลุย",         "emoji": "🐯", "image_url": "", "is_active": true },
+  { "id": 13, "name": "ยูนิคอร์นสายฝัน",    "emoji": "🦄", "image_url": "", "is_active": true },
+  { "id": 14, "name": "ปลาหมึกหลายมือ",    "emoji": "🐙", "image_url": "", "is_active": true },
+  { "id": 15, "name": "เต่าสายเรื่อย ๆ",     "emoji": "🐢", "image_url": "", "is_active": true },
+  { "id": 16, "name": "ผึ้งสายจัดตาราง",    "emoji": "🐝", "image_url": "", "is_active": true },
+  { "id": 17, "name": "แมวน้ำสายทะเล",     "emoji": "🦭", "image_url": "", "is_active": true },
+  { "id": 18, "name": "กวางนาระ",           "emoji": "🦌", "image_url": "", "is_active": true },
+  { "id": 19, "name": "ไดโนเสาร์สายถ่ายรูป", "emoji": "🦕", "image_url": "", "is_active": true },
+  { "id": 20, "name": "มังกรสายชอปปิ้ง",    "emoji": "🐲", "image_url": "", "is_active": true }
+]

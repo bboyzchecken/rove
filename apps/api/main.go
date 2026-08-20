@@ -60,16 +60,19 @@ func main() {
 	case "up":
 		runMigrate(cfg)
 	case "seed":
-		runSeed(cfg)
+		// `go run . seed` loads everything; `go run . seed pois` loads one set.
+		runSeed(cfg, arg(2))
 	default:
 		log.WithField("env", cfg.Environment).Infof("starting rove api on :%s", cfg.Port)
 		runServer(cfg)
 	}
 }
 
-func command() string {
-	if len(os.Args) > 1 {
-		return os.Args[1]
+func command() string { return arg(1) }
+
+func arg(i int) string {
+	if len(os.Args) > i {
+		return os.Args[i]
 	}
 	return ""
 }
