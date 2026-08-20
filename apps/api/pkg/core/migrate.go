@@ -107,6 +107,18 @@ func Migrate(db *gorm.DB) error {
 				return nil
 			},
 		},
+		{
+			// M1 — A1.3: the route a trip is built on. A trip that starts from
+			// "BKK→NRT, 4 Dec, lands 08:05" keeps those legs; the frame (dates,
+			// destinations, country) is derived from them rather than typed.
+			ID: "202608200000_trip_flights",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.AutoMigrate(&models.TripFlight{})
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return tx.Migrator().DropTable("trip_flights")
+			},
+		},
 	})
 
 	return m.Migrate()

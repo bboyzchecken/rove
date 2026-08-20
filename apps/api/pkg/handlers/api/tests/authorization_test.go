@@ -49,6 +49,9 @@ func TestOutsiderCannotReachAnyTripRoute(t *testing.T) {
 		{"clone", http.MethodPost, base + "/clone", nil},
 		{"activity", http.MethodGet, base + "/activity", nil},
 
+		{"route", http.MethodGet, base + "/flights", nil},
+		{"route write", http.MethodPut, base + "/flights", map[string]any{"flights": []any{}}},
+
 		{"members", http.MethodGet, base + "/members", nil},
 		{"invite", http.MethodPost, base + "/invites", map[string]any{}},
 

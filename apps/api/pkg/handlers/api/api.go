@@ -18,6 +18,7 @@ import (
 	"github.com/bboyzchecken/rove/apps/api/pkg/models"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/affiliate"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/ai"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/airports"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
 	fxsvc "github.com/bboyzchecken/rove/apps/api/pkg/services/fx"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/places"
@@ -48,11 +49,13 @@ type ServerParams struct {
 	Expenses   models.ExpenseStore
 	Prep       models.PrepStore
 	Bookings   models.BookingStore
+	Flights    models.FlightStore
 	Collab     models.CollabStore
 	AIJobs     models.AIJobStore
 
 	Hub       events.Hub
 	FX        fxsvc.Service
+	Airports  airports.Service
 	Weather   weather.Service
 	Affiliate affiliate.Service
 	Places    places.Service
@@ -80,11 +83,13 @@ type Server struct {
 	expenses   models.ExpenseStore
 	prep       models.PrepStore
 	bookings   models.BookingStore
+	flights    models.FlightStore
 	collab     models.CollabStore
 	aiJobs     models.AIJobStore
 
 	hub       events.Hub
 	fx        fxsvc.Service
+	airports  airports.Service
 	weather   weather.Service
 	affiliate affiliate.Service
 	places    places.Service
@@ -119,10 +124,12 @@ func NewServer(p ServerParams) *Server {
 		expenses:   p.Expenses,
 		prep:       p.Prep,
 		bookings:   p.Bookings,
+		flights:    p.Flights,
 		collab:     p.Collab,
 		aiJobs:     p.AIJobs,
 		hub:        p.Hub,
 		fx:         p.FX,
+		airports:   p.Airports,
 		weather:    p.Weather,
 		affiliate:  p.Affiliate,
 		places:     p.Places,
@@ -165,16 +172,18 @@ func (s *Server) registerRoutes() {
 
 	v1 := s.e.Group("/api/v1")
 
-	s.registerAuthRoutes(v1)   // A0.4 / A0.5
-	s.registerUserRoutes(v1)   // A3.1 / A14 / A15 / A17
-	s.registerPublicRoutes(v1) // A10.1 — shared + public trips
-	s.registerPOIRoutes(v1)    // A4.2
+	s.registerAuthRoutes(v1)     // A0.4 / A0.5
+	s.registerUserRoutes(v1)     // A3.1 / A14 / A15 / A17
+	s.registerPublicRoutes(v1)   // A10.1 — shared + public trips
+	s.registerPOIRoutes(v1)      // A4.2
+	s.registerAirportRoutes(v1)  // A1.3 — worldwide airport search
 	s.registerAIPublicRoutes(v1) // A1.2 — reading a ticket happens before a trip
 
 	// --- trip-scoped ---------------------------------------------------------
 	// Every route below carries :tripId and is guarded by TripRoleMiddleware.
 	trips := v1.Group("/trips", s.JwtMiddleware)
 	s.registerTripRoutes(trips)          // A1.1 / A2.1
+	s.registerFlightRoutes(trips)        // A1.3 — the route the trip is built on
 	s.registerMemberRoutes(trips)        // A2.2 / A2.3
 	s.registerDateRoutes(trips)          // A2.6 — date coordination
 	s.registerWishlistRoutes(trips)      // A3.2

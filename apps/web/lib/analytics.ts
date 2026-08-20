@@ -17,7 +17,10 @@ import { env } from './env';
  * wants out of their holiday is not telemetry.
  */
 export interface AnalyticsEvents {
-  trip_created: { entry_type: 'date' | 'city' | 'ticket' | 'clone' | 'coordinate' };
+  // M1 — the three doors: a booked route, dates first, or no dates at all.
+  trip_created: { entry_type: 'route' | 'date' | 'clone' | 'coordinate' };
+  /** How the legs got there — typed by hand, or read out of a pasted ticket. */
+  route_built: { legs: number; countries: number; source: 'manual' | 'ticket' };
   member_invited: { role: 'editor' | 'viewer' };
   member_joined: Record<string, never>;
   wishlist_item_added: { kind: 'must' | 'nice' | 'avoid' };

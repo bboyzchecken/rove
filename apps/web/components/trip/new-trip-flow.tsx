@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
@@ -8,100 +8,148 @@ import {
   CalendarDays,
   CalendarSearch,
   Check,
-  MapPin,
-  Ticket,
+  ClipboardPaste,
+  Plane,
 } from 'lucide-react';
 
 import { RoveMark } from '@/components/brand/rove-mark';
+import { RouteBuilder, RouteSummary, newLeg, useRouteDraft, type DraftLeg } from '@/components/trip/route-builder';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
 import { useCharacters, useUpdateMe } from '@/features/auth/queries';
 import { useCreateTrip } from '@/features/trip/queries';
+import { track } from '@/lib/analytics';
 import { repo } from '@/lib/data';
-import type { ParsedTicket } from '@/lib/data';
 import { addDays, daysBetween, thaiRangeLabel } from '@/lib/data/domain';
 import { cn } from '@/lib/utils';
 
 /**
- * Entry flow (M1 — W1.2 dates, W1.3 city, W1.4 pasted ticket, W2.8 no dates yet).
+ * Entry flow (M1 — W1.2 / W1.3 / W2.8).
  *
- * The constraint from X1.1 is the design: every route reaches a created trip
- * in at most three screens, so this is entry → details → done. The character
- * pick rides along on the last screen (W14.3) because it costs one tap.
+ * Three doors, and they no longer overlap. The old set had four, two of which
+ * asked the same question in different words: "เริ่มจากเมือง" wanted a city
+ * name and "วางข้อความตั๋ว" wanted the ticket that names the same city. Worse,
+ * the city answer was ambiguous — someone who picked "โซล" and "อูเอโนะ" had
+ * told us nothing about whether that is one country or two, or how they cross
+ * between them, and the planner cannot draft days it cannot place.
  *
- * "ยังไม่รู้วัน" is the fourth door and the honest one for a group chat: it
- * creates the room with no dates at all and drops everyone on the date board.
+ * So the doors are now sorted by what the group actually knows:
+ *
+ *   1. รู้เที่ยวบินแล้ว  → the route: airports, dates, arrival times. Pasting a
+ *                          ticket is a shortcut *inside* this door, not a door
+ *                          of its own — it fills in the same legs.
+ *   2. รู้วันแล้ว        → dates now, destination later.
+ *   3. ยังไม่รู้วัน      → the date board finds the days first.
+ *
+ * X1.1 still holds: every door reaches a created trip in at most three screens.
  */
-type Entry = 'date' | 'city' | 'ticket' | 'coordinate';
+type Entry = 'route' | 'date' | 'coordinate';
 
 const ENTRIES: { key: Entry; icon: typeof CalendarDays; title: string; hint: string }[] = [
-  { key: 'date', icon: CalendarDays, title: 'เริ่มจากวัน', hint: 'รู้วันลาแล้ว' },
+  { key: 'route', icon: Plane, title: 'รู้เที่ยวบินแล้ว', hint: 'ใส่สนามบินและวันบิน เดี๋ยวจัดวันให้' },
+  { key: 'date', icon: CalendarDays, title: 'รู้วันแล้ว', hint: 'ลาไว้แล้ว ยังไม่รู้จะไปไหน' },
   { key: 'coordinate', icon: CalendarSearch, title: 'ยังไม่รู้วัน', hint: 'หาวันที่ทุกคนว่างก่อน' },
-  { key: 'city', icon: MapPin, title: 'เริ่มจากเมือง', hint: 'รู้ว่าอยากไปไหน' },
-  { key: 'ticket', icon: Ticket, title: 'วางข้อความตั๋ว', hint: 'จองตั๋วไว้แล้ว' },
-];
-
-/** Suggestions only — the field takes any destination in the world. */
-const CITIES = [
-  'โตเกียว',
-  'เกียวโต',
-  'โซล',
-  'ไทเป',
-  'ดานัง',
-  'บาหลี',
-  'ลิสบอน',
-  'เรคยาวิก',
-  'เมลเบิร์น',
 ];
 
 const SAMPLE_TICKET = `Thai Airways — Booking confirmed
-TG 682  BKK 23:59 → HND 07:05  15 Nov 2026
-TG 673  KIX 12:20 → BKK 16:30  22 Nov 2026
+TG 682  BKK 23:59 → NRT 08:05  04 Dec 2026
+TG 677  NRT 14:35 → BKK 22:05  10 Dec 2026
 Passengers: 4`;
 
-const DEFAULT_START = '2026-11-15';
-const DEFAULT_END = '2026-11-22';
+const DEFAULT_START = '2026-12-04';
+const DEFAULT_END = '2026-12-10';
+/** Where a Thai group almost always leaves from — one less field to fill. */
+const HOME_AIRPORT = 'BKK';
 
 export function NewTripFlow() {
   const router = useRouter();
   const params = useSearchParams();
-  const initial = params.get('from') as Entry | null;
+  const initial = normaliseEntry(params.get('from'));
+  const presetAirport = params.get('to');
   const presetCity = params.get('city');
 
   const [entry, setEntry] = useState<Entry | null>(initial);
   const [step, setStep] = useState(initial ? 1 : 0);
-  const [cities, setCities] = useState<string[]>(presetCity ? [presetCity] : ['โตเกียว', 'เกียวโต']);
+  const [legs, setLegs] = useState<DraftLeg[]>(() => [
+    newLeg('out', { from: HOME_AIRPORT, to: presetAirport?.toUpperCase() ?? '', depDate: DEFAULT_START }),
+    newLeg('back', { from: presetAirport?.toUpperCase() ?? '', to: HOME_AIRPORT, depDate: DEFAULT_END }),
+  ]);
   const [startDate, setStartDate] = useState(DEFAULT_START);
   const [endDate, setEndDate] = useState(DEFAULT_END);
   const [party, setParty] = useState(4);
   const [character, setCharacter] = useState('shiba');
   const [ticket, setTicket] = useState('');
-  const [parsed, setParsed] = useState<ParsedTicket | null>(null);
+  const [pasting, setPasting] = useState(false);
   const [parsing, setParsing] = useState(false);
+  const [ticketNote, setTicketNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const { data: characters } = useCharacters();
   const createTrip = useCreateTrip();
   const updateMe = useUpdateMe();
+  const { airports, route, warnings } = useRouteDraft(legs);
+
+  // A link from "ที่อยากไป" carries a city name, not a code. Look it up once so
+  // the route opens on the airport that serves it.
+  useEffect(() => {
+    if (!presetCity || presetAirport) return;
+    let cancelled = false;
+
+    void repo.airports.search(presetCity, 1).then(([airport]) => {
+      if (cancelled || !airport) return;
+      setLegs((prev) =>
+        prev.map((leg) =>
+          leg.direction === 'out'
+            ? { ...leg, to: airport.iata }
+            : leg.direction === 'back'
+              ? { ...leg, from: airport.iata }
+              : leg,
+        ),
+      );
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [presetCity, presetAirport]);
 
   const coordinating = entry === 'coordinate';
-  const nights = coordinating ? 0 : Math.max(0, daysBetween(startDate, endDate) - 1);
+  const routing = entry === 'route';
+  const nights = routing ? route.nights : Math.max(0, daysBetween(startDate, endDate) - 1);
 
+  /** The paste shortcut: the same legs, typed by the airline instead of by you. */
   async function readTicket(text: string) {
     setTicket(text);
-    setParsed(null);
+    setTicketNote(null);
     if (text.trim().length < 40) return;
 
     setParsing(true);
     try {
-      const result = await repo.trips.parseTicket(text);
-      setParsed(result);
-      if (result.startDate) setStartDate(result.startDate);
-      if (result.endDate) setEndDate(result.endDate);
-      if (result.partySize) setParty(result.partySize);
-      if (result.cities.length > 0) setCities(result.cities);
+      const parsed = await repo.trips.parseTicket(text);
+      if (parsed.flights.length === 0) {
+        setTicketNote('อ่านเที่ยวบินไม่ออก — ใส่เองด้านล่างได้เลย หรือวางเฉพาะบรรทัดที่มีรหัสเที่ยวบิน');
+        return;
+      }
+
+      setLegs(
+        parsed.flights.map((flight, index) =>
+          newLeg(
+            index === 0 ? 'out' : index === parsed.flights.length - 1 ? 'back' : 'inter',
+            {
+              from: flight.from,
+              to: flight.to,
+              depDate: flight.date,
+              depTime: flight.time,
+              flightNo: flight.code,
+            },
+          ),
+        ),
+      );
+      if (parsed.partySize) setParty(parsed.partySize);
+      setTicketNote(`อ่านได้ ${parsed.flights.length} เที่ยวบิน — ตรวจแล้วแก้ตรงไหนก็ได้`);
+      track('route_built', { legs: parsed.flights.length, countries: 0, source: 'ticket' });
     } finally {
       setParsing(false);
     }
@@ -109,9 +157,15 @@ export function NewTripFlow() {
 
   function suggestedTitle() {
     if (coordinating) return 'ทริปใหม่ของแก๊ง';
-    const where = cities[0] ?? 'ทริปใหม่';
-    const year = Number(startDate.slice(0, 4)) + 543;
-    return `${where} ${year}`;
+    const where = routing ? (route.stops[0]?.city ?? 'ทริปใหม่') : 'ทริปใหม่';
+    const year = Number((routing ? route.startDate : startDate).slice(0, 4)) + 543;
+    return Number.isFinite(year) ? `${where} ${year}` : where;
+  }
+
+  /** The one rule: a route decides the frame, everything else is typed. */
+  function canContinue() {
+    if (!routing) return true;
+    return route.stops.length > 0;
   }
 
   async function create() {
@@ -120,11 +174,12 @@ export function NewTripFlow() {
       if (character) await updateMe.mutateAsync({ characterId: character });
 
       const trip = await createTrip.mutateAsync({
-        entryType: coordinating ? 'date' : (entry ?? 'date'),
+        entryType: coordinating ? 'date' : routing ? 'route' : 'date',
         title: suggestedTitle(),
-        cities: coordinating ? [] : cities,
-        startDate: coordinating ? undefined : startDate,
-        endDate: coordinating ? undefined : endDate,
+        flights: routing ? legs.filter((leg) => leg.from && leg.to && leg.depDate) : undefined,
+        cities: routing ? undefined : [],
+        startDate: coordinating || routing ? undefined : startDate,
+        endDate: coordinating || routing ? undefined : endDate,
         partySize: party,
         coordinateDates: coordinating,
       });
@@ -154,9 +209,9 @@ export function NewTripFlow() {
       {step === 0 ? (
         <div className="animate-rove-rise">
           <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight">
-            เริ่มทริปใหม่ยังไงดี
+            ตอนนี้รู้อะไรแล้วบ้าง
           </h1>
-          <p className="text-muted mt-1 text-sm">เลือกอันที่ตรงกับสิ่งที่รู้อยู่ตอนนี้</p>
+          <p className="text-muted mt-1 text-sm">เลือกอันที่ใกล้ที่สุด เดี๋ยวที่เหลือค่อยเติมทีหลัง</p>
 
           <div className="mt-5 space-y-2.5">
             {ENTRIES.map((option) => (
@@ -195,145 +250,115 @@ export function NewTripFlow() {
           </button>
 
           <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight">
-            {entry === 'date'
-              ? 'ไปวันไหน'
-              : entry === 'coordinate'
-                ? 'ไปกันกี่คน'
-                : entry === 'city'
-                  ? 'อยากไปเมืองไหน'
-                  : 'วางข้อความตั๋วมาเลย'}
+            {routing ? 'บินไปลงที่ไหน' : coordinating ? 'ไปกันกี่คน' : 'ไปวันไหน'}
           </h1>
+          {routing ? (
+            <p className="text-muted mt-1 text-sm">
+              ใส่สนามบินกับวันบิน — วันเดินทาง จำนวนคืน และประเทศ ROVE คิดให้เอง
+            </p>
+          ) : null}
 
           <div className="mt-5 space-y-4">
-            {entry === 'coordinate' ? (
+            {/* --- route door ------------------------------------------- */}
+            {routing ? (
+              <>
+                <RouteBuilder
+                  legs={legs}
+                  onChange={setLegs}
+                  airports={airports}
+                  warnings={warnings}
+                />
+
+                <RouteSummary route={route} />
+
+                <div>
+                  <button
+                    onClick={() => setPasting((v) => !v)}
+                    className="text-primary inline-flex items-center gap-1.5 text-xs font-semibold"
+                  >
+                    <ClipboardPaste className="size-3.5" />
+                    {pasting ? 'ซ่อนช่องวางตั๋ว' : 'มีอีเมลตั๋วอยู่แล้ว? วางมาเลย'}
+                  </button>
+
+                  {pasting ? (
+                    <div className="mt-2 space-y-2">
+                      <textarea
+                        value={ticket}
+                        onChange={(e) => void readTicket(e.target.value)}
+                        rows={5}
+                        placeholder="วางอีเมลยืนยันตั๋ว หรือข้อความจากสายการบินได้เลย"
+                        className="bg-surface text-espresso nums w-full rounded-2xl p-3.5 text-xs outline-none"
+                      />
+                      <Button
+                        variant="soft"
+                        size="sm"
+                        onClick={() => void readTicket(SAMPLE_TICKET)}
+                        disabled={parsing}
+                      >
+                        {parsing ? 'กำลังอ่าน…' : 'ใส่ตัวอย่างให้ดู'}
+                      </Button>
+                      {ticketNote ? (
+                        <Card accent="sun" className="p-3">
+                          <p className="text-espresso text-xs">{ticketNote}</p>
+                        </Card>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              </>
+            ) : null}
+
+            {/* --- date door -------------------------------------------- */}
+            {entry === 'date' ? (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="ไปวันที่">
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => {
+                        setStartDate(e.target.value);
+                        if (e.target.value > endDate) setEndDate(addDays(e.target.value, 4));
+                      }}
+                      className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
+                    />
+                  </Field>
+                  <Field label="กลับวันที่">
+                    <input
+                      type="date"
+                      value={endDate}
+                      min={startDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
+                    />
+                  </Field>
+                </div>
+
+                <p className="text-muted text-xs">
+                  {nights + 1} วัน {nights} คืน · {thaiRangeLabel(startDate, endDate)}
+                </p>
+
+                <Card accent="sky" className="p-4">
+                  <p className="text-espresso text-xs leading-relaxed">
+                    ยังไม่ต้องเลือกปลายทางตอนนี้ — สร้างห้องแล้ว ROVE จะแนะนำที่ที่เหมาะกับ{' '}
+                    {nights + 1} วันนี้ให้ พอจองตั๋วได้แล้วค่อยใส่เที่ยวบินทีหลัง
+                  </p>
+                  <button
+                    onClick={() => setEntry('route')}
+                    className="text-primary mt-2 text-xs font-semibold"
+                  >
+                    จองตั๋วแล้ว? ใส่เที่ยวบินเลยดีกว่า →
+                  </button>
+                </Card>
+              </>
+            ) : null}
+
+            {/* --- coordinate door -------------------------------------- */}
+            {coordinating ? (
               <Card accent="sky" className="p-4">
                 <p className="text-espresso text-xs leading-relaxed">
                   สร้างห้องก่อนโดยยังไม่ต้องมีวัน — ทุกคนเข้ามาแตะวันที่ตัวเองว่าง
                   แล้ว ROVE จะหาช่วงที่ซ้อนกันมากที่สุดให้ พร้อมแนะนำปลายทางที่เหมาะกับจำนวนวันนั้น
-                </p>
-              </Card>
-            ) : null}
-
-            {entry === 'ticket' ? (
-              <>
-                <textarea
-                  value={ticket}
-                  onChange={(e) => void readTicket(e.target.value)}
-                  rows={6}
-                  placeholder="วางอีเมลยืนยันตั๋ว หรือข้อความจากสายการบินได้เลย"
-                  className="bg-surface text-espresso nums w-full rounded-2xl p-3.5 text-xs outline-none"
-                />
-                <Button
-                  variant="soft"
-                  size="sm"
-                  onClick={() => void readTicket(SAMPLE_TICKET)}
-                  disabled={parsing}
-                >
-                  {parsing ? 'กำลังอ่าน…' : 'ใส่ตัวอย่างให้ดู'}
-                </Button>
-
-                {parsed && parsed.flights.length > 0 ? (
-                  <Card accent="matcha" className="animate-rove-rise p-4">
-                    <p className="section-label mb-2">อ่านออกมาได้แบบนี้</p>
-                    <ul className="text-espresso space-y-1.5 text-xs">
-                      {parsed.flights.map((flight, index) => (
-                        <li key={`${flight.code}-${index}`}>
-                          ✈️ {index === 0 ? 'ขาไป' : 'ขากลับ'} {flight.code} · {flight.from} →{' '}
-                          {flight.to} · {flight.date}
-                          {flight.time ? ` ${flight.time}` : ''}
-                        </li>
-                      ))}
-                      <li>
-                        👥 {parsed.partySize ?? party} คน · {nights + 1} วัน {nights} คืน
-                      </li>
-                    </ul>
-                    {parsed.simulated ? (
-                      <p className="text-muted mt-2 text-[11px]">
-                        โหมดทดลอง: อ่านจากข้อความตรง ๆ ยังไม่ได้ส่งให้ AI ตรวจ
-                      </p>
-                    ) : null}
-                  </Card>
-                ) : null}
-
-                {parsed && parsed.flights.length === 0 ? (
-                  <Card accent="sun" className="p-3.5">
-                    <p className="text-espresso text-xs">
-                      อ่านเที่ยวบินไม่ออก — ใส่วันเองได้ที่ขั้นถัดไป หรือลองวางเฉพาะส่วนที่มีรหัสเที่ยวบิน
-                    </p>
-                  </Card>
-                ) : null}
-              </>
-            ) : null}
-
-            {entry === 'date' || (entry === 'ticket' && parsed) ? (
-              <div className="grid grid-cols-2 gap-2">
-                <Field label="ไปวันที่">
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => {
-                      setStartDate(e.target.value);
-                      if (e.target.value > endDate) setEndDate(addDays(e.target.value, 4));
-                    }}
-                    className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
-                  />
-                </Field>
-                <Field label="กลับวันที่">
-                  <input
-                    type="date"
-                    value={endDate}
-                    min={startDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
-                  />
-                </Field>
-              </div>
-            ) : null}
-
-            {entry === 'date' ? (
-              <p className="text-muted text-xs">
-                {nights + 1} วัน {nights} คืน · {thaiRangeLabel(startDate, endDate)}
-              </p>
-            ) : null}
-
-            {entry === 'city' || entry === 'date' ? (
-              <Field
-                label={
-                  entry === 'city'
-                    ? 'เลือกเมือง (เลือกได้หลายเมือง)'
-                    : 'อยากไปเมืองไหนบ้าง (ข้ามได้)'
-                }
-              >
-                <div className="flex flex-wrap gap-1.5">
-                  {CITIES.map((city) => {
-                    const on = cities.includes(city);
-                    return (
-                      <button
-                        key={city}
-                        onClick={() =>
-                          setCities((prev) =>
-                            on ? prev.filter((c) => c !== city) : [...prev, city],
-                          )
-                        }
-                        className={cn(
-                          'rounded-full px-3.5 py-1.5 text-xs font-semibold transition',
-                          on ? 'bg-espresso text-bg' : 'bg-surface text-muted',
-                        )}
-                      >
-                        {city}
-                      </button>
-                    );
-                  })}
-                </div>
-              </Field>
-            ) : null}
-
-            {entry === 'city' && cities.length > 0 ? (
-              <Card accent="sky" className="p-3.5">
-                <p className="text-espresso text-xs leading-relaxed">
-                  {cities.length} เมืองแบบไม่รีบ ควรใช้เวลาประมาณ{' '}
-                  <span className="font-bold">{cities.length * 3 + 1} วัน</span> —
-                  เลือกวันจริงทีหลังได้
                 </p>
               </Card>
             ) : null}
@@ -360,9 +385,14 @@ export function NewTripFlow() {
             </Field>
           </div>
 
-          <Button block size="lg" className="mt-6" onClick={() => setStep(2)}>
+          <Button block size="lg" className="mt-6" onClick={() => setStep(2)} disabled={!canContinue()}>
             ต่อไป <ArrowRight className="size-4" />
           </Button>
+          {routing && !canContinue() ? (
+            <p className="text-muted mt-2 text-center text-[11px]">
+              ใส่สนามบินปลายทางและวันบินของขาไปก่อน
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -403,18 +433,29 @@ export function NewTripFlow() {
             <p className="section-label mb-2">สรุปทริปที่จะสร้าง</p>
             <div className="flex flex-wrap gap-1.5">
               <Badge tone="primary">
-                {coordinating ? 'ยังไม่กำหนดวัน' : thaiRangeLabel(startDate, endDate)}
+                {coordinating
+                  ? 'ยังไม่กำหนดวัน'
+                  : routing
+                    ? thaiRangeLabel(route.startDate, route.endDate)
+                    : thaiRangeLabel(startDate, endDate)}
               </Badge>
-              {cities.map((c) => (
-                <Badge key={c} tone="sky">
-                  {c}
-                </Badge>
-              ))}
+              {routing
+                ? route.stops.map((stop) => (
+                    <Badge key={stop.airport} tone="sky">
+                      {stop.city} {stop.nights} คืน
+                    </Badge>
+                  ))
+                : null}
               <Badge tone="matcha">{party} คน</Badge>
             </div>
             {coordinating ? (
               <p className="text-muted mt-2 text-[11px]">
                 สร้างเสร็จจะพาไปหน้า &ldquo;หาวันที่ตรงกัน&rdquo; ทันที
+              </p>
+            ) : null}
+            {routing && route.countries.length > 1 ? (
+              <p className="text-muted mt-2 text-[11px]">
+                {route.countries.length} ประเทศ — แพลนจะถูกแบ่งเป็นช่วงตามประเทศให้
               </p>
             ) : null}
           </Card>
@@ -443,6 +484,25 @@ export function NewTripFlow() {
       ) : null}
     </div>
   );
+}
+
+/**
+ * Old links still arrive with `?from=city` and `?from=ticket`. Both meant "I
+ * know where I am going", which is now one door.
+ */
+function normaliseEntry(value: string | null): Entry | null {
+  switch (value) {
+    case 'route':
+    case 'city':
+    case 'ticket':
+      return 'route';
+    case 'date':
+      return 'date';
+    case 'coordinate':
+      return 'coordinate';
+    default:
+      return null;
+  }
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

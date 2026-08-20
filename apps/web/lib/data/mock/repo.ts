@@ -1,6 +1,9 @@
 import { getCharacter, CHARACTERS } from '@/lib/mock/characters';
 import { DAYS } from '@/lib/mock/trip';
 
+import { getAirport, getAirports, searchAirports } from '../airports';
+import { buildRoute, routeCities } from '../route';
+
 import {
   addDays,
   budgetFromPlan,
@@ -27,11 +30,14 @@ import type {
   DreamItem,
   ExpenseEntry,
   ExportResult,
+  FlightLeg,
+  FlightLegInput,
   ParsedTicket,
   PlanDay,
   PlanItem,
   PrepTask,
   Trip,
+  TripRoute,
   TripSummary,
   Vote,
   WishlistItem,
@@ -156,6 +162,59 @@ function startJob(record: TripRecord, job: AiJob) {
   jobTimers.set(job.id, timer);
 }
 
+/* ----------------------------------------------------------------- route -- */
+
+/**
+ * Rebuilds the route of a trip from its legs (M1 — A1.3).
+ *
+ * The airport index is loaded lazily, so this is async where the rest of the
+ * mock repo is not — worth it: a 320 kB dataset has no business in the bundle
+ * of someone who never opens the picker.
+ */
+async function routeOf(record: TripRecord): Promise<TripRoute> {
+  const found = await getAirports(record.flights.flatMap((leg) => [leg.from, leg.to]));
+  return buildRoute(record.flights, (iata) => found[iata] ?? null);
+}
+
+/**
+ * Pushes what the legs imply back onto the frame: the dates the tickets already
+ * decided, and the destinations in visit order. Dates that come from a ticket
+ * are locked dates — there is nothing left to coordinate once a seat is paid
+ * for (M2.5).
+ */
+function applyRoute(record: TripRecord, route: TripRoute, memberId: string) {
+  if (route.flights.length === 0 && route.stops.length === 0) return;
+
+  const cities = routeCities(route);
+  record.trip = {
+    ...record.trip,
+    startDate: route.startDate || record.trip.startDate,
+    endDate: route.endDate || record.trip.endDate,
+    nights: route.nights,
+    cities: cities.length > 0 ? cities : record.trip.cities,
+  };
+
+  if (route.startDate && route.endDate) {
+    record.locked = {
+      startDate: route.startDate,
+      endDate: route.endDate,
+      days: route.days,
+      lockedBy: memberId,
+      lockedAt: nowIso(),
+      memberIds: record.members.map((m) => m.id),
+    };
+  }
+}
+
+function withIds(legs: FlightLegInput[]): FlightLeg[] {
+  return legs.map((leg) => ({
+    ...leg,
+    id: mockId('fl'),
+    from: leg.from.toUpperCase(),
+    to: leg.to.toUpperCase(),
+  }));
+}
+
 /* ------------------------------------------------------------------ repo -- */
 
 export const mockRepo: RoveRepo = {
@@ -184,6 +243,21 @@ export const mockRepo: RoveRepo = {
     },
   },
 
+  /* ---------------------------------------------------------- airports -- */
+  // Not simulated: this is the same worldwide index the API embeds, searched
+  // in the browser instead of over HTTP.
+  airports: {
+    async search(query, limit) {
+      return delay(await searchAirports(query, limit), 90);
+    },
+    async get(iata) {
+      return getAirport(iata);
+    },
+    async resolve(codes) {
+      return getAirports(codes);
+    },
+  },
+
   /* ------------------------------------------------------------- trips -- */
   trips: {
     async list() {
@@ -199,10 +273,13 @@ export const mockRepo: RoveRepo = {
     },
 
     async get(tripId) {
-      return delay(mutate((db) => clone(tripRecord(db, tripId).trip)));
+      const record = mutate((db) => clone(tripRecord(db, tripId)));
+      const trip = { ...record.trip, route: await routeOf(record) };
+      return delay(trip);
     },
 
     async overview(tripId) {
+      const route = await routeOf(mutate((db) => clone(tripRecord(db, tripId))));
       return delay(
         mutate((db) => {
           const record = tripRecord(db, tripId);
@@ -241,7 +318,7 @@ export const mockRepo: RoveRepo = {
           ];
 
           return {
-            trip: clone(record.trip),
+            trip: { ...clone(record.trip), route },
             members: clone(record.members),
             coverage,
             checklist,
@@ -261,15 +338,22 @@ export const mockRepo: RoveRepo = {
     },
 
     async create(input) {
+      // The route decides the frame, so it is resolved before the record is
+      // written — a trip is never stored with dates its tickets disagree with.
+      const legs = withIds(input.flights ?? []);
+      const found = await getAirports(legs.flatMap((leg) => [leg.from, leg.to]));
+      const route = buildRoute(legs, (iata) => found[iata] ?? null);
+
       const trip = mutate((db) => {
         const id = mockId('trip');
-        const start = input.startDate ?? '';
-        const end = input.endDate ?? '';
+        const start = route.startDate || (input.startDate ?? '');
+        const end = route.endDate || (input.endDate ?? '');
+        const cities = routeCities(route);
         const record: TripRecord = {
           trip: {
             id,
             title: input.title,
-            cities: input.cities ?? [],
+            cities: cities.length > 0 ? cities : (input.cities ?? []),
             startDate: start,
             endDate: end,
             nights: start && end ? Math.max(0, daysBetween(start, end) - 1) : 0,
@@ -307,6 +391,7 @@ export const mockRepo: RoveRepo = {
                 }
               : null,
           destinationId: null,
+          flights: legs,
           wishlist: [],
           days: [],
           budgetLines: [],
@@ -334,7 +419,7 @@ export const mockRepo: RoveRepo = {
         db.trips.unshift(record);
         return clone(record.trip);
       });
-      return delay(trip, 320);
+      return delay({ ...trip, route }, 320);
     },
 
     async update(tripId, patch) {
@@ -387,12 +472,6 @@ export const mockRepo: RoveRepo = {
         jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
         jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
       };
-      const CITY_BY_IATA: Record<string, string> = {
-        HND: 'โตเกียว', NRT: 'โตเกียว', KIX: 'โอซาก้า', ITM: 'โอซาก้า',
-        CTS: 'ซัปโปโร', FUK: 'ฟุกุโอกะ', ICN: 'โซล', TPE: 'ไทเป',
-        HKG: 'ฮ่องกง', HAN: 'ฮานอย', SGN: 'โฮจิมินห์', DAD: 'ดานัง',
-      };
-
       const flights: ParsedTicket['flights'] = [];
       // carrier + number … origin … destination … "15 Nov 2026"
       const line = new RegExp(
@@ -416,7 +495,20 @@ export const mockRepo: RoveRepo = {
 
       const dates = flights.map((f) => f.date).sort();
       const party = Number(/(?:passengers?|ผู้โดยสาร)\D*(\d+)/i.exec(text)?.[1] ?? '');
-      const cities = [...new Set(flights.map((f) => CITY_BY_IATA[f.to]).filter(Boolean))] as string[];
+
+      // Destinations come from the worldwide index, so a ticket to anywhere
+      // resolves — not only to the dozen cities this used to know by heart.
+      const found = await getAirports(flights.map((f) => f.to));
+      const home = flights[0]?.from.toUpperCase();
+      const cities = [
+        ...new Set(
+          flights
+            .filter((f) => f.to.toUpperCase() !== home)
+            .map((f) => found[f.to.toUpperCase()])
+            .filter(Boolean)
+            .map((airport) => airport!.cityTh || airport!.city),
+        ),
+      ];
 
       return delay(
         {
@@ -429,6 +521,30 @@ export const mockRepo: RoveRepo = {
         } satisfies ParsedTicket,
         480,
       );
+    },
+
+    async route(tripId) {
+      const record = mutate((db) => clone(tripRecord(db, tripId)));
+      return delay(await routeOf(record), 90);
+    },
+
+    /**
+     * Replacing the route re-derives the frame: new legs, new dates, new
+     * destinations, all in one write so the room never shows half of a change.
+     */
+    async setRoute(tripId, legs) {
+      const withRouteIds = withIds(legs);
+      const found = await getAirports(withRouteIds.flatMap((leg) => [leg.from, leg.to]));
+      const route = buildRoute(withRouteIds, (iata) => found[iata] ?? null);
+
+      mutate((db) => {
+        const record = tripRecord(db, tripId);
+        record.flights = withRouteIds;
+        applyRoute(record, route, db.user.id);
+        log(record, db.user.id, 'แก้เส้นทางบิน');
+      });
+
+      return delay(route, 200);
     },
 
     async upcoming() {

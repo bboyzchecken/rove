@@ -1,6 +1,7 @@
 import type {
   ActivityEvent,
   AdminStats,
+  Airport,
   AiCredits,
   AiGenerateInput,
   AiJob,
@@ -25,6 +26,7 @@ import type {
   ExpenseSummary,
   ExportFormat,
   ExportResult,
+  FlightLegInput,
   InviteLink,
   LockedDates,
   Member,
@@ -39,6 +41,7 @@ import type {
   ShareState,
   Trip,
   TripOverview,
+  TripRoute,
   TripSummary,
   TripVisibility,
   UpdateTripInput,
@@ -58,6 +61,7 @@ import type {
  */
 export interface RoveRepo {
   auth: AuthRepo;
+  airports: AirportRepo;
   trips: TripRepo;
   members: MemberRepo;
   dates: DateRepo;
@@ -84,6 +88,18 @@ export interface AuthRepo {
   updateMe(patch: Partial<Pick<CurrentUser, 'name' | 'handle' | 'characterId' | 'homeCurrency'>>): Promise<CurrentUser>;
 }
 
+/**
+ * Worldwide airport search (M1 — A1.3). Public data: the entry flow calls it
+ * before anyone has signed in, exactly like a flight-booking search.
+ */
+export interface AirportRepo {
+  /** Ranked: an exact IATA code first, then city, airport name, country. */
+  search(query: string, limit?: number): Promise<Airport[]>;
+  get(iata: string): Promise<Airport | null>;
+  /** Resolves several codes at once — the route builder needs them together. */
+  resolve(codes: string[]): Promise<Record<string, Airport>>;
+}
+
 export interface TripRepo {
   list(): Promise<TripSummary[]>;
   get(tripId: string): Promise<Trip>;
@@ -94,6 +110,10 @@ export interface TripRepo {
   clone(tripId: string): Promise<Trip>;
   /** Reads a pasted booking e-mail into a trip frame (M1 — A1.2). */
   parseTicket(text: string): Promise<ParsedTicket>;
+  /** The legs of a trip, plus everything derived from them (M1 — A1.3). */
+  route(tripId: string): Promise<TripRoute>;
+  /** Replaces the whole route; the trip frame follows the legs. */
+  setRoute(tripId: string, legs: FlightLegInput[]): Promise<TripRoute>;
   upcoming(): Promise<CalendarTrip[]>;
   past(): Promise<PastTrip[]>;
   stats(): Promise<YearStats>;

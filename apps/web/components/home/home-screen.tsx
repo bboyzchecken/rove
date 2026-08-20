@@ -317,7 +317,7 @@ export function HomeScreen() {
           />
           <div className="space-y-2">
             {dreams.slice(0, 3).map((dream) => (
-              <Link key={dream.id} href={`/new?from=city&city=${encodeURIComponent(dream.destination.split(' · ')[1] ?? '')}` as never}>
+              <Link key={dream.id} href={`/new?from=route&city=${encodeURIComponent(dream.destination.split(' · ')[1] ?? '')}` as never}>
                 <Card accent={dream.accent} className="flex items-center gap-3 p-3.5">
                   <div className="min-w-0 flex-1">
                     <p className="text-espresso truncate text-sm font-semibold">{dream.title}</p>

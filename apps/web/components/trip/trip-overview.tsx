@@ -6,6 +6,7 @@ import { CalendarSearch, Check, ChevronRight, Share2, Sparkles, UserPlus } from 
 
 import { SectionHeader, Stat } from '@/components/common/section';
 import { InviteDialog } from '@/components/trip/invite-dialog';
+import { RouteCard } from '@/components/trip/route-card';
 import { TripFrameDialog } from '@/components/trip/trip-frame-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button, ButtonLink } from '@/components/ui/button';
@@ -13,6 +14,7 @@ import { Card } from '@/components/ui/card';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
 import { Progress } from '@/components/ui/progress';
 import { ShareDialog } from '@/components/trip/share-dialog';
+import { useMe } from '@/features/auth/queries';
 import { useBudget } from '@/features/plan/queries';
 import { useTripOverview } from '@/features/trip/queries';
 import { thaiRangeLabel } from '@/lib/data/domain';
@@ -34,6 +36,7 @@ const STEP_HREF: Record<string, string> = {
 
 export function TripOverview({ tripId }: { tripId: string }) {
   const { data, isLoading } = useTripOverview(tripId);
+  const { data: me } = useMe();
   const { data: budget } = useBudget(tripId);
   const [inviting, setInviting] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -50,6 +53,10 @@ export function TripOverview({ tripId }: { tripId: string }) {
   }
 
   const { trip, members, coverage, checklist, counts, activity, locked } = data;
+  const route = trip.route;
+  const countries = route?.countries ?? [];
+  // A viewer may read the route but not touch it — the same rule the API keeps.
+  const canEdit = members.find((m) => m.id === me?.id)?.role !== 'viewer';
   const doneSteps = checklist.filter((step) => step.done).length;
   const pending = members.filter((m) => !m.hasWishlist);
   const hasDates = Boolean(trip.startDate && trip.endDate);
@@ -153,10 +160,18 @@ export function TripOverview({ tripId }: { tripId: string }) {
             <Stat value={`${trip.partySize} คน`} label="เดินทางด้วยกัน" />
           </Card>
           <Card accent="matcha" className="p-4">
+            {/* Countries, not cities: on a two-country route that is the number
+                that changes how the plan is drafted (M1 — A1.3). */}
             <Stat
-              value={trip.cities.length}
-              label="เมือง"
-              hint={trip.cities.length > 0 ? trip.cities.join(' · ') : 'ยังไม่ได้เลือกปลายทาง'}
+              value={countries.length > 0 ? countries.length : trip.cities.length}
+              label={countries.length > 0 ? 'ประเทศ' : 'เมือง'}
+              hint={
+                countries.length > 0
+                  ? countries.map((c) => `${c.name} ${c.nights} คืน`).join(' · ')
+                  : trip.cities.length > 0
+                    ? trip.cities.join(' · ')
+                    : 'ยังไม่ได้เลือกปลายทาง'
+              }
             />
           </Card>
           <Card accent="sun" className="p-4">
@@ -168,6 +183,9 @@ export function TripOverview({ tripId }: { tripId: string }) {
           </Card>
         </div>
       </section>
+
+      {/* ------------------------------------------------------- route */}
+      <RouteCard tripId={tripId} editable={canEdit} />
 
       {/* ----------------------------------------------------- members */}
       <section>

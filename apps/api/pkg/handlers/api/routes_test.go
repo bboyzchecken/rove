@@ -24,17 +24,19 @@ import (
 
 // publicPaths is the allowlist. Anything not on it must demand a token.
 var publicPaths = map[string]bool{
-	"/healthz":                       true,
-	"/readyz":                        true,
-	"/go/:clickId":                   true, // affiliate redirect — a link people click
-	"/api/v1/characters":             true, // static catalogue, also shipped in the web bundle
-	"/api/v1/auth/:provider/url":     true,
-	"/api/v1/auth/oauth/:provider":   true,
-	"/api/v1/auth/logout":            true,
-	"/api/v1/auth/demo":              true, // registered only when MOCK_MODE is on
-	"/api/v1/invites/:token":         true, // preview before signing in
+	"/healthz":                          true,
+	"/readyz":                           true,
+	"/go/:clickId":                      true, // affiliate redirect — a link people click
+	"/api/v1/characters":                true, // static catalogue, also shipped in the web bundle
+	"/api/v1/airports":                  true, // worldwide airport index — public reference data (A1.3)
+	"/api/v1/airports/:iata":            true,
+	"/api/v1/auth/:provider/url":        true,
+	"/api/v1/auth/oauth/:provider":      true,
+	"/api/v1/auth/logout":               true,
+	"/api/v1/auth/demo":                 true, // registered only when MOCK_MODE is on
+	"/api/v1/invites/:token":            true, // preview before signing in
 	"/api/v1/public/trips/:tokenOrSlug": true,
-	"/api/v1/public/explore":         true,
+	"/api/v1/public/explore":            true,
 }
 
 // isSynthetic filters the entries Echo adds for a group itself — the 404 and
@@ -77,7 +79,7 @@ func TestEveryPrivateRouteRequiresAToken(t *testing.T) {
 		for _, param := range []string{
 			":tripId", ":userId", ":itemId", ":wishId", ":expenseId", ":taskId",
 			":bookingId", ":commentId", ":jobId", ":dreamId", ":poiId", ":token",
-			":clickId", ":provider", ":tokenOrSlug",
+			":clickId", ":provider", ":tokenOrSlug", ":flightId",
 		} {
 			path = strings.ReplaceAll(path, param, "x")
 		}

@@ -105,6 +105,13 @@ export function thaiMonthLabel(monthIso: string) {
   return `${THAI_MONTHS[d.getMonth()]} ${d.getFullYear() + 543}`;
 }
 
+/** "4 ธ.ค." — one day, the way a boarding pass reads. */
+export function thaiDate(iso: string) {
+  if (!iso) return '';
+  const d = parseIsoDate(iso);
+  return `${d.getDate()} ${THAI_MONTHS_SHORT[d.getMonth()]}`;
+}
+
 /** "4–8 ธ.ค." / "28 ธ.ค. – 2 ม.ค." */
 export function thaiRangeLabel(startIso: string, endIso: string) {
   const s = parseIsoDate(startIso);

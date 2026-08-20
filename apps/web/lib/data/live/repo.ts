@@ -2,10 +2,11 @@ import { api, type Paginated } from '@/lib/api-client';
 import { env } from '@/lib/env';
 
 import type { RoveRepo } from '../repo';
-import type { AiJob, CurrentUser, Member } from '../types';
+import type { AiJob, Airport, CurrentUser, Member } from '../types';
 import type {
   ActivityDto,
   AdminStatsDto,
+  AirportDto,
   AiCreditsDto,
   AiJobDto,
   AvailabilityBoardDto,
@@ -30,6 +31,7 @@ import type {
   PlanVersionDto,
   PoiDto,
   PrepTaskDto,
+  RouteDto,
   ShareStateDto,
   TripDto,
   TripOverviewDto,
@@ -40,10 +42,12 @@ import type {
 import {
   fromBooking,
   fromExpense,
+  fromFlightLeg,
   fromPlanItem,
   fromPrepTask,
   fromWishlistItem,
   toActivity,
+  toAirport,
   toAiCredits,
   toAiJob,
   toBoard,
@@ -66,6 +70,7 @@ import {
   toPlanVersion,
   toPoi,
   toPrepTask,
+  toRoute,
   toShareState,
   toTrip,
   toTripOverview,
@@ -137,6 +142,37 @@ export const liveRepo: RoveRepo = {
     },
   },
 
+  /* ---------------------------------------------------------- airports -- */
+  airports: {
+    async search(query, limit) {
+      const dtos = await api.get<AirportDto[]>('/airports', {
+        searchParams: { q: query, limit: String(limit ?? 8) },
+      });
+      return dtos.map(toAirport);
+    },
+
+    async get(iata) {
+      try {
+        return toAirport(await api.get<AirportDto>(`/airports/${iata.toUpperCase()}`));
+      } catch {
+        // An unknown code is an answer, not an error — the picker says so.
+        return null;
+      }
+    },
+
+    // One request per code, in parallel: the route builder never holds more
+    // than a handful, and the API caches nothing it would not cache anyway.
+    async resolve(codes) {
+      const unique = [...new Set(codes.map((c) => c.trim().toUpperCase()).filter(Boolean))];
+      const found = await Promise.all(unique.map((code) => this.get(code)));
+      const out: Record<string, Airport> = {};
+      found.forEach((airport) => {
+        if (airport) out[airport.iata] = airport;
+      });
+      return out;
+    },
+  },
+
   /* ------------------------------------------------------------- trips -- */
   trips: {
     async list() {
@@ -160,6 +196,7 @@ export const liveRepo: RoveRepo = {
         budget_per_person_thb: input.budgetPerPersonThb,
         coordinate_dates: input.coordinateDates ?? false,
         source_trip_id: input.sourceTripId,
+        flights: (input.flights ?? []).map(fromFlightLeg),
       });
       return toTrip(dto);
     },
@@ -184,6 +221,17 @@ export const liveRepo: RoveRepo = {
     },
     async parseTicket(text) {
       return api.post<ParsedTicketDto>('/ai/parse-ticket', { text }).then(toParsedTicket);
+    },
+
+    async route(tripId) {
+      return toRoute(await api.get<RouteDto>(`/trips/${tripId}/flights`));
+    },
+
+    async setRoute(tripId, legs) {
+      const dto = await api.put<RouteDto>(`/trips/${tripId}/flights`, {
+        flights: legs.map(fromFlightLeg),
+      });
+      return toRoute(dto);
     },
     async upcoming() {
       return (await api.get<CalendarTripDto[]>('/users/me/trips/upcoming')).map(toCalendarTrip);
