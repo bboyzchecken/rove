@@ -19,6 +19,7 @@ export const queryKeys = {
   tripOverview: (tripId: string) => ['trip', tripId, 'overview'] as const,
   tripMembers: (tripId: string) => ['trip', tripId, 'members'] as const,
   tripActivity: (tripId: string) => ['trip', tripId, 'activity'] as const,
+  tripRecap: (tripId: string) => ['trip', tripId, 'recap'] as const,
 
   dateBoard: (tripId: string, month?: string) => ['trip', tripId, 'dates', month ?? 'current'] as const,
   dateWindows: (tripId: string) => ['trip', tripId, 'dates', 'windows'] as const,

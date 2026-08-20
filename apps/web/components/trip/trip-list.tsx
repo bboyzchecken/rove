@@ -137,10 +137,17 @@ export function TripList() {
 
       {past.length > 0 ? (
         <section>
-          <SectionHeader label={`ทริปที่จบไปแล้ว ${past.length} ทริป`} />
+          <SectionHeader
+            label={`ทริปที่จบไปแล้ว ${past.length} ทริป`}
+            action={<span className="text-muted text-[11px]">แตะเพื่อดูบันทึกทริป</span>}
+          />
           <Card className="divide-border divide-y">
             {past.map((trip) => (
-              <div key={trip.id} className="flex items-center gap-3 p-3.5">
+              <Link
+                key={trip.id}
+                href={`/recap/${trip.id}` as never}
+                className="flex items-center gap-3 p-3.5"
+              >
                 <Image
                   src={trip.cover}
                   alt=""
@@ -157,7 +164,8 @@ export function TripList() {
                 <span className="text-espresso nums shrink-0 text-xs font-semibold">
                   {formatMoney(trip.spentThb, 'THB')}
                 </span>
-              </div>
+                <ChevronRight className="text-muted size-4 shrink-0" />
+              </Link>
             ))}
           </Card>
         </section>

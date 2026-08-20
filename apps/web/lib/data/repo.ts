@@ -39,6 +39,7 @@ import type {
   ShareState,
   Trip,
   TripOverview,
+  TripRecap,
   TripSummary,
   TripVisibility,
   UpdateTripInput,
@@ -96,6 +97,8 @@ export interface TripRepo {
   parseTicket(text: string): Promise<ParsedTicket>;
   upcoming(): Promise<CalendarTrip[]>;
   past(): Promise<PastTrip[]>;
+  /** The read-only archive of a finished trip (M17 — A17.4). */
+  recap(tripId: string): Promise<TripRecap>;
   stats(): Promise<YearStats>;
 }
 

@@ -369,12 +369,41 @@ export interface PastTripDto {
   title: string;
   cities: string[];
   date_label: string;
+  end_date: string;
   days: number;
   places: number;
   spent_thb: number;
   cover_image_url: string;
   member_ids: string[];
   member_character_ids: string[] | null;
+  visibility: 'private' | 'link' | 'public';
+  public_slug: string | null;
+}
+
+export interface RecapDecisionDto {
+  id: string;
+  kind: 'dates' | 'destination' | 'budget' | 'plan' | 'rationale' | 'booking' | 'vote';
+  title: string;
+  detail: string;
+  decided_at: string | null;
+  decided_by: string | null;
+}
+
+export interface TripRecapDto {
+  trip: TripDto;
+  members: MemberDto[];
+  date_label: string;
+  days: number;
+  places: number;
+  spent_thb: number;
+  budget_per_person_thb: number;
+  itinerary: PlanDayDto[];
+  decisions: RecapDecisionDto[];
+  spending: { category: string; amount_thb: number }[];
+  activity: ActivityDto[];
+  share: ShareStateDto;
+  points_per_publish: number;
+  can_publish: boolean;
 }
 
 export interface YearStatsDto {

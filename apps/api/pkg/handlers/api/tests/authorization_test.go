@@ -42,6 +42,7 @@ func TestOutsiderCannotReachAnyTripRoute(t *testing.T) {
 	}{
 		{"trip detail", http.MethodGet, base, nil},
 		{"trip overview", http.MethodGet, base + "/overview", nil},
+		{"trip recap", http.MethodGet, base + "/recap", nil},
 		{"trip update", http.MethodPatch, base, map[string]any{"title": "hijacked"}},
 		{"trip delete", http.MethodDelete, base, nil},
 		{"visibility", http.MethodPatch, base + "/visibility", map[string]any{"visibility": "public"}},
@@ -120,7 +121,7 @@ func TestMemberCanReachTheirOwnTrip(t *testing.T) {
 
 	base := "/api/v1/trips/" + trip.ID
 	for _, path := range []string{
-		base, base + "/overview", base + "/wishlist", base + "/members",
+		base, base + "/overview", base + "/recap", base + "/wishlist", base + "/members",
 		base + "/expenses/summary", base + "/prep", base + "/comments",
 	} {
 		t.Run(path, func(t *testing.T) {

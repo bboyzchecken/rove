@@ -36,9 +36,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { data: me } = useMe();
 
-  // A trip room lives under /t/:id, which belongs to the "ทริปของฉัน" tab.
+  // A trip room lives under /t/:id and a finished one under /recap/:id — both
+  // belong to the "ทริปของฉัน" tab.
   const isActive = (href: string) => {
-    if (href === '/trips') return pathname.startsWith('/trips') || pathname.startsWith('/t/');
+    if (href === '/trips') {
+      return (
+        pathname.startsWith('/trips') ||
+        pathname.startsWith('/t/') ||
+        pathname.startsWith('/recap/')
+      );
+    }
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 

@@ -83,6 +83,15 @@ func (s *collabStore) ListVotes(ctx context.Context, tripID, targetType, targetI
 	return out, err
 }
 
+func (s *collabStore) ListTripVotes(ctx context.Context, tripID string) ([]models.Vote, error) {
+	var out []models.Vote
+	err := s.db.WithContext(ctx).
+		Where("trip_id = ?", tripID).
+		Order("voted_at ASC").
+		Find(&out).Error
+	return out, err
+}
+
 /* -------------------------------------------------------------- activity -- */
 
 func (s *collabStore) Log(ctx context.Context, a *models.Activity) error {

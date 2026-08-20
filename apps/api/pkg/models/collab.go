@@ -66,6 +66,9 @@ type CollabStore interface {
 
 	SetVote(ctx context.Context, v *Vote) error
 	ListVotes(ctx context.Context, tripID, targetType, targetID string) ([]Vote, error)
+	// ListTripVotes is every vote in one room — the recap reads it to say what
+	// the group settled, which it cannot do one target at a time.
+	ListTripVotes(ctx context.Context, tripID string) ([]Vote, error)
 
 	Log(ctx context.Context, a *Activity) error
 	// ListActivity is keyset-paginated: the feed must stay stable while new

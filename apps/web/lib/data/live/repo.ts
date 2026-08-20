@@ -33,6 +33,7 @@ import type {
   ShareStateDto,
   TripDto,
   TripOverviewDto,
+  TripRecapDto,
   VoteDto,
   WishlistItemDto,
   YearStatsDto,
@@ -69,6 +70,7 @@ import {
   toShareState,
   toTrip,
   toTripOverview,
+  toTripRecap,
   toTripSummary,
   toVote,
   toWishlistItem,
@@ -190,6 +192,9 @@ export const liveRepo: RoveRepo = {
     },
     async past() {
       return (await api.get<PastTripDto[]>('/users/me/trips/past')).map(toPastTrip);
+    },
+    async recap(tripId) {
+      return toTripRecap(await api.get<TripRecapDto>(`/trips/${tripId}/recap`));
     },
     async stats() {
       return toYearStats(await api.get<YearStatsDto>('/users/me/stats'));

@@ -14,6 +14,8 @@ import type {
   Member,
   PlanDay,
   PlanItem,
+  RecapDecision,
+  RecapSpend,
   Settlement,
   Trip,
   TripStatus,
@@ -32,6 +34,9 @@ export type {
   PastTrip,
   PlanDay,
   PlanItem,
+  RecapDecision,
+  RecapDecisionKind,
+  RecapSpend,
   Settlement,
   Trip,
   TripStatus,
@@ -285,6 +290,39 @@ export interface AiGenerateInput {
   brief?: string;
   pace?: 'relaxed' | 'balanced' | 'packed';
   focus?: string[];
+}
+
+/* ----------------------------------------------------------------- recap -- */
+
+/**
+ * A finished trip, read-only (M17 — W17.5).
+ *
+ * The room keeps working after the last day, but nobody plans in it any more:
+ * what is left is a record of what the group decided, what the plan ended up
+ * being, and where the money went. The recap is that record — and the one place
+ * that offers to open the trip to the public, because a trip you have already
+ * been on is the only kind worth someone else copying.
+ */
+export interface TripRecap {
+  tripId: string;
+  title: string;
+  cities: string[];
+  dateLabel: string;
+  cover: string;
+  days: number;
+  places: number;
+  spentThb: number;
+  budgetPerPersonThb: number;
+  members: Member[];
+  itinerary: PlanDay[];
+  decisions: RecapDecision[];
+  spending: RecapSpend[];
+  activity: ActivityEvent[];
+  share: ShareState;
+  /** What publishing pays, straight from the points ledger's own rate. */
+  pointsPerPublish: number;
+  /** Owner, and not public yet. */
+  canPublish: boolean;
 }
 
 /* ----------------------------------------------------------------- share -- */

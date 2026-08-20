@@ -271,34 +271,36 @@ export function HomeScreen() {
           <SectionHeader label="ทริปที่ผ่านมา" />
           <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 pb-1">
             {past.map((trip, i) => (
-              <Card
-                key={trip.id}
-                accent={PAST_ACCENTS[i % PAST_ACCENTS.length]}
-                className="w-64 shrink-0 overflow-hidden"
-              >
-                <Image
-                  src={trip.cover}
-                  alt=""
-                  width={1200}
-                  height={800}
-                  className="h-24 w-full object-cover"
-                />
-                <div className="p-3">
-                  <p className="text-espresso text-sm font-bold">{trip.title}</p>
-                  <p className="text-muted mt-0.5 text-[11px]">{trip.dateLabel}</p>
-                  <div className="text-muted mt-2 flex items-center justify-between text-[11px]">
-                    <span>
-                      {trip.days} วัน · {trip.places} ที่
-                    </span>
-                    <span className="text-espresso nums font-semibold">
-                      {formatMoney(trip.spentThb, 'THB')}
-                    </span>
+              <Link key={trip.id} href={`/recap/${trip.id}` as never} className="shrink-0">
+                <Card
+                  accent={PAST_ACCENTS[i % PAST_ACCENTS.length]}
+                  className="w-64 overflow-hidden"
+                >
+                  <Image
+                    src={trip.cover}
+                    alt=""
+                    width={1200}
+                    height={800}
+                    className="h-24 w-full object-cover"
+                  />
+                  <div className="p-3">
+                    <p className="text-espresso text-sm font-bold">{trip.title}</p>
+                    <p className="text-muted mt-0.5 text-[11px]">{trip.dateLabel}</p>
+                    <div className="text-muted mt-2 flex items-center justify-between text-[11px]">
+                      <span>
+                        {trip.days} วัน · {trip.places} ที่
+                      </span>
+                      <span className="text-espresso nums font-semibold">
+                        {formatMoney(trip.spentThb, 'THB')}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <CharacterStack characterIds={trip.characterIds ?? []} size="xs" />
+                      <span className="text-primary text-[11px] font-semibold">ดูบันทึกทริป</span>
+                    </div>
                   </div>
-                  <div className="mt-2">
-                    <CharacterStack characterIds={trip.characterIds ?? []} size="xs" />
-                  </div>
-                </div>
-              </Card>
+                </Card>
+              </Link>
             ))}
           </div>
         </section>

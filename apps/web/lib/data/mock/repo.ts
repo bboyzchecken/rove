@@ -1,5 +1,6 @@
 import { getCharacter, CHARACTERS } from '@/lib/mock/characters';
 import { DAYS } from '@/lib/mock/trip';
+import { PAST_TRIP_ARCHIVES, POINTS_PER_PUBLISH } from '@/lib/mock/user';
 
 import {
   addDays,
@@ -14,6 +15,7 @@ import {
   recomputeCoverage,
   thaiRangeLabel,
   toIsoDate,
+  toThb,
   validateDays,
 } from '../domain';
 import type { RoveRepo } from '../repo';
@@ -28,10 +30,14 @@ import type {
   ExpenseEntry,
   ExportResult,
   ParsedTicket,
+  PastTrip,
   PlanDay,
   PlanItem,
   PrepTask,
+  RecapDecision,
+  ShareState,
   Trip,
+  TripRecap,
   TripSummary,
   Vote,
   WishlistItem,
@@ -437,7 +443,21 @@ export const mockRepo: RoveRepo = {
     },
     async past() {
       const db = loadDb();
-      return delay(clone(db.past).map((trip) => ({ ...trip, characterIds: facesOf(db, trip) })));
+      return delay(
+        clone(db.past)
+          .map((trip) => ({ ...trip, characterIds: facesOf(db, trip) }))
+          .sort((a, b) => b.endDate.localeCompare(a.endDate)),
+      );
+    },
+
+    async recap(tripId) {
+      const db = loadDb();
+      // A finished trip may be an archived card with no room left (the seeded
+      // ones) or a room that simply ended. Both answer the same question, so
+      // both produce the same shape.
+      const archived = db.past.find((t) => t.id === tripId);
+      if (archived) return delay(recapOfArchive(db, archived));
+      return delay(mutate((current) => recapOfRecord(tripRecord(current, tripId))));
     },
     async stats() {
       return delay(clone(loadDb().stats));
@@ -1207,14 +1227,32 @@ export const mockRepo: RoveRepo = {
   /* ------------------------------------------------------------- share -- */
   share: {
     async state(tripId) {
-      return delay(mutate((db) => clone(tripRecord(db, tripId).share)));
+      return delay(
+        mutate((db) => {
+          const archived = db.past.find((t) => t.id === tripId);
+          if (archived) return archivedShareState(archived);
+          return clone(tripRecord(db, tripId).share);
+        }),
+      );
     },
 
     async setVisibility(tripId, visibility) {
       return delay(
         mutate((db) => {
+          // An archived trip has no room to write to, but publishing it is the
+          // whole point of keeping it (W17.6) — so its card carries the state.
+          const archived = db.past.find((t) => t.id === tripId);
+          if (archived) {
+            const wasPublic = archived.visibility === 'public';
+            archived.visibility = visibility;
+            archived.publicSlug = visibility === 'public' ? slugify(archived.title) : null;
+            if (visibility === 'public' && !wasPublic) awardPublishPoints(db, archived.title);
+            return archivedShareState(archived);
+          }
+
           const record = tripRecord(db, tripId);
           const origin = typeof window === 'undefined' ? '' : window.location.origin;
+          const wasPublic = record.share.visibility === 'public';
           record.share.visibility = visibility;
 
           if (visibility === 'private') {
@@ -1228,6 +1266,9 @@ export const mockRepo: RoveRepo = {
               visibility === 'public' ? slugify(record.trip.title) : null;
           }
           log(record, db.user.id, `ตั้งการแชร์เป็น ${visibility}`);
+          if (visibility === 'public' && !wasPublic) {
+            awardPublishPoints(db, record.trip.title, record);
+          }
           return clone(record.share);
         }),
       );
@@ -1357,6 +1398,196 @@ export const mockRepo: RoveRepo = {
     },
   },
 };
+
+/* --------------------------------------------------------------- recap -- */
+
+/**
+ * The archive of a trip that is over (M17 — W17.5).
+ *
+ * Two sources, one shape. A room that ended still holds everything — its plan,
+ * its bookings, its votes, its money — so its recap is derived, never stored.
+ * The seeded past trips predate the demo room and carry their record with them
+ * (lib/mock/user.ts), which is what a UAT tester sees on the home screen.
+ */
+function recapOfRecord(record: TripRecord): TripRecap {
+  const { trip } = record;
+  const items = record.days.flatMap((day) => day.items);
+  const expenses = computeExpenses(record.expenses, record.members, trip.fxRate, record.settled);
+
+  const spending = new Map<string, number>();
+  for (const entry of record.expenses) {
+    const category = entry.category || 'อื่นๆ';
+    spending.set(category, (spending.get(category) ?? 0) + toThb(entry, trip.fxRate));
+  }
+
+  const decisions: RecapDecision[] = [];
+
+  if (trip.startDate && trip.endDate) {
+    decisions.push({
+      id: 'dates',
+      kind: 'dates',
+      title: 'วันที่ไป',
+      detail: `${thaiRangeLabel(trip.startDate, trip.endDate)} · ${daysBetween(trip.startDate, trip.endDate)} วัน`,
+      decidedAt: record.locked?.lockedAt,
+      decidedBy: record.locked?.lockedBy,
+    });
+  }
+  if (trip.cities.length > 0) {
+    decisions.push({
+      id: 'destination',
+      kind: 'destination',
+      title: 'ปลายทางที่เลือก',
+      detail: trip.cities.join(' · '),
+    });
+  }
+  if (trip.budgetPerPersonThb > 0) {
+    decisions.push({
+      id: 'budget',
+      kind: 'budget',
+      title: 'งบที่ตั้งไว้',
+      detail: `฿${trip.budgetPerPersonThb.toLocaleString('th-TH')} ต่อคน`,
+    });
+  }
+  if (record.days.length > 0) {
+    decisions.push({
+      id: 'plan',
+      kind: 'plan',
+      title: 'แพลนที่ลงตัว',
+      detail: `${record.days.length} วัน · ${items.length} ที่`,
+    });
+    // Why the draft was arranged this way — written once, when it was accepted.
+    for (const [index, rationale] of AI_META.rationales.entries()) {
+      decisions.push({
+        id: `rationale-${index}`,
+        kind: 'rationale',
+        title: 'เหตุผลที่จัดแบบนี้',
+        detail: rationale,
+      });
+    }
+  }
+  for (const booking of record.bookings) {
+    if (booking.status !== 'booked') continue;
+    const price = booking.pricePerPersonThb
+      ? ` · ฿${booking.pricePerPersonThb.toLocaleString('th-TH')} ต่อคน`
+      : '';
+    decisions.push({
+      id: `booking-${booking.id}`,
+      kind: 'booking',
+      title: 'จองจริง',
+      detail: `${booking.title} · ${booking.partner}${price}`,
+      decidedBy: booking.bookedBy,
+    });
+  }
+  decisions.push(...voteDecisions(record));
+
+  return {
+    tripId: trip.id,
+    title: trip.title,
+    cities: trip.cities,
+    dateLabel:
+      trip.startDate && trip.endDate ? thaiRangeLabel(trip.startDate, trip.endDate) : 'ยังไม่ได้เลือกวัน',
+    cover: trip.cover,
+    days: trip.startDate && trip.endDate ? daysBetween(trip.startDate, trip.endDate) : 0,
+    places: items.length,
+    spentThb: expenses.totalThb,
+    budgetPerPersonThb: trip.budgetPerPersonThb,
+    members: clone(record.members),
+    itinerary: clone(record.days),
+    decisions,
+    spending: [...spending.entries()]
+      .map(([category, amountThb]) => ({ category, amountThb }))
+      .sort((a, b) => b.amountThb - a.amountThb),
+    activity: clone(record.activity),
+    share: clone(record.share),
+    pointsPerPublish: POINTS_PER_PUBLISH,
+    canPublish: record.role === 'owner' && record.share.visibility !== 'public',
+  };
+}
+
+/**
+ * Votes only make the record when they settled something: the tally, against a
+ * target that still has a name. A vote on a deleted item is dropped rather than
+ * printed as an id nobody recognises.
+ */
+function voteDecisions(record: TripRecord): RecapDecision[] {
+  const titles = new Map<string, string>();
+  for (const day of record.days) {
+    for (const item of day.items) titles.set(`item:${item.id}`, item.title);
+  }
+  for (const wish of record.wishlist) titles.set(`wish:${wish.id}`, wish.title);
+
+  const tally = new Map<string, { up: number; down: number }>();
+  for (const vote of record.votes) {
+    const key = `${vote.targetType}:${vote.targetId}`;
+    if (!titles.has(key)) continue;
+    const current = tally.get(key) ?? { up: 0, down: 0 };
+    if (vote.value > 0) current.up += 1;
+    else current.down += 1;
+    tally.set(key, current);
+  }
+
+  return [...tally.entries()].map(([key, counts]) => ({
+    id: `vote-${key}`,
+    kind: 'vote' as const,
+    title: 'โหวตกันแล้ว',
+    detail: `${titles.get(key)} · ${counts.up} เอา / ${counts.down} ไม่เอา`,
+  }));
+}
+
+function recapOfArchive(db: MockDb, past: PastTrip): TripRecap {
+  const archive = PAST_TRIP_ARCHIVES[past.id];
+  const roster = db.trips[0]?.members ?? [];
+  const characterIds = facesOf(db, past);
+
+  return {
+    tripId: past.id,
+    title: past.title,
+    cities: past.cities,
+    dateLabel: past.dateLabel,
+    cover: past.cover,
+    days: past.days,
+    places: past.places,
+    spentThb: past.spentThb,
+    budgetPerPersonThb: 0,
+    members: past.memberIds.map((id, index) => ({
+      id,
+      name: roster.find((m) => m.id === id)?.name ?? `เพื่อนคนที่ ${index + 1}`,
+      role: index === 0 ? ('owner' as const) : ('editor' as const),
+      characterId: characterIds[index] ?? 'shiba',
+      hasWishlist: true,
+    })),
+    itinerary: clone(archive?.itinerary ?? []),
+    decisions: clone(archive?.decisions ?? []),
+    spending: clone(archive?.spending ?? []),
+    activity: [],
+    share: archivedShareState(past),
+    pointsPerPublish: POINTS_PER_PUBLISH,
+    canPublish: past.visibility !== 'public',
+  };
+}
+
+/**
+ * Opening a trip to the public pays once (§6.5). Live mode writes a row in the
+ * points ledger; mock mode moves the balance the profile screen reads, so the
+ * reward the nudge promised actually shows up.
+ */
+function awardPublishPoints(db: MockDb, title: string, record?: TripRecord) {
+  db.user.points += POINTS_PER_PUBLISH;
+  if (record) log(record, db.user.id, `เปิดทริป "${title}" เป็นสาธารณะ +${POINTS_PER_PUBLISH} แต้ม`);
+}
+
+/** An archived card carries its own share state — there is no room to ask. */
+function archivedShareState(past: PastTrip): ShareState {
+  const origin = typeof window === 'undefined' ? '' : window.location.origin;
+  return {
+    visibility: past.visibility ?? 'private',
+    shareToken: null,
+    shareUrl: past.publicSlug ? `${origin}/p/${past.publicSlug}` : null,
+    publicSlug: past.publicSlug ?? null,
+    viewCount: 0,
+    cloneCount: 0,
+  };
+}
 
 /* ------------------------------------------------------------- helpers -- */
 
