@@ -14,6 +14,7 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState, ErrorState, SkeletonList } from '@/components/ui/states';
 import { formatTokyoDate } from '@/lib/format';
 import { useTripEvents } from '@/lib/sse';
+import { useEditorStore } from '@/stores/editor-store';
 import { cn } from '@/lib/utils';
 import type { Item } from '@/types/api';
 
@@ -21,7 +22,8 @@ import type { Item } from '@/types/api';
 export default function PlanPage({ params }: { params: Promise<{ tripId: string }> }) {
   const { tripId } = use(params);
 
-  const [dayIndex, setDayIndex] = useState(0);
+  const dayIndex = useEditorStore((state) => state.activeDayIndex);
+  const setDayIndex = useEditorStore((state) => state.setActiveDay);
   const [editing, setEditing] = useState<Item | null>(null);
   const [deletedItemId, setDeletedItemId] = useState<string | null>(null);
   const [listView, setListView] = useState(false);
