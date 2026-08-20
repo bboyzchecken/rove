@@ -16,7 +16,10 @@ import (
 // Members and invites (A2.2 / A2.3).
 func (s *Server) registerMemberRoutes(g *echo.Group) {
 	g.GET("/:tripId/members", s.handleListMembers, s.TripRoleMiddleware(models.TripRoleViewer))
-	g.POST("/:tripId/invites", s.handleCreateInvite, s.TripRoleMiddleware(models.TripRoleEditor))
+	// Owner-only, per the API contract in DEV_SPEC §7: an editor who could mint
+	// invite links could widen the set of people with write access to someone
+	// else's trip without asking them.
+	g.POST("/:tripId/invites", s.handleCreateInvite, s.TripRoleMiddleware(models.TripRoleOwner))
 	g.PATCH("/:tripId/members/:userId", s.handleUpdateMemberRole, s.TripRoleMiddleware(models.TripRoleOwner))
 	g.DELETE("/:tripId/members/:userId", s.handleRemoveMember, s.TripRoleMiddleware(models.TripRoleOwner))
 }
