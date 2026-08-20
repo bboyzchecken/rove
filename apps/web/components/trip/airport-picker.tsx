@@ -94,7 +94,14 @@ export function AirportPicker({
   }
 
   return (
-    <div className="block" ref={boxRef}>
+    /**
+     * `relative` + `min-w-0`: the list below is positioned, not stacked. In a
+     * `1fr` grid column an in-flow list of airport names sets the column's own
+     * min-content width, so a long one ("Don Mueang International Airport")
+     * used to stretch the leg card past the page. Overlaying it also stops the
+     * date row from jumping down every time the field is focused.
+     */
+    <div className="relative block min-w-0" ref={boxRef}>
       {label ? (
         <span className="text-muted mb-1.5 block text-[11px] font-semibold">{label}</span>
       ) : null}
@@ -143,7 +150,7 @@ export function AirportPicker({
       )}
 
       {open ? (
-        <div className="bg-surface animate-rove-rise mt-1.5 max-h-72 overflow-y-auto rounded-2xl p-1">
+        <div className="bg-surface shadow-warm-lg animate-rove-rise absolute inset-x-0 top-full z-20 mt-1.5 max-h-72 overflow-y-auto rounded-2xl p-1">
           {options.length === 0 ? (
             <p className="text-muted px-3 py-3 text-xs">
               {isFetching ? 'กำลังค้นหา…' : 'ไม่พบสนามบินที่ตรง — ลองใส่รหัส 3 ตัวจากตั๋ว เช่น NRT'}

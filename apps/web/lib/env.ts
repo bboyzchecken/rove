@@ -15,6 +15,13 @@ export const env = {
   mapsBrowserKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY ?? '',
   posthogKey: process.env.NEXT_PUBLIC_POSTHOG_KEY ?? '',
   posthogHost: process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://us.i.posthog.com',
+  /**
+   * Dev-only sign-in door. Live mode has no way in until real OAuth credentials
+   * exist, so this reveals a button on /login that trades nothing for a session
+   * on a fixed demo account. It only works while the API runs with
+   * MOCK_MODE=true, and `/api/auth/demo` refuses outright in production.
+   */
+  devLogin: process.env.NEXT_PUBLIC_DEV_LOGIN === 'true',
 } as const;
 
 /**

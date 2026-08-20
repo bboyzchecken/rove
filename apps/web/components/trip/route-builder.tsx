@@ -145,7 +145,7 @@ export function RouteBuilder({
   return (
     <div className="space-y-2.5">
       {legs.map((leg, index) => (
-        <Card key={leg.key} className="p-3.5">
+        <Card key={leg.key} className="p-3.5 md:p-5">
           <div className="mb-2.5 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               {leg.mode === 'ground' ? (
@@ -183,7 +183,14 @@ export function RouteBuilder({
             </div>
           </div>
 
-          <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
+          {/*
+            Two airports side by side is a desktop shape: at 375px each column
+            is barely wide enough for "Suvarnabhumi Airport", let alone the
+            search list under it. Below `md` the legs read top-to-bottom, with
+            the arrow turned to match, and the pair snaps back into a row from
+            `md` up where there is room for both.
+          */}
+          <div className="grid gap-1.5 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-end md:gap-2">
             <AirportPicker
               label="จาก"
               value={airports[leg.from] ?? null}
@@ -191,7 +198,7 @@ export function RouteBuilder({
               autoFocus={index === 0 && !leg.from}
               onChange={(airport) => patch(leg.key, { from: airport?.iata ?? '' })}
             />
-            <ArrowRight className="text-muted mb-3 size-4" />
+            <ArrowRight className="text-muted mx-auto size-4 rotate-90 md:mx-0 md:mb-3 md:rotate-0" />
             <AirportPicker
               label="ถึง"
               value={airports[leg.to] ?? null}
@@ -200,7 +207,14 @@ export function RouteBuilder({
             />
           </div>
 
-          <div className="mt-2.5 grid grid-cols-2 gap-2">
+          {/* Date, time and flight number are one row of facts off the ticket,
+              so from `lg` up they sit on one line instead of wrapping. */}
+          <div
+            className={cn(
+              'mt-2.5 grid grid-cols-2 gap-2 md:mt-3',
+              leg.mode === 'flight' && 'lg:grid-cols-3',
+            )}
+          >
             <label className="block">
               <span className="text-muted mb-1.5 block text-[11px] font-semibold">
                 {leg.mode === 'ground' ? 'เดินทางวันที่' : 'บินวันที่'}
@@ -223,21 +237,21 @@ export function RouteBuilder({
                 className="bg-bg text-espresso nums w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
               />
             </label>
-          </div>
 
-          {leg.mode === 'flight' ? (
-            <label className="mt-2.5 block">
-              <span className="text-muted mb-1.5 block text-[11px] font-semibold">
-                เที่ยวบิน (ใส่ทีหลังได้)
-              </span>
-              <input
-                value={leg.flightNo ?? ''}
-                onChange={(e) => patch(leg.key, { flightNo: e.target.value.toUpperCase() })}
-                placeholder="เช่น TG682"
-                className="bg-bg text-espresso nums w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
-              />
-            </label>
-          ) : null}
+            {leg.mode === 'flight' ? (
+              <label className="col-span-2 block lg:col-span-1">
+                <span className="text-muted mb-1.5 block text-[11px] font-semibold">
+                  เที่ยวบิน (ใส่ทีหลังได้)
+                </span>
+                <input
+                  value={leg.flightNo ?? ''}
+                  onChange={(e) => patch(leg.key, { flightNo: e.target.value.toUpperCase() })}
+                  placeholder="เช่น TG682"
+                  className="bg-bg text-espresso nums w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
+                />
+              </label>
+            ) : null}
+          </div>
 
           {/* The overnight case, which is the one that shifts a whole day. */}
           {leg.arrTime && leg.depDate ? (
