@@ -5,6 +5,10 @@ import { isLiveMode } from '@/lib/data/mode';
 /**
  * The sign-in wall (W0.5).
  *
+ * The file is `proxy.ts`, not `middleware.ts`: Next 16 renamed the convention
+ * and warns on the old name — see `file-conventions/proxy.md` in
+ * `node_modules/next/dist/docs`.
+ *
  * `app/(app)` is the signed-in half of the product — DEV_SPEC §3.2 calls it
  * exactly that — so an anonymous visitor is sent to /login with the page they
  * wanted remembered, instead of landing on a screen whose every query 401s.
@@ -27,7 +31,7 @@ function isGuarded(pathname: string) {
   return GUARDED.some((base) => pathname === base || pathname.startsWith(`${base}/`));
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   if (!isLiveMode) return NextResponse.next();
 
   const { pathname, search } = request.nextUrl;
