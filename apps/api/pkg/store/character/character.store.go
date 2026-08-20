@@ -1,3 +1,6 @@
+// Package character holds the GORM implementation of the character catalogue
+// (M14 — A14.1). The list is tiny and read on almost every screen, so it is
+// deliberately a plain table with no joins.
 package character
 
 import (
@@ -16,35 +19,21 @@ func New(db *gorm.DB) models.CharacterStore { return &store{db: db} }
 
 var Module = fx.Module("store.character", fx.Provide(New))
 
-func (s *store) List(ctx context.Context, activeOnly bool) ([]models.Character, error) {
-	q := s.db.WithContext(ctx).Model(&models.Character{})
-	if activeOnly {
-		q = q.Where("is_active = ?", true)
-	}
-	var cs []models.Character
-	err := q.Order("id ASC").Find(&cs).Error
-	return cs, err
+func (s *store) List(ctx context.Context) ([]models.Character, error) {
+	var out []models.Character
+	err := s.db.WithContext(ctx).
+		Where("is_active = ?", true).
+		Order("sort_order ASC").
+		Find(&out).Error
+	return out, err
 }
 
-func (s *store) GetByID(ctx context.Context, id int16) (*models.Character, error) {
-	var c models.Character
-	if err := s.db.WithContext(ctx).Where("id = ?", id).First(&c).Error; err != nil {
-		return nil, err
-	}
-	return &c, nil
-}
-
-// Upsert is what the seeder calls; re-running it updates names and art without
-// orphaning users who already picked that id.
+// Upsert keeps `go run . seed:characters` re-runnable.
 func (s *store) Upsert(ctx context.Context, c *models.Character) error {
 	return s.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"name", "emoji", "image_url", "is_active"}),
+		DoUpdates: clause.AssignmentColumns([]string{"name_th", "image_url", "accent", "sort_order", "is_active"}),
 	}).Create(c).Error
-}
-
-func (s *store) Update(ctx context.Context, c *models.Character) error {
-	return s.db.WithContext(ctx).Save(c).Error
 }
 
 func (s *store) Count(ctx context.Context) (int64, error) {

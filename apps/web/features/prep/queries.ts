@@ -2,92 +2,145 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { api } from '@/lib/api-client';
+import { repo } from '@/lib/data';
+import type { BookingEntry, BookingKind, BookingStatus, PrepTask } from '@/lib/data';
 import { queryKeys } from '@/lib/query-keys';
-import type { ChecklistEntry, Collection, PrepBlock } from '@/types/api';
 
-const prepApi = {
-  list: (tripId: string) => api.get<Collection<PrepBlock>>(`/trips/${tripId}/prep`),
-  regenerate: (tripId: string) =>
-    api.post<Collection<PrepBlock>>(`/trips/${tripId}/prep/regenerate`),
-  create: (tripId: string, body: { title: string; content_md?: string }) =>
-    api.post<PrepBlock>(`/trips/${tripId}/prep`, body),
-  update: (
-    blockId: string,
-    body: { title?: string; content_md?: string; checklist?: ChecklistEntry[] },
-  ) => api.patch<PrepBlock>(`/prep/${blockId}`, body),
-  remove: (blockId: string) => api.delete<void>(`/prep/${blockId}`),
-};
+/** Prep checklist (M8) and bookings (M12) — the two "before we fly" tabs. */
 
-export function usePrep(tripId: string) {
+export function usePrepTasks(tripId: string) {
   return useQuery({
     queryKey: queryKeys.prep(tripId),
-    queryFn: () => prepApi.list(tripId),
+    queryFn: () => repo.prep.list(tripId),
     enabled: Boolean(tripId),
   });
 }
 
-/**
- * Ticking a checklist box is optimistic. It is the single most-repeated
- * interaction in this tab and a round trip per tick makes it feel broken —
- * and the SSE event will correct any drift within a second anyway.
- */
-export function useToggleChecklist(tripId: string) {
+export function useAddPrepTask(tripId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Omit<PrepTask, 'id' | 'done'>) => repo.prep.add(tripId, input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.prep(tripId) }),
+  });
+}
+
+export function useTogglePrepTask(tripId: string) {
   const queryClient = useQueryClient();
   const key = queryKeys.prep(tripId);
 
   return useMutation({
-    mutationFn: ({ blockId, checklist }: { blockId: string; checklist: ChecklistEntry[] }) =>
-      prepApi.update(blockId, { checklist }),
+    mutationFn: (input: { taskId: string; done: boolean }) =>
+      repo.prep.toggle(tripId, input.taskId, input.done),
 
-    onMutate: async ({ blockId, checklist }) => {
+    // A checkbox that waits for the network feels broken, so it flips first.
+    onMutate: async (input) => {
       await queryClient.cancelQueries({ queryKey: key });
-      const previous = queryClient.getQueryData<Collection<PrepBlock>>(key);
+      const previous = queryClient.getQueryData<PrepTask[]>(key);
       if (previous) {
-        queryClient.setQueryData<Collection<PrepBlock>>(key, {
-          items: previous.items.map((b) => (b.id === blockId ? { ...b, checklist } : b)),
-        });
+        queryClient.setQueryData<PrepTask[]>(
+          key,
+          previous.map((task) => (task.id === input.taskId ? { ...task, done: input.done } : task)),
+        );
       }
       return { previous };
     },
-
-    onError: (_error, _vars, context) => {
+    onError: (_error, _input, context) => {
       if (context?.previous) queryClient.setQueryData(key, context.previous);
     },
-
-    onSettled: () => queryClient.invalidateQueries({ queryKey: key }),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: key });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tripOverview(tripId) });
+    },
   });
 }
 
-export function useRegeneratePrep(tripId: string) {
+export function useUpdatePrepTask(tripId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => prepApi.regenerate(tripId),
-    onSuccess: (fresh) => queryClient.setQueryData(queryKeys.prep(tripId), fresh),
-  });
-}
-
-export function useCreatePrepBlock(tripId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (body: { title: string; content_md?: string }) => prepApi.create(tripId, body),
+    mutationFn: (input: { taskId: string; patch: Partial<PrepTask> }) =>
+      repo.prep.update(tripId, input.taskId, input.patch),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.prep(tripId) }),
   });
 }
 
-export function useUpdatePrepBlock(tripId: string) {
+export function useRemovePrepTask(tripId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ blockId, ...body }: { blockId: string; title?: string; content_md?: string }) =>
-      prepApi.update(blockId, body),
+    mutationFn: (taskId: string) => repo.prep.remove(tripId, taskId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.prep(tripId) }),
   });
 }
 
-export function useDeletePrepBlock(tripId: string) {
+export function useApplyPrepTemplate(tripId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (blockId: string) => prepApi.remove(blockId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.prep(tripId) }),
+    mutationFn: () => repo.prep.applyTemplate(tripId),
+    onSuccess: (tasks) => queryClient.setQueryData(queryKeys.prep(tripId), tasks),
+  });
+}
+
+/** The trip's shared markdown block (W8.2). */
+export function usePrepNote(tripId: string) {
+  return useQuery({
+    queryKey: queryKeys.prepNote(tripId),
+    queryFn: () => repo.prep.note(tripId),
+    enabled: Boolean(tripId),
+  });
+}
+
+export function useSavePrepNote(tripId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: string) => repo.prep.saveNote(tripId, body),
+    onSuccess: (body) => queryClient.setQueryData(queryKeys.prepNote(tripId), body),
+  });
+}
+
+/* --------------------------------------------------------------- booking -- */
+
+export function useBookings(tripId: string) {
+  return useQuery({
+    queryKey: queryKeys.bookings(tripId),
+    queryFn: () => repo.booking.list(tripId),
+    enabled: Boolean(tripId),
+  });
+}
+
+export function useBookingOffers(tripId: string, kind: BookingKind) {
+  return useQuery({
+    queryKey: queryKeys.bookingOffers(tripId, kind),
+    queryFn: () => repo.booking.offers(tripId, kind),
+    enabled: Boolean(tripId),
+  });
+}
+
+export function useSaveBooking(tripId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Omit<BookingEntry, 'id'>) => repo.booking.save(tripId, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.bookings(tripId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tripOverview(tripId) });
+    },
+  });
+}
+
+export function useSetBookingStatus(tripId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { bookingId: string; status: BookingStatus }) =>
+      repo.booking.setStatus(tripId, input.bookingId, input.status),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.bookings(tripId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tripOverview(tripId) });
+    },
+  });
+}
+
+export function useRemoveBooking(tripId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (bookingId: string) => repo.booking.remove(tripId, bookingId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.bookings(tripId) }),
   });
 }

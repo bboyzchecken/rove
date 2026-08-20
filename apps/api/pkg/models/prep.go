@@ -2,51 +2,58 @@ package models
 
 import (
 	"context"
-
-	"gorm.io/datatypes"
+	"time"
 )
 
-// Prep block types.
+// Prep categories (DEV_SPEC M8).
 const (
-	PrepWeather = "weather"
-	PrepPacking = "packing"
-	PrepRule    = "rule"
-	PrepDocs    = "docs"
-	PrepCustom  = "custom"
+	PrepDocument = "document"
+	PrepPacking  = "packing"
+	PrepBooking  = "booking"
+	PrepMoney    = "money"
+	PrepHealth   = "health"
+	PrepOther    = "other"
 )
 
-// PrepBlock is one card in the Prep tab. Weather/packing/docs blocks are
-// regenerated from rules; custom blocks are hand-written markdown and are never
-// overwritten by a regenerate (A8.3).
-type PrepBlock struct {
+// PrepTask is one line of the shared "before we fly" checklist. Four people
+// tick this list at once, so it is deliberately flat: no sub-tasks, no owner
+// hierarchy, just an optional assignee.
+type PrepTask struct {
 	Base
-	TripID      string         `gorm:"type:char(36);not null;index" json:"trip_id"`
-	Type        string         `gorm:"type:varchar(20);not null" json:"type"`
-	Trigger     string         `gorm:"type:varchar(120)" json:"trigger"`
-	Title       string         `gorm:"type:varchar(200);not null" json:"title"`
-	ContentMD   string         `gorm:"type:text" json:"content_md"`
-	Checklist   datatypes.JSON `gorm:"type:json" json:"checklist"`
-	SortOrder   int            `gorm:"not null;default:0" json:"sort_order"`
-	GeneratedBy string         `gorm:"type:varchar(10);not null;default:'system'" json:"generated_by"`
+	TripID       string     `gorm:"type:char(36);not null;index" json:"trip_id"`
+	Title        string     `gorm:"type:varchar(200);not null" json:"title"`
+	Category     string     `gorm:"type:varchar(20);not null;default:'other'" json:"category"`
+	AssigneeID   *string    `gorm:"type:char(36)" json:"assignee_id"`
+	DueDate      *time.Time `gorm:"type:date" json:"due_date"`
+	Done         bool       `gorm:"not null;default:false" json:"done"`
+	DoneBy       *string    `gorm:"type:char(36)" json:"done_by"`
+	Note         string     `gorm:"type:text" json:"note"`
+	FromTemplate bool       `gorm:"not null;default:false" json:"from_template"`
+	SortOrder    int        `gorm:"not null;default:0" json:"sort_order"`
 }
 
-func (PrepBlock) TableName() string { return "prep_blocks" }
+func (PrepTask) TableName() string { return "prep_tasks" }
 
-// ChecklistEntry is the shape stored inside PrepBlock.Checklist.
-type ChecklistEntry struct {
-	ID     string `json:"id"`
-	Label  string `json:"label"`
-	Done   bool   `json:"done"`
-	DoneBy string `json:"done_by,omitempty"`
+// PrepNote is the free-form markdown block a trip keeps alongside the
+// checklist (W8.2) — packing notes, addresses, whatever the group pastes in.
+type PrepNote struct {
+	Base
+	TripID string `gorm:"type:char(36);not null;uniqueIndex" json:"trip_id"`
+	Body   string `gorm:"type:text" json:"body"`
+	Author string `gorm:"type:char(36)" json:"author"`
 }
+
+func (PrepNote) TableName() string { return "prep_notes" }
 
 type PrepStore interface {
-	ListByTrip(ctx context.Context, tripID string) ([]PrepBlock, error)
-	Create(ctx context.Context, b *PrepBlock) error
-	Get(ctx context.Context, tripID, id string) (*PrepBlock, error)
-	TripID(ctx context.Context, id string) (string, error)
-	Update(ctx context.Context, b *PrepBlock) error
-	Delete(ctx context.Context, tripID, id string) error
-	// ReplaceGenerated swaps every system-generated block, leaving custom ones.
-	ReplaceGenerated(ctx context.Context, tripID string, blocks []PrepBlock) error
+	Create(ctx context.Context, t *PrepTask) error
+	Get(ctx context.Context, tripID, taskID string) (*PrepTask, error)
+	ListByTrip(ctx context.Context, tripID string) ([]PrepTask, error)
+	Update(ctx context.Context, t *PrepTask) error
+	Delete(ctx context.Context, tripID, taskID string) error
+	// CreateMany seeds the country template, skipping titles already present.
+	CreateMany(ctx context.Context, tasks []PrepTask) error
+
+	GetNote(ctx context.Context, tripID string) (*PrepNote, error)
+	SaveNote(ctx context.Context, n *PrepNote) error
 }

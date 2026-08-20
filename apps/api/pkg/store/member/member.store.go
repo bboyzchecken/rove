@@ -53,12 +53,3 @@ func (s *store) Remove(ctx context.Context, tripID, userID string) error {
 		Where("trip_id = ? AND user_id = ?", tripID, userID).
 		Delete(&models.TripMember{}).Error
 }
-
-func (s *store) CountByTrip(ctx context.Context, tripID string) (int64, error) {
-	var n int64
-	err := s.db.WithContext(ctx).
-		Model(&models.TripMember{}).
-		Where("trip_id = ?", tripID).
-		Count(&n).Error
-	return n, err
-}

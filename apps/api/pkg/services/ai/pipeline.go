@@ -4,519 +4,757 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
-	"go.uber.org/fx"
-	"gorm.io/datatypes"
-	"gorm.io/gorm"
+	uberfx "go.uber.org/fx"
 
 	"github.com/bboyzchecken/rove/apps/api/pkg/core"
 	"github.com/bboyzchecken/rove/apps/api/pkg/domain"
 	"github.com/bboyzchecken/rove/apps/api/pkg/logger"
 	"github.com/bboyzchecken/rove/apps/api/pkg/models"
-	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
-	"github.com/bboyzchecken/rove/apps/api/pkg/services/jobs"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/weather"
 )
 
 // Pipeline is the ordered set of steps that turns a trip + wishlists into a
 // persisted plan. Each step is separately testable and separately retryable.
 //
-//	normalize   wishlist text -> tags + poi_id
-//	buildFrame  anchors: flights, prepaid stays, dated must-dos, zone per day
+//	buildFrame  anchors: dates, party size, cities, zone per day
 //	generate    -> PlanDraft (schemas.go)
 //	validate    pkg/domain.ValidatePlan — pure, no model involved
 //	repair      feed issues back to the model, at most 2 loops
 //	explain     -> rationales + open questions
-//	persist     one DB transaction + item_versions
 //
-// Validation is deliberately NOT part of the prompt: it is deterministic Go
-// code, so a plan is checked the same way whether a model or a person wrote it.
+// The steps are deliberately not collapsed into one prompt: validation is
+// deterministic Go code, and the model never gets to mark its own homework.
 type Pipeline interface {
-	// Enqueue creates the ai_jobs row and pushes the job. The HTTP handler
-	// returns the job id immediately; progress arrives over SSE.
-	Enqueue(ctx context.Context, kind, tripID, planID, userID string, input any) (string, error)
-	// Run executes one job to completion. Called by the worker, and directly by
-	// tests.
-	Run(ctx context.Context, job jobs.Job) error
-	// ParseTicket is synchronous: the entry-point flow blocks on it (M1).
+	Generate(ctx context.Context, in GenerateInput, onStep StepFunc) (*DraftResult, error)
 	ParseTicket(ctx context.Context, text string) (*ParsedTicket, error)
 }
 
-// maxRepairLoops is the §6.3 rule: at most two repair round trips before the
-// plan ships with its warnings attached rather than burning more tokens.
-const maxRepairLoops = 2
+// StepFunc reports progress so the SSE stream can show what is happening.
+// `progress` is 0..1.
+type StepFunc func(step string, progress float64)
 
-// cataloguePerCity bounds the POI shortlist so the prompt stays affordable.
-const cataloguePerCity = 60
+type GenerateInput struct {
+	Trip    models.Trip
+	Members []models.User
+	Wishes  []models.WishlistItem
+	Brief   string
+	Pace    string // relaxed | balanced | packed
+}
+
+type DraftItem struct {
+	Type      string   `json:"type"`
+	Title     string   `json:"title"`
+	Area      string   `json:"area"`
+	StartTime string   `json:"start_time"`
+	EndTime   string   `json:"end_time"`
+	CostJPY   float64  `json:"cost_jpy"`
+	TravelMin int      `json:"travel_minutes"`
+	TravelMode string  `json:"travel_mode"`
+	OpenHours string   `json:"open_hours"`
+	POIID     *string  `json:"poi_id"`
+	ForUsers  []string `json:"for_user_ids"`
+	Note      string   `json:"note"`
+	Bookable  bool     `json:"bookable"`
+}
+
+type DraftDay struct {
+	Date        time.Time   `json:"date"`
+	Label       string      `json:"label"`
+	City        string      `json:"city"`
+	WeatherIcon string      `json:"weather_icon"`
+	WeatherHigh float64     `json:"weather_high"`
+	WeatherLow  float64     `json:"weather_low"`
+	WeatherText string      `json:"weather_text"`
+	Items       []DraftItem `json:"items"`
+}
+
+type DraftResult struct {
+	Days          []DraftDay `json:"days"`
+	Rationales    []string   `json:"rationales"`
+	OpenQuestions []string   `json:"open_questions"`
+	Usage         Usage      `json:"-"`
+	Simulated     bool       `json:"simulated"`
+}
 
 type pipeline struct {
-	cfg    core.Config
-	db     *gorm.DB
-	client Client
-	tools  *Tools
-	queue  jobs.Queue
-	hub    events.Hub
-
-	trips     models.TripStore
-	members   models.TripMemberStore
-	profiles  models.ProfileStore
-	flights   models.FlightStore
-	wishlists models.WishlistStore
-	plans     models.PlanStore
-	aiJobs    models.AIJobStore
+	cfg     core.Config
+	client  Client
+	pois    models.POIStore
+	weather weather.Service
 }
 
-// PipelineDeps keeps the constructor readable as the graph grows. fx.In makes
-// FX fill the fields individually instead of looking for a PipelineDeps value.
-type PipelineDeps struct {
-	fx.In
-
-	Config core.Config
-	DB     *gorm.DB
-	Client Client
-	Tools  *Tools
-	Queue  jobs.Queue
-	Hub    events.Hub
-
-	Trips     models.TripStore
-	Members   models.TripMemberStore
-	Profiles  models.ProfileStore
-	Flights   models.FlightStore
-	Wishlists models.WishlistStore
-	Plans     models.PlanStore
-	AIJobs    models.AIJobStore
+func NewPipeline(
+	cfg core.Config,
+	client Client,
+	pois models.POIStore,
+	wx weather.Service,
+) Pipeline {
+	return &pipeline{cfg: cfg, client: client, pois: pois, weather: wx}
 }
 
-func NewPipeline(d PipelineDeps) Pipeline {
-	return &pipeline{
-		cfg: d.Config, db: d.DB, client: d.Client, tools: d.Tools,
-		queue: d.Queue, hub: d.Hub,
-		trips: d.Trips, members: d.Members, profiles: d.Profiles,
-		flights: d.Flights, wishlists: d.Wishlists, plans: d.Plans, aiJobs: d.AIJobs,
-	}
-}
+var _ = uberfx.Provide
 
-func (p *pipeline) Enqueue(ctx context.Context, kind, tripID, planID, userID string, input any) (string, error) {
-	if !p.client.Configured() {
-		return "", ErrNotConfigured
+// itemsPerDay is how many stops a day gets at each pace. Packed is not
+// "everything we can fit": a day with more than five stops stops being a
+// holiday and starts being a schedule.
+var itemsPerDay = map[string]int{"relaxed": 3, "balanced": 4, "packed": 5}
+
+func (p *pipeline) Generate(ctx context.Context, in GenerateInput, onStep StepFunc) (*DraftResult, error) {
+	step := func(label string, progress float64) {
+		if onStep != nil {
+			onStep(label, progress)
+		}
 	}
 
-	raw, err := json.Marshal(input)
+	step("อ่านที่อยากไปของทุกคน", 0.1)
+	frame, err := p.buildFrame(ctx, in)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	job := &models.AIJob{
-		TripID: tripID,
-		UserID: userID,
-		Kind:   kind,
-		Status: models.JobQueued,
-		Input:  datatypes.JSON(raw),
-	}
-	if planID != "" {
-		job.PlanID = &planID
-	}
-	if err := p.aiJobs.Create(ctx, job); err != nil {
-		return "", err
-	}
+	step("จับกลุ่มสถานที่ตามโซน", 0.3)
 
-	err = p.queue.Enqueue(ctx, jobs.Job{
-		ID: job.ID, Kind: jobs.Kind(kind),
-		TripID: tripID, PlanID: planID, UserID: userID, Input: raw,
-	})
-	if err != nil {
-		_ = p.aiJobs.Fail(ctx, job.ID, "ไม่สามารถส่งงานเข้าคิวได้: "+err.Error())
-		return "", err
-	}
-	return job.ID, nil
-}
-
-func (p *pipeline) Run(ctx context.Context, job jobs.Job) error {
-	switch job.Kind {
-	case jobs.KindGenerate:
-		return p.runGenerate(ctx, job)
-	case jobs.KindRefine:
-		return p.runRefine(ctx, job)
-	case jobs.KindNormalize:
-		return p.runNormalize(ctx, job)
-	default:
-		return fmt.Errorf("ai: pipeline has no step for kind %q", job.Kind)
-	}
-}
-
-// GenerateInput is what the handler puts on the queue for a generate job.
-type GenerateInput struct {
-	Hints string `json:"hints"`
-}
-
-// RefineInput is the same for a refine job.
-type RefineInput struct {
-	Instruction string `json:"instruction"`
-}
-
-func (p *pipeline) runGenerate(ctx context.Context, job jobs.Job) error {
-	var in GenerateInput
-	_ = json.Unmarshal(job.Input, &in)
-
-	fail := func(step string, err error) error {
-		_ = p.aiJobs.Fail(ctx, job.ID, step+": "+err.Error())
-		p.emit(ctx, job.TripID, job.ID, "error", step)
-		return err
-	}
-
-	p.step(ctx, job, "gathering")
-	ctxData, err := p.gather(ctx, job.TripID)
-	if err != nil {
-		return fail("รวบรวมข้อมูลทริป", err)
-	}
-
-	p.step(ctx, job, "frame")
-	frame, err := p.buildFrame(ctxData)
-	if err != nil {
-		return fail("สร้างกรอบทริป", err)
-	}
-
-	p.step(ctx, job, "facts")
-	facts, err := p.factSheet(ctx, ctxData)
-	if err != nil {
-		return fail("ดึงข้อมูลอ้างอิง", err)
-	}
-
-	p.step(ctx, job, "generating")
-	draft, usage, err := p.generate(ctx, frame, ctxData, facts, in.Hints)
-	if err != nil {
-		return fail("ร่างแพลน", err)
-	}
-	total := usage
-
-	// validate → repair, at most maxRepairLoops times. Issues that survive are
-	// attached to the plan as warnings rather than blocking it.
-	var issues []domain.Issue
-	for loop := 0; loop <= maxRepairLoops; loop++ {
-		p.step(ctx, job, "validating")
-		issues, err = p.validate(ctx, ctxData, draft)
+	var result *DraftResult
+	if p.cfg.UseMock() || p.cfg.Anthropic.ApiKey == "" {
+		// The simulated path builds a real plan out of real POIs — it just does
+		// the arranging in Go instead of asking a model. Everything downstream
+		// (validation, persistence, coverage) runs exactly as it does live.
+		result = p.simulate(frame)
+		result.Simulated = true
+	} else {
+		step("ให้ AI จัดวันและมื้ออาหาร", 0.45)
+		result, err = p.generateWithModel(ctx, frame)
 		if err != nil {
-			return fail("ตรวจแพลน", err)
+			logger.L().WithError(err).Warn("ai: model draft failed, falling back to the deterministic planner")
+			result = p.simulate(frame)
+			result.Simulated = true
 		}
-		if !domain.HasErrors(issues) || loop == maxRepairLoops {
-			break
-		}
-
-		p.step(ctx, job, fmt.Sprintf("repairing_%d", loop+1))
-		repaired, ru, err := p.repair(ctx, frame, ctxData, facts, draft, issues)
-		if err != nil {
-			// A failed repair is not a failed job: ship the plan with warnings.
-			logger.L().WithError(err).Warn("ai: repair loop failed, keeping the draft")
-			break
-		}
-		draft = repaired
-		total = add(total, ru)
 	}
 
-	p.step(ctx, job, "persisting")
-	planID, err := p.persist(ctx, job, ctxData, draft, issues)
-	if err != nil {
-		return fail("บันทึกแพลน", err)
+	step("เช็กเวลาเปิด-ปิดและเวลาเดินทาง", 0.7)
+	result.Days = p.applyValidation(result.Days, in)
+
+	step("ดูพยากรณ์อากาศรายวัน", 0.85)
+	p.attachWeather(ctx, result.Days, frame)
+
+	step("เขียนเหตุผลกำกับแต่ละวัน", 0.95)
+	if len(result.Rationales) == 0 {
+		result.Rationales = explain(result.Days, in)
+	}
+	if len(result.OpenQuestions) == 0 {
+		result.OpenQuestions = openQuestions(in)
 	}
 
-	p.finish(ctx, job.ID, planID, total, map[string]any{
-		"plan_id":        planID,
-		"issues":         issues,
-		"open_questions": draft.OpenQuestions,
-	})
-	p.emitPlanReady(ctx, job.TripID, planID)
-	return nil
+	step("เสร็จแล้ว", 1)
+	return result, nil
 }
 
-// tripContext is everything the pipeline needs about one trip, loaded once.
-type tripContext struct {
-	Trip     *models.Trip
-	Members  []models.TripMember
-	Profiles []models.MemberProfile
-	Flights  []models.TripFlight
-	Wishes   []models.WishlistItem
-	Cities   []string
+/* ------------------------------------------------------------ buildFrame -- */
+
+// frame is everything the planner needs that is *not* negotiable: the dates,
+// who is going, which cities, and the POI shortlist their wishes point at.
+type frame struct {
+	start     time.Time
+	days      int
+	partySize int
+	cities    []string
+	pace      string
+	brief     string
+	wishes    []models.WishlistItem
+	// candidates are POIs pulled from our own table, grouped by city.
+	candidates map[string][]models.POI
+	memberIDs  []string
 }
 
-func (p *pipeline) gather(ctx context.Context, tripID string) (*tripContext, error) {
-	trip, err := p.trips.GetByID(ctx, tripID)
-	if err != nil {
-		return nil, err
-	}
-	if trip.StartDate == nil || trip.EndDate == nil {
-		return nil, fmt.Errorf("ทริปยังไม่มีวันเริ่มและวันจบ")
+func (p *pipeline) buildFrame(ctx context.Context, in GenerateInput) (*frame, error) {
+	if in.Trip.StartDate == nil || in.Trip.EndDate == nil {
+		return nil, fmt.Errorf("ทริปนี้ยังไม่มีวันเดินทาง — ล็อควันก่อนถึงจะร่างแพลนได้")
 	}
 
-	members, err := p.members.ListByTrip(ctx, tripID)
-	if err != nil {
-		return nil, err
-	}
-	profiles, err := p.profiles.ListByTrip(ctx, tripID)
-	if err != nil {
-		return nil, err
-	}
-	flights, err := p.flights.ListByTrip(ctx, tripID)
-	if err != nil {
-		return nil, err
-	}
-	wishes, err := p.wishlists.ListByTrip(ctx, tripID)
-	if err != nil {
-		return nil, err
+	days := domain.DaysBetween(*in.Trip.StartDate, *in.Trip.EndDate)
+	if days < 1 {
+		days = 1
 	}
 
 	var cities []string
-	if len(trip.DestinationCities) > 0 {
-		_ = json.Unmarshal(trip.DestinationCities, &cities)
+	if len(in.Trip.DestinationCities) > 0 {
+		_ = json.Unmarshal(in.Trip.DestinationCities, &cities)
 	}
 	if len(cities) == 0 {
-		cities = []string{"tokyo"}
+		cities = []string{"โตเกียว"}
 	}
 
-	return &tripContext{
-		Trip: trip, Members: members, Profiles: profiles,
-		Flights: flights, Wishes: wishes, Cities: cities,
-	}, nil
-}
-
-func (p *pipeline) buildFrame(c *tripContext) (domain.Frame, error) {
-	in := domain.FrameInput{
-		StartDate:      *c.Trip.StartDate,
-		EndDate:        *c.Trip.EndDate,
-		PartySize:      c.Trip.PartySize,
-		MaxItemsPerDay: strictestPace(c.Profiles),
-		HomeCurrency:   c.Trip.HomeCurrency,
-		DestCurrency:   c.Trip.DestCurrency,
+	pace := in.Pace
+	if _, ok := itemsPerDay[pace]; !ok {
+		pace = "balanced"
 	}
-	for _, f := range c.Flights {
-		at := f.DepAt
-		airport := f.DepAirport
-		if f.Direction == models.FlightDirectionOut {
-			at, airport = f.ArrAt, f.ArrAirport
-		}
-		if at == nil {
+
+	f := &frame{
+		start:      domain.Day(*in.Trip.StartDate),
+		days:       days,
+		partySize:  in.Trip.PartySize,
+		cities:     cities,
+		pace:       pace,
+		brief:      in.Brief,
+		wishes:     in.Wishes,
+		candidates: map[string][]models.POI{},
+	}
+	for _, m := range in.Members {
+		f.memberIDs = append(f.memberIDs, m.ID)
+	}
+
+	// Wishes first: a POI someone actually asked for outranks anything the
+	// catalogue would have suggested on its own.
+	seen := map[string]bool{}
+	for _, wish := range in.Wishes {
+		if wish.Kind == models.WishAvoid {
 			continue
 		}
-		in.Flights = append(in.Flights, domain.FrameFlight{
-			Direction: f.Direction, Airport: airport, At: *at,
+		found, err := p.pois.Search(ctx, wish.Title, "", "", 3)
+		if err != nil {
+			continue
+		}
+		for _, poi := range found {
+			if seen[poi.ID] {
+				continue
+			}
+			seen[poi.ID] = true
+			f.candidates[poi.City] = append(f.candidates[poi.City], poi)
+		}
+	}
+
+	// Then fill each city up to a workable shortlist.
+	for _, city := range cities {
+		need := f.days*itemsPerDay[pace] + 4
+		if len(f.candidates[city]) >= need {
+			continue
+		}
+		found, err := p.pois.Search(ctx, "", city, "", need)
+		if err != nil {
+			continue
+		}
+		for _, poi := range found {
+			if seen[poi.ID] {
+				continue
+			}
+			seen[poi.ID] = true
+			f.candidates[city] = append(f.candidates[city], poi)
+		}
+	}
+
+	return f, nil
+}
+
+/* -------------------------------------------------------------- simulate -- */
+
+// simulate lays out the shortlist without a model: one anchor in the morning,
+// lunch, one or two in the afternoon, dinner. It is what MOCK_MODE runs, and
+// what a model failure falls back to — a plan that is merely sensible is far
+// better than an error page.
+func (p *pipeline) simulate(f *frame) *DraftResult {
+	perDay := itemsPerDay[f.pace]
+	result := &DraftResult{Days: make([]DraftDay, 0, f.days)}
+
+	// Cities are visited in order, splitting the trip evenly between them.
+	cityForDay := func(index int) string {
+		if len(f.cities) == 0 {
+			return ""
+		}
+		slot := index * len(f.cities) / f.days
+		if slot >= len(f.cities) {
+			slot = len(f.cities) - 1
+		}
+		return f.cities[slot]
+	}
+
+	used := map[string]bool{}
+	wishOwners := wishOwnersByTitle(f.wishes)
+
+	for i := 0; i < f.days; i++ {
+		city := cityForDay(i)
+		day := DraftDay{
+			Date:  f.start.AddDate(0, 0, i),
+			Label: fmt.Sprintf("วันที่ %d", i+1),
+			City:  city,
+		}
+
+		pool := f.candidates[city]
+		if len(pool) == 0 {
+			for _, list := range f.candidates {
+				pool = append(pool, list...)
+			}
+		}
+
+		clock := 9 * 60
+		placed := 0
+
+		for _, poi := range pool {
+			if placed >= perDay {
+				break
+			}
+			if used[poi.ID] {
+				continue
+			}
+			used[poi.ID] = true
+
+			visit := poi.AvgVisitMin
+			if visit <= 0 {
+				visit = 90
+			}
+			cost := 0.0
+			if poi.AvgCostJPY != nil {
+				cost = *poi.AvgCostJPY
+			}
+
+			poiID := poi.ID
+			item := DraftItem{
+				Type:       models.ItemPOI,
+				Title:      poi.NameTH,
+				Area:       poi.Area,
+				StartTime:  clockString(clock),
+				EndTime:    clockString(clock + visit),
+				CostJPY:    cost,
+				TravelMin:  25,
+				TravelMode: "train",
+				POIID:      &poiID,
+				ForUsers:   wishOwners[domain.NormalizeName(poi.NameTH)],
+				Bookable:   strings.Contains(poi.Tips, "จอง") || cost > 2000,
+			}
+			day.Items = append(day.Items, item)
+			clock += visit + 25
+			placed++
+
+			// A meal after the late-morning stop, and another in the evening.
+			if clock >= 12*60 && clock < 14*60 {
+				day.Items = append(day.Items, DraftItem{
+					Type:       models.ItemMeal,
+					Title:      "ข้าวเที่ยงแถว" + orDefault(poi.Area, city),
+					Area:       orDefault(poi.Area, city),
+					StartTime:  clockString(clock),
+					EndTime:    clockString(clock + 60),
+					CostJPY:    1500,
+					TravelMin:  15,
+					TravelMode: "walk",
+				})
+				clock += 75
+			}
+		}
+
+		if clock < 18*60 {
+			clock = 18 * 60
+		}
+		day.Items = append(day.Items, DraftItem{
+			Type:      models.ItemMeal,
+			Title:     "ข้าวเย็นแถว" + city,
+			Area:      city,
+			StartTime: clockString(clock),
+			EndTime:   clockString(clock + 90),
+			CostJPY:   2200,
 		})
+
+		result.Days = append(result.Days, day)
 	}
-	return domain.BuildFrame(in)
+
+	return result
 }
 
-// strictestPace takes the tightest limit across the group: if one person wants
-// a chill trip, planning at "packed" guarantees an argument on day two.
-func strictestPace(profiles []models.MemberProfile) int {
-	limit := domain.MaxNormalItems
-	for _, pr := range profiles {
-		if n, ok := models.MaxItemsPerDay[pr.Pace]; ok && n < limit {
-			limit = n
+func wishOwnersByTitle(wishes []models.WishlistItem) map[string][]string {
+	out := map[string][]string{}
+	for _, w := range wishes {
+		if w.Kind == models.WishAvoid {
+			continue
 		}
+		key := domain.NormalizeName(w.Title)
+		out[key] = append(out[key], w.UserID)
 	}
-	return limit
+	return out
 }
 
-func (p *pipeline) factSheet(ctx context.Context, c *tripContext) (FactSheet, error) {
-	texts := make([]string, 0, len(c.Wishes))
-	for _, w := range c.Wishes {
-		if w.Kind != models.WishAvoid {
-			texts = append(texts, w.Text)
+/* ----------------------------------------------------------- model path -- */
+
+const plannerSystem = `คุณคือผู้ช่วยวางแผนทริปของ ROVE สำหรับกลุ่มเพื่อนชาวไทย
+
+กติกาที่ห้ามฝ่าฝืน:
+- ตอบกลับเป็น JSON เท่านั้น ตาม schema ที่กำหนด ห้ามมีข้อความอื่นนอก JSON
+- ห้ามแต่งเวลาเปิด-ปิด ราคา หรือเวลาเดินทางเอง ถ้าไม่มีข้อมูลให้เว้นว่าง
+- ใช้เฉพาะสถานที่จากรายการที่ให้มา ถ้าจำเป็นต้องเพิ่มให้ใส่ poi_id เป็น null
+- เวลาเป็นเวลาท้องถิ่นปลายทาง รูปแบบ "HH:mm"
+- เขียนชื่อและโน้ตเป็นภาษาไทย
+- อย่าจัดวันจนแน่นเกินไป เผื่อเวลาเดินทางและเวลาพักเสมอ`
+
+func (p *pipeline) generateWithModel(ctx context.Context, f *frame) (*DraftResult, error) {
+	prompt := buildPrompt(f)
+
+	var lastErr error
+	// Two attempts: the second one is told exactly what was wrong with the
+	// first. A third would cost more than it is worth (A4.6).
+	for attempt := 0; attempt < 2; attempt++ {
+		msgs := []Message{{Role: "user", Content: prompt}}
+		if lastErr != nil {
+			msgs = append(msgs, Message{
+				Role:    "user",
+				Content: "ร่างก่อนหน้าใช้ไม่ได้เพราะ: " + lastErr.Error() + " — กรุณาส่ง JSON ใหม่ให้ถูก schema",
+			})
 		}
-	}
 
-	pois, err := p.tools.Catalogue(ctx, c.Cities, texts, cataloguePerCity)
-	if err != nil {
-		return FactSheet{}, err
-	}
-
-	facts := FactSheet{POIs: pois}
-	if len(pois) == 0 {
-		facts.Warnings = append(facts.Warnings,
-			"ยังไม่มีข้อมูล POI ในระบบสำหรับเมืองนี้ — ให้เสนอสถานที่โดยไม่ต้องใส่ poi_ref")
-	}
-
-	if q, ok := p.tools.FX(ctx, c.Trip.DestCurrency, c.Trip.HomeCurrency); ok {
-		facts.FXRate = &q
-	}
-	if lat, lng, ok := anchorLatLng(pois); ok {
-		facts.Weather = p.tools.Weather(ctx, lat, lng, *c.Trip.StartDate, *c.Trip.EndDate)
-	}
-	return facts, nil
-}
-
-// anchorLatLng picks any catalogue coordinate as the weather lookup point; a
-// city-level forecast is all a packing list needs.
-func anchorLatLng(pois []POICandidate) (float64, float64, bool) {
-	// Candidates carry no coordinates by design (the prompt does not need them),
-	// so fall back to the Tokyo city centre for the forecast.
-	if len(pois) == 0 {
-		return 0, 0, false
-	}
-	return 35.6762, 139.6503, true
-}
-
-func (p *pipeline) generate(ctx context.Context, frame domain.Frame, c *tripContext, facts FactSheet, hints string) (*PlanDraft, Usage, error) {
-	system := MustPrompt(PromptPlanner)
-	user := p.userMessage(frame, c, facts, hints)
-
-	var draft PlanDraft
-	usage, err := p.completeJSON(ctx, p.cfg.Anthropic.ModelPlanner, system, user, &draft)
-	if err != nil {
-		return nil, usage, err
-	}
-	if len(draft.Days) == 0 {
-		return nil, usage, fmt.Errorf("โมเดลตอบกลับมาโดยไม่มีวันในแพลน")
-	}
-	return &draft, usage, nil
-}
-
-func (p *pipeline) repair(ctx context.Context, frame domain.Frame, c *tripContext, facts FactSheet, draft *PlanDraft, issues []domain.Issue) (*PlanDraft, Usage, error) {
-	list := make([]string, 0, len(issues))
-	for _, i := range issues {
-		list = append(list, fmt.Sprintf("- [%s/%s] %s", i.Code, i.Severity, i.Message))
-	}
-	system, err := LoadPrompt(PromptRepair, map[string]string{"issues": strings.Join(list, "\n")})
-	if err != nil {
-		return nil, Usage{}, err
-	}
-
-	current, _ := json.Marshal(draft)
-	user := p.userMessage(frame, c, facts, "") +
-		"\n\n# แพลนปัจจุบันที่ต้องแก้\n```json\n" + string(current) + "\n```"
-
-	var repaired PlanDraft
-	usage, err := p.completeJSON(ctx, p.cfg.Anthropic.ModelPlanner, system, user, &repaired)
-	if err != nil {
-		return nil, usage, err
-	}
-	if len(repaired.Days) == 0 {
-		return nil, usage, fmt.Errorf("การซ่อมแพลนคืนค่าว่าง")
-	}
-	return &repaired, usage, nil
-}
-
-// userMessage assembles the one user turn: the frame, the wishlists, and the
-// facts. Everything the model is allowed to rely on is in here.
-func (p *pipeline) userMessage(frame domain.Frame, c *tripContext, facts FactSheet, hints string) string {
-	frameJSON, _ := json.MarshalIndent(frame, "", "  ")
-
-	type wishOut struct {
-		ID     string   `json:"id"`
-		Kind   string   `json:"kind"`
-		Text   string   `json:"text"`
-		Tags   []string `json:"tags,omitempty"`
-		POIID  string   `json:"poi_id,omitempty"`
-		Member string   `json:"member_id"`
-	}
-	wishes := make([]wishOut, 0, len(c.Wishes))
-	for _, w := range c.Wishes {
-		o := wishOut{ID: w.ID, Kind: w.Kind, Text: w.Text, Member: w.MemberID}
-		if len(w.Tags) > 0 {
-			_ = json.Unmarshal(w.Tags, &o.Tags)
+		res, err := p.client.Complete(ctx, p.cfg.Anthropic.ModelPlanner, plannerSystem, msgs, p.cfg.Anthropic.MaxTokens)
+		if err != nil {
+			return nil, err
 		}
-		if w.POIID != nil {
-			o.POIID = *w.POIID
+		if res.Simulated || strings.TrimSpace(res.Text) == "" {
+			return nil, fmt.Errorf("ai: empty completion")
 		}
-		wishes = append(wishes, o)
-	}
-	wishJSON, _ := json.MarshalIndent(wishes, "", "  ")
 
+		draft, err := parseDraft(res.Text, f)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		draft.Usage = res.Usage
+		return draft, nil
+	}
+
+	return nil, lastErr
+}
+
+func buildPrompt(f *frame) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "# frame\n```json\n%s\n```\n\n", frameJSON)
-	fmt.Fprintf(&b, "# wishlist\n```json\n%s\n```\n\n", wishJSON)
-	fmt.Fprintf(&b, "# facts\n```json\n%s\n```\n", facts.JSON())
-	if strings.TrimSpace(hints) != "" {
-		fmt.Fprintf(&b, "\n# คำขอเพิ่มเติมจากกลุ่ม\n%s\n", hints)
+
+	fmt.Fprintf(&b, "ทริป %d วัน เริ่ม %s\n", f.days, f.start.Format("2006-01-02"))
+	fmt.Fprintf(&b, "ไปกัน %d คน เมือง: %s\n", f.partySize, strings.Join(f.cities, ", "))
+	fmt.Fprintf(&b, "จังหวะการเที่ยว: %s (ประมาณ %d ที่ต่อวัน)\n\n", f.pace, itemsPerDay[f.pace])
+
+	if f.brief != "" {
+		fmt.Fprintf(&b, "สิ่งที่กลุ่มขอเพิ่ม: %s\n\n", f.brief)
 	}
+
+	b.WriteString("ที่อยากไปของสมาชิก:\n")
+	for _, w := range f.wishes {
+		label := map[string]string{"must": "ต้องไป", "nice": "ไปได้ก็ดี", "avoid": "ไม่เอา"}[w.Kind]
+		fmt.Fprintf(&b, "- [%s] %s (ของ %s)\n", label, w.Title, w.UserID)
+	}
+
+	b.WriteString("\nสถานที่ที่เลือกได้ (ใช้ poi_id นี้เท่านั้น):\n")
+	for city, pois := range f.candidates {
+		fmt.Fprintf(&b, "เมือง %s:\n", city)
+		for _, poi := range pois {
+			cost := 0.0
+			if poi.AvgCostJPY != nil {
+				cost = *poi.AvgCostJPY
+			}
+			fmt.Fprintf(&b, "  - id=%s | %s | ย่าน %s | ใช้เวลา %d นาที | ราคา %.0f เยน\n",
+				poi.ID, poi.NameTH, poi.Area, poi.AvgVisitMin, cost)
+		}
+	}
+
+	b.WriteString(`
+ส่งกลับ JSON รูปแบบนี้:
+{"days":[{"date":"YYYY-MM-DD","label":"วันที่ 1","city":"โตเกียว","items":[
+ {"type":"poi|meal|transport|stay|free","title":"...","area":"...","start_time":"09:00","end_time":"11:00",
+  "cost_jpy":0,"travel_minutes":20,"travel_mode":"train|walk|bus|car","poi_id":"...หรือ null","note":""}]}],
+ "rationales":["เหตุผลที่จัดแบบนี้"],"open_questions":["คำถามกลับถึงกลุ่ม"]}`)
+
 	return b.String()
 }
 
-// completeJSON is the one place a model call turns into a Go struct. The retry
-// here is for schema failures; transport retries live in the client.
-func (p *pipeline) completeJSON(ctx context.Context, model, system, user string, dst any) (Usage, error) {
-	if model == "" {
-		model = "claude-opus-5"
+// parseDraft is strict about structure and forgiving about wrapping: models
+// like to put JSON in a fenced block, and rejecting that would fail a draft
+// that is otherwise perfectly good.
+func parseDraft(text string, f *frame) (*DraftResult, error) {
+	raw := strings.TrimSpace(text)
+	if start := strings.Index(raw, "{"); start > 0 {
+		raw = raw[start:]
+	}
+	if end := strings.LastIndex(raw, "}"); end >= 0 && end < len(raw)-1 {
+		raw = raw[:end+1]
 	}
 
-	var total Usage
-	msgs := []Message{{Role: "user", Content: user}}
+	var parsed struct {
+		Days []struct {
+			Date  string      `json:"date"`
+			Label string      `json:"label"`
+			City  string      `json:"city"`
+			Items []DraftItem `json:"items"`
+		} `json:"days"`
+		Rationales    []string `json:"rationales"`
+		OpenQuestions []string `json:"open_questions"`
+	}
+	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+		return nil, fmt.Errorf("JSON ไม่ถูกต้อง: %w", err)
+	}
+	if len(parsed.Days) == 0 {
+		return nil, fmt.Errorf("ไม่มีวันในร่าง")
+	}
 
-	for attempt := 1; attempt <= 2; attempt++ {
-		res, err := p.client.Complete(ctx, model, system, msgs, p.cfg.Anthropic.MaxTokens)
+	known := map[string]bool{}
+	for _, list := range f.candidates {
+		for _, poi := range list {
+			known[poi.ID] = true
+		}
+	}
+
+	out := &DraftResult{
+		Rationales:    parsed.Rationales,
+		OpenQuestions: parsed.OpenQuestions,
+	}
+
+	for i, day := range parsed.Days {
+		date, err := time.Parse("2006-01-02", day.Date)
 		if err != nil {
-			return total, err
-		}
-		total = add(total, res.Usage)
-
-		if err := ParseJSON(res.Text, dst); err == nil {
-			return total, nil
-		} else if attempt == 2 {
-			return total, err
+			date = f.start.AddDate(0, 0, i)
 		}
 
-		// Show the model its own output and the parse error; a bare "try again"
-		// usually reproduces the same malformed shape.
-		msgs = append(msgs,
-			Message{Role: "assistant", Content: truncate(res.Text, 4000)},
-			Message{Role: "user", Content: "ผลลัพธ์ก่อนหน้าไม่ใช่ JSON ที่ตรง schema ตอบใหม่เป็น JSON อย่างเดียว ไม่ต้องมีข้อความอื่น"},
-		)
+		items := make([]DraftItem, 0, len(day.Items))
+		for _, item := range day.Items {
+			// A POI the model invented is kept as free text rather than being
+			// written back as if it were catalogued.
+			if item.POIID != nil && !known[*item.POIID] {
+				item.POIID = nil
+			}
+			if item.StartTime == "" {
+				continue
+			}
+			items = append(items, item)
+		}
+
+		out.Days = append(out.Days, DraftDay{
+			Date:  domain.Day(date),
+			Label: orDefault(day.Label, fmt.Sprintf("วันที่ %d", i+1)),
+			City:  day.City,
+			Items: items,
+		})
 	}
-	return total, fmt.Errorf("ai: model did not return valid JSON")
+
+	return out, nil
 }
 
-func add(a, b Usage) Usage {
-	return Usage{
-		InputTokens:  a.InputTokens + b.InputTokens,
-		OutputTokens: a.OutputTokens + b.OutputTokens,
-		CostUSD:      a.CostUSD + b.CostUSD,
+/* ------------------------------------------------------------- validate -- */
+
+// applyValidation runs the deterministic checks and writes the warnings onto
+// the draft, so the group sees the same flags whether the plan came from the
+// model or from the fallback planner.
+func (p *pipeline) applyValidation(days []DraftDay, in GenerateInput) []DraftDay {
+	items := make([]domain.ValidateItem, 0)
+	index := map[string][2]int{}
+
+	for di, day := range days {
+		for ii, item := range day.Items {
+			id := fmt.Sprintf("d%di%d", di, ii)
+			index[id] = [2]int{di, ii}
+			items = append(items, domain.ValidateItem{
+				ID:        id,
+				DayIndex:  di + 1,
+				Title:     item.Title,
+				StartTime: item.StartTime,
+				EndTime:   item.EndTime,
+				OpenHours: item.OpenHours,
+				TravelMin: item.TravelMin,
+			})
+		}
 	}
+
+	musts := make([]string, 0)
+	for _, w := range in.Wishes {
+		if w.Kind == models.WishMust {
+			musts = append(musts, w.Title)
+		}
+	}
+
+	issues := domain.ValidatePlan(domain.ValidateInput{Items: items, MustWishes: musts})
+	for id, warning := range domain.WarningsByItem(issues) {
+		if pos, ok := index[id]; ok {
+			days[pos[0]].Items[pos[1]].Note = joinNote(days[pos[0]].Items[pos[1]].Note, warning)
+		}
+	}
+	return days
 }
 
-func (p *pipeline) step(ctx context.Context, job jobs.Job, step string) {
-	_ = p.aiJobs.SetStep(ctx, job.ID, step)
-	p.emit(ctx, job.TripID, job.ID, "running", step)
+func joinNote(note, warning string) string {
+	if note == "" {
+		return warning
+	}
+	return note + " · " + warning
 }
 
-func (p *pipeline) emit(ctx context.Context, tripID, jobID, status, step string) {
-	if p.hub == nil || tripID == "" {
+/* --------------------------------------------------------------- weather -- */
+
+func (p *pipeline) attachWeather(ctx context.Context, days []DraftDay, f *frame) {
+	if len(days) == 0 {
 		return
 	}
-	_ = p.hub.Publish(ctx, tripID, events.Event{
-		Type:       events.TypeAIProgress,
-		TargetType: "ai_job",
-		TargetID:   jobID,
-		Meta:       map[string]any{"status": status, "step": step},
-	})
-}
 
-func (p *pipeline) emitPlanReady(ctx context.Context, tripID, planID string) {
-	if p.hub == nil {
-		return
+	// One call for the whole trip rather than one per day.
+	lat, lng := 35.6762, 139.6503 // Tokyo, the Phase 1 default
+	for _, list := range f.candidates {
+		for _, poi := range list {
+			if poi.Lat != nil && poi.Lng != nil {
+				lat, lng = *poi.Lat, *poi.Lng
+				break
+			}
+		}
+		break
 	}
-	_ = p.hub.Publish(ctx, tripID, events.Event{
-		Type:       events.TypePlanReady,
-		TargetType: "plan",
-		TargetID:   planID,
-	})
-}
 
-func (p *pipeline) finish(ctx context.Context, jobID, planID string, usage Usage, output map[string]any) {
-	job, err := p.aiJobs.Get(ctx, jobID)
+	forecasts, err := p.weather.Daily(ctx, lat, lng, days[0].Date, days[len(days)-1].Date)
 	if err != nil {
 		return
 	}
-	raw, _ := json.Marshal(output)
-	now := time.Now().UTC()
 
-	job.Status = models.JobDone
-	job.Step = "done"
-	job.Output = datatypes.JSON(raw)
-	job.TokensIn = usage.InputTokens
-	job.TokensOut = usage.OutputTokens
-	job.CostUSD = usage.CostUSD
-	job.FinishedAt = &now
-	if planID != "" {
-		job.PlanID = &planID
+	byDate := map[string]weather.Forecast{}
+	for _, f := range forecasts {
+		byDate[f.Date.Format("2006-01-02")] = f
 	}
-	_ = p.aiJobs.Update(ctx, job)
+
+	for i := range days {
+		f, ok := byDate[days[i].Date.Format("2006-01-02")]
+		if !ok {
+			continue
+		}
+		days[i].WeatherHigh = f.TempMaxC
+		days[i].WeatherLow = f.TempMinC
+		days[i].WeatherText = f.Summary
+		days[i].WeatherIcon = weather.Icon(f)
+	}
+}
+
+/* --------------------------------------------------------------- explain -- */
+
+// explain writes the "ทำไมจัดแบบนี้" lines from the plan itself. When the model
+// produced its own, those win — these are the floor, not the ceiling.
+func explain(days []DraftDay, in GenerateInput) []string {
+	out := make([]string, 0, 4)
+	if len(days) == 0 {
+		return out
+	}
+
+	early := ""
+	for _, day := range days {
+		for _, item := range day.Items {
+			if item.StartTime < "09:00" && item.Type == models.ItemPOI {
+				early = item.Title
+				break
+			}
+		}
+		if early != "" {
+			break
+		}
+	}
+	if early != "" {
+		out = append(out, fmt.Sprintf("จัด \"%s\" ไว้เช้าตรู่ เพราะช่วงสายคนเยอะจนถ่ายรูปแทบไม่ได้", early))
+	}
+
+	byMember := map[string]int{}
+	for _, day := range days {
+		for _, item := range day.Items {
+			for _, id := range item.ForUsers {
+				byMember[id]++
+			}
+		}
+	}
+	names := map[string]string{}
+	for _, m := range in.Members {
+		names[m.ID] = m.DisplayName
+	}
+	ids := make([]string, 0, len(byMember))
+	for id := range byMember {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		if name, ok := names[id]; ok {
+			out = append(out, fmt.Sprintf("แพลนนี้มีของที่%sอยากไป %d อย่าง", name, byMember[id]))
+		}
+	}
+
+	total := 0
+	for _, day := range days {
+		total += len(day.Items)
+	}
+	out = append(out, fmt.Sprintf("ทั้งทริป %d วัน %d รายการ เฉลี่ยวันละ %d — เผื่อเวลาเดินทางไว้ทุกช่วงแล้ว",
+		len(days), total, total/len(days)))
+
+	return out
+}
+
+func openQuestions(in GenerateInput) []string {
+	out := make([]string, 0, 3)
+
+	missing := 0
+	for _, m := range in.Members {
+		has := false
+		for _, w := range in.Wishes {
+			if w.UserID == m.ID {
+				has = true
+				break
+			}
+		}
+		if !has {
+			missing++
+			out = append(out, fmt.Sprintf("%s ยังไม่ได้ใส่ที่อยากไป — รอก่อน หรือให้ร่างไปก่อนแล้วค่อยปรับ?", m.DisplayName))
+		}
+	}
+
+	if in.Trip.BudgetPerPersonTHB > 0 {
+		out = append(out, "งบที่ตั้งไว้พอไหม หรืออยากให้ตัดบางอย่างออกเพื่อลดค่าใช้จ่าย?")
+	}
+	out = append(out, "อยากได้วันไหนเป็นวันพักแบบไม่ต้องตื่นเช้าไหม?")
+
+	if missing == 0 && len(out) > 3 {
+		out = out[:3]
+	}
+	return out
+}
+
+/* ---------------------------------------------------------- parse ticket -- */
+
+// ParseTicket reads a pasted booking e-mail. In mock mode — and whenever the
+// model is unavailable — it falls back to a regex that handles the shape
+// airline confirmations actually use, which is enough to reach a trip frame.
+func (p *pipeline) ParseTicket(ctx context.Context, text string) (*ParsedTicket, error) {
+	if p.cfg.UseMock() || p.cfg.Anthropic.ApiKey == "" {
+		return parseTicketHeuristic(text), nil
+	}
+
+	res, err := p.client.Complete(ctx, p.cfg.Anthropic.ModelFast, ticketSystem,
+		[]Message{{Role: "user", Content: text}}, 1500)
+	if err != nil || res.Simulated || strings.TrimSpace(res.Text) == "" {
+		return parseTicketHeuristic(text), nil
+	}
+
+	raw := strings.TrimSpace(res.Text)
+	if start := strings.Index(raw, "{"); start > 0 {
+		raw = raw[start:]
+	}
+	if end := strings.LastIndex(raw, "}"); end >= 0 && end < len(raw)-1 {
+		raw = raw[:end+1]
+	}
+
+	var out ParsedTicket
+	if err := json.Unmarshal([]byte(raw), &out); err != nil {
+		return parseTicketHeuristic(text), nil
+	}
+	return &out, nil
+}
+
+const ticketSystem = `อ่านอีเมลยืนยันตั๋วเครื่องบิน แล้วตอบกลับเป็น JSON เท่านั้น:
+{"flights":[{"direction":"out|back","airline":"","flight_no":"","dep_airport":"","arr_airport":"","dep_at":"YYYY-MM-DDTHH:mm","arr_at":"YYYY-MM-DDTHH:mm"}],
+ "suggested_title":"","start_date":"YYYY-MM-DD","end_date":"YYYY-MM-DD"}
+ถ้าอ่านไม่ออกให้ส่ง flights เป็น []`
+
+/* ----------------------------------------------------------------- util -- */
+
+func clockString(minutes int) string {
+	minutes %= 24 * 60
+	return fmt.Sprintf("%02d:%02d", minutes/60, minutes%60)
+}
+
+func orDefault(value, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
 }

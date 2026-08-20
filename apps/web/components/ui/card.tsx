@@ -1,51 +1,49 @@
-import { type HTMLAttributes } from 'react';
-
 import { cn } from '@/lib/utils';
 
 /**
- * Cards are the whole layout language of this product (§15): soft radius,
- * warm shadow, no hard borders. `tone` paints the accent-block variant used to
- * colour-code a category.
+ * The only card in the app.
+ *
+ * §15 Visual Direction: the page is white and separation comes from flat
+ * colour blocks, not from borders or shadows. `accent` picks which block this
+ * is; the accent hue is tinted over white rather than kept as a second set of
+ * pastel hexes, so brand.css stays the only place a colour is named.
  */
-export type CardTone = 'plain' | 'matcha' | 'sky' | 'sun' | 'joyfull' | 'primary';
+const ACCENT_TINT = {
+  none: 'bg-surface',
+  primary: 'bg-primary/12',
+  matcha: 'bg-matcha/55',
+  sky: 'bg-sky/55',
+  sun: 'bg-sun/55',
+  joyfull: 'bg-joyfull/55',
+  /** Full-strength terracotta — one per screen at most, for the main action. */
+  solid: 'bg-primary text-primary-fg',
+} as const;
 
-const toneClass: Record<CardTone, string> = {
-  plain: 'bg-surface',
-  matcha: 'bg-matcha/25',
-  sky: 'bg-sky/25',
-  sun: 'bg-sun/25',
-  joyfull: 'bg-joyfull/25',
-  primary: 'bg-primary/10',
-};
+export type Accent = keyof typeof ACCENT_TINT;
 
-export interface CardProps extends HTMLAttributes<HTMLDivElement> {
-  tone?: CardTone;
-  /** Drops the shadow for cards nested inside another card. */
-  flat?: boolean;
+export function Card({
+  accent = 'none',
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & { accent?: Accent }) {
+  return <div className={cn('rounded-brand', ACCENT_TINT[accent], className)} {...props} />;
 }
 
-export function Card({ tone = 'plain', flat, className, ...props }: CardProps) {
+export function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div
-      className={cn(
-        'rounded-brand-lg p-4',
-        toneClass[tone],
-        !flat && tone === 'plain' && 'shadow-brand',
-        className,
-      )}
+    <div className={cn('flex items-start justify-between gap-3 p-4 pb-0', className)} {...props} />
+  );
+}
+
+export function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
+  return (
+    <h3
+      className={cn('font-display text-espresso text-base font-bold tracking-tight', className)}
       {...props}
     />
   );
 }
 
-export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('mb-3 flex items-start justify-between gap-3', className)} {...props} />;
-}
-
-export function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) {
-  return <h3 className={cn('font-display text-base font-bold', className)} {...props} />;
-}
-
-export function CardDescription({ className, ...props }: HTMLAttributes<HTMLParagraphElement>) {
-  return <p className={cn('text-sm text-muted', className)} {...props} />;
+export function CardBody({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn('p-4', className)} {...props} />;
 }

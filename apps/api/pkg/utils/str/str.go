@@ -2,8 +2,10 @@
 package str
 
 import (
+	"crypto/rand"
 	"regexp"
 	"strings"
+	"time"
 )
 
 var nonSlug = regexp.MustCompile(`[^a-z0-9ก-๙]+`)
@@ -32,4 +34,27 @@ func Deref[T any](p *T, fallback T) T {
 		return fallback
 	}
 	return *p
+}
+
+// RandomToken returns a URL-safe random string of n characters, used for
+// invite links, share tokens and OAuth state. crypto/rand, never math/rand:
+// a guessable share token is an unlisted trip anyone can find.
+func RandomToken(n int) string {
+	const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+	buf := make([]byte, n)
+	if _, err := rand.Read(buf); err != nil {
+		// crypto/rand failing is not recoverable in a way that should produce a
+		// weaker token, so fall back to the process clock only to avoid a panic
+		// and let the caller's uniqueness constraint catch a collision.
+		for i := range buf {
+			buf[i] = alphabet[(int(time.Now().UnixNano())+i)%len(alphabet)]
+		}
+		return string(buf)
+	}
+
+	for i, b := range buf {
+		buf[i] = alphabet[int(b)%len(alphabet)]
+	}
+	return string(buf)
 }

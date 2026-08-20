@@ -1,20 +1,17 @@
-// Package email sends the few transactional messages this product needs —
-// mainly the invite fallback when LINE is not an option.
+// Package email sends the few transactional messages this product needs.
 //
-// Decision (DEV_SPEC §16): Resend over the Gmail API. Gmail needs an OAuth
-// consent screen and a refresh token per sender, which is a lot of moving parts
-// for the handful of messages Phase 1 sends.
+// Phase 1 decision: there are none. Invites are links pasted into a LINE chat
+// (M2 — W2.4), the AI paywall is in-app, and there is no password to reset
+// because sign-in is OAuth. Rather than wire a provider nothing calls, this is
+// a logging stub that records what *would* have been sent — so the day a real
+// message is needed, the call site already exists and only the transport
+// changes.
 package email
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"time"
 
-	"go.uber.org/fx"
+	uberfx "go.uber.org/fx"
 
 	"github.com/bboyzchecken/rove/apps/api/pkg/core"
 	"github.com/bboyzchecken/rove/apps/api/pkg/logger"
@@ -22,63 +19,19 @@ import (
 
 type Service interface {
 	Send(ctx context.Context, to, subject, htmlBody string) error
-	Configured() bool
 }
 
-const endpoint = "https://api.resend.com/emails"
+type service struct{ cfg core.Config }
 
-type service struct {
-	apiKey string
-	from   string
-	http   *http.Client
-}
+func New(cfg core.Config) Service { return &service{cfg: cfg} }
 
-func New(cfg core.Config) Service {
-	return &service{
-		apiKey: cfg.Email.ResendAPIKey,
-		from:   cfg.Email.From,
-		http:   &http.Client{Timeout: 10 * time.Second},
-	}
-}
+var Module = uberfx.Module("services.email", uberfx.Provide(New))
 
-var Module = fx.Module("services.email", fx.Provide(New))
-
-func (s *service) Configured() bool { return s.apiKey != "" && s.from != "" }
-
-// Send logs and returns nil when email is not configured. An invite link is
-// copied to the clipboard in the UI anyway, so a missing SMTP key must not fail
-// the invite request.
-func (s *service) Send(ctx context.Context, to, subject, htmlBody string) error {
-	if !s.Configured() {
-		logger.L().WithField("to", to).Info("email not configured, skipping send")
-		return nil
-	}
-
-	body, err := json.Marshal(map[string]any{
-		"from":    s.from,
-		"to":      []string{to},
-		"subject": subject,
-		"html":    htmlBody,
-	})
-	if err != nil {
-		return err
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("content-type", "application/json")
-	req.Header.Set("authorization", "Bearer "+s.apiKey)
-
-	res, err := s.http.Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode >= 300 {
-		return fmt.Errorf("email: resend returned %d", res.StatusCode)
-	}
+// Send never fails: nothing in Phase 1 depends on delivery, and turning a
+// missing provider into a 500 on an otherwise successful invite would be the
+// wrong trade.
+func (s *service) Send(_ context.Context, to, subject, _ string) error {
+	logger.L().WithField("to", to).WithField("subject", subject).
+		Info("email: not sent — no transport configured in this phase")
 	return nil
 }

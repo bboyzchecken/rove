@@ -1,3 +1,5 @@
+// Package booking holds the GORM implementation of bookings and the affiliate
+// click trail (M12 — A12.2, A12.4).
 package booking
 
 import (
@@ -6,7 +8,6 @@ import (
 
 	"go.uber.org/fx"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 
 	"github.com/bboyzchecken/rove/apps/api/pkg/models"
 )
@@ -17,82 +18,69 @@ func New(db *gorm.DB) models.BookingStore { return &store{db: db} }
 
 var Module = fx.Module("store.booking", fx.Provide(New))
 
-func (s *store) CreateClick(ctx context.Context, c *models.BookingClick) error {
-	return s.db.WithContext(ctx).Create(c).Error
+func (s *store) Create(ctx context.Context, b *models.Booking) error {
+	return s.db.WithContext(ctx).Create(b).Error
 }
 
-// GetClickByTracking is keyed on the random tracking id, which is what the
-// unauthenticated /go/:trackingId redirect has to work with.
-func (s *store) GetClickByTracking(ctx context.Context, trackingID string) (*models.BookingClick, error) {
-	var c models.BookingClick
-	err := s.db.WithContext(ctx).Where("tracking_id = ?", trackingID).First(&c).Error
+func (s *store) Get(ctx context.Context, tripID, bookingID string) (*models.Booking, error) {
+	var b models.Booking
+	err := s.db.WithContext(ctx).Where("trip_id = ? AND id = ?", tripID, bookingID).First(&b).Error
 	if err != nil {
 		return nil, err
 	}
-	return &c, nil
+	return &b, nil
 }
 
-func (s *store) MarkClicked(ctx context.Context, trackingID, ua, referrer string) error {
-	now := time.Now().UTC()
-	return s.db.WithContext(ctx).Model(&models.BookingClick{}).
-		Where("tracking_id = ?", trackingID).
-		Updates(map[string]any{"clicked_at": now, "ua": ua, "referrer": referrer}).Error
-}
-
-func (s *store) ListByTrip(ctx context.Context, tripID string) ([]models.BookingClick, error) {
-	var cs []models.BookingClick
-	err := s.db.WithContext(ctx).Where("trip_id = ?", tripID).
-		Order("created_at DESC").Find(&cs).Error
-	return cs, err
-}
-
-func (s *store) CreateConfirmation(ctx context.Context, c *models.BookingConfirmation) error {
-	return s.db.WithContext(ctx).Create(c).Error
-}
-
-// GetConfirmationByRef makes the importer and the webhook idempotent: the same
-// partner reference must never award points twice.
-func (s *store) GetConfirmationByRef(ctx context.Context, partner, partnerRef string) (*models.BookingConfirmation, error) {
-	var c models.BookingConfirmation
+func (s *store) ListByTrip(ctx context.Context, tripID string) ([]models.Booking, error) {
+	var out []models.Booking
 	err := s.db.WithContext(ctx).
-		Where("partner = ? AND partner_ref = ?", partner, partnerRef).
-		First(&c).Error
-	if err != nil {
+		Where("trip_id = ?", tripID).
+		Order("created_at ASC").
+		Find(&out).Error
+	return out, err
+}
+
+func (s *store) Update(ctx context.Context, b *models.Booking) error {
+	return s.db.WithContext(ctx).Where("trip_id = ? AND id = ?", b.TripID, b.ID).Save(b).Error
+}
+
+func (s *store) Delete(ctx context.Context, tripID, bookingID string) error {
+	return s.db.WithContext(ctx).
+		Where("trip_id = ? AND id = ?", tripID, bookingID).
+		Delete(&models.Booking{}).Error
+}
+
+/* ---------------------------------------------------------------- clicks -- */
+
+// AddClick is written before the redirect, not after: if the log fails we would
+// rather know than silently lose the attribution the business model runs on.
+func (s *store) AddClick(ctx context.Context, click *models.BookingClick) error {
+	if click.ClickedAt.IsZero() {
+		click.ClickedAt = time.Now().UTC()
+	}
+	return s.db.WithContext(ctx).Create(click).Error
+}
+
+// GetClick is looked up by id alone on purpose — /go/:id is a public redirect
+// and the id is the unguessable capability.
+func (s *store) GetClick(ctx context.Context, clickID string) (*models.BookingClick, error) {
+	var c models.BookingClick
+	if err := s.db.WithContext(ctx).Where("id = ?", clickID).First(&c).Error; err != nil {
 		return nil, err
 	}
 	return &c, nil
 }
 
-func (s *store) ListPartners(ctx context.Context) ([]models.AffiliatePartner, error) {
-	var ps []models.AffiliatePartner
-	err := s.db.WithContext(ctx).Order("priority DESC").Find(&ps).Error
-	return ps, err
+func (s *store) ConfirmClick(ctx context.Context, clickID string, at time.Time) error {
+	return s.db.WithContext(ctx).Model(&models.BookingClick{}).
+		Where("id = ?", clickID).
+		Update("confirmed_at", at).Error
 }
 
-func (s *store) UpsertPartner(ctx context.Context, p *models.AffiliatePartner) error {
-	return s.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "key"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"name", "item_types", "deeplink_template", "subid_param",
-			"enabled", "priority", "notes", "updated_at",
-		}),
-	}).Create(p).Error
-}
-
-func (s *store) RecordClone(ctx context.Context, c *models.PlanClone) error {
-	return s.db.WithContext(ctx).Create(c).Error
-}
-
-func (s *store) CountClicksSince(ctx context.Context, since time.Time) (int64, error) {
+func (s *store) CountClicks(ctx context.Context, since time.Time) (int64, error) {
 	var n int64
 	err := s.db.WithContext(ctx).Model(&models.BookingClick{}).
-		Where("created_at >= ?", since).Count(&n).Error
-	return n, err
-}
-
-func (s *store) CountConfirmationsSince(ctx context.Context, since time.Time) (int64, error) {
-	var n int64
-	err := s.db.WithContext(ctx).Model(&models.BookingConfirmation{}).
-		Where("created_at >= ?", since).Count(&n).Error
+		Where("clicked_at >= ?", since).
+		Count(&n).Error
 	return n, err
 }

@@ -1,202 +1,198 @@
 package api
 
 import (
-	"errors"
+	"bytes"
 	"fmt"
+	"html"
 	"net/http"
-	"time"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/bboyzchecken/rove/apps/api/pkg/domain"
 	"github.com/bboyzchecken/rove/apps/api/pkg/handlers/api/request"
 	"github.com/bboyzchecken/rove/apps/api/pkg/models"
-	"github.com/bboyzchecken/rove/apps/api/pkg/services/export"
+	"github.com/bboyzchecken/rove/apps/api/pkg/utils/str"
 )
 
-// registerExportRoutes covers HTML/PDF export (DEV_SPEC §5.11 / M10).
+// Export (M10 — A10.2).
 //
-//	POST /trips/:tripId/export   [viewer] {format} -> {url}
-//
-// Export is synchronous. A 7-day plan renders in well under a second, and a job
-// with a polling UI would be more machinery than the feature needs; the job
-// queue stays reserved for the AI calls that genuinely take minutes.
-func (s *Server) registerExportRoutes(v1, trips *echo.Group) {
-	trips.POST("/:tripId/export", s.handleExport,
-		s.TripRoleMiddleware(models.TripRoleViewer),
-		s.RateLimit(RateLimitConfig{Key: "export", Limit: 20, Window: time.Minute}))
+// The file is streamed straight back rather than uploaded to a bucket and
+// signed: a trip export is a few kilobytes the user asked for and downloads
+// immediately, and a round trip through storage would add a dependency, a key
+// and a lifecycle policy to solve a problem nobody has. Money is never in it,
+// at any visibility (W16.5).
+func (s *Server) registerExportRoutes(g *echo.Group) {
+	view := s.TripRoleMiddleware(models.TripRoleViewer)
+
+	g.POST("/:tripId/export", s.handleExport, view)
+	g.GET("/:tripId/export", s.handleExport, view)
 }
 
 type exportRequest struct {
-	Format string `json:"format" validate:"omitempty,oneof=html pdf"`
-	PlanID string `json:"plan_id" validate:"omitempty,uuid4"`
+	Format string `json:"format"`
 }
 
 func (s *Server) handleExport(c echo.Context) error {
 	var req exportRequest
-	if err := request.BindAndValidate(c, &req); err != nil {
-		return err
+	_ = c.Bind(&req)
+
+	format := strings.ToLower(orDefault(req.Format, c.QueryParam("format")))
+	if format == "" {
+		format = "html"
 	}
 
-	ctx, cancel := contextWithTimeout(c, 60*time.Second)
-	defer cancel()
-
-	tripID := request.TripID(c)
-	planID := req.PlanID
-	if planID == "" {
-		plan, err := s.activePlan(ctx, tripID)
-		if err != nil {
-			return request.BadRequest(c, "ทริปนี้ยังไม่มีแพลนให้ export")
-		}
-		planID = plan.ID
-	}
-
-	view, err := s.planView(c, tripID, planID)
-	if err != nil {
-		return request.NotFound(c, "ไม่พบแพลน")
-	}
-
-	format := orDefaultString(req.Format, export.FormatHTML)
-	url, err := s.export.Render(ctx, format, *view)
-	if err != nil {
-		if errors.Is(err, export.ErrPDFNotConfigured) {
-			return request.Error(c, http.StatusServiceUnavailable,
-				"ยังไม่ได้ตั้งค่าตัวสร้าง PDF — export เป็น HTML แทนได้")
-		}
-		return request.Internal(c, "สร้างไฟล์ export ไม่สำเร็จ")
-	}
-
-	s.emit(c, tripID, emitOpts{
-		Action:     models.ActionExportRequested,
-		TargetType: "plan", TargetID: planID,
-		Meta: map[string]any{"format": format},
-	})
-	return request.OK(c, map[string]any{
-		"url":        url,
-		"format":     format,
-		"expires_in": int(export.SignedURLTTL.Seconds()),
-	})
-}
-
-// planView flattens a plan into the export document. It is also what the public
-// share page renders, so the two can never drift apart.
-func (s *Server) planView(c echo.Context, tripID, planID string) (*export.PlanView, error) {
 	ctx := c.Request().Context()
+	tripID := request.TripID(c)
 
 	trip, err := s.trips.GetByID(ctx, tripID)
 	if err != nil {
-		return nil, err
+		return request.NotFound(c, "ไม่พบทริป")
 	}
-	detail, err := s.planDetail(ctx, tripID, planID)
-	if err != nil {
-		return nil, err
-	}
+	days, _ := s.plans.ListDays(ctx, tripID)
+	items, _ := s.plans.ListItems(ctx, tripID)
 
-	rate, rateAt := s.tripRate(c, trip)
-
-	view := &export.PlanView{
-		TripID:       trip.ID,
-		PlanID:       planID,
-		Title:        trip.Title,
-		Subtitle:     detail.Plan.KeyDecision,
-		PartySize:    trip.PartySize,
-		Summary:      firstNonEmpty(detail.Plan.Summary, trip.Summary),
-		BrandName:    "ROVE",
-		GeneratedAt:  time.Now().UTC().Format("2 Jan 2006 15:04") + " UTC",
-		HomeCurrency: trip.HomeCurrency,
-		FXNote:       fxNote(rateAt),
-	}
-	if trip.StartDate != nil {
-		view.StartDate = trip.StartDate.Format("2 Jan 2006")
-	}
-	if trip.EndDate != nil {
-		view.EndDate = trip.EndDate.Format("2 Jan 2006")
+	byDay := map[string][]models.PlanItem{}
+	for _, item := range items {
+		byDay[item.DayID] = append(byDay[item.DayID], item)
 	}
 
-	costs := []domain.CostInput{}
-	for _, d := range detail.Days {
-		day := export.DayView{
-			Date:  d.Date.Format("Mon 2 Jan"),
-			Title: d.Title,
-			Theme: d.Theme,
-		}
-		for _, it := range d.Items {
-			day.Items = append(day.Items, export.ItemView{
-				Time:     timeRange(it),
-				Title:    it.Title,
-				Notes:    it.Notes,
-				Type:     it.Type,
-				Travel:   travelLabel(it),
-				Cost:     costLabel(it),
-				Verified: it.Verified == models.VerifiedYes,
-			})
-
-			cost := domain.CostInput{
-				ItemID:   it.ID,
-				Category: domain.CategoryForItemType(it.Type),
-				Currency: it.CostCurrency, Basis: it.CostBasis,
-				Nights: trip.Nights(), IsPrepaid: it.IsPrepaid,
-			}
-			if it.CostAmount != nil {
-				cost.Amount = *it.CostAmount
-			}
-			costs = append(costs, cost)
-		}
-		view.Days = append(view.Days, day)
+	filename := str.Slugify(trip.Title)
+	if filename == "" {
+		filename = "trip"
 	}
 
-	budget := domain.ComputeBudget(costs, trip.PartySize, rate, trip.HomeCurrency)
-	view.TotalLabel = fmt.Sprintf("ประมาณการรวม %.0f %s · ต่อคน %.0f %s",
-		budget.Total, trip.HomeCurrency, budget.PerPerson, trip.HomeCurrency)
+	switch format {
+	case "ics":
+		body := buildICS(*trip, days, byDay)
+		return download(c, filename+".ics", "text/calendar; charset=utf-8", body)
 
-	if members, err := s.memberViews(c, tripID); err == nil {
-		for _, m := range members {
-			view.Members = append(view.Members, m.DisplayName)
-		}
-	}
-	return view, nil
-}
+	case "json":
+		payload := map[string]any{"trip": toTripDTO(*trip), "days": planDayDTOs(days, byDay)}
+		return download(c, filename+".json", "application/json; charset=utf-8", toJSON(payload))
 
-func timeRange(it models.Item) string {
-	switch {
-	case it.StartTime != "" && it.EndTime != "":
-		return it.StartTime + "–" + it.EndTime
-	case it.StartTime != "":
-		return it.StartTime
+	case "pdf", "html":
+		// "PDF" is the browser's print dialog on a self-contained page: a
+		// headless renderer is a whole service to maintain, and the page it
+		// would render is this one.
+		body := buildPrintableHTML(*trip, days, byDay)
+		return download(c, filename+".html", "text/html; charset=utf-8", body)
+
 	default:
-		return ""
+		return request.BadRequest(c, "รูปแบบไฟล์ไม่รองรับ")
 	}
 }
 
-func travelLabel(it models.Item) string {
-	if it.TravelMin <= 0 {
-		return ""
-	}
-	mode := it.TravelMode
-	if mode == "" {
-		mode = "เดินทาง"
-	}
-	return fmt.Sprintf("%s %d นาที", mode, it.TravelMin)
+func download(c echo.Context, filename, contentType string, body []byte) error {
+	c.Response().Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	return c.Blob(http.StatusOK, contentType, body)
 }
 
-// costLabel always says "ประมาณ" for an estimate, so an exported plan cannot be
-// mistaken for a quote (DEV_SPEC §6.3).
-func costLabel(it models.Item) string {
-	if it.CostAmount == nil || *it.CostAmount == 0 {
-		return ""
+func planDayDTOs(days []models.PlanDay, byDay map[string][]models.PlanItem) []planDayDTO {
+	out := make([]planDayDTO, 0, len(days))
+	for _, day := range days {
+		out = append(out, toPlanDayDTO(day, byDay[day.ID]))
 	}
-	basis := map[string]string{
-		models.CostBasisPerPerson: "/คน",
-		models.CostBasisPerNight:  "/คืน",
-		models.CostBasisPerGroup:  "/กลุ่ม",
-	}[it.CostBasis]
+	return out
+}
 
-	label := fmt.Sprintf("%.0f %s%s", *it.CostAmount, it.CostCurrency, basis)
-	if it.CostStatus == models.CostStatusEstimate {
-		label = "ประมาณ " + label
+/* ------------------------------------------------------------------- ics -- */
+
+// buildICS emits one all-day event per plan day, with the stops in the
+// description. Per-item timed events would flood a personal calendar with
+// twenty entries a day.
+func buildICS(trip models.Trip, days []models.PlanDay, byDay map[string][]models.PlanItem) []byte {
+	var b bytes.Buffer
+
+	b.WriteString("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//ROVE//TH//\r\nCALSCALE:GREGORIAN\r\n")
+
+	for _, day := range days {
+		lines := make([]string, 0, len(byDay[day.ID]))
+		for _, item := range byDay[day.ID] {
+			lines = append(lines, item.StartTime+" "+item.Title)
+		}
+
+		b.WriteString("BEGIN:VEVENT\r\n")
+		fmt.Fprintf(&b, "UID:%s@rove.app\r\n", day.ID)
+		fmt.Fprintf(&b, "DTSTART;VALUE=DATE:%s\r\n", day.Date.Format("20060102"))
+		fmt.Fprintf(&b, "DTEND;VALUE=DATE:%s\r\n", day.Date.AddDate(0, 0, 1).Format("20060102"))
+		fmt.Fprintf(&b, "SUMMARY:%s — %s\r\n", icsEscape(trip.Title), icsEscape(day.Label))
+		fmt.Fprintf(&b, "DESCRIPTION:%s\r\n", icsEscape(strings.Join(lines, "\\n")))
+		if day.City != "" {
+			fmt.Fprintf(&b, "LOCATION:%s\r\n", icsEscape(day.City))
+		}
+		b.WriteString("END:VEVENT\r\n")
 	}
-	if it.IsPrepaid {
-		label += " (จ่ายแล้ว)"
+
+	b.WriteString("END:VCALENDAR\r\n")
+	return b.Bytes()
+}
+
+func icsEscape(s string) string {
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, ";", "\\;")
+	s = strings.ReplaceAll(s, ",", "\\,")
+	s = strings.ReplaceAll(s, "\n", "\\n")
+	return s
+}
+
+/* ------------------------------------------------------------------ html -- */
+
+// buildPrintableHTML is deliberately self-contained: no fonts, no scripts, no
+// external CSS. It has to render the same in a browser, in a print dialog and
+// in whatever the file gets forwarded into.
+func buildPrintableHTML(trip models.Trip, days []models.PlanDay, byDay map[string][]models.PlanItem) []byte {
+	var b bytes.Buffer
+
+	dates := ""
+	if trip.StartDate != nil && trip.EndDate != nil {
+		dates = domain.ThaiRangeLabel(*trip.StartDate, *trip.EndDate) +
+			fmt.Sprintf(" · %d วัน %d คืน", domain.DaysBetween(*trip.StartDate, *trip.EndDate), trip.Nights())
 	}
-	return label
+
+	b.WriteString(`<!doctype html><html lang="th"><head><meta charset="utf-8">`)
+	fmt.Fprintf(&b, `<title>%s — ROVE</title>`, html.EscapeString(trip.Title))
+	b.WriteString(`<meta name="viewport" content="width=device-width,initial-scale=1">`)
+	b.WriteString(`<style>
+:root{color-scheme:light}
+body{font-family:system-ui,-apple-system,"Noto Sans Thai",sans-serif;color:#3D2B24;background:#fff;margin:0;padding:32px;line-height:1.6}
+.wrap{max-width:720px;margin:0 auto}
+h1{font-size:26px;margin:0 0 4px;letter-spacing:-.3px}
+.sub{color:#6B5B4E;font-size:14px;margin:0 0 28px}
+h2{font-size:15px;margin:28px 0 8px;padding-bottom:6px;border-bottom:1px solid #eee}
+.item{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid #f5f5f5}
+.time{width:52px;flex:none;font-variant-numeric:tabular-nums;font-size:13px;color:#6B5B4E}
+.title{font-weight:600;font-size:14px}
+.meta{color:#6B5B4E;font-size:12px}
+.foot{margin-top:36px;color:#6B5B4E;font-size:12px;border-top:1px solid #eee;padding-top:12px}
+@media print{body{padding:0}.foot{position:fixed;bottom:0}}
+</style></head><body><div class="wrap">`)
+
+	fmt.Fprintf(&b, `<h1>%s</h1>`, html.EscapeString(trip.Title))
+	fmt.Fprintf(&b, `<p class="sub">%s</p>`, html.EscapeString(dates))
+
+	for _, day := range days {
+		fmt.Fprintf(&b, `<h2>%s · %s</h2>`, html.EscapeString(day.Label), html.EscapeString(day.City))
+		for _, item := range byDay[day.ID] {
+			meta := item.Area
+			if item.CostJPY != nil && *item.CostJPY > 0 {
+				if meta != "" {
+					meta += " · "
+				}
+				meta += fmt.Sprintf("¥%.0f", *item.CostJPY)
+			}
+			b.WriteString(`<div class="item">`)
+			fmt.Fprintf(&b, `<div class="time">%s</div><div><div class="title">%s</div>`,
+				html.EscapeString(item.StartTime), html.EscapeString(item.Title))
+			if meta != "" {
+				fmt.Fprintf(&b, `<div class="meta">%s</div>`, html.EscapeString(meta))
+			}
+			b.WriteString(`</div></div>`)
+		}
+	}
+
+	b.WriteString(`<p class="foot">พิมพ์จาก ROVE · ค่าใช้จ่ายจริงของกลุ่มไม่ถูกรวมในไฟล์นี้</p>`)
+	b.WriteString(`</div></body></html>`)
+
+	return b.Bytes()
 }

@@ -2,59 +2,42 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { api } from '@/lib/api-client';
 import { track } from '@/lib/analytics';
+import { repo } from '@/lib/data';
+import type { WishlistItem } from '@/lib/data';
 import { queryKeys } from '@/lib/query-keys';
-import type {
-  Collection,
-  CoverageResponse,
-  MemberProfile,
-  WishlistItem,
-} from '@/types/api';
 
-export interface WishInput {
-  kind?: 'must' | 'nice' | 'avoid';
-  text: string;
-  tags?: string[];
-  poi_id?: string;
-}
-
-const wishlistApi = {
-  list: (tripId: string) => api.get<Collection<WishlistItem>>(`/trips/${tripId}/wishlist`),
-  create: (tripId: string, input: WishInput) =>
-    api.post<WishlistItem>(`/trips/${tripId}/wishlist`, input),
-  update: (tripId: string, id: string, input: WishInput) =>
-    api.patch<WishlistItem>(`/trips/${tripId}/wishlist/${id}`, input),
-  remove: (tripId: string, id: string) => api.delete<void>(`/trips/${tripId}/wishlist/${id}`),
-  coverage: (tripId: string, planId?: string) =>
-    api.get<CoverageResponse>(`/trips/${tripId}/coverage`, { searchParams: { plan_id: planId } }),
-  profile: (tripId: string) => api.get<MemberProfile>(`/trips/${tripId}/profile/me`),
-  saveProfile: (tripId: string, profile: Partial<MemberProfile>) =>
-    api.put<MemberProfile>(`/trips/${tripId}/profile/me`, profile),
-};
+/** Wishlist + coverage (M3). Adding a wish changes coverage, so both refresh. */
 
 export function useWishlist(tripId: string) {
   return useQuery({
     queryKey: queryKeys.wishlist(tripId),
-    queryFn: () => wishlistApi.list(tripId),
+    queryFn: () => repo.wishlist.list(tripId),
     enabled: Boolean(tripId),
   });
 }
 
-/** Adding a wish also changes coverage and the overview's "waiting on" count. */
-function invalidateWishlist(queryClient: ReturnType<typeof useQueryClient>, tripId: string) {
+export function useCoverage(tripId: string) {
+  return useQuery({
+    queryKey: queryKeys.coverage(tripId),
+    queryFn: () => repo.wishlist.coverage(tripId),
+    enabled: Boolean(tripId),
+  });
+}
+
+function invalidate(queryClient: ReturnType<typeof useQueryClient>, tripId: string) {
   void queryClient.invalidateQueries({ queryKey: queryKeys.wishlist(tripId) });
   void queryClient.invalidateQueries({ queryKey: queryKeys.coverage(tripId) });
   void queryClient.invalidateQueries({ queryKey: queryKeys.tripOverview(tripId) });
 }
 
-export function useCreateWish(tripId: string) {
+export function useAddWish(tripId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: WishInput) => wishlistApi.create(tripId, input),
+    mutationFn: (input: Omit<WishlistItem, 'id' | 'coverage'>) => repo.wishlist.add(tripId, input),
     onSuccess: (_wish, input) => {
-      track({ name: 'wishlist_item_added', props: { kind: input.kind ?? 'nice' } });
-      invalidateWishlist(queryClient, tripId);
+      track('wishlist_item_added', { kind: input.kind });
+      invalidate(queryClient, tripId);
     },
   });
 }
@@ -62,63 +45,34 @@ export function useCreateWish(tripId: string) {
 export function useUpdateWish(tripId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...input }: WishInput & { id: string }) =>
-      wishlistApi.update(tripId, id, input),
-    onSuccess: () => invalidateWishlist(queryClient, tripId),
+    mutationFn: (input: { wishId: string; patch: Partial<WishlistItem> }) =>
+      repo.wishlist.update(tripId, input.wishId, input.patch),
+    onSuccess: () => invalidate(queryClient, tripId),
   });
 }
 
-/** Deleting is optimistic: the row vanishing instantly is the whole feel of a list. */
-export function useDeleteWish(tripId: string) {
+export function useRemoveWish(tripId: string) {
   const queryClient = useQueryClient();
-  const key = queryKeys.wishlist(tripId);
-
   return useMutation({
-    mutationFn: (id: string) => wishlistApi.remove(tripId, id),
+    mutationFn: (wishId: string) => repo.wishlist.remove(tripId, wishId),
 
-    onMutate: async (id) => {
+    // Deleting one's own wish should not make the board flicker through a
+    // loading state — drop it locally, then confirm.
+    onMutate: async (wishId) => {
+      const key = queryKeys.wishlist(tripId);
       await queryClient.cancelQueries({ queryKey: key });
-      const previous = queryClient.getQueryData<Collection<WishlistItem>>(key);
+      const previous = queryClient.getQueryData<WishlistItem[]>(key);
       if (previous) {
-        queryClient.setQueryData<Collection<WishlistItem>>(key, {
-          items: previous.items.filter((w) => w.id !== id),
-        });
+        queryClient.setQueryData<WishlistItem[]>(
+          key,
+          previous.filter((w) => w.id !== wishId),
+        );
       }
       return { previous };
     },
-
-    onError: (_error, _id, context) => {
-      if (context?.previous) queryClient.setQueryData(key, context.previous);
+    onError: (_error, _wishId, context) => {
+      if (context?.previous) queryClient.setQueryData(queryKeys.wishlist(tripId), context.previous);
     },
-
-    onSettled: () => invalidateWishlist(queryClient, tripId),
-  });
-}
-
-export function useCoverage(tripId: string, planId?: string) {
-  return useQuery({
-    queryKey: [...queryKeys.coverage(tripId), planId ?? ''],
-    queryFn: () => wishlistApi.coverage(tripId, planId),
-    enabled: Boolean(tripId),
-  });
-}
-
-export function useProfile(tripId: string) {
-  return useQuery({
-    queryKey: queryKeys.profile(tripId),
-    queryFn: () => wishlistApi.profile(tripId),
-    enabled: Boolean(tripId),
-  });
-}
-
-export function useSaveProfile(tripId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (profile: Partial<MemberProfile>) => wishlistApi.saveProfile(tripId, profile),
-    onSuccess: (saved) => {
-      track({ name: 'profile_completed', props: { pace: saved.pace } });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.profile(tripId) });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.tripOverview(tripId) });
-    },
+    onSettled: () => invalidate(queryClient, tripId),
   });
 }

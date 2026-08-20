@@ -2,73 +2,28 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { api, type Paginated } from '@/lib/api-client';
 import { track } from '@/lib/analytics';
+import { repo } from '@/lib/data';
+import type { ExpenseEntry } from '@/lib/data';
 import { queryKeys } from '@/lib/query-keys';
-import type { ExpenseEntry, ExpenseSummary } from '@/types/api';
 
-export interface ExpenseInput {
-  title: string;
-  amount: number;
-  currency?: string;
-  category?: ExpenseEntry['category'];
-  split_type?: 'shared' | 'personal';
-  participants_json?: string[];
-  day_id?: string;
-  note?: string;
-  paid_by_user_id?: string;
-}
+/** Real spending and the settle-up (M16). */
 
-export interface ExpenseFilters {
-  day_id?: string;
-  user_id?: string;
-  split_type?: string;
-  page?: number;
-}
-
-const expenseApi = {
-  list: (tripId: string, filters: ExpenseFilters) =>
-    api.get<Paginated<ExpenseEntry>>(`/trips/${tripId}/expense`, { searchParams: { ...filters } }),
-  summary: (tripId: string) => api.get<ExpenseSummary>(`/trips/${tripId}/expense/summary`),
-  create: (tripId: string, input: ExpenseInput) =>
-    api.post<ExpenseEntry>(`/trips/${tripId}/expense`, input),
-  update: (id: string, input: ExpenseInput) => api.patch<ExpenseEntry>(`/expense/${id}`, input),
-  remove: (id: string) => api.delete<void>(`/expense/${id}`),
-};
-
-export function useExpenses(tripId: string, filters: ExpenseFilters = {}) {
+export function useExpenses(tripId: string) {
   return useQuery({
-    queryKey: [...queryKeys.expense(tripId), filters],
-    queryFn: () => expenseApi.list(tripId, filters),
+    queryKey: queryKeys.expenses(tripId),
+    queryFn: () => repo.expense.summary(tripId),
     enabled: Boolean(tripId),
   });
 }
 
-export function useExpenseSummary(tripId: string) {
-  return useQuery({
-    queryKey: queryKeys.expenseSummary(tripId),
-    queryFn: () => expenseApi.summary(tripId),
-    enabled: Boolean(tripId),
-  });
-}
-
-/** An expense change moves the list, the settlement table and the user's stats. */
-function invalidateExpense(queryClient: ReturnType<typeof useQueryClient>, tripId: string) {
-  void queryClient.invalidateQueries({ queryKey: queryKeys.expense(tripId) });
-  void queryClient.invalidateQueries({ queryKey: queryKeys.expenseSummary(tripId) });
-  void queryClient.invalidateQueries({ queryKey: queryKeys.userStats() });
-}
-
-export function useCreateExpense(tripId: string) {
+export function useAddExpense(tripId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: ExpenseInput) => expenseApi.create(tripId, input),
+    mutationFn: (input: Omit<ExpenseEntry, 'id'>) => repo.expense.add(tripId, input),
     onSuccess: (_entry, input) => {
-      track({
-        name: 'expense_added',
-        props: { split_type: input.split_type ?? 'shared', category: input.category ?? 'other' },
-      });
-      invalidateExpense(queryClient, tripId);
+      track('expense_added', { split_type: input.scope, category: input.category });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.expenses(tripId) });
     },
   });
 }
@@ -76,15 +31,25 @@ export function useCreateExpense(tripId: string) {
 export function useUpdateExpense(tripId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...input }: ExpenseInput & { id: string }) => expenseApi.update(id, input),
-    onSuccess: () => invalidateExpense(queryClient, tripId),
+    mutationFn: (input: { expenseId: string; patch: Partial<ExpenseEntry> }) =>
+      repo.expense.update(tripId, input.expenseId, input.patch),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.expenses(tripId) }),
   });
 }
 
-export function useDeleteExpense(tripId: string) {
+export function useRemoveExpense(tripId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => expenseApi.remove(id),
-    onSuccess: () => invalidateExpense(queryClient, tripId),
+    mutationFn: (expenseId: string) => repo.expense.remove(tripId, expenseId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.expenses(tripId) }),
+  });
+}
+
+export function useSettleUp(tripId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { fromMemberId: string; toMemberId: string }) =>
+      repo.expense.settle(tripId, input.fromMemberId, input.toMemberId),
+    onSuccess: (summary) => queryClient.setQueryData(queryKeys.expenses(tripId), summary),
   });
 }

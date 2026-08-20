@@ -10,157 +10,122 @@ import (
 	"strings"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	uberfx "go.uber.org/fx"
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 
 	"github.com/bboyzchecken/rove/apps/api/pkg/core"
-	"github.com/bboyzchecken/rove/apps/api/pkg/models"
-	"github.com/bboyzchecken/rove/apps/api/pkg/services/cache"
+	"github.com/bboyzchecken/rove/apps/api/pkg/logger"
 )
-
-// Quote is a rate plus when it was taken. Every response that shows converted
-// money carries the timestamp, because the UI must say "อัตราโดยประมาณ ณ ..."
-// rather than implying a live rate (DEV_SPEC §6.2, W16.4).
-type Quote struct {
-	Pair      string    `json:"pair"`
-	Rate      float64   `json:"rate"`
-	FetchedAt time.Time `json:"fetched_at"`
-}
 
 type Service interface {
 	// Rate returns how many units of `to` one unit of `from` buys.
 	Rate(ctx context.Context, from, to string) (float64, error)
-	// Quote is Rate plus the as-of timestamp the UI has to display.
-	Quote(ctx context.Context, from, to string) (Quote, error)
 }
 
-// TTL is 24h: a budget must not silently change between two refreshes of the
-// same page.
-const TTL = 24 * time.Hour
+// cacheTTL is 12 hours: a trip snapshots its rate into trips.fx_rate anyway, so
+// the live rate only has to be fresh enough for a new estimate — not for a
+// trading desk.
+const cacheTTL = 12 * time.Hour
+
+// fallbackRates keep the product working when the provider is down or unset.
+// They are deliberately conservative and are always labelled "โดยประมาณ" in
+// the UI, which is true of the live rates too.
+var fallbackRates = map[string]float64{
+	"JPY>THB": 0.235,
+	"THB>JPY": 4.26,
+	"KRW>THB": 0.026,
+	"TWD>THB": 1.09,
+	"USD>THB": 35.5,
+	"EUR>THB": 38.2,
+	"HKD>THB": 4.55,
+	"VND>THB": 0.0014,
+}
 
 type service struct {
-	cfg   core.Config
-	db    *gorm.DB
-	cache *cache.Cache
-	http  *http.Client
+	cfg    core.Config
+	redis  *redis.Client
+	client *http.Client
 }
 
-func New(cfg core.Config, db *gorm.DB, c *cache.Cache) Service {
+func New(cfg core.Config, rdb *redis.Client) Service {
 	return &service{
 		cfg:   cfg,
-		db:    db,
-		cache: c,
-		http:  &http.Client{Timeout: 10 * time.Second},
+		redis: rdb,
+		// A budget screen must not hang on a currency API.
+		client: &http.Client{Timeout: 6 * time.Second},
 	}
 }
 
 var Module = uberfx.Module("services.fx", uberfx.Provide(New))
 
 func (s *service) Rate(ctx context.Context, from, to string) (float64, error) {
-	q, err := s.Quote(ctx, from, to)
-	if err != nil {
-		return 0, err
-	}
-	return q.Rate, nil
-}
-
-// Quote walks three layers before touching the network: Redis, the fx_cache
-// table (which survives a Redis flush), then the provider.
-func (s *service) Quote(ctx context.Context, from, to string) (Quote, error) {
 	from, to = strings.ToUpper(from), strings.ToUpper(to)
 	if from == to {
-		return Quote{Pair: from + "_" + to, Rate: 1, FetchedAt: time.Now().UTC()}, nil
+		return 1, nil
 	}
-	pair := from + "_" + to
+	key := from + ">" + to
 
-	var cached Quote
-	if s.cache != nil && s.cache.GetJSON(ctx, "fx:"+pair, &cached) && cached.Rate > 0 {
+	if cached, ok := s.fromCache(ctx, key); ok {
 		return cached, nil
 	}
 
-	if row, ok := s.fromDB(ctx, pair); ok {
-		s.warm(ctx, row)
-		return row, nil
+	// Mock mode and a missing provider behave identically on purpose: the same
+	// deterministic number, so a UAT budget is reproducible.
+	if s.cfg.UseMock() || s.cfg.FX.ApiURL == "" {
+		rate, ok := fallbackRates[key]
+		if !ok {
+			return 0, fmt.Errorf("fx: no fallback rate for %s", key)
+		}
+		return rate, nil
 	}
 
 	rate, err := s.fetch(ctx, from, to)
 	if err != nil {
-		// A stale rate beats no rate: the page still renders, labelled with its
-		// real (old) timestamp, instead of showing a broken budget.
-		if row, ok := s.fromDBStale(ctx, pair); ok {
-			return row, nil
+		if fallback, ok := fallbackRates[key]; ok {
+			logger.L().WithError(err).Warnf("fx: falling back to a stored rate for %s", key)
+			return fallback, nil
 		}
-		return Quote{}, err
+		return 0, err
 	}
 
-	q := Quote{Pair: pair, Rate: rate, FetchedAt: time.Now().UTC()}
-	s.persist(ctx, q)
-	s.warm(ctx, q)
-	return q, nil
+	s.toCache(ctx, key, rate)
+	return rate, nil
 }
 
-func (s *service) fromDB(ctx context.Context, pair string) (Quote, bool) {
-	var row models.FXCache
-	err := s.db.WithContext(ctx).Where("currency_pair = ?", pair).First(&row).Error
-	if err != nil || time.Since(row.FetchedAt) > TTL {
-		return Quote{}, false
+func (s *service) fromCache(ctx context.Context, key string) (float64, bool) {
+	if s.redis == nil {
+		return 0, false
 	}
-	return Quote{Pair: pair, Rate: row.Rate, FetchedAt: row.FetchedAt}, true
-}
-
-func (s *service) fromDBStale(ctx context.Context, pair string) (Quote, bool) {
-	var row models.FXCache
-	if err := s.db.WithContext(ctx).Where("currency_pair = ?", pair).First(&row).Error; err != nil {
-		return Quote{}, false
+	var rate float64
+	if err := s.redis.Get(ctx, "fx:"+key).Scan(&rate); err != nil || rate <= 0 {
+		return 0, false
 	}
-	return Quote{Pair: pair, Rate: row.Rate, FetchedAt: row.FetchedAt}, true
+	return rate, true
 }
 
-func (s *service) persist(ctx context.Context, q Quote) {
-	row := models.FXCache{CurrencyPair: q.Pair, Rate: q.Rate, FetchedAt: q.FetchedAt}
-	_ = s.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "currency_pair"}},
-		DoUpdates: clause.AssignmentColumns([]string{"rate", "fetched_at"}),
-	}).Create(&row).Error
-}
-
-func (s *service) warm(ctx context.Context, q Quote) {
-	if s.cache == nil {
+func (s *service) toCache(ctx context.Context, key string, rate float64) {
+	if s.redis == nil {
 		return
 	}
-	remaining := TTL - time.Since(q.FetchedAt)
-	if remaining <= 0 {
-		return
+	if err := s.redis.Set(ctx, "fx:"+key, rate, cacheTTL).Err(); err != nil {
+		logger.L().WithError(err).Debug("fx: cache write failed")
 	}
-	_ = s.cache.SetJSON(ctx, "fx:"+q.Pair, q, remaining)
 }
 
-// fetch calls the configured provider. The default URL shape is the free
-// exchangerate.host / open.er-api.com style: {"rates":{"THB":0.23}}.
+// fetch expects the shape exchangerate-style APIs return:
+// {"rates": {"THB": 0.235}}.
 func (s *service) fetch(ctx context.Context, from, to string) (float64, error) {
-	base := s.cfg.FX.ApiURL
-	if base == "" {
-		return 0, fmt.Errorf("fx: FX_API_URL is not configured")
-	}
-
-	url := strings.NewReplacer("{from}", from, "{to}", to).Replace(base)
-	if !strings.Contains(base, "{from}") {
-		url = fmt.Sprintf("%s?base=%s&symbols=%s", strings.TrimRight(base, "?&"), from, to)
-	}
-	if s.cfg.FX.ApiKey != "" {
-		sep := "?"
-		if strings.Contains(url, "?") {
-			sep = "&"
-		}
-		url += sep + "access_key=" + s.cfg.FX.ApiKey
-	}
+	url := fmt.Sprintf("%s?base=%s&symbols=%s", strings.TrimRight(s.cfg.FX.ApiURL, "/"), from, to)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return 0, err
 	}
-	res, err := s.http.Do(req)
+	if s.cfg.FX.ApiKey != "" {
+		req.Header.Set("apikey", s.cfg.FX.ApiKey)
+	}
+
+	res, err := s.client.Do(req)
 	if err != nil {
 		return 0, err
 	}
@@ -170,19 +135,16 @@ func (s *service) fetch(ctx context.Context, from, to string) (float64, error) {
 		return 0, fmt.Errorf("fx: provider returned %d", res.StatusCode)
 	}
 
-	var payload struct {
-		Rates  map[string]float64 `json:"rates"`
-		Result float64            `json:"result"`
+	var body struct {
+		Rates map[string]float64 `json:"rates"`
 	}
-	if err := json.NewDecoder(res.Body).Decode(&payload); err != nil {
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
 		return 0, err
 	}
 
-	if rate, ok := payload.Rates[to]; ok && rate > 0 {
-		return rate, nil
+	rate, ok := body.Rates[to]
+	if !ok || rate <= 0 {
+		return 0, fmt.Errorf("fx: provider has no rate for %s", to)
 	}
-	if payload.Result > 0 {
-		return payload.Result, nil
-	}
-	return 0, fmt.Errorf("fx: no rate for %s in the provider response", to)
+	return rate, nil
 }

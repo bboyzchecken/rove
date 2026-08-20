@@ -35,5 +35,4 @@ type TripMemberStore interface {
 	ListByTrip(ctx context.Context, tripID string) ([]TripMember, error)
 	UpdateRole(ctx context.Context, tripID, userID, role string) error
 	Remove(ctx context.Context, tripID, userID string) error
-	CountByTrip(ctx context.Context, tripID string) (int64, error)
 }

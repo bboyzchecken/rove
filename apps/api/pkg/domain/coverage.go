@@ -8,14 +8,7 @@ const (
 	CoverageCovered   CoverageStatus = "covered"
 	CoveragePartial   CoverageStatus = "partial"
 	CoverageUncovered CoverageStatus = "uncovered"
-	CoverageNA        CoverageStatus = "na" // an 'avoid' wish with nothing to flag
-)
-
-// Wish kinds, mirroring models.Wish*.
-const (
-	KindMust  = "must"
-	KindNice  = "nice"
-	KindAvoid = "avoid"
+	CoverageNA        CoverageStatus = "na" // e.g. an 'avoid' wish, nothing to cover
 )
 
 // WishInput is one wishlist row, flattened for the pure calculation.
@@ -43,123 +36,151 @@ type CoverageResult struct {
 	Note            string
 }
 
-// partialTagThreshold is the tag overlap at which we say "something like this
-// is in the plan, but not exactly what you asked for".
-const partialTagThreshold = 0.34
+// CoverageSummary is the headline the Overview and the Wishlist tab share.
+type CoverageSummary struct {
+	Covered     int `json:"covered"`
+	Partial     int `json:"partial"`
+	Uncovered   int `json:"uncovered"`
+	Total       int `json:"total"`
+	MustCovered int `json:"must_covered"`
+	MustTotal   int `json:"must_total"`
+	Percent     int `json:"percent"`
+}
 
-// ComputeCoverage matches every wish against the plan's items.
+// Matching thresholds. A tag overlap alone is weak evidence — "ของกิน" matches
+// half the plan — so it only ever produces `partial`, never `covered`.
+const (
+	strongTagOverlap = 0.6
+	weakTagOverlap   = 0.25
+)
+
+// ComputeCoverage matches wishes against plan items, best evidence first:
+// the same POI, then a name match, then tag overlap.
 //
-// Match strength, strongest first:
-//  1. same poi_id            — unambiguous, always "covered"
-//  2. similar title text     — the wish was free text and an item names it
-//  3. tag overlap            — "ramen" wish, "Ichiran Shinjuku" item → partial
-//
-// 'avoid' wishes invert: a match is a CONFLICT, not coverage. They are reported
-// as uncovered (with a note naming the offending items) so the board shows a
-// red flag, and as 'na' when the plan respects them.
+// 'avoid' inverts: an item that matches it is a conflict the group needs to see,
+// not coverage. It is reported as `partial` with a note rather than as a silent
+// pass, because "you said no theme parks and the plan has one" is exactly the
+// kind of thing this board exists to surface.
 func ComputeCoverage(wishes []WishInput, items []PlanItemInput) []CoverageResult {
 	out := make([]CoverageResult, 0, len(wishes))
 
 	for _, w := range wishes {
-		exact, partial := matchItems(w, items)
+		result := CoverageResult{WishlistItemID: w.ID, Status: CoverageUncovered}
+		wishName := NormalizeName(w.Text)
 
-		if w.Kind == KindAvoid {
-			if len(exact) > 0 || len(partial) > 0 {
-				out = append(out, CoverageResult{
-					WishlistItemID:  w.ID,
-					Status:          CoverageUncovered,
-					CoveredByItemID: append(exact, partial...),
-					Note:            "แพลนมีรายการที่ขอเลี่ยงไว้",
-				})
-				continue
+		var (
+			exact   []string
+			partial []string
+		)
+
+		for _, item := range items {
+			switch {
+			case w.POIID != "" && item.POIID != "" && w.POIID == item.POIID:
+				exact = append(exact, item.ID)
+
+			case wishName != "" && namesMatch(wishName, NormalizeName(item.Title)):
+				exact = append(exact, item.ID)
+
+			case TagOverlap(w.Tags, item.Tags) >= strongTagOverlap:
+				exact = append(exact, item.ID)
+
+			case TagOverlap(w.Tags, item.Tags) >= weakTagOverlap:
+				partial = append(partial, item.ID)
 			}
-			out = append(out, CoverageResult{
-				WishlistItemID: w.ID,
-				Status:         CoverageNA,
-				Note:           "แพลนไม่มีรายการที่ขอเลี่ยง",
-			})
+		}
+
+		if w.Kind == "avoid" {
+			if len(exact) > 0 || len(partial) > 0 {
+				result.Status = CoveragePartial
+				result.CoveredByItemID = append(exact, partial...)
+				result.Note = "แพลนมีสิ่งที่บอกว่าไม่เอา — ลองดูอีกที"
+			} else {
+				result.Status = CoverageNA
+			}
+			out = append(out, result)
 			continue
 		}
 
 		switch {
 		case len(exact) > 0:
-			out = append(out, CoverageResult{
-				WishlistItemID:  w.ID,
-				Status:          CoverageCovered,
-				CoveredByItemID: exact,
-			})
+			result.Status = CoverageCovered
+			result.CoveredByItemID = exact
 		case len(partial) > 0:
-			out = append(out, CoverageResult{
-				WishlistItemID:  w.ID,
-				Status:          CoveragePartial,
-				CoveredByItemID: partial,
-				Note:            "มีรายการใกล้เคียง แต่ไม่ตรงที่ขอไว้",
-			})
-		default:
-			out = append(out, CoverageResult{
-				WishlistItemID: w.ID,
-				Status:         CoverageUncovered,
-			})
+			result.Status = CoveragePartial
+			result.CoveredByItemID = partial
+			result.Note = "มีของคล้ายกันในแพลน แต่ยังไม่ตรงเป๊ะ"
 		}
+
+		out = append(out, result)
 	}
 
 	return out
 }
 
-// matchItems splits the plan's items into exact and partial matches for a wish.
-func matchItems(w WishInput, items []PlanItemInput) (exact, partial []string) {
-	for _, it := range items {
-		switch {
-		case w.POIID != "" && it.POIID != "" && w.POIID == it.POIID:
-			exact = append(exact, it.ID)
-		case TextSimilar(w.Text, it.Title):
-			exact = append(exact, it.ID)
-		case TagOverlap(w.Tags, it.Tags) >= partialTagThreshold:
-			partial = append(partial, it.ID)
-		}
-	}
-	return exact, partial
-}
-
-// CoverageStats summarises a board into the percentage shown on the Overview
-// tab and used by the AI eval set (A4.12).
-type CoverageStats struct {
-	Total          int     `json:"total"`
-	Covered        int     `json:"covered"`
-	Partial        int     `json:"partial"`
-	Uncovered      int     `json:"uncovered"`
-	MustUncovered  int     `json:"must_uncovered"`
-	CoveredPercent float64 `json:"covered_percent"`
-}
-
-// SummarizeCoverage weights a partial as half a covered wish. 'na' rows are
-// excluded from the denominator — an avoided place was never something to cover.
-func SummarizeCoverage(wishes []WishInput, results []CoverageResult) CoverageStats {
+// SummariseCoverage counts the results the way both tabs display them. An
+// 'avoid' wish with nothing to conflict with is not "covered" — it is simply
+// not applicable, so it stays out of the percentage entirely.
+func SummariseCoverage(wishes []WishInput, results []CoverageResult) CoverageSummary {
 	kind := make(map[string]string, len(wishes))
 	for _, w := range wishes {
 		kind[w.ID] = w.Kind
 	}
 
-	var s CoverageStats
+	summary := CoverageSummary{}
 	for _, r := range results {
+		if kind[r.WishlistItemID] == "must" {
+			summary.MustTotal++
+			if r.Status == CoverageCovered {
+				summary.MustCovered++
+			}
+		}
 		if r.Status == CoverageNA {
 			continue
 		}
-		s.Total++
+		summary.Total++
 		switch r.Status {
 		case CoverageCovered:
-			s.Covered++
+			summary.Covered++
 		case CoveragePartial:
-			s.Partial++
-		case CoverageUncovered:
-			s.Uncovered++
-			if kind[r.WishlistItemID] == KindMust {
-				s.MustUncovered++
-			}
+			summary.Partial++
+		default:
+			summary.Uncovered++
 		}
 	}
-	if s.Total > 0 {
-		s.CoveredPercent = (float64(s.Covered) + 0.5*float64(s.Partial)) / float64(s.Total) * 100
+
+	if summary.Total > 0 {
+		summary.Percent = int(roundHalfUp(float64(summary.Covered) / float64(summary.Total) * 100))
 	}
-	return s
+	return summary
+}
+
+// namesMatch is deliberately loose in one direction only: "ฟุชิมิอินาริ" should
+// match "ศาลเจ้าฟุชิมิอินาริ", but two unrelated names sharing a common word
+// should not.
+func namesMatch(a, b string) bool {
+	if a == "" || b == "" {
+		return false
+	}
+	if a == b {
+		return true
+	}
+	if len(a) >= 6 && contains(b, a) {
+		return true
+	}
+	if len(b) >= 6 && contains(a, b) {
+		return true
+	}
+	return false
+}
+
+func contains(haystack, needle string) bool {
+	if len(needle) > len(haystack) {
+		return false
+	}
+	for i := 0; i+len(needle) <= len(haystack); i++ {
+		if haystack[i:i+len(needle)] == needle {
+			return true
+		}
+	}
+	return false
 }

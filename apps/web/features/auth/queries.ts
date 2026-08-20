@@ -1,35 +1,105 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { api, ApiError } from '@/lib/api-client';
+import { track } from '@/lib/analytics';
+import { repo } from '@/lib/data';
+import type { CurrentUser, DreamItem } from '@/lib/data';
 import { queryKeys } from '@/lib/query-keys';
-import type { Me } from '@/types/api';
 
 /**
- * The current user. Anonymous visitors get `undefined` rather than an error, so
- * public pages can call this unconditionally.
+ * The signed-in user and everything hanging off the profile: characters,
+ * dream list, travel stats, past and upcoming trips.
+ *
+ * `useMe` returns null for an anonymous visitor rather than throwing, so public
+ * pages can call it unconditionally.
  */
+
 export function useMe() {
   return useQuery({
     queryKey: queryKeys.me(),
-    queryFn: async () => {
-      try {
-        return await api.get<Me>('/auth/me');
-      } catch (error) {
-        // 401 is the normal state for a logged-out visitor, not a failure.
-        if (error instanceof ApiError && error.isUnauthorized) return null;
-        throw error;
-      }
-    },
+    queryFn: () => repo.auth.me(),
     retry: false,
     staleTime: 5 * 60_000,
   });
 }
 
-/** Where to send someone who needs to sign in first. */
-export function loginHref(provider: 'line' | 'google', returnTo?: string) {
-  const params = new URLSearchParams({ provider });
-  if (returnTo) params.set('return_to', returnTo);
-  return `/api/auth/login?${params.toString()}`;
+export function useUpdateMe() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: Partial<Pick<CurrentUser, 'name' | 'handle' | 'characterId' | 'homeCurrency'>>) =>
+      repo.auth.updateMe(patch),
+    onSuccess: (user, patch) => {
+      if (patch.characterId) track('character_selected', { character_id: patch.characterId });
+      queryClient.setQueryData(queryKeys.me(), user);
+    },
+  });
+}
+
+export function useLogin() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (provider: 'line' | 'google') => repo.auth.startLogin(provider),
+    onSuccess: (result) => {
+      // Live mode hands back an OAuth URL to follow; mock mode signs the seeded
+      // user in on the spot.
+      if (result.redirectUrl) window.location.href = result.redirectUrl;
+      else if (result.user) queryClient.setQueryData(queryKeys.me(), result.user);
+    },
+  });
+}
+
+export function useLogout() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => repo.auth.logout(),
+    onSuccess: () => queryClient.clear(),
+  });
+}
+
+/* --------------------------------------------------------------- profile -- */
+
+export function useCharacters() {
+  return useQuery({
+    queryKey: queryKeys.characters(),
+    queryFn: () => repo.profile.characters(),
+    staleTime: Infinity,
+  });
+}
+
+export function useDreams() {
+  return useQuery({ queryKey: queryKeys.dreams(), queryFn: () => repo.profile.dreams() });
+}
+
+export function useAddDream() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Omit<DreamItem, 'id'>) => repo.profile.addDream(input),
+    onSuccess: () => {
+      track('dream_item_added', {});
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dreams() });
+    },
+  });
+}
+
+export function useRemoveDream() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (dreamId: string) => repo.profile.removeDream(dreamId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.dreams() }),
+  });
+}
+
+/* ----------------------------------------------------------------- trips -- */
+
+export function useUpcomingTrips() {
+  return useQuery({ queryKey: queryKeys.tripsUpcoming(), queryFn: () => repo.trips.upcoming() });
+}
+
+export function usePastTrips() {
+  return useQuery({ queryKey: queryKeys.tripsPast(), queryFn: () => repo.trips.past() });
+}
+
+export function useYearStats() {
+  return useQuery({ queryKey: queryKeys.stats(), queryFn: () => repo.trips.stats() });
 }

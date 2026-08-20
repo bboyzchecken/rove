@@ -10,8 +10,8 @@ export const env = {
   /** Reachable from the user's browser. */
   apiUrl: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000',
   appUrl: process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000',
-  /** Placeholder until BRAND is decided — DEV_SPEC §15. */
-  brandName: process.env.NEXT_PUBLIC_BRAND_NAME ?? 'TripPlanner',
+  /** DEV_SPEC §15 — the name lives in env, never in a component. */
+  brandName: process.env.NEXT_PUBLIC_BRAND_NAME ?? 'ROVE',
   mapsBrowserKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY ?? '',
   posthogKey: process.env.NEXT_PUBLIC_POSTHOG_KEY ?? '',
   posthogHost: process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://us.i.posthog.com',

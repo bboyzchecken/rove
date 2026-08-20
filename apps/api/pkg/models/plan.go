@@ -7,190 +7,111 @@ import (
 	"gorm.io/datatypes"
 )
 
-// Plan status.
+// Itinerary item types.
 const (
-	PlanStatusGenerating = "generating"
-	PlanStatusReady      = "ready"
-	PlanStatusError      = "error"
+	ItemPOI       = "poi"
+	ItemMeal      = "meal"
+	ItemTransport = "transport"
+	ItemStay      = "stay"
+	ItemFree      = "free"
+	ItemFlight    = "flight"
 )
 
-// Plan authorship.
-const (
-	CreatedByAI   = "ai"
-	CreatedByUser = "user"
-)
-
-// Item types.
-const (
-	ItemTypePlace     = "place"
-	ItemTypeFood      = "food"
-	ItemTypeStay      = "stay"
-	ItemTypeTransport = "transport"
-	ItemTypeFlight    = "flight"
-	ItemTypeFree      = "free"
-	ItemTypeNote      = "note"
-)
-
-// Cost basis / status.
-const (
-	CostBasisPerPerson = "per_person"
-	CostBasisPerGroup  = "per_group"
-	CostBasisPerNight  = "per_night"
-	CostBasisPerUnit   = "per_unit"
-
-	CostStatusEstimate = "estimate"
-	CostStatusQuoted   = "quoted"
-	CostStatusActual   = "actual"
-	CostStatusPaid     = "paid"
-)
-
-// Booking status on an item.
-const (
-	BookingStatusNone    = "none"
-	BookingStatusClicked = "clicked"
-	BookingStatusBooked  = "booked"
-	BookingStatusSkipped = "skipped"
-)
-
-// Verification: whether the POI behind an item exists in our catalogue.
-const (
-	VerifiedYes = "verified"
-	VerifiedNo  = "unverified"
-)
-
-// Rationale kinds.
-const (
-	RationaleCut     = "cut"
-	RationaleMoved   = "moved"
-	RationaleChosen  = "chosen"
-	RationaleAdded   = "added"
-	RationaleWarning = "warning"
-)
-
+// Plan is one version of an itinerary. Phase 1 keeps exactly one plan per trip;
+// the table carries `is_final` and `label` so Phase 2 variants (M6) can land
+// without a migration that rewrites data.
 type Plan struct {
 	Base
-	TripID          string         `gorm:"type:char(36);not null;index" json:"trip_id"`
-	Name            string         `gorm:"type:varchar(200);not null" json:"name"`
-	ParentPlanID    *string        `gorm:"type:char(36)" json:"parent_plan_id"`
-	Version         int            `gorm:"not null;default:1" json:"version"`
-	IsFinal         bool           `gorm:"not null;default:false" json:"is_final"`
-	CreatedBy       string         `gorm:"type:varchar(10);not null;default:'user'" json:"created_by"`
-	CreatedByUserID *string        `gorm:"type:char(36)" json:"created_by_user_id"`
-	Summary         string         `gorm:"type:text" json:"summary"`
-	Pros            datatypes.JSON `gorm:"type:json" json:"pros"`
-	Cons            datatypes.JSON `gorm:"type:json" json:"cons"`
-	KeyDecision     string         `gorm:"type:varchar(255)" json:"key_decision"`
-	Status          string         `gorm:"type:varchar(20);not null;default:'ready'" json:"status"`
-	GenerationJobID *string        `gorm:"type:char(36)" json:"generation_job_id"`
+	TripID     string         `gorm:"type:char(36);not null;index" json:"trip_id"`
+	Label      string         `gorm:"type:varchar(120);not null;default:'แพลนหลัก'" json:"label"`
+	IsFinal    bool           `gorm:"not null;default:true" json:"is_final"`
+	Rationales datatypes.JSON `gorm:"type:json" json:"rationales"`
+	OpenQs     datatypes.JSON `gorm:"type:json;column:open_questions" json:"open_questions"`
+	CreatedBy  string         `gorm:"type:char(36)" json:"created_by"`
 }
 
 func (Plan) TableName() string { return "plans" }
 
-type Day struct {
+type PlanDay struct {
 	Base
-	PlanID    string    `gorm:"type:char(36);not null;index" json:"plan_id"`
-	Date      time.Time `gorm:"type:date;not null" json:"date"`
-	DayIndex  int       `gorm:"not null" json:"day_index"`
-	Title     string    `gorm:"type:varchar(200)" json:"title"`
-	Theme     string    `gorm:"type:varchar(120)" json:"theme"`
-	SortOrder int       `gorm:"not null;default:0" json:"sort_order"`
+	PlanID       string    `gorm:"type:char(36);not null;index" json:"plan_id"`
+	TripID       string    `gorm:"type:char(36);not null;index" json:"trip_id"`
+	DayIndex     int       `gorm:"not null" json:"day_index"`
+	Date         time.Time `gorm:"type:date;not null" json:"date"`
+	Label        string    `gorm:"type:varchar(80)" json:"label"`
+	City         string    `gorm:"type:varchar(80)" json:"city"`
+	WeatherIcon  string    `gorm:"type:varchar(16)" json:"weather_icon"`
+	WeatherHigh  *float64  `gorm:"type:decimal(5,2)" json:"weather_high"`
+	WeatherLow   *float64  `gorm:"type:decimal(5,2)" json:"weather_low"`
+	WeatherText  string    `gorm:"type:varchar(120)" json:"weather_text"`
+	WeatherAt    *time.Time `json:"weather_at"`
 }
 
-func (Day) TableName() string { return "days" }
+func (PlanDay) TableName() string { return "plan_days" }
 
-type Item struct {
+// PlanItem is one stop. Times are "HH:mm" strings in the destination's local
+// time: the editor thinks in Asia/Tokyo, and storing a UTC instant would make
+// "09:00 at the shrine" depend on which server rendered it.
+type PlanItem struct {
 	Base
-	DayID     string `gorm:"type:char(36);not null;index:idx_item_plan_day,priority:2" json:"day_id"`
-	PlanID    string `gorm:"type:char(36);not null;index:idx_item_plan_day,priority:1" json:"plan_id"`
-	SortOrder int    `gorm:"not null;default:0;index:idx_item_plan_day,priority:3" json:"sort_order"`
-	Type      string `gorm:"type:varchar(20);not null;default:'place'" json:"type"`
-
-	POIID *string `gorm:"type:char(36);index" json:"poi_id"`
-	Title string  `gorm:"type:varchar(200);not null" json:"title"`
-	Notes string  `gorm:"type:text" json:"notes"`
-
-	StartTime   string `gorm:"type:varchar(5)" json:"start_time"` // "09:30", Asia/Tokyo
-	EndTime     string `gorm:"type:varchar(5)" json:"end_time"`
-	DurationMin int    `gorm:"not null;default:0" json:"duration_min"`
-
-	TravelMode string `gorm:"type:varchar(20)" json:"travel_mode"`
-	TravelMin  int    `gorm:"not null;default:0" json:"travel_min"`
-	TravelNote string `gorm:"type:varchar(255)" json:"travel_note"`
-
-	CostAmount   *float64 `gorm:"type:decimal(12,2)" json:"cost_amount"`
-	CostCurrency string   `gorm:"type:varchar(3);not null;default:'JPY'" json:"cost_currency"`
-	CostBasis    string   `gorm:"type:varchar(20);not null;default:'per_person'" json:"cost_basis"`
-	CostStatus   string   `gorm:"type:varchar(20);not null;default:'estimate'" json:"cost_status"`
-	CostNote     string   `gorm:"type:varchar(255)" json:"cost_note"`
-	IsPrepaid    bool     `gorm:"not null;default:false" json:"is_prepaid"`
-
-	BookingPartner string `gorm:"type:varchar(40)" json:"booking_partner"`
-	BookingURL     string `gorm:"type:varchar(1000)" json:"booking_url"`
-	BookingStatus  string `gorm:"type:varchar(20);not null;default:'none'" json:"booking_status"`
-
-	Verified string   `gorm:"type:varchar(20);not null;default:'unverified'" json:"verified"`
-	Lat      *float64 `gorm:"type:decimal(10,7)" json:"lat"`
-	Lng      *float64 `gorm:"type:decimal(10,7)" json:"lng"`
+	DayID     string         `gorm:"type:char(36);not null;index" json:"day_id"`
+	TripID    string         `gorm:"type:char(36);not null;index" json:"trip_id"`
+	SortOrder int            `gorm:"not null;default:0" json:"sort_order"`
+	Type      string         `gorm:"type:varchar(20);not null;default:'poi'" json:"type"`
+	StartTime string         `gorm:"type:varchar(5);not null;default:'09:00'" json:"start_time"`
+	EndTime   string         `gorm:"type:varchar(5)" json:"end_time"`
+	Title     string         `gorm:"type:varchar(200);not null" json:"title"`
+	Area      string         `gorm:"type:varchar(120)" json:"area"`
+	POIID     *string        `gorm:"type:char(36);index" json:"poi_id"`
+	CostJPY   *float64       `gorm:"type:decimal(12,2)" json:"cost_jpy"`
+	TravelMin *int           `json:"travel_minutes"`
+	TravelMode string        `gorm:"type:varchar(10)" json:"travel_mode"`
+	TravelLine string        `gorm:"type:varchar(80)" json:"travel_line"`
+	OpenHours string         `gorm:"type:varchar(80)" json:"open_hours"`
+	ForUsers  datatypes.JSON `gorm:"type:json" json:"for_user_ids"`
+	Bookable  bool           `gorm:"not null;default:false" json:"bookable"`
+	Booked    bool           `gorm:"not null;default:false" json:"booked"`
+	Warning   string         `gorm:"type:varchar(255)" json:"warning"`
+	Note      string         `gorm:"type:text" json:"note"`
 }
 
-func (Item) TableName() string { return "items" }
+func (PlanItem) TableName() string { return "plan_items" }
 
-// ItemVersion is the undo tape: every mutation snapshots the previous row.
+// ItemVersion is the undo trail (A5.1 / W5.7). One row per mutation, holding
+// the item as it looked *before* the change.
 type ItemVersion struct {
 	Base
-	ItemID       string         `gorm:"type:char(36);not null;index" json:"item_id"`
-	PlanID       string         `gorm:"type:char(36);not null;index" json:"plan_id"`
-	Snapshot     datatypes.JSON `gorm:"type:json" json:"snapshot"`
-	ChangedBy    string         `gorm:"type:char(36)" json:"changed_by"`
-	ChangeSource string         `gorm:"type:varchar(10);not null;default:'user'" json:"change_source"`
+	TripID   string         `gorm:"type:char(36);not null;index" json:"trip_id"`
+	ItemID   string         `gorm:"type:char(36);not null;index" json:"item_id"`
+	Action   string         `gorm:"type:varchar(20);not null" json:"action"` // update | move | delete
+	Snapshot datatypes.JSON `gorm:"type:json;not null" json:"snapshot"`
+	ActorID  string         `gorm:"type:char(36)" json:"actor_id"`
 }
 
 func (ItemVersion) TableName() string { return "item_versions" }
 
-// Rationale is the "why" the AI attaches to a decision — the feature that makes
-// the plan arguable instead of magic (DEV_SPEC §1).
-type Rationale struct {
-	Base
-	PlanID         string  `gorm:"type:char(36);not null;index" json:"plan_id"`
-	ItemID         *string `gorm:"type:char(36)" json:"item_id"`
-	WishlistItemID *string `gorm:"type:char(36)" json:"wishlist_item_id"`
-	Kind           string  `gorm:"type:varchar(20);not null" json:"kind"`
-	Text           string  `gorm:"type:text;not null" json:"text"`
-	CreatedByKind  string  `gorm:"type:varchar(10);not null;default:'ai'" json:"created_by"`
-}
-
-func (Rationale) TableName() string { return "rationales" }
-
+// PlanStore covers the whole itinerary aggregate. Everything is trip-scoped.
 type PlanStore interface {
-	ListByTrip(ctx context.Context, tripID string) ([]Plan, error)
-	Create(ctx context.Context, p *Plan) error
-	Get(ctx context.Context, tripID, planID string) (*Plan, error)
-	// GetTripID resolves the owning trip for a /plans/:planId route so the
-	// handler can run the same role check as a trip-scoped route.
-	GetTripID(ctx context.Context, planID string) (string, error)
-	Update(ctx context.Context, p *Plan) error
-	Delete(ctx context.Context, tripID, planID string) error
-	Freeze(ctx context.Context, tripID, planID string) error
+	EnsurePlan(ctx context.Context, tripID, userID string) (*Plan, error)
+	GetPlan(ctx context.Context, tripID string) (*Plan, error)
+	UpdatePlan(ctx context.Context, p *Plan) error
+	// ReplaceDays swaps the entire itinerary in one transaction (A4.8).
+	ReplaceDays(ctx context.Context, tripID string, days []PlanDay, items map[string][]PlanItem) error
 
-	Days(ctx context.Context, planID string) ([]Day, error)
-	CreateDay(ctx context.Context, d *Day) error
-	Items(ctx context.Context, planID string) ([]Item, error)
-	Rationales(ctx context.Context, planID string) ([]Rationale, error)
-	CountByTrip(ctx context.Context, tripID string) (int64, error)
-}
+	ListDays(ctx context.Context, tripID string) ([]PlanDay, error)
+	ListItems(ctx context.Context, tripID string) ([]PlanItem, error)
+	GetDay(ctx context.Context, tripID, dayID string) (*PlanDay, error)
+	UpdateDay(ctx context.Context, d *PlanDay) error
 
-type ItemStore interface {
-	Create(ctx context.Context, planID string, it *Item) error
-	Get(ctx context.Context, planID, itemID string) (*Item, error)
-	// PlanID resolves the owning plan for an /items/:itemId route. It falls
-	// back to item_versions when the row is gone, so undo-of-delete can still
-	// be authorized against the plan the item belonged to.
-	PlanID(ctx context.Context, itemID string) (string, error)
-	Update(ctx context.Context, planID string, it *Item, actorID, source string) error
-	Move(ctx context.Context, planID, itemID, dayID string, position int, actorID string) error
-	Delete(ctx context.Context, planID, itemID, actorID string) error
-	// Undo restores the most recent snapshot, re-creating a deleted item.
-	Undo(ctx context.Context, planID, itemID, actorID string) (*Item, error)
-	NextSortOrder(ctx context.Context, dayID string) (int, error)
-	SnapshotPlan(ctx context.Context, planID, actorID string) error
+	CreateItem(ctx context.Context, item *PlanItem, index int) error
+	GetItem(ctx context.Context, tripID, itemID string) (*PlanItem, error)
+	UpdateItem(ctx context.Context, item *PlanItem) error
+	MoveItem(ctx context.Context, tripID, itemID, toDayID string, toIndex int) error
+	DeleteItem(ctx context.Context, tripID, itemID string) error
+	SetWarnings(ctx context.Context, tripID string, warnings map[string]string) error
+
+	AddVersion(ctx context.Context, v *ItemVersion) error
+	LatestVersion(ctx context.Context, tripID, itemID string) (*ItemVersion, error)
+	ListVersions(ctx context.Context, tripID string, limit int) ([]ItemVersion, error)
+	DeleteVersion(ctx context.Context, tripID, versionID string) error
 }

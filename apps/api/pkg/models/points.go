@@ -5,46 +5,36 @@ import (
 	"time"
 )
 
-// Points transaction types (DEV_SPEC §4.2).
+// Point ledger reasons (DEV_SPEC §6.5).
 const (
-	PointsTypeEarnFromClone = "earn_from_clone"
-	PointsTypeRedeemBooking = "redeem_booking"
-	PointsTypeAdminAdjust   = "admin_adjust"
+	PointsReasonReferral    = "referral"
+	PointsReasonBooking     = "booking_confirmed"
+	PointsReasonClone       = "trip_cloned"
+	PointsReasonPublish     = "trip_published"
+	PointsReasonAIDraft     = "ai_draft"
+	PointsReasonAdjustment  = "adjustment"
 )
 
-// Points reference types.
-const (
-	PointsRefBookingConfirmation = "booking_confirmation"
-	PointsRefBookingClick        = "booking_click"
-)
-
-// UserPoints is 1:1 with users; user_id is the primary key.
+// UserPoints is an append-only ledger, never a balance column.
+//
+// A balance you can only reach by summing rows cannot silently drift, and
+// "why do I have 1,240 points?" is a question the product has to be able to
+// answer line by line.
 type UserPoints struct {
-	UserID         string    `gorm:"type:char(36);primaryKey" json:"user_id"`
-	Balance        float64   `gorm:"type:decimal(10,0);not null;default:0" json:"balance"`
-	LifetimeEarned float64   `gorm:"type:decimal(10,0);not null;default:0" json:"lifetime_earned"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	Base
+	UserID string `gorm:"type:char(36);not null;index" json:"user_id"`
+	// Positive to award, negative to spend.
+	Delta     int        `gorm:"not null" json:"delta"`
+	Reason    string     `gorm:"type:varchar(40);not null" json:"reason"`
+	Note      string     `gorm:"type:varchar(255)" json:"note"`
+	TripID    *string    `gorm:"type:char(36);index" json:"trip_id"`
+	OccurredAt time.Time `gorm:"not null" json:"occurred_at"`
 }
 
 func (UserPoints) TableName() string { return "user_points" }
 
-// PointsTransaction is the append-only ledger behind UserPoints.Balance.
-// Amount is positive for an earn and negative for a redeem.
-type PointsTransaction struct {
-	Base
-	UserID  string `gorm:"type:char(36);not null;index:idx_points_user" json:"user_id"`
-	Amount  int    `gorm:"not null" json:"amount"`
-	Type    string `gorm:"type:varchar(30);not null" json:"type"`
-	RefID   string `gorm:"type:char(36)" json:"ref_id"`
-	RefType string `gorm:"type:varchar(30)" json:"ref_type"`
-	Note    string `gorm:"type:varchar(255)" json:"note"`
-}
-
-func (PointsTransaction) TableName() string { return "points_transactions" }
-
 type PointsStore interface {
-	Get(ctx context.Context, userID string) (*UserPoints, error)
-	// Award writes the ledger row and moves the balance in one transaction.
-	Award(ctx context.Context, tx *PointsTransaction) error
-	History(ctx context.Context, userID, cursor string, limit int) ([]PointsTransaction, error)
+	Add(ctx context.Context, entry *UserPoints) error
+	Balance(ctx context.Context, userID string) (int, error)
+	List(ctx context.Context, userID string, limit int) ([]UserPoints, error)
 }

@@ -25,8 +25,6 @@ var Zones = []Zone{
 	{Code: "kawagoe", NameTH: "คาวาโกเอะ", City: "kawagoe", NeighbourCodes: []string{"tokyo_west"}},
 	{Code: "hakone", NameTH: "ฮาโกเน่", City: "hakone", NeighbourCodes: []string{"fuji"}},
 	{Code: "nikko", NameTH: "นิกโก้", City: "nikko", NeighbourCodes: []string{}},
-	{Code: "narita", NameTH: "นาริตะ (ใกล้สนามบิน)", City: "narita", NeighbourCodes: []string{}},
-	{Code: "hitachi", NameTH: "ฮิตาชิ ซีไซด์ปาร์ค (อิบารากิ)", City: "hitachinaka", NeighbourCodes: []string{}},
 }
 
 var zoneByCode = func() map[string]Zone {

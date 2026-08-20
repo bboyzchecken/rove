@@ -1,6 +1,7 @@
 package api
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -8,123 +9,172 @@ import (
 	"github.com/bboyzchecken/rove/apps/api/pkg/domain"
 	"github.com/bboyzchecken/rove/apps/api/pkg/handlers/api/request"
 	"github.com/bboyzchecken/rove/apps/api/pkg/models"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
 )
 
-// registerBudgetRoutes exposes the estimate derived from plan items
-// (DEV_SPEC §5.6). This is NOT the same number as the Expense tab, and the
-// response says so in fx_rate_note and estimate_label so the UI cannot forget.
+// Budget (M7 — A7.1 / A7.2).
 //
-//	GET /plans/:planId/budget   [viewer]
-func (s *Server) registerBudgetRoutes(v1 *echo.Group) {
-	plans := v1.Group("/plans", s.JwtMiddleware)
-	plans.GET("/:planId/budget", s.handlePlanBudget,
-		s.ResolveTrip("planId", models.TripRoleViewer, s.planTrip))
+// Everything here is an ESTIMATE derived from plan items. Actual money lives in
+// the Expense tab and the two are never mixed, because conflating them is how
+// group budgets go wrong.
+func (s *Server) registerBudgetRoutes(g *echo.Group) {
+	view := s.TripRoleMiddleware(models.TripRoleViewer)
+	edit := s.TripRoleMiddleware(models.TripRoleEditor)
+
+	g.GET("/:tripId/budget", s.handleGetBudget, view)
+	g.PUT("/:tripId/budget", s.handleSetBudget, edit)
+	g.POST("/:tripId/budget/fx", s.handleRefreshFx, edit)
 }
 
-// BudgetResponse carries the FX provenance alongside the numbers. Every place
-// converted money appears has to be able to say when the rate was taken
-// (DEV_SPEC §6.2, §7.2).
-type BudgetResponse struct {
-	domain.BudgetSummary
-	PartySize      int        `json:"party_size"`
-	SourceCurrency string     `json:"source_currency"`
-	FXRate         float64    `json:"fx_rate"`
-	FXRateAt       *time.Time `json:"fx_rate_at"`
-	FXRateNote     string     `json:"fx_rate_note"`
-	EstimateLabel  string     `json:"estimate_label"`
-	// BudgetRange is what the group said they wanted to spend, for the
-	// "over/under budget" comparison in W7.1.
-	BudgetMin *float64 `json:"budget_min"`
-	BudgetMax *float64 `json:"budget_max"`
+// categoryMeta maps an item type to the row the Budget tab renders. The icon
+// and accent live here rather than in the client so the export, the API and the
+// web app label the same money the same way.
+var categoryMeta = map[string]struct{ label, icon, accent string }{
+	models.ItemStay:      {"ที่พัก", "🏠", "joyfull"},
+	models.ItemTransport: {"เดินทาง", "🚄", "sky"},
+	models.ItemFlight:    {"เดินทาง", "🚄", "sky"},
+	models.ItemMeal:      {"อาหาร", "🍜", "primary"},
+	models.ItemPOI:       {"ตั๋ว/กิจกรรม", "🎟️", "matcha"},
+	models.ItemFree:      {"อื่นๆ", "✨", "joyfull"},
 }
 
-func (s *Server) handlePlanBudget(c echo.Context) error {
+func (s *Server) handleGetBudget(c echo.Context) error {
 	ctx := c.Request().Context()
 	tripID := request.TripID(c)
-	planID := c.Param("planId")
 
 	trip, err := s.trips.GetByID(ctx, tripID)
 	if err != nil {
 		return request.NotFound(c, "ไม่พบทริป")
 	}
-	items, err := s.plans.Items(ctx, planID)
+	items, err := s.plans.ListItems(ctx, tripID)
 	if err != nil {
-		return request.Internal(c, "อ่านรายการไม่สำเร็จ")
+		return request.Internal(c, "โหลดแพลนไม่สำเร็จ")
 	}
 
-	rate, rateAt := s.tripRate(c, trip)
+	return c.JSON(http.StatusOK, s.budgetOf(*trip, items))
+}
 
+func (s *Server) budgetOf(trip models.Trip, items []models.PlanItem) budgetDTO {
 	costs := make([]domain.CostInput, 0, len(items))
-	for _, it := range items {
-		cost := domain.CostInput{
-			ItemID:    it.ID,
-			Category:  domain.CategoryForItemType(it.Type),
-			Currency:  it.CostCurrency,
-			Basis:     it.CostBasis,
-			Nights:    trip.Nights(),
-			IsPrepaid: it.IsPrepaid,
+	for _, item := range items {
+		meta, ok := categoryMeta[item.Type]
+		if !ok {
+			meta = categoryMeta[models.ItemFree]
 		}
-		if it.CostAmount != nil {
-			cost.Amount = *it.CostAmount
+		amount := 0.0
+		if item.CostJPY != nil {
+			amount = *item.CostJPY
 		}
-		costs = append(costs, cost)
+		costs = append(costs, domain.CostInput{
+			ItemID:   item.ID,
+			Category: meta.label,
+			Amount:   amount,
+			Currency: trip.DestCurrency,
+			Basis:    domain.BasisPerPerson,
+			// A hotel already paid for should not be in the "bring this much
+			// cash" number, which is what prepaid separates out.
+			IsPrepaid: item.Type == models.ItemStay && item.Booked,
+		})
 	}
 
+	rate := tripFxRate(trip)
 	summary := domain.ComputeBudget(costs, trip.PartySize, rate, trip.HomeCurrency)
 
-	res := BudgetResponse{
-		BudgetSummary:  summary,
-		PartySize:      trip.PartySize,
-		SourceCurrency: trip.DestCurrency,
-		FXRate:         rate,
-		FXRateAt:       rateAt,
-		FXRateNote:     fxNote(rateAt),
-		EstimateLabel:  "ประมาณการจากรายการในแพลน ไม่ใช่ยอดใช้จ่ายจริง",
-	}
-
-	// The budget range is the tightest one anyone set, because exceeding the
-	// most cautious member's ceiling is the conversation worth surfacing.
-	if profiles, err := s.profiles.ListByTrip(ctx, tripID); err == nil {
-		for _, p := range profiles {
-			if p.BudgetMin != nil && (res.BudgetMin == nil || *p.BudgetMin > *res.BudgetMin) {
-				res.BudgetMin = p.BudgetMin
-			}
-			if p.BudgetMax != nil && (res.BudgetMax == nil || *p.BudgetMax < *res.BudgetMax) {
-				res.BudgetMax = p.BudgetMax
+	lines := make([]budgetLineDTO, 0, len(summary.Lines))
+	for _, line := range summary.Lines {
+		icon, accent := "✨", "joyfull"
+		for _, meta := range categoryMeta {
+			if meta.label == line.Category {
+				icon, accent = meta.icon, meta.accent
+				break
 			}
 		}
+		lines = append(lines, budgetLineDTO{
+			Category:     line.Category,
+			Icon:         icon,
+			Accent:       accent,
+			TotalJPY:     line.TotalJPY,
+			PerPersonJPY: line.PerPersonJPY,
+			Prepaid:      line.Prepaid,
+		})
 	}
 
-	return request.OK(c, res)
+	perPersonTHB := domain.ToHomeCurrency(summary.PerPerson, rate)
+	used := 0.0
+	if trip.BudgetPerPersonTHB > 0 {
+		used = perPersonTHB / trip.BudgetPerPersonTHB
+	}
+
+	fxAsOf := ""
+	if trip.FxRateAt != nil {
+		fxAsOf = trip.FxRateAt.Format("2006-01-02")
+	}
+
+	return budgetDTO{
+		Lines:            lines,
+		TotalJPY:         summary.Total,
+		PerPersonJPY:     summary.PerPerson,
+		PrepaidJPY:       summary.PrepaidTotal,
+		PerPersonTHB:     perPersonTHB,
+		BudgetUsed:       used,
+		RemainingTHB:     trip.BudgetPerPersonTHB - perPersonTHB,
+		ItemsWithoutCost: summary.ItemsWithoutCost,
+		FxRate:           rate,
+		FxAsOf:           fxAsOf,
+	}
 }
 
-// tripRate prefers the rate snapshotted on the trip so the budget does not move
-// under the group's feet between two page loads; it falls back to a live quote
-// and stores it.
-func (s *Server) tripRate(c echo.Context, trip *models.Trip) (float64, *time.Time) {
-	if trip.FxRate != nil && *trip.FxRate > 0 && trip.FxRateAt != nil {
-		return *trip.FxRate, trip.FxRateAt
+type setBudgetRequest struct {
+	PerPersonTHB float64 `json:"per_person_thb"`
+}
+
+func (s *Server) handleSetBudget(c echo.Context) error {
+	var req setBudgetRequest
+	if err := request.BindAndValidate(c, &req); err != nil {
+		return err
 	}
 
-	quote, err := s.fx.Quote(c.Request().Context(), trip.DestCurrency, trip.HomeCurrency)
+	ctx := c.Request().Context()
+	tripID := request.TripID(c)
+
+	trip, err := s.trips.GetByID(ctx, tripID)
 	if err != nil {
-		return 0, nil
+		return request.NotFound(c, "ไม่พบทริป")
 	}
 
-	trip.FxRate = &quote.Rate
-	at := quote.FetchedAt
-	trip.FxRateAt = &at
-	// Persisting is best effort; a failure here just means the next request
-	// quotes again.
-	_ = s.trips.Update(c.Request().Context(), trip)
+	trip.BudgetPerPersonTHB = req.PerPersonTHB
+	if err := s.trips.Update(ctx, trip); err != nil {
+		return request.Internal(c, "บันทึกงบไม่สำเร็จ")
+	}
 
-	return quote.Rate, &at
+	items, _ := s.plans.ListItems(ctx, tripID)
+	s.track(c, tripID, "ตั้งงบไว้ที่ "+itoa(int(req.PerPersonTHB))+" บาท/คน", events.TypeTripUpdated, "trip", tripID)
+	return c.JSON(http.StatusOK, s.budgetOf(*trip, items))
 }
 
-// fxNote is the label DEV_SPEC §7.2 requires next to every converted amount.
-func fxNote(at *time.Time) string {
-	if at == nil {
-		return "ยังไม่มีอัตราแลกเปลี่ยน — แสดงเป็นสกุลเงินต้นทาง"
+// handleRefreshFx re-snapshots the rate. It is explicit rather than automatic:
+// a budget that changes on its own overnight is a budget nobody trusts.
+func (s *Server) handleRefreshFx(c echo.Context) error {
+	ctx := c.Request().Context()
+	tripID := request.TripID(c)
+
+	trip, err := s.trips.GetByID(ctx, tripID)
+	if err != nil {
+		return request.NotFound(c, "ไม่พบทริป")
 	}
-	return "อัตราโดยประมาณ ณ วันที่ " + at.Format("2 Jan 2006")
+
+	rate, err := s.fx.Rate(ctx, trip.DestCurrency, trip.HomeCurrency)
+	if err != nil {
+		return request.Internal(c, "ดึงอัตราแลกเปลี่ยนไม่สำเร็จ")
+	}
+
+	now := time.Now().UTC()
+	trip.FxRate = &rate
+	trip.FxRateAt = &now
+	if err := s.trips.Update(ctx, trip); err != nil {
+		return request.Internal(c, "บันทึกอัตราแลกเปลี่ยนไม่สำเร็จ")
+	}
+
+	items, _ := s.plans.ListItems(ctx, tripID)
+	return c.JSON(http.StatusOK, s.budgetOf(*trip, items))
 }

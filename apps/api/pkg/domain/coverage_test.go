@@ -2,120 +2,119 @@ package domain
 
 import "testing"
 
-func statusOf(results []CoverageResult, wishID string) CoverageStatus {
-	for _, r := range results {
-		if r.WishlistItemID == wishID {
-			return r.Status
+func TestNormalizeNameIgnoresSpacingAndPunctuation(t *testing.T) {
+	cases := [][2]string{
+		{"Tokyo Skytree", "tokyoskytree"},
+		{"  tokyo  skytree ", "tokyoskytree"},
+		{"teamLab Planets!", "teamlabplanets"},
+		{"โตเกียว สกายทรี", "โตเกียวสกายทรี"},
+	}
+	for _, c := range cases {
+		if got := NormalizeName(c[0]); got != c[1] {
+			t.Errorf("NormalizeName(%q) = %q, want %q", c[0], got, c[1])
 		}
 	}
-	return ""
 }
 
-func TestComputeCoverage(t *testing.T) {
-	items := []PlanItemInput{
-		{ID: "i1", Title: "Tokyo Skytree", POIID: "poi-skytree", Tags: []string{"view", "landmark"}},
-		{ID: "i2", Title: "Ichiran Shinjuku", Tags: []string{"food", "ramen"}},
-		{ID: "i3", Title: "อิสระตามอัธยาศัย", Tags: nil},
+func TestTagOverlapIsJaccard(t *testing.T) {
+	if got := TagOverlap([]string{"ของกิน", "ตลาด"}, []string{"ของกิน", "ตลาด"}); got != 1 {
+		t.Errorf("identical sets = %v, want 1", got)
 	}
-
-	cases := []struct {
-		name string
-		wish WishInput
-		want CoverageStatus
-	}{
-		{
-			name: "poi id match is covered",
-			wish: WishInput{ID: "w1", Kind: KindMust, Text: "อยากขึ้นตึกสูง", POIID: "poi-skytree"},
-			want: CoverageCovered,
-		},
-		{
-			name: "title text match is covered",
-			wish: WishInput{ID: "w2", Kind: KindNice, Text: "Tokyo Skytree"},
-			want: CoverageCovered,
-		},
-		{
-			name: "tag overlap only is partial",
-			wish: WishInput{ID: "w3", Kind: KindMust, Text: "กินราเมงร้านดัง", Tags: []string{"ramen", "food"}},
-			want: CoveragePartial,
-		},
-		{
-			name: "no signal is uncovered",
-			wish: WishInput{ID: "w4", Kind: KindMust, Text: "ดูซากุระที่เมกุโระ", Tags: []string{"sakura"}},
-			want: CoverageUncovered,
-		},
-		{
-			name: "avoid respected is na",
-			wish: WishInput{ID: "w5", Kind: KindAvoid, Text: "ไม่เอาพิพิธภัณฑ์", Tags: []string{"museum"}},
-			want: CoverageNA,
-		},
-		{
-			name: "avoid violated is uncovered",
-			wish: WishInput{ID: "w6", Kind: KindAvoid, Text: "ไม่เอาร้านราเมง", Tags: []string{"ramen"}},
-			want: CoverageUncovered,
-		},
+	if got := TagOverlap([]string{"ของกิน"}, []string{"วัด"}); got != 0 {
+		t.Errorf("disjoint sets = %v, want 0", got)
 	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			got := ComputeCoverage([]WishInput{tc.wish}, items)
-			if len(got) != 1 {
-				t.Fatalf("expected 1 result, got %d", len(got))
-			}
-			if s := statusOf(got, tc.wish.ID); s != tc.want {
-				t.Errorf("status = %q, want %q", s, tc.want)
-			}
-		})
+	// One shared tag out of three distinct ones.
+	if got := TagOverlap([]string{"ของกิน", "ตลาด"}, []string{"ของกิน"}); got != 0.5 {
+		t.Errorf("half overlap = %v, want 0.5", got)
+	}
+	if got := TagOverlap(nil, []string{"ของกิน"}); got != 0 {
+		t.Errorf("empty set = %v, want 0", got)
 	}
 }
 
-func TestComputeCoverageEmptyPlan(t *testing.T) {
+func TestComputeCoverageMatchesByPOIFirst(t *testing.T) {
+	wishes := []WishInput{{ID: "w1", Kind: "must", Text: "ไปดูวิว", POIID: "poi-1"}}
+	items := []PlanItemInput{{ID: "i1", Title: "Shibuya Sky", POIID: "poi-1"}}
+
+	got := ComputeCoverage(wishes, items)
+	if got[0].Status != CoverageCovered || got[0].CoveredByItemID[0] != "i1" {
+		t.Fatalf("got %+v, want covered by i1", got[0])
+	}
+}
+
+func TestComputeCoverageMatchesBySubstringName(t *testing.T) {
+	wishes := []WishInput{{ID: "w1", Kind: "must", Text: "ฟุชิมิอินาริ"}}
+	items := []PlanItemInput{{ID: "i1", Title: "ศาลเจ้าฟุชิมิอินาริ"}}
+
+	if got := ComputeCoverage(wishes, items); got[0].Status != CoverageCovered {
+		t.Fatalf("status = %v, want covered", got[0].Status)
+	}
+}
+
+func TestComputeCoverageTagMatchStrengths(t *testing.T) {
+	// One tag shared out of four distinct ones (Jaccard 0.25) is a hint, not an
+	// answer: the board says "มีของคล้ายกัน" rather than ticking the wish off.
+	weak := ComputeCoverage(
+		[]WishInput{{ID: "w1", Kind: "nice", Text: "อยากกินของอร่อย", Tags: []string{"ของกิน", "ตลาด"}}},
+		[]PlanItemInput{{ID: "i1", Title: "โดทงโบริ", Tags: []string{"ของกิน", "ย่าน", "ช้อป"}}},
+	)
+	if weak[0].Status != CoveragePartial {
+		t.Errorf("weak overlap = %v, want partial", weak[0].Status)
+	}
+
+	// Sharing most of a small tag set is real evidence.
+	strong := ComputeCoverage(
+		[]WishInput{{ID: "w1", Kind: "nice", Text: "ตลาดเช้า", Tags: []string{"ของกิน", "เช้า"}}},
+		[]PlanItemInput{{ID: "i1", Title: "ตลาดสึกิจิ", Tags: []string{"ของกิน", "เช้า"}}},
+	)
+	if strong[0].Status != CoverageCovered {
+		t.Errorf("strong overlap = %v, want covered", strong[0].Status)
+	}
+
+	// A single shared tag buried in a long list is noise.
+	noise := ComputeCoverage(
+		[]WishInput{{ID: "w1", Kind: "nice", Text: "อะไรก็ได้", Tags: []string{"ของกิน", "ตลาด", "เช้า"}}},
+		[]PlanItemInput{{ID: "i1", Title: "โดทงโบริ", Tags: []string{"ของกิน", "กลางคืน", "ย่าน", "ช้อป"}}},
+	)
+	if noise[0].Status != CoverageUncovered {
+		t.Errorf("one tag in six = %v, want uncovered", noise[0].Status)
+	}
+}
+
+func TestComputeCoverageAvoidInverts(t *testing.T) {
+	wishes := []WishInput{{ID: "w1", Kind: "avoid", Text: "ยูนิเวอร์แซล"}}
+
+	clean := ComputeCoverage(wishes, []PlanItemInput{{ID: "i1", Title: "ปราสาทโอซาก้า"}})
+	if clean[0].Status != CoverageNA {
+		t.Errorf("nothing to conflict with = %v, want na", clean[0].Status)
+	}
+
+	conflict := ComputeCoverage(wishes, []PlanItemInput{{ID: "i1", Title: "ยูนิเวอร์แซลสตูดิโอ"}})
+	if conflict[0].Status != CoveragePartial || conflict[0].Note == "" {
+		t.Errorf("conflict = %+v, want partial with a note", conflict[0])
+	}
+}
+
+func TestSummariseCoverageExcludesNotApplicable(t *testing.T) {
 	wishes := []WishInput{
-		{ID: "w1", Kind: KindMust, Text: "Disney Sea"},
-		{ID: "w2", Kind: KindAvoid, Text: "ตลาดปลา"},
+		{ID: "w1", Kind: "must", Text: "ฟุชิมิอินาริ"},
+		{ID: "w2", Kind: "nice", Text: "ไม่มีในแพลน"},
+		{ID: "w3", Kind: "avoid", Text: "สวนสนุก"},
 	}
-	got := ComputeCoverage(wishes, nil)
+	items := []PlanItemInput{{ID: "i1", Title: "ศาลเจ้าฟุชิมิอินาริ"}}
 
-	if statusOf(got, "w1") != CoverageUncovered {
-		t.Errorf("must wish against empty plan should be uncovered")
-	}
-	if statusOf(got, "w2") != CoverageNA {
-		t.Errorf("avoid wish against empty plan should be na")
-	}
-}
+	summary := SummariseCoverage(wishes, ComputeCoverage(wishes, items))
 
-func TestComputeCoverageReportsCoveringItems(t *testing.T) {
-	items := []PlanItemInput{{ID: "i1", Title: "Tokyo Skytree", POIID: "poi-skytree"}}
-	got := ComputeCoverage([]WishInput{{ID: "w1", Kind: KindMust, POIID: "poi-skytree"}}, items)
-
-	if len(got[0].CoveredByItemID) != 1 || got[0].CoveredByItemID[0] != "i1" {
-		t.Fatalf("expected covering item i1, got %v", got[0].CoveredByItemID)
+	if summary.Total != 2 {
+		t.Errorf("total = %d, want 2 (the avoid wish is not applicable)", summary.Total)
 	}
-}
-
-func TestSummarizeCoverage(t *testing.T) {
-	wishes := []WishInput{
-		{ID: "w1", Kind: KindMust},
-		{ID: "w2", Kind: KindNice},
-		{ID: "w3", Kind: KindMust},
-		{ID: "w4", Kind: KindAvoid},
+	if summary.Covered != 1 || summary.Uncovered != 1 {
+		t.Errorf("covered/uncovered = %d/%d, want 1/1", summary.Covered, summary.Uncovered)
 	}
-	results := []CoverageResult{
-		{WishlistItemID: "w1", Status: CoverageCovered},
-		{WishlistItemID: "w2", Status: CoveragePartial},
-		{WishlistItemID: "w3", Status: CoverageUncovered},
-		{WishlistItemID: "w4", Status: CoverageNA},
+	if summary.MustCovered != 1 || summary.MustTotal != 1 {
+		t.Errorf("must = %d/%d, want 1/1", summary.MustCovered, summary.MustTotal)
 	}
-
-	got := SummarizeCoverage(wishes, results)
-
-	if got.Total != 3 {
-		t.Errorf("Total = %d, want 3 (na excluded)", got.Total)
-	}
-	if got.MustUncovered != 1 {
-		t.Errorf("MustUncovered = %d, want 1", got.MustUncovered)
-	}
-	// (1 covered + 0.5 partial) / 3 = 50%
-	if got.CoveredPercent < 49.9 || got.CoveredPercent > 50.1 {
-		t.Errorf("CoveredPercent = %v, want 50", got.CoveredPercent)
+	if summary.Percent != 50 {
+		t.Errorf("percent = %d, want 50", summary.Percent)
 	}
 }

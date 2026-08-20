@@ -25,7 +25,6 @@ type User struct {
 	Base
 	DisplayName  string  `gorm:"type:varchar(120);not null" json:"display_name"`
 	AvatarURL    string  `gorm:"type:varchar(500)" json:"avatar_url"`
-	CharacterID  *int16  `gorm:"index" json:"character_id"`
 	Handle       *string `gorm:"type:varchar(60);uniqueIndex" json:"handle"`
 	Email        *string `gorm:"type:varchar(255);uniqueIndex" json:"email"`
 	Password     string  `gorm:"type:varchar(255)" json:"-"`
@@ -36,6 +35,11 @@ type User struct {
 	IsCreator    bool    `gorm:"not null;default:false" json:"is_creator"`
 	Locale       string  `gorm:"type:varchar(10);not null;default:'th'" json:"locale"`
 	HomeCurrency string  `gorm:"type:varchar(3);not null;default:'THB'" json:"home_currency"`
+	// The little animal that stands in for this person everywhere in the app
+	// (M14 — A14.3). Nullable: a brand-new account has not picked one yet.
+	CharacterID *string `gorm:"type:varchar(40);index" json:"character_id"`
+	// Who invited them, so a referral can be paid out once they join a trip.
+	ReferredBy  *string `gorm:"type:char(36)" json:"referred_by"`
 }
 
 func (User) TableName() string { return "users" }
@@ -47,33 +51,9 @@ type UserStore interface {
 	GetByID(ctx context.Context, id string) (*User, error)
 	GetByEmail(ctx context.Context, email string) (*User, error)
 	GetByProvider(ctx context.Context, provider, providerUID string) (*User, error)
-	GetByHandle(ctx context.Context, handle string) (*User, error)
-	// ListByIDs backs member lists, comment authors and activity feeds without
-	// an N+1 query per row.
-	ListByIDs(ctx context.Context, ids []string) ([]User, error)
 	Update(ctx context.Context, u *User) error
-	SetCharacter(ctx context.Context, userID string, characterID int16) error
+	// ListByIDs hydrates a member list in one query instead of N.
+	ListByIDs(ctx context.Context, ids []string) ([]User, error)
+	GetByHandle(ctx context.Context, handle string) (*User, error)
 	Count(ctx context.Context) (int64, error)
-}
-
-// PublicUser is the only user shape that ever leaves the API. Email, provider
-// ids and password never appear in a response.
-type PublicUser struct {
-	ID          string  `json:"id"`
-	DisplayName string  `json:"display_name"`
-	AvatarURL   string  `json:"avatar_url"`
-	Handle      *string `json:"handle"`
-	CharacterID *int16  `json:"character_id"`
-	IsCreator   bool    `json:"is_creator"`
-}
-
-func (u User) Public() PublicUser {
-	return PublicUser{
-		ID:          u.ID,
-		DisplayName: u.DisplayName,
-		AvatarURL:   u.AvatarURL,
-		Handle:      u.Handle,
-		CharacterID: u.CharacterID,
-		IsCreator:   u.IsCreator,
-	}
 }

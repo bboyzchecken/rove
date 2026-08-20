@@ -1,6 +1,8 @@
 package api
 
 import (
+	"net/http"
+
 	"github.com/labstack/echo/v4"
 
 	"github.com/bboyzchecken/rove/apps/api/pkg/handlers/api/request"
@@ -8,32 +10,20 @@ import (
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
 )
 
-// registerCollaborationRoutes covers comments and votes (DEV_SPEC §5.9 / M9).
-//
-//	GET/POST /trips/:tripId/comments?target_type=&target_id=   [viewer]
-//	DELETE   /comments/:id                                     [author or owner]
-//	POST     /trips/:tripId/votes                              [viewer]
-//	GET      /trips/:tripId/votes                              [viewer]
-//
-// Commenting is viewer-level on purpose: someone invited to look at a plan
-// should be able to say "this day looks packed" without edit rights.
-func (s *Server) registerCollaborationRoutes(v1, trips *echo.Group) {
-	viewer := s.TripRoleMiddleware(models.TripRoleViewer)
+// Comments, votes and the activity feed (M9 — A9.1, A2.4).
+func (s *Server) registerCollaborationRoutes(g *echo.Group) {
+	view := s.TripRoleMiddleware(models.TripRoleViewer)
+	edit := s.TripRoleMiddleware(models.TripRoleEditor)
 
-	trips.GET("/:tripId/comments", s.handleListComments, viewer)
-	trips.POST("/:tripId/comments", s.handleCreateComment, viewer)
-	trips.GET("/:tripId/votes", s.handleListVotes, viewer)
-	trips.POST("/:tripId/votes", s.handleVote, viewer)
+	g.GET("/:tripId/comments", s.handleListComments, view)
+	g.POST("/:tripId/comments", s.handleCreateComment, edit)
+	g.PATCH("/:tripId/comments/:commentId", s.handleUpdateComment, edit)
+	g.DELETE("/:tripId/comments/:commentId", s.handleDeleteComment, edit)
 
-	comments := v1.Group("/comments", s.JwtMiddleware)
-	comments.DELETE("/:id", s.handleDeleteComment,
-		s.ResolveTrip("id", models.TripRoleViewer, s.commentTrip))
-}
+	g.GET("/:tripId/votes", s.handleListVotes, view)
+	g.POST("/:tripId/votes", s.handleVote, edit)
 
-// CommentView carries the author inline so a thread renders in one request.
-type CommentView struct {
-	models.Comment
-	Author models.PublicUser `json:"author"`
+	g.GET("/:tripId/activity", s.handleActivity, view)
 }
 
 func (s *Server) handleListComments(c echo.Context) error {
@@ -47,39 +37,28 @@ func (s *Server) handleListComments(c echo.Context) error {
 		comments []models.Comment
 		err      error
 	)
-	if targetType != "" && targetID != "" {
-		comments, err = s.comments.List(ctx, tripID, targetType, targetID)
+	if targetType == "" || targetID == "" {
+		// No target means "everything in this room", which is what the
+		// Discussion tab's unread badge needs.
+		comments, err = s.collab.ListTripComments(ctx, tripID)
 	} else {
-		// No target means the Discussion tab, which shows the whole trip.
-		comments, err = s.comments.ListByTrip(ctx, tripID,
-			c.QueryParam("cursor"), atoiDefault(c.QueryParam("limit"), 50))
+		comments, err = s.collab.ListComments(ctx, tripID, targetType, targetID)
 	}
 	if err != nil {
-		return request.Internal(c, "อ่านคอมเมนต์ไม่สำเร็จ")
+		return request.Internal(c, "โหลดคอมเมนต์ไม่สำเร็จ")
 	}
 
-	ids := make([]string, 0, len(comments))
-	for _, cm := range comments {
-		ids = append(ids, cm.UserID)
+	out := make([]commentDTO, 0, len(comments))
+	for _, comment := range comments {
+		out = append(out, toCommentDTO(comment))
 	}
-	users, _ := s.users.ListByIDs(ctx, ids)
-	byID := make(map[string]models.PublicUser, len(users))
-	for _, u := range users {
-		byID[u.ID] = u.Public()
-	}
-
-	views := make([]CommentView, 0, len(comments))
-	for _, cm := range comments {
-		views = append(views, CommentView{Comment: cm, Author: byID[cm.UserID]})
-	}
-	return request.OK(c, map[string]any{"items": views})
+	return c.JSON(http.StatusOK, out)
 }
 
 type commentRequest struct {
-	TargetType string  `json:"target_type" validate:"required,oneof=trip plan day item wishlist"`
-	TargetID   string  `json:"target_id" validate:"required,uuid4"`
-	Body       string  `json:"body" validate:"required,max=4000"`
-	ParentID   *string `json:"parent_id" validate:"omitempty,uuid4"`
+	TargetType string `json:"target_type" validate:"required,oneof=trip day item wish"`
+	TargetID   string `json:"target_id" validate:"required"`
+	Body       string `json:"body" validate:"required"`
 }
 
 func (s *Server) handleCreateComment(c echo.Context) error {
@@ -92,95 +71,157 @@ func (s *Server) handleCreateComment(c echo.Context) error {
 	tripID := request.TripID(c)
 
 	comment := &models.Comment{
-		TripID: tripID, TargetType: req.TargetType, TargetID: req.TargetID,
-		UserID: request.UserID(c), Body: req.Body,
+		TripID:     tripID,
+		TargetType: req.TargetType,
+		TargetID:   req.TargetID,
+		UserID:     request.UserID(c),
+		Body:       req.Body,
 	}
-	if req.ParentID != nil {
-		// Threads are one level deep: replying to a reply attaches to its
-		// parent rather than growing a tree the UI cannot render.
-		parent, err := s.comments.Get(ctx, tripID, *req.ParentID)
-		if err != nil {
-			return request.BadRequest(c, "ไม่พบคอมเมนต์ที่ตอบกลับ")
+	if err := s.collab.CreateComment(ctx, comment); err != nil {
+		return request.Internal(c, "ส่งคอมเมนต์ไม่สำเร็จ")
+	}
+
+	s.track(c, tripID, "คอมเมนต์ในแพลน", events.TypeCommentCreated, req.TargetType, req.TargetID)
+	return c.JSON(http.StatusCreated, toCommentDTO(*comment))
+}
+
+type updateCommentRequest struct {
+	Body     *string `json:"body"`
+	Resolved *bool   `json:"resolved"`
+}
+
+func (s *Server) handleUpdateComment(c echo.Context) error {
+	var req updateCommentRequest
+	if err := request.BindAndValidate(c, &req); err != nil {
+		return err
+	}
+
+	ctx := c.Request().Context()
+	tripID := request.TripID(c)
+
+	comment, err := s.collab.GetComment(ctx, tripID, c.Param("commentId"))
+	if err != nil {
+		return request.NotFound(c, "ไม่พบคอมเมนต์นี้")
+	}
+
+	// Anyone in the room may mark a thread settled — that is a group decision.
+	// Editing the words is only for the person who wrote them.
+	if req.Body != nil {
+		if comment.UserID != request.UserID(c) {
+			return request.Forbidden(c, "แก้ข้อความของคนอื่นไม่ได้")
 		}
-		root := parent.ID
-		if parent.ParentID != nil {
-			root = *parent.ParentID
-		}
-		comment.ParentID = &root
+		comment.Body = *req.Body
+	}
+	if req.Resolved != nil {
+		comment.Resolved = *req.Resolved
 	}
 
-	if err := s.comments.Create(ctx, comment); err != nil {
-		return request.Internal(c, "บันทึกคอมเมนต์ไม่สำเร็จ")
+	if err := s.collab.UpdateComment(ctx, comment); err != nil {
+		return request.Internal(c, "บันทึกไม่สำเร็จ")
 	}
-
-	s.emit(c, tripID, emitOpts{
-		Action:     models.ActionCommentCreated,
-		EventType:  events.TypeCommentCreated,
-		TargetType: req.TargetType, TargetID: req.TargetID,
-		Meta: map[string]any{"comment_id": comment.ID},
-	})
-
-	author, _ := s.users.GetByID(ctx, comment.UserID)
-	view := CommentView{Comment: *comment}
-	if author != nil {
-		view.Author = author.Public()
-	}
-	return request.Created(c, view)
+	return c.JSON(http.StatusOK, toCommentDTO(*comment))
 }
 
 func (s *Server) handleDeleteComment(c echo.Context) error {
 	ctx := c.Request().Context()
 	tripID := request.TripID(c)
 
-	comment, err := s.comments.Get(ctx, tripID, c.Param("id"))
+	comment, err := s.collab.GetComment(ctx, tripID, c.Param("commentId"))
 	if err != nil {
-		return request.NotFound(c, "ไม่พบคอมเมนต์")
+		return request.NotFound(c, "ไม่พบคอมเมนต์นี้")
 	}
 	if comment.UserID != request.UserID(c) && request.TripRole(c) != models.TripRoleOwner {
-		return request.Forbidden(c, "ลบได้เฉพาะคอมเมนต์ของตัวเอง")
+		return request.Forbidden(c, "ลบคอมเมนต์ของคนอื่นไม่ได้")
 	}
 
-	if err := s.comments.Delete(ctx, tripID, comment.ID); err != nil {
-		return request.Internal(c, "ลบคอมเมนต์ไม่สำเร็จ")
+	if err := s.collab.DeleteComment(ctx, tripID, comment.ID); err != nil {
+		return request.Internal(c, "ลบไม่สำเร็จ")
 	}
-	return request.NoContent(c)
+	return c.NoContent(http.StatusNoContent)
+}
+
+/* ----------------------------------------------------------------- votes -- */
+
+func (s *Server) handleListVotes(c echo.Context) error {
+	votes, err := s.collab.ListVotes(
+		c.Request().Context(),
+		request.TripID(c),
+		c.QueryParam("target_type"),
+		c.QueryParam("target_id"),
+	)
+	if err != nil {
+		return request.Internal(c, "โหลดโหวตไม่สำเร็จ")
+	}
+	return c.JSON(http.StatusOK, toVoteDTOs(votes))
 }
 
 type voteRequest struct {
-	TargetType string `json:"target_type" validate:"required,oneof=plan item poll"`
-	TargetID   string `json:"target_id" validate:"required,uuid4"`
-	Choice     string `json:"choice" validate:"required,max=40"`
-	Reason     string `json:"reason" validate:"omitempty,max=500"`
+	TargetType string `json:"target_type" validate:"required"`
+	TargetID   string `json:"target_id" validate:"required"`
+	Value      int    `json:"value"`
 }
 
-// handleVote upserts, so changing your mind replaces your vote instead of
-// stacking a second one.
 func (s *Server) handleVote(c echo.Context) error {
 	var req voteRequest
 	if err := request.BindAndValidate(c, &req); err != nil {
 		return err
 	}
-
-	vote := &models.Vote{
-		TripID: request.TripID(c), TargetType: req.TargetType, TargetID: req.TargetID,
-		UserID: request.UserID(c), Choice: req.Choice, Reason: req.Reason,
-	}
-	if err := s.votes.Upsert(c.Request().Context(), vote); err != nil {
-		return request.Internal(c, "บันทึกโหวตไม่สำเร็จ")
+	if req.Value != 1 && req.Value != -1 {
+		return request.BadRequest(c, "ค่าโหวตต้องเป็น 1 หรือ -1")
 	}
 
-	s.emit(c, vote.TripID, emitOpts{
-		EventType:  events.TypePlanUpdated,
-		TargetType: req.TargetType, TargetID: req.TargetID,
+	ctx := c.Request().Context()
+	tripID := request.TripID(c)
+
+	err := s.collab.SetVote(ctx, &models.Vote{
+		TripID:     tripID,
+		TargetType: req.TargetType,
+		TargetID:   req.TargetID,
+		UserID:     request.UserID(c),
+		Value:      req.Value,
 	})
-	return request.OK(c, vote)
+	if err != nil {
+		return request.Internal(c, "โหวตไม่สำเร็จ")
+	}
+
+	votes, err := s.collab.ListVotes(ctx, tripID, req.TargetType, req.TargetID)
+	if err != nil {
+		return request.Internal(c, "โหลดโหวตไม่สำเร็จ")
+	}
+	return c.JSON(http.StatusOK, toVoteDTOs(votes))
 }
 
-func (s *Server) handleListVotes(c echo.Context) error {
-	votes, err := s.votes.List(c.Request().Context(), request.TripID(c),
-		c.QueryParam("target_type"), c.QueryParam("target_id"))
-	if err != nil {
-		return request.Internal(c, "อ่านโหวตไม่สำเร็จ")
+func toVoteDTOs(votes []models.Vote) []voteDTO {
+	out := make([]voteDTO, 0, len(votes))
+	for _, v := range votes {
+		out = append(out, voteDTO{
+			TargetType: v.TargetType,
+			TargetID:   v.TargetID,
+			UserID:     v.UserID,
+			Value:      v.Value,
+		})
 	}
-	return request.OK(c, map[string]any{"items": votes})
+	return out
+}
+
+/* -------------------------------------------------------------- activity -- */
+
+// handleActivity is keyset-paginated: the feed grows at the top while someone
+// is scrolling it, and an offset would show them the same row twice.
+func (s *Server) handleActivity(c echo.Context) error {
+	entries, err := s.collab.ListActivity(
+		c.Request().Context(),
+		request.TripID(c),
+		c.QueryParam("cursor"),
+		30,
+	)
+	if err != nil {
+		return request.Internal(c, "โหลดความเคลื่อนไหวไม่สำเร็จ")
+	}
+
+	out := make([]activityDTO, 0, len(entries))
+	for _, entry := range entries {
+		out = append(out, toActivityDTO(entry))
+	}
+	return c.JSON(http.StatusOK, out)
 }

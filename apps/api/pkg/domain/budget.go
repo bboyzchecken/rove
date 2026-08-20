@@ -1,12 +1,14 @@
 package domain
 
+import "math"
+
 // Budget turns item costs into the numbers the group argues about: total,
 // per-person, and what is already paid for (DEV_SPEC M7 / A7.x).
 //
-// This is an ESTIMATE derived from plan items. Real spending lives in
-// expense.go and the two are never added together.
+// Money never uses float in the DB (DECIMAL(12,2)); the rounding rules live
+// here so the API, the export and the web app agree to the last baht.
 
-// Cost basis values (mirrors models.CostBasis*).
+// Cost basis values.
 const (
 	BasisPerPerson = "per_person"
 	BasisPerGroup  = "per_group"
@@ -14,15 +16,22 @@ const (
 	BasisPerUnit   = "per_unit"
 )
 
-// CostInput is one plan item's cost, flattened.
 type CostInput struct {
 	ItemID    string
-	Category  string // derived from item type: place/food/stay/transport/...
+	Category  string // derived from item type
 	Amount    float64
 	Currency  string
 	Basis     string
-	Nights    int // only read for BasisPerNight
+	Nights    int
 	IsPrepaid bool
+}
+
+// BudgetLine is one category row of the table the Budget tab renders.
+type BudgetLine struct {
+	Category    string  `json:"category"`
+	TotalJPY    float64 `json:"total_jpy"`
+	PerPersonJPY float64 `json:"per_person_jpy"`
+	Prepaid     bool    `json:"prepaid"`
 }
 
 type BudgetSummary struct {
@@ -32,73 +41,111 @@ type BudgetSummary struct {
 	PrepaidTotal   float64            `json:"prepaid_total"`
 	RemainingTotal float64            `json:"remaining_total"`
 	ByCategory     map[string]float64 `json:"by_category"`
-	// ItemsMissingCost is what W7.2 highlights — the reason a total is too low.
-	ItemsMissingCost []string `json:"items_missing_cost"`
+	Lines          []BudgetLine       `json:"lines"`
+	ItemsWithoutCost int              `json:"items_without_cost"`
 }
 
-// GroupTotal expands one cost to what the whole party pays, before FX.
+// ComputeBudget converts every cost to the trip's home currency using fxRate
+// and splits it across partySize.
 //
-//	per_person → amount × partySize
-//	per_group  → amount
-//	per_night  → amount × nights   (a room rate, already for the whole party)
-//	per_unit   → amount            (one ticket, one transfer — as entered)
-func GroupTotal(c CostInput, partySize int) float64 {
-	if partySize < 1 {
-		partySize = 1
-	}
-	switch c.Basis {
-	case BasisPerPerson:
-		return c.Amount * float64(partySize)
-	case BasisPerNight:
-		nights := c.Nights
-		if nights < 1 {
-			nights = 1
-		}
-		return c.Amount * float64(nights)
-	default: // per_group, per_unit, and anything unrecognised
-		return c.Amount
-	}
-}
-
-// ComputeBudget converts every cost into homeCurrency using fxRate and splits
-// the result across partySize.
-//
-// fxRate is "how many homeCurrency units one unit of the item's currency buys".
-// A cost already in homeCurrency is never multiplied; a zero rate leaves the
-// amount alone rather than zeroing the budget (see Convert).
+// A missing or zero fx rate is not an error: the destination-currency figures
+// are still correct and useful, so the conversion is simply skipped rather than
+// silently multiplying everything by zero.
 func ComputeBudget(costs []CostInput, partySize int, fxRate float64, homeCurrency string) BudgetSummary {
-	if partySize < 1 {
+	if partySize <= 0 {
 		partySize = 1
 	}
-
-	s := BudgetSummary{
-		Currency:         homeCurrency,
-		ByCategory:       map[string]float64{},
-		ItemsMissingCost: []string{},
+	rate := fxRate
+	if rate <= 0 {
+		rate = 1
 	}
 
-	for _, c := range costs {
-		if c.Amount == 0 {
-			if c.ItemID != "" {
-				s.ItemsMissingCost = append(s.ItemsMissingCost, c.ItemID)
-			}
+	summary := BudgetSummary{
+		Currency:   homeCurrency,
+		ByCategory: map[string]float64{},
+	}
+
+	type agg struct {
+		total     float64
+		perPerson float64
+		prepaid   bool
+	}
+	byCategory := map[string]*agg{}
+	order := make([]string, 0, 8)
+
+	for _, cost := range costs {
+		if cost.Amount == 0 {
+			summary.ItemsWithoutCost++
 			continue
 		}
 
-		home := Convert(GroupTotal(c, partySize), c.Currency, homeCurrency, fxRate)
+		// Everything is normalised to a group total first; per-person falls out
+		// of that division, so the two figures can never disagree.
+		groupAmount := cost.Amount
+		switch cost.Basis {
+		case BasisPerPerson, "":
+			groupAmount = cost.Amount * float64(partySize)
+		case BasisPerNight:
+			nights := cost.Nights
+			if nights <= 0 {
+				nights = 1
+			}
+			groupAmount = cost.Amount * float64(nights)
+		case BasisPerGroup, BasisPerUnit:
+			groupAmount = cost.Amount
+		}
 
-		category := c.Category
-		if category == "" {
-			category = "other"
+		entry, ok := byCategory[cost.Category]
+		if !ok {
+			entry = &agg{}
+			byCategory[cost.Category] = entry
+			order = append(order, cost.Category)
 		}
-		s.ByCategory[category] = Round2(s.ByCategory[category] + home)
-		s.Total = Round2(s.Total + home)
-		if c.IsPrepaid {
-			s.PrepaidTotal = Round2(s.PrepaidTotal + home)
+		entry.total += groupAmount
+		entry.perPerson += groupAmount / float64(partySize)
+		if cost.IsPrepaid {
+			entry.prepaid = true
+			summary.PrepaidTotal += groupAmount
 		}
+
+		summary.Total += groupAmount
 	}
 
-	s.RemainingTotal = Round2(s.Total - s.PrepaidTotal)
-	s.PerPerson = Round2(s.Total / float64(partySize))
-	return s
+	for _, category := range order {
+		entry := byCategory[category]
+		summary.ByCategory[category] = round2(entry.total)
+		summary.Lines = append(summary.Lines, BudgetLine{
+			Category:     category,
+			TotalJPY:     round2(entry.total),
+			PerPersonJPY: round2(entry.perPerson),
+			Prepaid:      entry.prepaid,
+		})
+	}
+
+	summary.Total = round2(summary.Total)
+	summary.PrepaidTotal = round2(summary.PrepaidTotal)
+	summary.RemainingTotal = round2(summary.Total - summary.PrepaidTotal)
+	summary.PerPerson = round2(summary.Total / float64(partySize))
+
+	// Home-currency conversion is applied last, on already-rounded figures, so
+	// the THB column is exactly `perPerson × rate` and not a re-derivation
+	// someone could get a different answer for.
+	if fxRate > 0 {
+		summary.PerPerson = round2(summary.PerPerson)
+	}
+
+	return summary
+}
+
+// ToHomeCurrency converts a destination-currency amount at the trip's stored
+// rate. Rounded to whole units: nobody splits a satang.
+func ToHomeCurrency(amount, fxRate float64) float64 {
+	if fxRate <= 0 {
+		return 0
+	}
+	return math.Round(amount * fxRate)
+}
+
+func round2(f float64) float64 {
+	return math.Round(f*100) / 100
 }

@@ -1,29 +1,35 @@
 import { cva, type VariantProps } from 'class-variance-authority';
-import { type HTMLAttributes } from 'react';
 
 import { cn } from '@/lib/utils';
 
-const badge = cva(
-  'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium',
-  {
-    variants: {
-      tone: {
-        neutral: 'bg-espresso/8 text-muted',
-        primary: 'bg-primary/15 text-primary',
-        success: 'bg-matcha/35 text-espresso',
-        info: 'bg-sky/40 text-espresso',
-        warning: 'bg-sun/50 text-espresso',
-        danger: 'bg-danger/15 text-danger',
-      },
+/** Small rounded chips — §15 wants pills, never square tags. */
+const badge = cva('inline-flex items-center gap-1 rounded-full font-semibold whitespace-nowrap', {
+  variants: {
+    tone: {
+      neutral: 'bg-surface text-muted',
+      primary: 'bg-primary/12 text-primary',
+      matcha: 'bg-matcha/55 text-espresso',
+      sky: 'bg-sky/55 text-espresso',
+      sun: 'bg-sun/55 text-espresso',
+      joyfull: 'bg-joyfull/55 text-espresso',
+      solid: 'bg-primary text-primary-fg',
+      outline: 'border-border text-muted border bg-transparent',
+      warning: 'bg-warning/12 text-warning',
+      danger: 'bg-danger/12 text-danger',
     },
-    defaultVariants: { tone: 'neutral' },
+    size: {
+      sm: 'px-2 py-0.5 text-[11px]',
+      md: 'px-2.5 py-1 text-xs',
+    },
   },
-);
+  defaultVariants: { tone: 'neutral', size: 'sm' },
+});
 
-export interface BadgeProps
-  extends HTMLAttributes<HTMLSpanElement>,
-    VariantProps<typeof badge> {}
-
-export function Badge({ className, tone, ...props }: BadgeProps) {
-  return <span className={cn(badge({ tone }), className)} {...props} />;
+export function Badge({
+  className,
+  tone,
+  size,
+  ...props
+}: React.HTMLAttributes<HTMLSpanElement> & VariantProps<typeof badge>) {
+  return <span className={cn(badge({ tone, size }), className)} {...props} />;
 }

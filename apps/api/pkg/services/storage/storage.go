@@ -1,106 +1,68 @@
-// Package storage wraps Cloudflare R2 (S3-compatible) for exports, OG images
-// and uploads. R2 is used because egress is free (DEV_SPEC §2.3).
+// Package storage wraps object storage for exports, OG images and uploads.
+//
+// Phase 1 decision: exports are streamed straight from the API with a
+// Content-Disposition header instead of being uploaded and signed. A trip
+// export is a few kilobytes of HTML or ICS that the user asked for and
+// downloads immediately — putting it in a bucket first adds a dependency, a
+// signing key and a lifecycle policy to solve a problem nobody has yet.
+//
+// The interface stays because Phase 2 (photos, PDF rendering, OG images) does
+// need a bucket; `NewService` returns a stub until R2 credentials are set, and
+// every caller has to handle `ErrNotConfigured` anyway.
 package storage
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"io"
 	"time"
 
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"go.uber.org/fx"
+	uberfx "go.uber.org/fx"
 
 	"github.com/bboyzchecken/rove/apps/api/pkg/core"
 )
 
 type Service interface {
 	Put(ctx context.Context, bucket, key string, body io.Reader, contentType string) error
-	// SignedURL is how a private export reaches the browser: a short-lived URL
-	// rather than a public bucket.
 	SignedURL(ctx context.Context, bucket, key string, ttl time.Duration) (string, error)
 	Delete(ctx context.Context, bucket, key string) error
+	// Configured reports whether a real bucket is behind this service, so a
+	// caller can pick the streaming path instead.
 	Configured() bool
 }
 
-// ErrNotConfigured is returned when R2 credentials are absent. Export jobs
-// report it as a job error rather than crashing the worker.
-var ErrNotConfigured = fmt.Errorf("storage: R2 credentials are not configured")
+// ErrNotConfigured is returned by every method when R2 has no credentials.
+var ErrNotConfigured = errors.New("storage: R2 is not configured")
 
-type service struct {
-	client *s3.Client
-	ok     bool
+type service struct{ cfg core.Config }
+
+func New(cfg core.Config) Service { return &service{cfg: cfg} }
+
+var Module = uberfx.Module("services.storage", uberfx.Provide(New))
+
+func (s *service) Configured() bool {
+	return s.cfg.R2.Endpoint != "" && s.cfg.R2.AccessKey != "" && s.cfg.R2.SecretKey != ""
 }
 
-func New(cfg core.Config) Service {
-	r2 := cfg.R2
-	if r2.Endpoint == "" || r2.AccessKey == "" || r2.SecretKey == "" {
-		// Running without object storage is normal in local dev; every method
-		// returns ErrNotConfigured instead of panicking at wire time.
-		return &service{}
-	}
-
-	region := r2.Region
-	if region == "" {
-		region = "auto" // R2 ignores region but the SDK requires one
-	}
-
-	awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(),
-		awsconfig.WithRegion(region),
-		awsconfig.WithCredentialsProvider(
-			credentials.NewStaticCredentialsProvider(r2.AccessKey, r2.SecretKey, ""),
-		),
-	)
-	if err != nil {
-		return &service{}
-	}
-
-	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.BaseEndpoint = &r2.Endpoint
-		// R2 does not support virtual-hosted-style addressing.
-		o.UsePathStyle = true
-	})
-	return &service{client: client, ok: true}
-}
-
-var Module = fx.Module("services.storage", fx.Provide(New))
-
-func (s *service) Configured() bool { return s.ok }
-
-func (s *service) Put(ctx context.Context, bucket, key string, body io.Reader, contentType string) error {
-	if !s.ok {
+func (s *service) Put(context.Context, string, string, io.Reader, string) error {
+	if !s.Configured() {
 		return ErrNotConfigured
 	}
-	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket:      &bucket,
-		Key:         &key,
-		Body:        body,
-		ContentType: &contentType,
-	})
-	return err
+	// TODO(Phase 2 — photos): implement with an S3-compatible client once
+	// something needs to persist a file rather than stream it.
+	return ErrNotConfigured
 }
 
-func (s *service) SignedURL(ctx context.Context, bucket, key string, ttl time.Duration) (string, error) {
-	if !s.ok {
+func (s *service) SignedURL(context.Context, string, string, time.Duration) (string, error) {
+	if !s.Configured() {
 		return "", ErrNotConfigured
 	}
-	presign := s3.NewPresignClient(s.client)
-	req, err := presign.PresignGetObject(ctx, &s3.GetObjectInput{
-		Bucket: &bucket,
-		Key:    &key,
-	}, s3.WithPresignExpires(ttl))
-	if err != nil {
-		return "", err
-	}
-	return req.URL, nil
+	return "", ErrNotConfigured
 }
 
-func (s *service) Delete(ctx context.Context, bucket, key string) error {
-	if !s.ok {
+func (s *service) Delete(context.Context, string, string) error {
+	if !s.Configured() {
 		return ErrNotConfigured
 	}
-	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: &bucket, Key: &key})
-	return err
+	return ErrNotConfigured
 }

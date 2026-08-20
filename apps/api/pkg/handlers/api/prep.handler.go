@@ -1,63 +1,67 @@
 package api
 
 import (
-	"encoding/json"
+	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"gorm.io/datatypes"
 
 	"github.com/bboyzchecken/rove/apps/api/pkg/handlers/api/request"
 	"github.com/bboyzchecken/rove/apps/api/pkg/models"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
 )
 
-// registerPrepRoutes covers the Prep tab (DEV_SPEC §5.8 / M8).
-//
-//	GET/POST /trips/:tripId/prep             [viewer read / editor write]
-//	POST     /trips/:tripId/prep/regenerate  [editor]
-//	PATCH    /prep/:blockId                  [viewer — ticking a box is not an edit]
-//	DELETE   /prep/:blockId                  [editor]
-func (s *Server) registerPrepRoutes(v1, trips *echo.Group) {
-	viewer := s.TripRoleMiddleware(models.TripRoleViewer)
-	editor := s.TripRoleMiddleware(models.TripRoleEditor)
+// Prep checklist (M8 — A8.1 … A8.3).
+func (s *Server) registerPrepRoutes(g *echo.Group) {
+	view := s.TripRoleMiddleware(models.TripRoleViewer)
+	edit := s.TripRoleMiddleware(models.TripRoleEditor)
 
-	trips.GET("/:tripId/prep", s.handleListPrep, viewer)
-	trips.POST("/:tripId/prep", s.handleCreatePrep, editor)
-	trips.POST("/:tripId/prep/regenerate", s.handleRegeneratePrep, editor)
+	g.GET("/:tripId/prep", s.handleListPrep, view)
+	g.POST("/:tripId/prep", s.handleCreatePrep, edit)
+	g.PATCH("/:tripId/prep/:taskId", s.handleUpdatePrep, edit)
+	g.DELETE("/:tripId/prep/:taskId", s.handleDeletePrep, edit)
+	g.POST("/:tripId/prep/template", s.handleApplyPrepTemplate, edit)
+	g.GET("/:tripId/prep/note", s.handleGetPrepNote, view)
+	g.PUT("/:tripId/prep/note", s.handleSavePrepNote, edit)
+}
 
-	prep := v1.Group("/prep", s.JwtMiddleware)
-	// Any member may tick a checklist item — that is the whole point of a
-	// shared list — so this resolves at viewer level.
-	prep.PATCH("/:blockId", s.handleUpdatePrep,
-		s.ResolveTrip("blockId", models.TripRoleViewer, s.prepTrip))
-	prep.DELETE("/:blockId", s.handleDeletePrep,
-		s.ResolveTrip("blockId", models.TripRoleEditor, s.prepTrip))
+// japanTemplate is the default checklist for a Japan trip (A8.3). It is a
+// country template, not a generic one: "Visit Japan Web" is the item that
+// actually catches people out.
+var japanTemplate = []struct {
+	title    string
+	category string
+}{
+	{"เช็กวันหมดอายุพาสปอร์ต (เหลือ > 6 เดือน)", models.PrepDocument},
+	{"ลงทะเบียน Visit Japan Web ล่วงหน้า", models.PrepDocument},
+	{"ซื้อประกันเดินทาง", models.PrepHealth},
+	{"ซื้อ eSIM / pocket wifi", models.PrepBooking},
+	{"แลกเงินเยน / เปิดบัตรที่กดเงินต่างประเทศได้", models.PrepMoney},
+	{"จองที่พักให้ครบทุกคืน", models.PrepBooking},
+	{"เตรียมยาประจำตัว + ยาแก้หวัด", models.PrepHealth},
+	{"เตรียมเสื้อกันหนาว / ร่มพับ", models.PrepPacking},
+	{"ปลั๊กแปลง Type A + power bank", models.PrepPacking},
+	{"ตั้งกลุ่มแชร์ตำแหน่งไว้ใช้ตอนหลง", models.PrepOther},
 }
 
 func (s *Server) handleListPrep(c echo.Context) error {
-	ctx := c.Request().Context()
-	tripID := request.TripID(c)
-
-	blocks, err := s.preps.ListByTrip(ctx, tripID)
+	tasks, err := s.prep.ListByTrip(c.Request().Context(), request.TripID(c))
 	if err != nil {
-		return request.Internal(c, "อ่านข้อมูลเตรียมตัวไม่สำเร็จ")
+		return request.Internal(c, "โหลดเช็กลิสต์ไม่สำเร็จ")
 	}
-
-	// Generating on first read means the tab is never empty on the first visit,
-	// which is when people actually look at it.
-	if len(blocks) == 0 {
-		if generated, err := s.regeneratePrep(c, tripID); err == nil {
-			blocks = generated
-		}
+	out := make([]prepTaskDTO, 0, len(tasks))
+	for _, t := range tasks {
+		out = append(out, toPrepDTO(t))
 	}
-	return request.OK(c, map[string]any{"items": blocks})
+	return c.JSON(http.StatusOK, out)
 }
 
 type prepRequest struct {
-	Type      string                  `json:"type" validate:"omitempty,oneof=weather packing rule docs custom"`
-	Title     string                  `json:"title" validate:"required,max=200"`
-	ContentMD string                  `json:"content_md" validate:"omitempty,max=20000"`
-	Checklist []models.ChecklistEntry `json:"checklist" validate:"omitempty,max=100,dive"`
+	Title      string  `json:"title"`
+	Category   string  `json:"category"`
+	AssigneeID *string `json:"assignee_id"`
+	DueDate    string  `json:"due_date"`
+	Done       *bool   `json:"done"`
+	Note       string  `json:"note"`
 }
 
 func (s *Server) handleCreatePrep(c echo.Context) error {
@@ -65,46 +69,132 @@ func (s *Server) handleCreatePrep(c echo.Context) error {
 	if err := request.BindAndValidate(c, &req); err != nil {
 		return err
 	}
+	if req.Title == "" {
+		return request.BadRequest(c, "ใส่ชื่อสิ่งที่ต้องเตรียมด้วย")
+	}
 
 	ctx := c.Request().Context()
 	tripID := request.TripID(c)
-	existing, _ := s.preps.ListByTrip(ctx, tripID)
 
-	block := &models.PrepBlock{
-		TripID:    tripID,
-		Type:      orDefaultString(req.Type, models.PrepCustom),
-		Title:     req.Title,
-		ContentMD: req.ContentMD,
-		SortOrder: len(existing),
-		// Marking it user-generated is what protects it from regenerate.
-		GeneratedBy: models.CreatedByUser,
+	task := &models.PrepTask{
+		TripID:     tripID,
+		Title:      req.Title,
+		Category:   orDefault(req.Category, models.PrepOther),
+		AssigneeID: req.AssigneeID,
+		Note:       req.Note,
 	}
-	if raw, err := json.Marshal(orEmptyChecklist(req.Checklist)); err == nil {
-		block.Checklist = datatypes.JSON(raw)
+	if due, ok := parseDateParam(req.DueDate); ok {
+		task.DueDate = &due
 	}
 
-	if err := s.preps.Create(ctx, block); err != nil {
+	if err := s.prep.Create(ctx, task); err != nil {
 		return request.Internal(c, "บันทึกไม่สำเร็จ")
 	}
 
-	s.emit(c, tripID, emitOpts{
-		Action:     models.ActionPrepUpdated,
-		EventType:  events.TypePrepUpdated,
-		TargetType: "prep", TargetID: block.ID,
-	})
-	return request.Created(c, block)
+	s.track(c, tripID, "", events.TypePrepChanged, "prep", task.ID)
+	return c.JSON(http.StatusCreated, toPrepDTO(*task))
 }
 
-type updatePrepRequest struct {
-	Title     *string                  `json:"title" validate:"omitempty,max=200"`
-	ContentMD *string                  `json:"content_md" validate:"omitempty,max=20000"`
-	Checklist *[]models.ChecklistEntry `json:"checklist" validate:"omitempty,max=100,dive"`
-}
-
-// handleUpdatePrep is what a checkbox tick calls. It stamps who ticked each
-// entry so the card can show "แพรเตรียมแล้ว" rather than an anonymous tick.
 func (s *Server) handleUpdatePrep(c echo.Context) error {
-	var req updatePrepRequest
+	var req prepRequest
+	if err := request.BindAndValidate(c, &req); err != nil {
+		return err
+	}
+
+	ctx := c.Request().Context()
+	tripID := request.TripID(c)
+	userID := request.UserID(c)
+
+	task, err := s.prep.Get(ctx, tripID, c.Param("taskId"))
+	if err != nil {
+		return request.NotFound(c, "ไม่พบรายการนี้")
+	}
+
+	if req.Title != "" {
+		task.Title = req.Title
+	}
+	if req.Category != "" {
+		task.Category = req.Category
+	}
+	if req.AssigneeID != nil {
+		task.AssigneeID = req.AssigneeID
+	}
+	if req.Note != "" {
+		task.Note = req.Note
+	}
+	if due, ok := parseDateParam(req.DueDate); ok {
+		task.DueDate = &due
+	}
+	if req.Done != nil {
+		task.Done = *req.Done
+		if task.Done {
+			task.DoneBy = &userID
+		} else {
+			task.DoneBy = nil
+		}
+	}
+
+	if err := s.prep.Update(ctx, task); err != nil {
+		return request.Internal(c, "บันทึกไม่สำเร็จ")
+	}
+
+	s.track(c, tripID, "", events.TypePrepChanged, "prep", task.ID)
+	return c.JSON(http.StatusOK, toPrepDTO(*task))
+}
+
+func (s *Server) handleDeletePrep(c echo.Context) error {
+	ctx := c.Request().Context()
+	tripID := request.TripID(c)
+
+	if err := s.prep.Delete(ctx, tripID, c.Param("taskId")); err != nil {
+		return request.Internal(c, "ลบไม่สำเร็จ")
+	}
+	s.track(c, tripID, "", events.TypePrepChanged, "prep", c.Param("taskId"))
+	return c.NoContent(http.StatusNoContent)
+}
+
+// handleApplyPrepTemplate seeds the country template, skipping anything already
+// on the list — pressing it twice is harmless.
+func (s *Server) handleApplyPrepTemplate(c echo.Context) error {
+	ctx := c.Request().Context()
+	tripID := request.TripID(c)
+
+	tasks := make([]models.PrepTask, 0, len(japanTemplate))
+	for i, row := range japanTemplate {
+		tasks = append(tasks, models.PrepTask{
+			TripID:       tripID,
+			Title:        row.title,
+			Category:     row.category,
+			FromTemplate: true,
+			SortOrder:    i,
+		})
+	}
+
+	if err := s.prep.CreateMany(ctx, tasks); err != nil {
+		return request.Internal(c, "ดึงเช็กลิสต์ไม่สำเร็จ")
+	}
+
+	s.track(c, tripID, "ดึงเช็กลิสต์เตรียมตัวมาใช้", events.TypePrepChanged, "prep", tripID)
+	return s.handleListPrep(c)
+}
+
+/* ------------------------------------------------------------------ note -- */
+
+func (s *Server) handleGetPrepNote(c echo.Context) error {
+	note, err := s.prep.GetNote(c.Request().Context(), request.TripID(c))
+	if err != nil {
+		// No note yet is the normal case, not an error.
+		return c.JSON(http.StatusOK, map[string]string{"body": ""})
+	}
+	return c.JSON(http.StatusOK, map[string]string{"body": note.Body})
+}
+
+type prepNoteRequest struct {
+	Body string `json:"body"`
+}
+
+func (s *Server) handleSavePrepNote(c echo.Context) error {
+	var req prepNoteRequest
 	if err := request.BindAndValidate(c, &req); err != nil {
 		return err
 	}
@@ -112,146 +202,15 @@ func (s *Server) handleUpdatePrep(c echo.Context) error {
 	ctx := c.Request().Context()
 	tripID := request.TripID(c)
 
-	block, err := s.preps.Get(ctx, tripID, c.Param("blockId"))
-	if err != nil {
-		return request.NotFound(c, "ไม่พบรายการ")
+	note := &models.PrepNote{TripID: tripID, Body: req.Body, Author: request.UserID(c)}
+	if existing, err := s.prep.GetNote(ctx, tripID); err == nil {
+		note.ID = existing.ID
 	}
 
-	// Only an editor may rewrite the text of a block; anyone may tick a box.
-	isEditor := models.TripRoleRank[request.TripRole(c)] >= models.TripRoleRank[models.TripRoleEditor]
-	if (req.Title != nil || req.ContentMD != nil) && !isEditor {
-		return request.Forbidden(c, "แก้ไขเนื้อหาได้เฉพาะสมาชิกที่แก้ไขได้")
+	if err := s.prep.SaveNote(ctx, note); err != nil {
+		return request.Internal(c, "บันทึกโน้ตไม่สำเร็จ")
 	}
 
-	if req.Title != nil {
-		block.Title = *req.Title
-	}
-	if req.ContentMD != nil {
-		block.ContentMD = *req.ContentMD
-	}
-	if req.Checklist != nil {
-		entries := stampDoneBy(*req.Checklist, request.UserID(c))
-		if raw, err := json.Marshal(entries); err == nil {
-			block.Checklist = datatypes.JSON(raw)
-		}
-	}
-
-	if err := s.preps.Update(ctx, block); err != nil {
-		return request.Internal(c, "บันทึกไม่สำเร็จ")
-	}
-
-	s.emit(c, tripID, emitOpts{
-		Action:     models.ActionPrepUpdated,
-		EventType:  events.TypePrepUpdated,
-		TargetType: "prep", TargetID: block.ID,
-	})
-	return request.OK(c, block)
-}
-
-// stampDoneBy records who ticked each newly-completed entry and clears the name
-// when it is un-ticked.
-func stampDoneBy(entries []models.ChecklistEntry, userID string) []models.ChecklistEntry {
-	out := make([]models.ChecklistEntry, 0, len(entries))
-	for _, e := range entries {
-		if e.Done && e.DoneBy == "" {
-			e.DoneBy = userID
-		}
-		if !e.Done {
-			e.DoneBy = ""
-		}
-		out = append(out, e)
-	}
-	return out
-}
-
-func (s *Server) handleDeletePrep(c echo.Context) error {
-	tripID := request.TripID(c)
-	if err := s.preps.Delete(c.Request().Context(), tripID, c.Param("blockId")); err != nil {
-		return request.Internal(c, "ลบไม่สำเร็จ")
-	}
-	return request.NoContent(c)
-}
-
-func (s *Server) handleRegeneratePrep(c echo.Context) error {
-	blocks, err := s.regeneratePrep(c, request.TripID(c))
-	if err != nil {
-		return request.Internal(c, "สร้างข้อมูลเตรียมตัวไม่สำเร็จ")
-	}
-	return request.OK(c, map[string]any{"items": blocks})
-}
-
-// regeneratePrep rebuilds only the system blocks; custom blocks written by
-// members survive (A8.3).
-func (s *Server) regeneratePrep(c echo.Context, tripID string) ([]models.PrepBlock, error) {
-	ctx := c.Request().Context()
-
-	trip, err := s.trips.GetByID(ctx, tripID)
-	if err != nil {
-		return nil, err
-	}
-	profiles, _ := s.profiles.ListByTrip(ctx, tripID)
-
-	generated, err := s.prep.Generate(ctx, trip, profiles, s.planTags(c, tripID))
-	if err != nil {
-		return nil, err
-	}
-	if err := s.preps.ReplaceGenerated(ctx, tripID, generated); err != nil {
-		return nil, err
-	}
-
-	s.emit(c, tripID, emitOpts{
-		Action:     models.ActionPrepUpdated,
-		EventType:  events.TypePrepUpdated,
-		TargetType: "prep", TargetID: tripID,
-	})
-	return s.preps.ListByTrip(ctx, tripID)
-}
-
-// planTags collects the POI tags in the active plan, which is how the packing
-// list knows the group is going to an onsen or a theme park.
-func (s *Server) planTags(c echo.Context, tripID string) []string {
-	ctx := c.Request().Context()
-
-	plan, err := s.activePlan(ctx, tripID)
-	if err != nil {
-		return nil
-	}
-	items, err := s.plans.Items(ctx, plan.ID)
-	if err != nil {
-		return nil
-	}
-
-	ids := []string{}
-	for _, it := range items {
-		if it.POIID != nil {
-			ids = append(ids, *it.POIID)
-		}
-	}
-	pois, err := s.pois.ListByIDs(ctx, ids)
-	if err != nil {
-		return nil
-	}
-
-	seen := map[string]bool{}
-	out := []string{}
-	for _, p := range pois {
-		var tags []string
-		if len(p.Tags) > 0 {
-			_ = json.Unmarshal(p.Tags, &tags)
-		}
-		for _, t := range tags {
-			if !seen[t] {
-				seen[t] = true
-				out = append(out, t)
-			}
-		}
-	}
-	return out
-}
-
-func orEmptyChecklist(s []models.ChecklistEntry) []models.ChecklistEntry {
-	if s == nil {
-		return []models.ChecklistEntry{}
-	}
-	return s
+	s.track(c, tripID, "", events.TypePrepChanged, "prep", tripID)
+	return c.JSON(http.StatusOK, map[string]string{"body": note.Body})
 }

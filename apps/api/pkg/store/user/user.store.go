@@ -52,29 +52,22 @@ func (s *store) Update(ctx context.Context, u *models.User) error {
 	return s.db.WithContext(ctx).Save(u).Error
 }
 
+// ListByIDs hydrates a member list in one query instead of N.
+func (s *store) ListByIDs(ctx context.Context, ids []string) ([]models.User, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var users []models.User
+	err := s.db.WithContext(ctx).Where("id IN ?", ids).Find(&users).Error
+	return users, err
+}
+
 func (s *store) GetByHandle(ctx context.Context, handle string) (*models.User, error) {
 	var u models.User
 	if err := s.db.WithContext(ctx).Where("handle = ?", handle).First(&u).Error; err != nil {
 		return nil, err
 	}
 	return &u, nil
-}
-
-// ListByIDs keeps member lists and activity feeds to two queries instead of N+1.
-func (s *store) ListByIDs(ctx context.Context, ids []string) ([]models.User, error) {
-	if len(ids) == 0 {
-		return nil, nil
-	}
-	var us []models.User
-	err := s.db.WithContext(ctx).Where("id IN ?", ids).Find(&us).Error
-	return us, err
-}
-
-func (s *store) SetCharacter(ctx context.Context, userID string, characterID int16) error {
-	return s.db.WithContext(ctx).
-		Model(&models.User{}).
-		Where("id = ?", userID).
-		Update("character_id", characterID).Error
 }
 
 func (s *store) Count(ctx context.Context) (int64, error) {

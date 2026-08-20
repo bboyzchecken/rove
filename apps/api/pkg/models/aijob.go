@@ -7,53 +7,69 @@ import (
 	"gorm.io/datatypes"
 )
 
-// AI job kinds.
+// AI job kinds and statuses (DEV_SPEC M4 — A4.9).
 const (
-	JobGenerate    = "generate"
-	JobRefine      = "refine"
-	JobExplain     = "explain"
-	JobNormalize   = "normalize"
-	JobParseTicket = "parse_ticket"
-	JobExport      = "export"
+	AIKindDraft       = "draft"
+	AIKindRefine      = "refine"
+	AIKindRebalance   = "rebalance"
+	AIKindDestination = "suggest_destination"
+	AIKindTicket      = "parse_ticket"
+	AIKindNormalize   = "normalize_wishlist"
 )
 
-// AI job status.
 const (
-	JobQueued  = "queued"
-	JobRunning = "running"
-	JobDone    = "done"
-	JobError   = "error"
+	AIQueued  = "queued"
+	AIRunning = "running"
+	AIDone    = "done"
+	AIFailed  = "failed"
 )
 
-// AIJob is both the queue record and the audit trail: every model call writes
-// its tokens and USD cost here, which is what the daily cost cap reads (A4.11).
+// AIJob is one run of the planner. Drafting takes tens of seconds, so it is a
+// job with progress rather than a request that blocks — the browser subscribes
+// to it over SSE.
 type AIJob struct {
 	Base
-	TripID     string         `gorm:"type:char(36);index" json:"trip_id"`
-	PlanID     *string        `gorm:"type:char(36)" json:"plan_id"`
-	UserID     string         `gorm:"type:char(36)" json:"user_id"`
-	Kind       string         `gorm:"type:varchar(20);not null" json:"kind"`
-	Status     string         `gorm:"type:varchar(20);not null;default:'queued'" json:"status"`
-	Step       string         `gorm:"type:varchar(40)" json:"step"`
+	TripID     string         `gorm:"type:char(36);not null;index" json:"trip_id"`
+	UserID     string         `gorm:"type:char(36);not null" json:"user_id"`
+	Kind       string         `gorm:"type:varchar(24);not null;default:'draft'" json:"kind"`
+	Status     string         `gorm:"type:varchar(10);not null;default:'queued'" json:"status"`
+	Progress   float64        `gorm:"type:decimal(4,3);not null;default:0" json:"progress"`
+	Step       string         `gorm:"type:varchar(120)" json:"step"`
 	Input      datatypes.JSON `gorm:"type:json" json:"input"`
-	Output     datatypes.JSON `gorm:"type:json" json:"output"`
-	Error      string         `gorm:"type:text" json:"error"`
-	TokensIn   int            `gorm:"not null;default:0" json:"tokens_in"`
-	TokensOut  int            `gorm:"not null;default:0" json:"tokens_out"`
-	CostUSD    float64        `gorm:"type:decimal(10,4);not null;default:0" json:"cost_usd"`
-	FinishedAt *time.Time     `json:"finished_at"`
+	Result     datatypes.JSON `gorm:"type:json" json:"result"`
+	Error      string         `gorm:"type:varchar(500)" json:"error"`
+	// Cost accounting for the daily cap (A4.11).
+	InputTokens  int     `gorm:"not null;default:0" json:"input_tokens"`
+	OutputTokens int     `gorm:"not null;default:0" json:"output_tokens"`
+	CostUSD      float64 `gorm:"type:decimal(10,5);not null;default:0" json:"cost_usd"`
+	Simulated    bool    `gorm:"not null;default:false" json:"simulated"`
+	FinishedAt   *time.Time `json:"finished_at"`
 }
 
 func (AIJob) TableName() string { return "ai_jobs" }
 
+// DefaultIncludedDrafts is what every trip gets for free (§16).
+const DefaultIncludedDrafts = 2
+
+// AICredit is the per-trip draft meter (§16). `included` is granted on trip
+// creation; `extra` is bought or paid for with points.
+type AICredit struct {
+	TripID   string `gorm:"type:char(36);primaryKey" json:"trip_id"`
+	Included int    `gorm:"not null;default:2" json:"included"`
+	Extra    int    `gorm:"not null;default:0" json:"extra"`
+	Used     int    `gorm:"not null;default:0" json:"used"`
+}
+
+func (AICredit) TableName() string { return "ai_credits" }
+
 type AIJobStore interface {
 	Create(ctx context.Context, j *AIJob) error
-	Get(ctx context.Context, id string) (*AIJob, error)
+	Get(ctx context.Context, tripID, jobID string) (*AIJob, error)
 	Update(ctx context.Context, j *AIJob) error
-	SetStep(ctx context.Context, id, step string) error
-	Fail(ctx context.Context, id, message string) error
-	// CostSince backs the per-trip daily cost cap.
-	CostSince(ctx context.Context, tripID string, since time.Time) (float64, error)
-	CountSince(ctx context.Context, tripID string, since time.Time) (int64, error)
-	TotalCostSince(ctx context.Context, since time.Time) (float64, error)
+	ListByTrip(ctx context.Context, tripID string, limit int) ([]AIJob, error)
+	// CostSince powers the daily cap.
+	CostSince(ctx context.Context, since time.Time) (float64, error)
+
+	Credits(ctx context.Context, tripID string) (*AICredit, error)
+	SaveCredits(ctx context.Context, c *AICredit) error
 }

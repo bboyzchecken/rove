@@ -5,17 +5,6 @@
 > **BRAND (§15) ✅ ใส่แล้ว** — อ่าน §15 ก่อนแตะ UI ทุกครั้ง
 > Backend ยึดตาม `PROJECT_TEMPLATE.md` (Go + Echo + GORM + Uber FX + MySQL) — ห้ามเปลี่ยน pattern โดยไม่บันทึกใน Decision Log
 
-> **สถานะ (2026-08-20): Phase 0 + Phase 1 เขียนโค้ดครบแล้ว — ติ๊ก 133/145**
->
-> ที่เหลืออีก 12 ข้อไม่ใช่โค้ดที่ยังไม่ได้เขียน แต่เป็นสิ่งที่ต้องมีบัญชี เซิร์ฟเวอร์
-> หรือ API ที่เสียเงินก่อน (Lightsail instance, Vercel, Google Maps billing,
-> สมัคร affiliate, AI eval, closed beta) — แต่ละข้อมีโน้ตกำกับไว้ใน §9/§10 ว่าติดอะไร
->
-> - `go test ./...` และ `pnpm test` ผ่านทั้งหมด · `pnpm build` ผ่าน 22 routes
-> - `pkg/domain` (logic เรื่องเงิน/coverage/validate) coverage 92.6%
-> - เทสต์ cross-trip access ครอบทุกกลุ่ม endpoint ใน §5 แล้ว (X.3) — เจอบั๊กจริง 2 ตัวและแก้แล้ว
-> - การตัดสินใจตอนสร้าง Phase 1 อยู่ใน §16 และ `docs/adr/0003`
-
 ---
 
 ## 0. วิธีใช้ไฟล์นี้กับ Claude Code
@@ -262,7 +251,7 @@ index: `(country, city, area)`, FULLTEXT `(name_th, name_en, name_ja)`
 **expense_entries** *(actual spending — แยกจาก Budget estimate)* — `id, trip_id, day_id(null), paid_by_user_id, title, amount DECIMAL(12,2), currency, category('food'|'stay'|'transport'|'ticket'|'shopping'|'other'), split_type('shared'|'personal'), participants_json JSON (user_ids ที่หาร — ใช้เมื่อ shared), fx_rate_snapshot DECIMAL(10,4), note, created_at`
 index: `(trip_id, day_id)`, `(trip_id, paid_by_user_id)`
 
-> `split_type='shared'` → คิดแบบ "ขุนทอง" หารตาม participants_json
+> `split_type='shared'` → **"น้องหาร"** (ชื่อฟีเจอร์หารบิลของ ROVE) หารตาม participants_json
 > `split_type='personal'` → ค่าใช้จ่ายส่วนตัวของ paid_by_user_id เท่านั้น
 > FX rate ใช้ snapshot ณ วันที่บันทึก (cache รายวันจาก API) — แสดง label "อัตราโดยประมาณ"
 
@@ -638,40 +627,35 @@ Lightsail Ubuntu 2 vCPU / 2 GB / 60 GB SSD  ($12/mo)  + static IP (ฟรีเ�
 ## 9. Phase 0 — Setup & Validate
 
 ### API (`rove-api`)
-- [x] A0.1 init repo ตาม template: main.go + FX + Echo + GORM + Viper + Logrus + validator
-- [x] A0.2 `docker-compose.yml` (mysql 8 + redis) สำหรับ local, `.env.example` ครบ §6.1
-- [x] A0.3 gormigrate migration แรก: users, user_points, trips, trip_members, pois, characters (AutoMigrate)
-- [x] A0.4 Auth: JWT HS256 + `JwtMiddleware` + `OptionalJwt` + `IsAdmin` + `TripRoleMiddleware`
-- [x] A0.5 OAuth LINE Login + Google → สร้าง/ผูก user → ออก JWT
-  > โค้ดครบทั้งสองฝั่ง (แลก code, ผูกบัญชีเดิมด้วยอีเมลที่ยืนยันแล้ว, state cookie กัน CSRF) — ยังไม่ได้ทดสอบกับ credential จริง ต้องใส่ `LINE_LOGIN_CHANNEL_ID` / `GOOGLE_OAUTH_CLIENT_ID` แล้วลองล็อกอินหนึ่งรอบ
-- [x] A0.6 `pkg/store/store.go` pagination + `pkg/utils/*` ตาม template
-- [x] A0.7 Redis client + rate limit middleware + cache helper (รวม FX cache helper)
-- [x] A0.8 `/healthz`, `/readyz`, request logger, CORS (allow WebBaseURL), Recover, Secure
-- [x] A0.9 Dockerfile multi-stage + GitHub Actions (test/build/push GHCR)
+- [ ] A0.1 init repo ตาม template: main.go + FX + Echo + GORM + Viper + Logrus + validator
+- [ ] A0.2 `docker-compose.yml` (mysql 8 + redis) สำหรับ local, `.env.example` ครบ §6.1
+- [ ] A0.3 gormigrate migration แรก: users, user_points, trips, trip_members, pois, characters (AutoMigrate)
+- [ ] A0.4 Auth: JWT HS256 + `JwtMiddleware` + `OptionalJwt` + `IsAdmin` + `TripRoleMiddleware`
+- [ ] A0.5 OAuth LINE Login + Google → สร้าง/ผูก user → ออก JWT
+- [ ] A0.6 `pkg/store/store.go` pagination + `pkg/utils/*` ตาม template
+- [ ] A0.7 Redis client + rate limit middleware + cache helper (รวม FX cache helper)
+- [ ] A0.8 `/healthz`, `/readyz`, request logger, CORS (allow WebBaseURL), Recover, Secure
+- [ ] A0.9 Dockerfile multi-stage + GitHub Actions (test/build/push GHCR)
 - [ ] A0.10 `deploy/` (compose.prod, Caddyfile, deploy.sh) + สร้าง Lightsail instance + domain + TLS ผ่านจริง
-  > สคริปต์และ compose.prod พร้อมแล้วใน `deploy/` — ที่ยังขาดคือการสร้าง Lightsail instance จริง จด domain และให้ TLS ผ่าน ซึ่งต้องมีบัญชี AWS และโดเมนก่อน
 
 ### Web (`rove-web`)
-- [x] W0.1 `pnpm create next-app@latest` (App Router, TS strict) + บันทึกเวอร์ชันใน Decision Log
-- [x] W0.2 Tailwind + shadcn/ui + lucide + `styles/brand.css` โดยใช้ค่า token จาก §15 ทันที (ไม่ใช้ placeholder)
-- [x] W0.3 TanStack Query provider + devtools + default options §7.1
-- [x] W0.4 `lib/api-client.ts` (fetch wrapper: base url, auth, error → typed) + `features/` skeleton
-- [x] W0.5 Auth flow: LINE/Google button → callback route → set httpOnly cookie → `useMe()`
-- [x] W0.6 Zustand store สำหรับ UI state + next-intl + PostHog + flags
+- [ ] W0.1 `pnpm create next-app@latest` (App Router, TS strict) + บันทึกเวอร์ชันใน Decision Log
+- [ ] W0.2 Tailwind + shadcn/ui + lucide + `styles/brand.css` โดยใช้ค่า token จาก §15 ทันที (ไม่ใช้ placeholder)
+- [ ] W0.3 TanStack Query provider + devtools + default options §7.1
+- [ ] W0.4 `lib/api-client.ts` (fetch wrapper: base url, auth, error → typed) + `features/` skeleton
+- [ ] W0.5 Auth flow: LINE/Google button → callback route → set httpOnly cookie → `useMe()`
+- [ ] W0.6 Zustand store สำหรับ UI state + next-intl + PostHog + flags
 - [ ] W0.7 Vercel (หรือ container) deploy preview ต่อ PR
-  > ต้องเชื่อม repo กับ Vercel (หรือเปิด GitHub Environment) ก่อน ทำจากในโค้ดอย่างเดียวไม่ได้
 
 ### Data / Ops
-- [x] D0.1 zone codes ญี่ปุ่นใน `pkg/domain/zones.go` (tokyo_east/west/bay, yokohama, kamakura, fuji, kawagoe, …)
-- [x] D0.2 `data/poi/jp.csv` + validator + import command (`go run main.go seed:poi`)
-- [x] D0.3 seed POI ≥ 300 จุด (Disney, DisneySea, Tsukiji, Sensoji, Skytree, Ueno NM, Ameyoko, Akihabara, Kawagoe, Ikebukuro, Shinjuku, TeamLab Planets, Tokyo Tower, Takeshita, Shibuya Sky, Roppongi, Kamakura crossing, Enoshima, Cup Noodles, Red Brick, Chureito, Oishi Park, Oshino Hakkai ฯลฯ)
+- [ ] D0.1 zone codes ญี่ปุ่นใน `pkg/domain/zones.go` (tokyo_east/west/bay, yokohama, kamakura, fuji, kawagoe, …)
+- [ ] D0.2 `data/poi/jp.csv` + validator + import command (`go run main.go seed:poi`)
+- [ ] D0.3 seed POI ≥ 300 จุด (Disney, DisneySea, Tsukiji, Sensoji, Skytree, Ueno NM, Ameyoko, Akihabara, Kawagoe, Ikebukuro, Shinjuku, TeamLab Planets, Tokyo Tower, Takeshita, Shibuya Sky, Roppongi, Kamakura crossing, Enoshima, Cup Noodles, Red Brick, Chureito, Oishi Park, Oshino Hakkai ฯลฯ)
 - [ ] D0.4 enrich จาก Google Places (place_id, lat/lng, open_hours) + cache
-  > `pkg/services/places` + `Tools.ResolveFromURL` พร้อมแล้ว (ใช้ตอนวางลิงก์ Google Maps) แต่ยังไม่มีคำสั่ง batch enrich ทั้ง catalogue — และต้องมี `GOOGLE_MAPS_SERVER_KEY` ที่เปิด billing ก่อน
-- [x] D0.5 `data/templates/` 3 แพลนต้นแบบ (Tokyo Base, Yokohama Base, +1)
+- [ ] D0.5 `data/templates/` 3 แพลนต้นแบบ (Tokyo Base, Yokohama Base, +1)
 - [ ] D0.6 สมัคร affiliate (Agoda, Booking, Klook, KKday, Rentalcars, Airalo) + seed `affiliate_partners`
-  > seed `affiliate_partners` ครบ 6 รายแล้ว (`go run . seed partners`) พร้อม deeplink template — ที่เหลือคือสมัครกับแต่ละพาร์ทเนอร์เพื่อเอา affiliate id มาใส่ `.env`
-- [x] D0.7 **seed characters:** `data/characters.json` 20 ตัว (สัตว์น่ารัก/ตัวละคร ชื่อ + emoji + image_url placeholder) + `go run main.go seed:characters`
-- [x] D0.8 ADR แรก: stack, id strategy, deploy target
+- [ ] D0.7 **seed characters:** `data/characters.json` 20 ตัว (สัตว์น่ารัก/ตัวละคร ชื่อ + emoji + image_url placeholder) + `go run main.go seed:characters`
+- [ ] D0.8 ADR แรก: stack, id strategy, deploy target
 
 ---
 
@@ -680,164 +664,156 @@ Lightsail Ubuntu 2 vCPU / 2 GB / 60 GB SSD  ($12/mo)  + static IP (ฟรีเ�
 **DoD:** กลุ่ม 4 คนสร้างทริปญี่ปุ่น ใส่ wishlist ทุกคน กด AI ร่างแพลน แก้ timeline ร่วมกัน เห็น **Budget ประมาณการ** และ **Expense จริงแบบ Shared/Personal** export/แชร์ลิงก์ กดปุ่มจองแล้ว track ได้ — ผู้ใช้มี character ประจำตัว มี dream list ส่วนตัว เห็น stats รวม — ทำงานจริงบน Lightsail
 
 ### M1 Entry Points
-- [x] A1.1 `POST /trips` รองรับ entry_type ('date'|'city'|'ticket'|'clone')
-- [x] A1.2 `POST /ai/parse-ticket` → flights + suggested frame
-- [x] W1.1 Landing 3 การ์ด (เริ่มจากวัน / เมือง / วางข้อความตั๋ว)
-- [x] W1.2 Flow วัน: date range → เมือง (optional) → party size → create → redirect
-- [x] W1.3 Flow เมือง: chips เมือง → แนะนำจำนวนวัน → วัน → create
-- [x] W1.4 Flow ตั๋ว: textarea → preview flights → confirm → create
-- [x] W1.5 Onboarding checklist ใน Overview (ชวนเพื่อน / ใส่ wishlist / กด AI)
+- [ ] A1.1 `POST /trips` รองรับ entry_type ('date'|'city'|'ticket'|'clone')
+- [ ] A1.2 `POST /ai/parse-ticket` → flights + suggested frame
+- [ ] W1.1 Landing 3 การ์ด (เริ่มจากวัน / เมือง / วางข้อความตั๋ว)
+- [ ] W1.2 Flow วัน: date range → เมือง (optional) → party size → create → redirect
+- [ ] W1.3 Flow เมือง: chips เมือง → แนะนำจำนวนวัน → วัน → create
+- [ ] W1.4 Flow ตั๋ว: textarea → preview flights → confirm → create
+- [ ] W1.5 Onboarding checklist ใน Overview (ชวนเพื่อน / ใส่ wishlist / กด AI)
 - [ ] X1.1 e2e: ทุก entry ได้ทริปใน ≤ 3 หน้าจอ
-  > เขียนไว้แล้วใน `apps/web/e2e/entry.spec.ts` — ต้องรันกับ stack ที่ boot จริง (`docker compose up`) ยังไม่ได้รันในสภาพแวดล้อมนี้
 
 ### M2 Trip Room
-- [x] A2.1 trip CRUD + flights + overview payload (counts, flags)
-- [x] A2.2 invites: create/accept, role guard ครบทุก endpoint
-- [x] A2.3 members list/patch/remove
-- [x] A2.4 activity_logs + `GET /activity` (cursor)
-- [x] A2.5 SSE hub (redis pubsub) + `GET /events` + emit helper ในทุก mutation
-- [x] W2.1 Layout `/t/[tripId]` + tabs + mobile bottom nav (Overview|Wishlist|Plan|Budget|Expense|Prep|Bookings|Discussion)
-- [x] W2.2 Overview: Trip Frame card, members (character avatar), สถานะ, quick actions
-- [x] W2.3 Inline edit frame (optimistic)
-- [x] W2.4 Invite dialog + `/invite/[token]`
-- [x] W2.5 Activity feed (infinite query)
-- [x] W2.6 `useTripEvents` hook → invalidate ตาม event type
-- [x] W2.7 Empty/loading/error states ทุก tab
+- [ ] A2.1 trip CRUD + flights + overview payload (counts, flags)
+- [ ] A2.2 invites: create/accept, role guard ครบทุก endpoint
+- [ ] A2.3 members list/patch/remove
+- [ ] A2.4 activity_logs + `GET /activity` (cursor)
+- [ ] A2.5 SSE hub (redis pubsub) + `GET /events` + emit helper ในทุก mutation
+- [ ] W2.1 Layout `/t/[tripId]` + tabs + mobile bottom nav (Overview|Wishlist|Plan|Budget|Expense|Prep|Bookings|Discussion)
+- [ ] W2.2 Overview: Trip Frame card, members (character avatar), สถานะ, quick actions
+- [ ] W2.3 Inline edit frame (optimistic)
+- [ ] W2.4 Invite dialog + `/invite/[token]`
+- [ ] W2.5 Activity feed (infinite query)
+- [ ] W2.6 `useTripEvents` hook → invalidate ตาม event type
+- [ ] W2.7 Empty/loading/error states ทุก tab
 
 ### M3 Wishlist & Coverage
-- [x] A3.1 member_profiles GET/PUT
-- [x] A3.2 wishlist CRUD (เขียนได้เฉพาะของตัวเอง ยกเว้น owner)
-- [x] A3.3 AI normalize wishlist (job) → tags + poi_id
-- [x] A3.4 `pkg/domain/coverage.go` + unit tests + `GET /coverage`
-- [x] A3.5 recompute coverage หลัง items เปลี่ยน (hook ใน service layer)
-- [x] W3.1 Profile form
-- [x] W3.2 Wishlist editor (must/nice/avoid, tags, reorder, delete)
-- [x] W3.3 Coverage Board (✅/⚠️/❌ + note + ลิงก์ไป item)
-- [x] W3.4 แสดง "ใครยังไม่ใส่ wishlist" ใน Overview
+- [ ] A3.1 member_profiles GET/PUT
+- [ ] A3.2 wishlist CRUD (เขียนได้เฉพาะของตัวเอง ยกเว้น owner)
+- [ ] A3.3 AI normalize wishlist (job) → tags + poi_id
+- [ ] A3.4 `pkg/domain/coverage.go` + unit tests + `GET /coverage`
+- [ ] A3.5 recompute coverage หลัง items เปลี่ยน (hook ใน service layer)
+- [ ] W3.1 Profile form
+- [ ] W3.2 Wishlist editor (must/nice/avoid, tags, reorder, delete)
+- [ ] W3.3 Coverage Board (✅/⚠️/❌ + note + ลิงก์ไป item)
+- [ ] W3.4 แสดง "ใครยังไม่ใส่ wishlist" ใน Overview
 
 ### M4 AI Planner
-- [x] A4.1 `services/ai` skeleton: client, schemas, prompts, token accounting
-- [x] A4.2 tools: lookup_poi, get_poi, distance (Google + redis cache), weather, fx
-- [x] A4.3 buildFrame (anchors: flights, prepaid stay, dated must-do, zones)
-- [x] A4.4 generatePlan → PlanDraft (1 variant)
-- [x] A4.5 `pkg/domain/validate.go` (closed day, นอกเวลาเปิด, วันยาวเกิน, travel ไม่สมจริง, must-do หาย, POI ซ้ำ) + tests
-- [x] A4.6 repairPlan (≤2 loops)
-- [x] A4.7 explainPlan → rationales + open_questions
-- [x] A4.8 persistPlan ใน transaction + item_versions
-- [x] A4.9 ai_jobs + redis queue + worker pool + SSE progress
-- [x] A4.10 refinePlan → ItemDiff[] + `apply-diff`
-- [x] A4.11 rate limit + cost cap ต่อ trip/วัน
+- [ ] A4.1 `services/ai` skeleton: client, schemas, prompts, token accounting
+- [ ] A4.2 tools: lookup_poi, get_poi, distance (Google + redis cache), weather, fx
+- [ ] A4.3 buildFrame (anchors: flights, prepaid stay, dated must-do, zones)
+- [ ] A4.4 generatePlan → PlanDraft (1 variant)
+- [ ] A4.5 `pkg/domain/validate.go` (closed day, นอกเวลาเปิด, วันยาวเกิน, travel ไม่สมจริง, must-do หาย, POI ซ้ำ) + tests
+- [ ] A4.6 repairPlan (≤2 loops)
+- [ ] A4.7 explainPlan → rationales + open_questions
+- [ ] A4.8 persistPlan ใน transaction + item_versions
+- [ ] A4.9 ai_jobs + redis queue + worker pool + SSE progress
+- [ ] A4.10 refinePlan → ItemDiff[] + `apply-diff`
+- [ ] A4.11 rate limit + cost cap ต่อ trip/วัน
 - [ ] A4.12 eval set 5 ทริป (`services/ai/evals`) วัด schema pass / coverage% / issues / latency
-  > ต้องเรียก Anthropic API จริงทุกครั้งที่รัน ซึ่งมีค่าใช้จ่าย — ควรทำหลังตั้ง `ANTHROPIC_API_KEY` และตกลงงบ eval แล้ว
-- [x] W4.1 ปุ่ม "ให้ AI ร่างแพลน" + progress steps (จาก SSE)
-- [x] W4.2 Rationale panel + Open questions (ตอบ → ส่ง refine)
-- [x] W4.3 Refine chat + **Diff preview UI** (accept ทั้งหมด/รายรายการ)
+- [ ] W4.1 ปุ่ม "ให้ AI ร่างแพลน" + progress steps (จาก SSE)
+- [ ] W4.2 Rationale panel + Open questions (ตอบ → ส่ง refine)
+- [ ] W4.3 Refine chat + **Diff preview UI** (accept ทั้งหมด/รายรายการ)
 
 ### M5 Itinerary Editor
-- [x] A5.1 day/item CRUD + move (คำนวณ sort_order) + undo จาก item_versions
-- [x] A5.2 `GET /plans/:id` payload เดียวจบ (days+items+rationales+warnings)
-- [x] A5.3 `POST /pois/resolve` (google maps url / place_id / text)
-- [x] W5.1 Plan tab: day tabs + timeline card (เวลา, ชื่อ, POI badge, cost, booking, verified)
-- [x] W5.2 Add item: search POI (debounced) / paste maps url / free text
-- [x] W5.3 Edit item sheet (ครบทุกฟิลด์ §4.2)
-- [x] W5.4 dnd-kit reorder + ข้ามวัน + optimistic + rollback
-- [x] W5.5 Delete + undo
-- [x] W5.6 List view (print-friendly)
-- [x] W5.7 Version snapshot + ดูประวัติ
-- [x] W5.8 Warning badge จาก `/validate`
+- [ ] A5.1 day/item CRUD + move (คำนวณ sort_order) + undo จาก item_versions
+- [ ] A5.2 `GET /plans/:id` payload เดียวจบ (days+items+rationales+warnings)
+- [ ] A5.3 `POST /pois/resolve` (google maps url / place_id / text)
+- [ ] W5.1 Plan tab: day tabs + timeline card (เวลา, ชื่อ, POI badge, cost, booking, verified)
+- [ ] W5.2 Add item: search POI (debounced) / paste maps url / free text
+- [ ] W5.3 Edit item sheet (ครบทุกฟิลด์ §4.2)
+- [ ] W5.4 dnd-kit reorder + ข้ามวัน + optimistic + rollback
+- [ ] W5.5 Delete + undo
+- [ ] W5.6 List view (print-friendly)
+- [ ] W5.7 Version snapshot + ดูประวัติ
+- [ ] W5.8 Warning badge จาก `/validate`
 - [ ] X5.1 ทดสอบ dnd บนมือถือจริง (iOS Safari + Android Chrome)
-  > ตั้ง Playwright project `ios` / `android` ไว้แล้ว — ต้องมี fixture ที่ seed ทริปพร้อมแพลนก่อน แล้วรันบนเครื่องจริงอีกรอบ
 
 ### M7 Budget (ประมาณการจาก plan items)
-- [x] A7.1 `pkg/domain/budget.go` (category rollup, per_person/group/night, prepaid แยก, FX) + tests
-- [x] A7.2 `GET /plans/:id/budget` + FX service (cache รายวันจาก API) + override manual
-- [x] W7.1 Budget tab: ตาราง category × (JPY, THB, ต่อคน) + total + prepaid + เทียบงบที่ตั้งไว้ + label "ประมาณการ"
-- [x] W7.2 Highlight item ที่ยังไม่มี cost
-- [x] W7.3 Budget ส่วนตัว (per_person) + tooltip อัตราแลกเปลี่ยนโดยประมาณ ณ วันที่
+- [ ] A7.1 `pkg/domain/budget.go` (category rollup, per_person/group/night, prepaid แยก, FX) + tests
+- [ ] A7.2 `GET /plans/:id/budget` + FX service (cache รายวันจาก API) + override manual
+- [ ] W7.1 Budget tab: ตาราง category × (JPY, THB, ต่อคน) + total + prepaid + เทียบงบที่ตั้งไว้ + label "ประมาณการ"
+- [ ] W7.2 Highlight item ที่ยังไม่มี cost
+- [ ] W7.3 Budget ส่วนตัว (per_person) + tooltip อัตราแลกเปลี่ยนโดยประมาณ ณ วันที่
 
 ### M8 Prep
-- [x] A8.1 weather service (Open-Meteo) + cache → prep block
-- [x] A8.2 packing generator (rule จาก temp band + tags) + AI เสริมข้อความ
-- [x] A8.3 docs checklist default (passport, Visit Japan Web, insurance, eSIM, IDP ถ้ามีรถ)
-- [x] W8.1 Prep tab + checklist ติ๊กร่วมกัน (optimistic + SSE)
-- [x] W8.2 Custom block (markdown)
+- [ ] A8.1 weather service (Open-Meteo) + cache → prep block
+- [ ] A8.2 packing generator (rule จาก temp band + tags) + AI เสริมข้อความ
+- [ ] A8.3 docs checklist default (passport, Visit Japan Web, insurance, eSIM, IDP ถ้ามีรถ)
+- [ ] W8.1 Prep tab + checklist ติ๊กร่วมกัน (optimistic + SSE)
+- [ ] W8.2 Custom block (markdown)
 
 ### M9 Collaboration
-- [x] A9.1 comments CRUD (thread 1 ชั้น) + emit SSE
-- [x] W9.1 Comment thread บน item/day/plan + Discussion tab
-- [x] W9.2 Viewer mode + ปุ่ม "เข้าร่วมทริป"
+- [ ] A9.1 comments CRUD (thread 1 ชั้น) + emit SSE
+- [ ] W9.1 Comment thread บน item/day/plan + Discussion tab
+- [ ] W9.2 Viewer mode + ปุ่ม "เข้าร่วมทริป"
 
 ### M10 Share & Export
-- [x] A10.1 visibility private/link + share_token + `GET /public/plans/:token` (ซ่อน expense payload เสมอ)
-- [x] A10.2 export job: render HTML (Go template self-contained) → R2 → signed url
-- [x] A10.3 export PDF (chromedp/gotenberg) — บันทึกทางเลือกที่เลือกใน Decision Log
-- [x] W10.1 Share dialog + copy link
-- [x] W10.2 `/s/[token]` view page (noindex)
-- [x] W10.3 ปุ่ม export + สถานะ job + ดาวน์โหลด
-- [x] W10.4 OG image พื้นฐาน
+- [ ] A10.1 visibility private/link + share_token + `GET /public/plans/:token` (ซ่อน expense payload เสมอ)
+- [ ] A10.2 export job: render HTML (Go template self-contained) → R2 → signed url
+- [ ] A10.3 export PDF (chromedp/gotenberg) — บันทึกทางเลือกที่เลือกใน Decision Log
+- [ ] W10.1 Share dialog + copy link
+- [ ] W10.2 `/s/[token]` view page (noindex)
+- [ ] W10.3 ปุ่ม export + สถานะ job + ดาวน์โหลด
+- [ ] W10.4 OG image พื้นฐาน
 
 ### M12 Booking (stay + activity)
-- [x] A12.1 `services/affiliate`: partner registry + `BuildDeepLink(partner, item, trackingID)`
-- [x] A12.2 `POST /items/:id/booking-link` + `GET /go/:trackingId` (302 + log click + บันทึก source_creator_id ถ้ามี)
-- [x] A12.3 partner selection rule (poi.partner_links → type-based priority)
-- [x] A12.4 booking-status manual + `GET /trips/:id/bookings`
+- [ ] A12.1 `services/affiliate`: partner registry + `BuildDeepLink(partner, item, trackingID)`
+- [ ] A12.2 `POST /items/:id/booking-link` + `GET /go/:trackingId` (302 + log click + บันทึก source_creator_id ถ้ามี)
+- [ ] A12.3 partner selection rule (poi.partner_links → type-based priority)
+- [ ] A12.4 booking-status manual + `GET /trips/:id/bookings`
 - [ ] A12.5 generic confirmations importer (CSV) + webhook skeleton + award points เมื่อ confirmed
-  > webhook `/webhooks/affiliate/:partner` + การให้แต้มตอน confirmed ทำแล้วและมี guard กันจ่ายซ้ำ — ที่ขาดคือ CSV importer และ signature ของแต่ละพาร์ทเนอร์ ซึ่งต้องรู้รูปแบบจริงจากพาร์ทเนอร์ก่อน
-- [x] W12.1 ปุ่มจองบน item card + สถานะ
-- [x] W12.2 Bookings tab (กรองตาม type/สถานะ)
+- [ ] W12.1 ปุ่มจองบน item card + สถานะ
+- [ ] W12.2 Bookings tab (กรองตาม type/สถานะ)
 
 ### M13 Admin
-- [x] A13.1 admin guard + POI CRUD + CSV import + character management
-- [x] A13.2 dashboard endpoints (trips, ai cost, clicks, confirmations, points issued)
-- [x] W13.1 หน้า admin ง่าย ๆ (table + form)
-- [x] A13.2b feature flags table/env
+- [ ] A13.1 admin guard + POI CRUD + CSV import + character management
+- [ ] A13.2 dashboard endpoints (trips, ai cost, clicks, confirmations, points issued)
+- [ ] W13.1 หน้า admin ง่าย ๆ (table + form)
+- [ ] A13.2b feature flags table/env
 
 ### M14 Widget Character (NEW — ง่าย)
-- [x] A14.1 seed 20 characters จาก `data/characters.json` → ตาราง `characters`
-- [x] A14.2 `GET /api/v1/characters` + `PATCH /api/v1/users/me/character {character_id}`
-- [x] A14.3 migration: เพิ่ม `character_id` ใน `users` (nullable, FK)
-- [x] W14.1 Character picker dialog ใน profile setup + settings
-- [x] W14.2 แสดง character แทน avatar ใน member list, activity feed, comment (ถ้าไม่มี avatar_url จาก OAuth)
-- [x] W14.3 Character เป็น option ใน onboarding step แรก ("เลือกตัวละครของคุณ")
+- [ ] A14.1 seed 20 characters จาก `data/characters.json` → ตาราง `characters`
+- [ ] A14.2 `GET /api/v1/characters` + `PATCH /api/v1/users/me/character {character_id}`
+- [ ] A14.3 migration: เพิ่ม `character_id` ใน `users` (nullable, FK)
+- [ ] W14.1 Character picker dialog ใน profile setup + settings
+- [ ] W14.2 แสดง character แทน avatar ใน member list, activity feed, comment (ถ้าไม่มี avatar_url จาก OAuth)
+- [ ] W14.3 Character เป็น option ใน onboarding step แรก ("เลือกตัวละครของคุณ")
 
 ### M15 Dream Trip — Bucket List (NEW — ง่าย)
-- [x] A15.1 migration: ตาราง `dream_items`
-- [x] A15.2 dream CRUD + reorder endpoints (§5.2)
-- [x] W15.1 Dream list ใน `/profile` — cards ที่อยากไป (ชื่อ, ปลายทาง, url, notes)
-- [x] W15.2 Add dream dialog: ชื่อ, ปลายทาง, วาง URL ได้, โน้ต
-- [x] W15.3 ปุ่ม "เริ่มแพลนทริปนี้" จาก dream item → pre-fill city ใน Entry flow (M1)
-- [x] W15.4 Dream list ใน Home Dashboard (M18) — แสดง 3 อันดับแรก
+- [ ] A15.1 migration: ตาราง `dream_items`
+- [ ] A15.2 dream CRUD + reorder endpoints (§5.2)
+- [ ] W15.1 Dream list ใน `/profile` — cards ที่อยากไป (ชื่อ, ปลายทาง, url, notes)
+- [ ] W15.2 Add dream dialog: ชื่อ, ปลายทาง, วาง URL ได้, โน้ต
+- [ ] W15.3 ปุ่ม "เริ่มแพลนทริปนี้" จาก dream item → pre-fill city ใน Entry flow (M1)
+- [ ] W15.4 Dream list ใน Home Dashboard (M18) — แสดง 3 อันดับแรก
 
 ### M16 Expense Tracking — Shared / Personal (NEW — กลาง)
-- [x] A16.1 migration: ตาราง `expense_entries`
-- [x] A16.2 `pkg/domain/expense.go`: คำนวณ per-member (shared หารตาม participants), personal แยก, FX conversion + tests
-- [x] A16.3 expense CRUD endpoints + summary endpoint (§5.7)
-- [x] A16.4 emit SSE `expense.created` / `expense.updated` หลังทุก mutation
-- [x] W16.1 **Expense tab** แยกจาก Budget tab ชัดเจน
-- [x] W16.2 Add expense form: ชื่อ, จำนวน, สกุลเงิน, category, Shared/Personal toggle, เลือกว่าใครร่วมหาร (ถ้า shared)
-- [x] W16.3 Summary: รายคน (ใครจ่ายไปเท่าไหร่, ใครเป็นหนี้ใคร), total รวม
-- [x] W16.4 แสดง label "อัตราโดยประมาณ ณ [date]" ทุกที่ที่แปลงสกุลเงิน
-- [x] W16.5 ตั้งค่า privacy: Expense tab ซ่อนเสมอใน public view (toggle ปิดไม่ได้ — เป็น UX default ที่ชัดเจน)
+- [ ] A16.1 migration: ตาราง `expense_entries`
+- [ ] A16.2 `pkg/domain/expense.go`: คำนวณ per-member (shared หารตาม participants), personal แยก, FX conversion + tests
+- [ ] A16.3 expense CRUD endpoints + summary endpoint (§5.7)
+- [ ] A16.4 emit SSE `expense.created` / `expense.updated` หลังทุก mutation
+- [ ] W16.1 **Expense tab** แยกจาก Budget tab ชัดเจน
+- [ ] W16.2 Add expense form: ชื่อ, จำนวน, สกุลเงิน, category, Shared/Personal toggle, เลือกว่าใครร่วมหาร (ถ้า shared)
+- [ ] W16.3 Summary: รายคน (ใครจ่ายไปเท่าไหร่, ใครเป็นหนี้ใคร), total รวม
+- [ ] W16.4 แสดง label "อัตราโดยประมาณ ณ [date]" ทุกที่ที่แปลงสกุลเงิน
+- [ ] W16.5 ตั้งค่า privacy: Expense tab ซ่อนเสมอใน public view (toggle ปิดไม่ได้ — เป็น UX default ที่ชัดเจน)
 
 ### M17 Home Dashboard + Stats + Calendar (NEW — ง่าย)
-- [x] A17.1 `GET /api/v1/users/me/stats` — aggregate จาก trips (status='done'|'planning'), expense_entries
-- [x] A17.2 `GET /api/v1/users/me/calendar` — upcoming trips sorted by start_date + ต่อ trip ดึง weather snippet
-- [x] W17.1 `/home` page: upcoming trips (calendar strip + days until), past trip recap cards, dream list preview, points balance
-- [x] W17.2 Stats widget: ปีนี้ไปกี่ทริป / กี่วัน / กี่ประเทศ / ใช้เงินรวมเท่าไหร่ (THB โดยประมาณ)
-- [x] W17.3 Calendar view: trip bars บน calendar + weather ปลายทาง
-- [x] W17.4 Points balance display + history link
+- [ ] A17.1 `GET /api/v1/users/me/stats` — aggregate จาก trips (status='done'|'planning'), expense_entries
+- [ ] A17.2 `GET /api/v1/users/me/calendar` — upcoming trips sorted by start_date + ต่อ trip ดึง weather snippet
+- [ ] W17.1 `/home` page: upcoming trips (calendar strip + days until), past trip recap cards, dream list preview, points balance
+- [ ] W17.2 Stats widget: ปีนี้ไปกี่ทริป / กี่วัน / กี่ประเทศ / ใช้เงินรวมเท่าไหร่ (THB โดยประมาณ)
+- [ ] W17.3 Calendar view: trip bars บน calendar + weather ปลายทาง
+- [ ] W17.4 Points balance display + history link
 
 ### Cross-cutting
 - [ ] X.1 e2e: create → invite 2 users → wishlist → generate → edit → budget → add expense → share → book click
-  > flow เดียวกันนี้ครอบไว้แล้วในระดับ API (`pkg/handlers/api/tests/flow_test.go`) — ส่วนที่ยังไม่ได้คือผ่าน UI จริง ซึ่งติดสองอย่าง: ล็อกอินโดยไม่มีบัญชี LINE จริง และ response ของ AI ที่ต้องอัดไว้ล่วงหน้าไม่ให้เสียเงินทุกรอบ
 - [ ] X.2 Perf: Trip Room LCP < 2.5s บน 4G; plan 7 วัน × 10 items ลื่นบนมือถือ
-  > ต้องวัดกับ stack ที่ deploy จริงบน 4G ยังวัดไม่ได้จากที่นี่
-- [x] X.3 Security: integration test cross-trip access ทุกกลุ่ม endpoint + ตรวจ expense ไม่หลุด public payload + ตรวจ secret ไม่หลุด client bundle
-- [x] X.4 Analytics events §13 ครบ
+- [ ] X.3 Security: integration test cross-trip access ทุกกลุ่ม endpoint + ตรวจ expense ไม่หลุด public payload + ตรวจ secret ไม่หลุด client bundle
+- [ ] X.4 Analytics events §13 ครบ
 - [ ] X.5 Backup/restore ทดสอบจริง 1 รอบ
-  > `deploy/backup.sh` พร้อมแล้ว — ต้องมีเซิร์ฟเวอร์จริงถึงจะทดสอบ restore ได้
 - [ ] X.6 Closed beta 10–20 กลุ่ม + feedback log
-  > ต้อง deploy ขึ้น production ก่อน
 
 ---
 
@@ -1022,48 +998,53 @@ AUTH_COOKIE_DOMAIN=rove.app
 - **Wordmark:** `R✳VE` — ตัว O แทนด้วย asterisk 8 กลีบ (เข็มทิศ + ดอกไม้)
 - **Logo file:** `public/brand/logo.svg` (custom SVG — ห้ามใช้ Unicode ✳ เพราะ render ไม่คม)
 - **Logo variants:** 3 สี — ใช้ variant ตามพื้นหลัง:
-  - Default (light bg): espresso body `#2C1A0E` + terracotta asterisk `#D4614A`
+  - Default (light bg): espresso body `#3D2B24` + terracotta asterisk `#D9714E`
   - Dark bg: white body + terracotta asterisk
   - Monochrome: espresso ทั้งหมด
 - **App icon / favicon:** asterisk เดี่ยว terracotta บน cream circle
+- **รูปทรงจริงที่ใช้:** เข็มทิศ 8 แขน **ปลายมน** (แขนแนวตั้ง/แนวนอนยาวกว่าแนวทแยง เพื่อให้อ่านเป็นเข็มทิศ ไม่ใช่เกล็ดหิมะ)
+- **Implementation:** wordmark เป็น React component (`components/brand/rove-logo.tsx`) = ตัวอักษร Inter ExtraBold + mark SVG — ไม่ใช่ไฟล์ภาพ จะได้คมทุกขนาด
 - **Gimmick:** 8 ทิศ = infinite directions = การเดินทางที่ไม่ตายตัว
 
 ### Color Tokens (`styles/brand.css`)
 ```css
 :root {
-  /* Primary */
-  --brand-primary:        19 62% 56%;   /* #D4614A cha thai terracotta */
-  --brand-primary-light:  16 52% 67%;   /* #E8906B terracotta light */
+  /* Primary — ใช้เฉพาะ action / highlight เท่านั้น ไม่ใช่สีพื้น */
+  --brand-primary:        15 65% 58%;   /* #D9714E cha thai terracotta */
+  --brand-primary-light:  15 65% 70%;   /* #E49A81 terracotta light */
   --brand-primary-fg:     0  0%  100%;  /* white text on primary */
 
   /* Base */
-  --brand-espresso:       24 53% 16%;   /* #2C1A0E logo / headings */
-  --brand-bg:             38 27% 91%;   /* #F0EDE6 cream linen (textured) */
-  --brand-surface:        0  0%  100%;  /* #FFFFFF white cards */
-  --brand-muted:          22 18% 43%;   /* #6B5B4E gray body text */
+  --brand-espresso:       17 26% 19%;   /* #3D2B24 black coffee — ตัวอักษรทั้งหมด */
+  --brand-bg:             0  0%  100%;  /* white page */
+  --brand-surface:        30 10% 96%;   /* neutral card บนพื้นขาว */
+  --brand-muted:          22 18% 43%;   /* #6B5B4E secondary text */
+  --brand-border:         30 8%  90%;
 
-  /* Accent palette (category colors, badges) */
+  /* Accent palette — colour block ของ component (tint ทับขาวเอา ไม่มี hex ชุดสอง) */
   --brand-matcha:         137 36% 65%;  /* #8BC99A success / nature */
   --brand-sky:            207 68% 81%;  /* #A8D4F0 info / calm */
   --brand-sun:            52  82% 68%;  /* #F0E06B warning / happy */
   --brand-joyfull:        260 37% 80%;  /* #C4B8E8 playful / secondary */
 }
 ```
+> Card ใช้ accent tint ที่ `/55` (matcha/sky/sun/joyfull) และ `/12` สำหรับ primary — ห้ามเขียน pastel hex ชุดใหม่
 > Shadcn CSS vars mapping: ตั้งค่าใน `globals.css` ให้ `--primary` = `--brand-primary`, `--background` = `--brand-bg` ฯลฯ
 
 ### Typography
-- **Display / Headings:** Prompt (Google Fonts) — Bold/ExtraBold, Uppercase สำหรับ section headers
-- **Body:** Noto Sans Thai (Google Fonts) — Regular/Medium, อ่านสบาย
-- **Mono / Data:** JetBrains Mono — ใช้ใน code snippet, tracking id
-- **Type scale:** ยึด Tailwind default (`text-xs` → `text-4xl`) + Prompt สำหรับ display
+- **ทั้งเว็บใช้ Inter** (Google Fonts) — Regular → ExtraBold ทั้ง heading และ body
+- **ภาษาไทย:** Inter ไม่มี glyph ไทย → fallback เป็น **Noto Sans Thai** (จับคู่ x-height/น้ำหนักแล้ว) — stack อยู่ใน `--brand-font-sans`
+- **ตัวเลข:** ใช้ Inter + `.nums` (`font-variant-numeric: tabular-nums`) ทุกที่ที่เป็นเงิน/เวลา/จำนวน — ไม่มี mono font แยก
+- **Type scale:** ยึด Tailwind default (`text-xs` → `text-5xl`)
 
 ### Visual Direction
-- **Mood:** Cozy · Warm · Playful · Inviting — ไม่ใช่ corporate dashboard
-- **Background:** Cream linen texture — ให้รู้สึกเหมือนสมุดบันทึกการเดินทาง
-- **Border radius:** 16-24px (rounded-2xl / rounded-3xl) สำหรับ cards — friendly, ไม่ sharp
-- **Cards:** Colored blocks ใช้สีจาก accent palette แทน border — แต่ละ category ใช้คนละสี
-- **Icons:** Rounded filled style (lucide-react rounded variant) — ไม่ใช่ outline เท่านั้น
-- **Shadows:** Soft, warm-tinted shadow `rgba(44,26,14,0.10)` แทน neutral gray
+- **Mood:** Bright · Playful · Colorful — สะอาดตา อ่านง่าย ไม่ใช่ corporate dashboard และไม่ใช่กระดาษสา
+- **Background:** **ขาวล้วน** — ความต่างของพื้นที่มาจาก colour block ไม่ใช่ texture
+- **Border radius:** 24px (`--brand-radius`) สำหรับ card, pill เต็มวงสำหรับปุ่ม/ชิป
+- **Cards:** Colour block จาก accent palette — แต่ละหมวด/แต่ละ stat คนละสี ไม่ใช้ border
+- **Icons:** lucide-react เส้นหนา (`strokeWidth` 2–2.5) วางบน colour block
+- **Shadows:** แทบไม่ใช้ — เฉพาะ dialog/sheet ที่ลอยเหนือหน้า (`rgba(61,43,36,0.10)`)
+- **Illustration:** flat vector บนพื้นขาว สีจาก palette เดียวกัน — ปลายทางทั่วโลก ไม่ผูกกับญี่ปุ่น
 
 ### Tone of Voice
 - **ภาษาไทยเป็นหลัก** — เป็นกันเอง ไม่ทางการ ใช้คำสั้น ตรงใจ
@@ -1086,9 +1067,9 @@ AUTH_COOKIE_DOMAIN=rove.app
 | — | Realtime | SSE + Redis pubsub (ไม่ใช้ WebSocket) | อ่านอย่างเดียวพอ, ผ่าน proxy ง่าย, ต้นทุนต่ำ |
 | — | Server state | TanStack Query เท่านั้น, Zustand เฉพาะ UI | กัน state ซ้ำซ้อน |
 | — | Deploy | Lightsail instance เดียว + Docker Compose | ต้นทุน ≤ $25/mo ใน Phase 1 |
-| 2026-08-19 | Next.js version | **16.3.1** + React 19.2.8 + TS 5.9.3 + Tailwind 4.3.3 | ดู `docs/adr/0002` — มี 2 จุดที่ค้างเวอร์ชันไว้พร้อมเหตุผล (air, ESLint) |
-| 2026-08-20 | PDF renderer | **Gotenberg** เป็น compose profile แยก (`--profile pdf`) | chromedp = Chrome ทั้งตัวใน image API บนเครื่อง 2 GB; Gotenberg เป็น container ที่เปิดเฉพาะตอนใช้ และ `GOTENBERG_URL` ว่าง = export HTML ได้ปกติ |
-| 2026-08-20 | Affiliate approve status | seed 6 เจ้าใน DB แล้ว (Agoda, Booking, Klook, KKday, Rentalcars, Airalo) — **ยังไม่ได้สมัครจริง** | เก็บ partner ไว้ใน `affiliate_partners` ไม่ใช่ในโค้ด จะได้เปลี่ยน template/commission โดยไม่ deploy |
+| — | Next.js version | (บันทึกเวอร์ชันจริงตอน init) | สเปคไม่ผูกเลขเวอร์ชัน |
+| — | PDF renderer | chromedp หรือ gotenberg (เลือกใน T10.4) | ใช้สำหรับ plan export + photo book Phase 2 |
+| — | Affiliate approve status | (บันทึกเมื่อสมัครแต่ละเจ้า) | |
 | — | Brand name | ROVE | ตัด `xxx` placeholder — §15 filled |
 | — | Booking/Affiliate phase | Phase 1 — core revenue | ไม่เลื่อน, เป็น DoD ของ MVP |
 | — | Public plan model | Incentivized publish — creator ได้ "แต้ม" เมื่อคนจองตาม | ไม่ใช่ open community ฟรี — จูงใจด้วย value ที่ชัด |
@@ -1101,14 +1082,20 @@ AUTH_COOKIE_DOMAIN=rove.app
 | — | Expense Tracking phase | Phase 1 (กลาง — ดีกว่ารอ V2) | ROVE ให้ความสำคัญชัดเจน, ใช้งานระหว่างทริปจริง |
 | — | Stats + Calendar phase | Phase 1 lightweight (M17) | ง่าย + เพิ่ม reason to return ให้ app |
 | — | Photo/Document phase | Phase 2 (V1) | ต้องออกแบบ UX ละเอียด + R2 bucket เพิ่ม + gotenberg |
-| 2026-08-19 | Repo layout | **Monorepo** `apps/api` + `apps/web` + `.env` เดียว (ต่างจาก §0 ที่ระบุ 2 repo) | prototype คนเดียว — 2 repo = 2 CI, 2 env ที่ drift, และ PR ที่ต้อง merge ตามลำดับ ดู `docs/adr/0001` |
-| 2026-08-20 | AI tools | resolve facts **ก่อน** เรียกโมเดล แล้วแนบเป็น `facts` block (ไม่ใช้ tool-use loop) | tool loop = 5+ round trip ต่อการร่าง 1 ครั้ง บน job ที่ retry+repair อยู่แล้ว การันตีเท่ากัน เพราะ validator ตรวจซ้ำด้วย Go อยู่ดี ดู `docs/adr/0003` |
-| 2026-08-20 | Export | **synchronous** คืน signed URL เลย (§5.11 ออกแบบเป็น job) | แพลน 7 วัน render ไม่ถึงวินาที — job + polling UI เกินความจำเป็น เก็บ queue ไว้ให้ AI ที่ใช้เวลาเป็นนาทีจริง ๆ |
-| 2026-08-20 | Email | **Resend** (§2.2 ให้เลือกกับ Gmail API) | Gmail ต้องมี consent screen + refresh token ต่อผู้ส่ง สำหรับ invite fallback ไม่กี่ฉบับไม่คุ้ม; ไม่ตั้งค่า = ข้ามการส่ง ไม่ทำให้ invite พัง |
-| 2026-08-20 | UI components | เขียน component เองบน Tailwind + lucide (ไม่ได้รัน shadcn CUI) | §15 ต้องการ card สีทึบ ไม่มี border, radius 16-24px, เงาโทนอุ่น — override shadcn ทุกตัวจนเหลือแต่โครง สู้เขียนตรง ๆ 8 ไฟล์ดีกว่า; `dialog` ใช้ `<dialog>` ของ platform เลยได้ focus trap + Escape ฟรี |
-| 2026-08-20 | Sort order | dense `0..n-1` renumber ทุกครั้งที่ย้าย (ไม่ใช้ fractional index) | วันหนึ่งมีราว 10 รายการ — renumber ถูกกว่าและตัดบั๊ก "precision หมด" ทิ้งทั้งกลุ่ม |
-| 2026-08-20 | Coverage | คำนวณสดตอนอ่าน `GET /coverage` (คอลัมน์ที่เก็บไว้เป็น cache สำหรับ list) | board ไม่มีวันค้างหลังแก้ item ด้วยมือ และ hook A3.5 กลายเป็น optimisation ไม่ใช่เงื่อนไขความถูกต้อง |
-| 2026-08-20 | Expense privacy | ทำเป็น **โครงสร้าง** ไม่ใช่ flag — `public.handler.go` ไม่มี path ไปยังตาราง expense เลย | flag ที่ payload builder ต้องอ่าน = บั๊กที่รอเกิด; แบบนี้ leak ไม่ได้แม้จะพลิกค่า |
+| 19 ส.ค. 2569 | Logo asset | Wordmark = React component (Prompt ExtraBold + SVG mark) ไม่ใช่ไฟล์ภาพ; mark = เข็มทิศ 8 แขน ปลายมน hand-authored SVG | ต้องคมทุกขนาดรวม favicon 16px — FLUX เจนตัวอักษรออกมาแล้ว trace เป็น SVG ไม่ได้ |
+| 19 ส.ค. 2569 | Illustration assets | เจนด้วย FLUX (`flux-2-pro`, seed คงที่) → `scripts/gen-brand-assets.mjs` | ได้ 20 characters + hero + empty states + covers + texture ที่เป็นสไตล์เดียวกัน และ regenerate ซ้ำได้ |
+| 19 ส.ค. 2569 | UI prototype | ทำบน route จริงตาม §3.2 โดยอ่านข้อมูลจาก `apps/web/lib/mock/` แทน API | พอ Go API พร้อม สลับเป็น `features/*/queries.ts` ได้โดยไม่ต้องรื้อ component |
+| 19 ส.ค. 2569 | Dark theme | ยังไม่ทำ — brand.css มีเฉพาะ light | cream linen paper คือตัวแบรนด์เอง ค่อยออกแบบ dark ใน Phase 2 |
+| 19 ส.ค. 2569 | Visual direction v2 | พื้นขาวล้วน + colour block, ตัด cream linen texture ทิ้ง | ทีมเห็นว่า cozy paper ดูผูกกับญี่ปุ่นเกินไป — ขาว+สีสด อ่านง่ายกว่าและเป็นสากล |
+| 19 ส.ค. 2569 | Typography | ใช้ **Inter** ทั้งเว็บ (ไทย fallback Noto Sans Thai), ตัด Prompt + JetBrains Mono | Inter ไม่มี glyph ไทย จึงต้องมี fallback — ตัวเลขใช้ `tabular-nums` แทน mono font |
+| 19 ส.ค. 2569 | Brand colour | terracotta `#D9714E`, espresso `#3D2B24` (ปรับจาก #D4614A / #2C1A0E) | เจ้าของแบรนด์เคาะค่าจริง |
+| 19 ส.ค. 2569 | ชื่อฟีเจอร์หารบิล | **น้องหาร** | เลี่ยงชื่อ "ขุนทอง" ที่เป็นแบรนด์ของคนอื่น — ความเสี่ยงเครื่องหมายการค้า |
+| 19 ส.ค. 2569 | Scope ปลายทาง (prototype) | UI/copy พูดถึงทั่วโลก ไม่ผูกกับญี่ปุ่น | Phase 1 ยัง **ship ญี่ปุ่นก่อน** ตาม §1 — แต่หน้าจอที่ใช้นำเสนอต้องสื่อว่าโตไปทั่วโลกได้ |
+| 19 ส.ค. 2569 | AI monetisation | ร่างฟรี **2 ครั้ง/ทริป** จากนั้นจ่ายด้วยแต้ม (300) หรือซื้อครั้งละ ฿39 | คุมต้นทุน Anthropic ต่อทริป + ผูกกับ referral/public points ให้เป็นวงจรเดียวกัน |
+| 19 ส.ค. 2569 | แหล่งที่มาของแต้ม | referral (150/คน) + คนจองตามทริป public | เดิมมีแค่ทางที่สอง — referral ทำให้ผู้ใช้ใหม่มีแต้มตั้งต้นไว้ปลดล็อก AI |
+| 19 ส.ค. 2569 | หน้า error/สถานะ | `not-found.tsx`, `error.tsx`, `global-error.tsx` + route `/maintenance` (static) | `/maintenance` ให้ Caddy เสิร์ฟตอน deploy/ล่มได้โดยไม่ต้องรอ Next ขึ้น (§8.1 instance เดียว) |
+| 19 ส.ค. 2569 | แยก 503 ออกจาก 500 | error boundary เช็ค ApiError ≥500 / network → แสดงจอ "หลังบ้านไม่ตอบ" | ผู้ใช้แก้เองไม่ได้ ต้องบอกว่าไม่ใช่ที่เขา + ปุ่ม retry แทน "กลับหน้าแรก" · **ข้อจำกัด:** production Next mask error ฝั่ง server ทำให้ branch นี้ยิงจริงเฉพาะ error ฝั่ง client (ที่ TanStack Query อยู่) |
+| 19 ส.ค. 2569 | เอกสารกฎหมาย | `/terms` + `/privacy` เป็น **ฉบับร่าง** เขียนจากพฤติกรรมจริงของระบบ | ให้ที่ปรึกษากฎหมายตรวจต่อจากของจริง ไม่ใช่ template · ช่อง `[...]` = ข้อมูลนิติบุคคลที่ยังไม่มี |
 
 ---
 

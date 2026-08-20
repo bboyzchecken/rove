@@ -17,14 +17,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
 
-	"go.uber.org/fx"
+	uberfx "go.uber.org/fx"
 
 	"github.com/bboyzchecken/rove/apps/api/pkg/core"
+	"github.com/bboyzchecken/rove/apps/api/pkg/logger"
 )
 
 type Message struct {
@@ -33,126 +33,100 @@ type Message struct {
 }
 
 type Usage struct {
-	InputTokens  int     `json:"input_tokens"`
-	OutputTokens int     `json:"output_tokens"`
-	CostUSD      float64 `json:"cost_usd"`
+	InputTokens  int
+	OutputTokens int
+	CostUSD      float64
 }
 
 type Response struct {
-	Text  string `json:"text"`
-	Usage Usage  `json:"usage"`
+	Text  string
+	Usage Usage
+	// Simulated is true when no model was called, so the job — and the UI —
+	// can say so instead of implying a draft came from Claude.
+	Simulated bool
 }
 
 // Client is the thin Anthropic wrapper. Kept as an interface so the pipeline
 // can be tested with a recorded response.
 type Client interface {
-	Complete(ctx context.Context, model, system string, msgs []Message, maxTokens int) (*Response, error)
-	Configured() bool
+	Complete(ctx context.Context, model string, system string, msgs []Message, maxTokens int) (*Response, error)
 }
 
-// ErrNotConfigured is returned when no API key is set. The handler turns it
-// into a clear "AI ยังไม่ได้ตั้งค่า" rather than a 500.
-var ErrNotConfigured = fmt.Errorf("ai: ANTHROPIC_API_KEY is not configured")
-
-const (
-	apiURL     = "https://api.anthropic.com/v1/messages"
-	apiVersion = "2023-06-01"
-	// maxAttempts is 1 try plus 2 retries, matching the §6.3 rule.
-	maxAttempts = 3
-	// requestTimeout is generous: a 7-day plan is a large completion.
-	requestTimeout = 120 * time.Second
-)
-
-// pricePerMTok is USD per million tokens, used only to record job cost so the
-// daily cap has something to compare against. Wrong-but-close is fine here;
-// the number is a guardrail, not an invoice.
-var pricePerMTok = map[string]struct{ In, Out float64 }{
-	"claude-opus-5":             {In: 5, Out: 25},
-	"claude-sonnet-5":           {In: 3, Out: 15},
-	"claude-haiku-4-5-20251001": {In: 1, Out: 5},
+// Pricing per million tokens, used for the daily cost cap (A4.11). Rounded up
+// from the published rates: a cap that under-counts is not a cap.
+var pricing = map[string]struct{ in, out float64 }{
+	"claude-opus-4-20250514":     {15, 75},
+	"claude-sonnet-4-20250514":   {3, 15},
+	"claude-3-5-haiku-20241022":  {0.80, 4},
+	"claude-haiku-4-5-20251001":  {1, 5},
 }
 
-// defaultPrice covers a model id we do not have a row for, so cost accounting
-// never silently reports zero.
-var defaultPrice = struct{ In, Out float64 }{In: 3, Out: 15}
+const defaultPricingKey = "claude-sonnet-4-20250514"
 
-type client struct {
-	apiKey string
-	http   *http.Client
-}
-
+// NewClient returns the live Anthropic client, or the stand-in when the API key
+// is missing or MOCK_MODE is on. The two are interchangeable by design: UAT
+// exercises the same pipeline, the same schema and the same persistence.
 func NewClient(cfg core.Config) Client {
-	return &client{
-		apiKey: cfg.Anthropic.ApiKey,
-		http:   &http.Client{Timeout: requestTimeout},
+	if cfg.UseMock() || cfg.Anthropic.ApiKey == "" {
+		logger.L().Info("ai: using the simulated client (no ANTHROPIC_API_KEY or MOCK_MODE=true)")
+		return &mockClient{}
+	}
+	return &anthropicClient{
+		cfg: cfg,
+		// Drafting a week takes real time; the job is async, so a generous
+		// timeout here is cheaper than a retry storm.
+		client: &http.Client{Timeout: 120 * time.Second},
 	}
 }
 
-func (c *client) Configured() bool { return c.apiKey != "" }
+var Module = uberfx.Module("services.ai", uberfx.Provide(NewClient, NewPipeline))
 
-func (c *client) Complete(ctx context.Context, model, system string, msgs []Message, maxTokens int) (*Response, error) {
-	if !c.Configured() {
-		return nil, ErrNotConfigured
+/* ------------------------------------------------------------ anthropic -- */
+
+type anthropicClient struct {
+	cfg    core.Config
+	client *http.Client
+}
+
+const anthropicURL = "https://api.anthropic.com/v1/messages"
+
+func (c *anthropicClient) Complete(
+	ctx context.Context,
+	model, system string,
+	msgs []Message,
+	maxTokens int,
+) (*Response, error) {
+	if model == "" {
+		model = c.cfg.Anthropic.ModelPlanner
 	}
 	if maxTokens <= 0 {
-		maxTokens = 8000
+		maxTokens = c.cfg.Anthropic.MaxTokens
 	}
 
-	body, err := json.Marshal(map[string]any{
+	body := map[string]any{
 		"model":      model,
 		"max_tokens": maxTokens,
 		"system":     system,
 		"messages":   msgs,
-	})
+	}
+	raw, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 
-	var lastErr error
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		res, err := c.attempt(ctx, model, body)
-		if err == nil {
-			return res, nil
-		}
-		lastErr = err
-
-		// A bad request will fail identically on every retry; only transient
-		// failures are worth waiting for.
-		if !retryable(err) || attempt == maxAttempts {
-			break
-		}
-		backoff := time.Duration(attempt*attempt) * time.Second
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(backoff):
-		}
-	}
-	return nil, lastErr
-}
-
-func (c *client) attempt(ctx context.Context, model string, body []byte) (*Response, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, anthropicURL, bytes.NewReader(raw))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("content-type", "application/json")
-	req.Header.Set("x-api-key", c.apiKey)
-	req.Header.Set("anthropic-version", apiVersion)
+	req.Header.Set("x-api-key", c.cfg.Anthropic.ApiKey)
+	req.Header.Set("anthropic-version", "2023-06-01")
 
-	res, err := c.http.Do(req)
+	res, err := c.client.Do(req)
 	if err != nil {
-		return nil, &apiError{Status: 0, Message: err.Error()}
+		return nil, err
 	}
 	defer res.Body.Close()
-
-	raw, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, &apiError{Status: res.StatusCode, Message: err.Error()}
-	}
-	if res.StatusCode != http.StatusOK {
-		return nil, &apiError{Status: res.StatusCode, Message: string(raw)}
-	}
 
 	var payload struct {
 		Content []struct {
@@ -163,9 +137,15 @@ func (c *client) attempt(ctx context.Context, model string, body []byte) (*Respo
 			InputTokens  int `json:"input_tokens"`
 			OutputTokens int `json:"output_tokens"`
 		} `json:"usage"`
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
 	}
-	if err := json.Unmarshal(raw, &payload); err != nil {
-		return nil, &apiError{Status: res.StatusCode, Message: "undecodable response: " + err.Error()}
+	if err := json.NewDecoder(res.Body).Decode(&payload); err != nil {
+		return nil, err
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("ai: anthropic returned %d: %s", res.StatusCode, payload.Error.Message)
 	}
 
 	var text strings.Builder
@@ -175,12 +155,12 @@ func (c *client) attempt(ctx context.Context, model string, body []byte) (*Respo
 		}
 	}
 
-	price, ok := pricePerMTok[model]
+	price, ok := pricing[model]
 	if !ok {
-		price = defaultPrice
+		price = pricing[defaultPricingKey]
 	}
-	cost := float64(payload.Usage.InputTokens)/1e6*price.In +
-		float64(payload.Usage.OutputTokens)/1e6*price.Out
+	cost := float64(payload.Usage.InputTokens)/1e6*price.in +
+		float64(payload.Usage.OutputTokens)/1e6*price.out
 
 	return &Response{
 		Text: text.String(),
@@ -192,37 +172,14 @@ func (c *client) attempt(ctx context.Context, model string, body []byte) (*Respo
 	}, nil
 }
 
-type apiError struct {
-	Status  int
-	Message string
-}
+/* ----------------------------------------------------------------- mock -- */
 
-func (e *apiError) Error() string {
-	return fmt.Sprintf("ai: anthropic returned %d: %s", e.Status, truncate(e.Message, 400))
-}
+// mockClient answers with an empty body and zero cost. The pipeline detects
+// this and builds its draft from the seeded POI table instead of parsing model
+// output, which is what makes MOCK_MODE a complete, playable flow rather than
+// a broken one.
+type mockClient struct{}
 
-// retryable covers the transient cases: network failures, rate limits and 5xx.
-func retryable(err error) bool {
-	var ae *apiError
-	if !asAPIError(err, &ae) {
-		return false
-	}
-	return ae.Status == 0 || ae.Status == http.StatusTooManyRequests || ae.Status >= 500
+func (m *mockClient) Complete(_ context.Context, _, _ string, _ []Message, _ int) (*Response, error) {
+	return &Response{Text: "", Simulated: true}, nil
 }
-
-func asAPIError(err error, target **apiError) bool {
-	ae, ok := err.(*apiError)
-	if ok {
-		*target = ae
-	}
-	return ok
-}
-
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	return s[:n] + "..."
-}
-
-var Module = fx.Module("services.ai", fx.Provide(NewClient, NewTools, NewPipeline))

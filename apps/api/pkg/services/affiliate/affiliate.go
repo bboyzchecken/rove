@@ -5,16 +5,13 @@ package affiliate
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"net/url"
 	"sort"
 	"strings"
 
-	"go.uber.org/fx"
+	uberfx "go.uber.org/fx"
 
 	"github.com/bboyzchecken/rove/apps/api/pkg/core"
-	"github.com/bboyzchecken/rove/apps/api/pkg/models"
 )
 
 type Partner struct {
@@ -22,7 +19,7 @@ type Partner struct {
 	Name             string   `json:"name"`
 	ItemTypes        []string `json:"item_types"`
 	DeeplinkTemplate string   `json:"deeplink_template"`
-	SubIDParam       string   `json:"subid_param"`
+	SubIDParam       string   `json:"sub_id_param"`
 	Enabled          bool     `json:"enabled"`
 	Priority         int      `json:"priority"`
 }
@@ -31,8 +28,6 @@ type LinkRequest struct {
 	Partner    string
 	TargetURL  string
 	TrackingID string
-	// Query values substituted into the template: {destination}, {checkin}, ...
-	Params map[string]string
 }
 
 type Service interface {
@@ -40,150 +35,157 @@ type Service interface {
 	BuildLink(ctx context.Context, req LinkRequest) (string, error)
 	// PartnersFor returns enabled partners for an item type, highest priority first.
 	PartnersFor(ctx context.Context, itemType string) ([]Partner, error)
-	// Pick chooses the single partner to show on an item card, honouring a
-	// POI's own partner_links override before falling back to priority.
-	Pick(ctx context.Context, itemType string, poiPartnerLinks map[string]string) (Partner, string, bool)
+	// Offers is the catalogue the Bookings tab shows before anything is booked.
+	Offers(ctx context.Context, kind string) ([]Offer, error)
 }
 
-type service struct {
-	store models.BookingStore
-	// affiliateIDs maps a partner key to our id with that partner, from env.
-	affiliateIDs map[string]string
+// Offer is one suggestion. Prices are indicative and labelled as such — ROVE
+// never quotes a price it cannot honour.
+type Offer struct {
+	Kind              string  `json:"kind"`
+	Title             string  `json:"title"`
+	Partner           string  `json:"partner"`
+	URL               string  `json:"url"`
+	PricePerPersonTHB float64 `json:"price_per_person_thb"`
+	Note              string  `json:"note"`
 }
 
-func New(cfg core.Config, store models.BookingStore) Service {
-	return &service{store: store, affiliateIDs: cfg.Affiliate}
+// partners is the registry. It lives in code rather than in a table because a
+// deeplink template is a piece of integration logic, not configuration — the
+// affiliate *id* is the part that varies per environment, and that comes from
+// the config.
+var partners = []Partner{
+	{Key: "agoda", Name: "Agoda", ItemTypes: []string{"stay"}, DeeplinkTemplate: "https://www.agoda.com/?cid={id}", SubIDParam: "tag", Priority: 100},
+	{Key: "booking", Name: "Booking.com", ItemTypes: []string{"stay"}, DeeplinkTemplate: "https://www.booking.com/index.html?aid={id}", SubIDParam: "label", Priority: 90},
+	{Key: "klook", Name: "Klook", ItemTypes: []string{"activity", "transport"}, DeeplinkTemplate: "https://www.klook.com/?aid={id}", SubIDParam: "aff_ext", Priority: 100},
+	{Key: "kkday", Name: "KKday", ItemTypes: []string{"activity"}, DeeplinkTemplate: "https://www.kkday.com/?cid={id}", SubIDParam: "ud1", Priority: 80},
+	{Key: "rentalcars", Name: "Rentalcars", ItemTypes: []string{"transport"}, DeeplinkTemplate: "https://www.rentalcars.com/?affiliateCode={id}", SubIDParam: "adplat", Priority: 70},
+	{Key: "airalo", Name: "Airalo", ItemTypes: []string{"esim"}, DeeplinkTemplate: "https://www.airalo.com/?ref={id}", SubIDParam: "utm_content", Priority: 100},
 }
 
-var Module = fx.Module("services.affiliate", fx.Provide(New))
+type service struct{ cfg core.Config }
 
-// BuildLink fills the template. Every partner takes a different subid parameter
-// name, which is why the name is data rather than code.
-//
-//	{target}      the deep URL we want the user to land on
-//	{affiliate_id} our id with this partner
-//	{subid}       our tracking id, so a confirmation maps back to a click
-func (s *service) BuildLink(ctx context.Context, req LinkRequest) (string, error) {
-	partners, err := s.all(ctx)
-	if err != nil {
-		return "", err
-	}
-	p, ok := partners[req.Partner]
-	if !ok {
-		return "", fmt.Errorf("affiliate: unknown partner %q", req.Partner)
-	}
-	if !p.Enabled {
-		return "", fmt.Errorf("affiliate: partner %q is disabled", req.Partner)
-	}
+func New(cfg core.Config) Service { return &service{cfg: cfg} }
 
-	link := p.DeeplinkTemplate
-	replacements := map[string]string{
-		"{target}":       url.QueryEscape(req.TargetURL),
-		"{target_raw}":   req.TargetURL,
-		"{affiliate_id}": s.affiliateIDs[p.Key],
-		"{subid}":        req.TrackingID,
-	}
-	for k, v := range req.Params {
-		replacements["{"+k+"}"] = url.QueryEscape(v)
-	}
-	for placeholder, value := range replacements {
-		link = strings.ReplaceAll(link, placeholder, value)
-	}
+var Module = uberfx.Module("services.affiliate", uberfx.Provide(New))
 
-	// A template that does not mention subid still needs the tracking id, or a
-	// confirmation can never be attributed back to the click.
-	if p.SubIDParam != "" && !strings.Contains(link, req.TrackingID) {
-		sep := "?"
-		if strings.Contains(link, "?") {
-			sep = "&"
+// BuildLink appends the tracking id as the partner's sub-id parameter, so a
+// postback can be matched back to the click we logged.
+func (s *service) BuildLink(_ context.Context, req LinkRequest) (string, error) {
+	target := req.TargetURL
+
+	if target == "" {
+		for _, p := range partners {
+			if p.Key == req.Partner {
+				target = strings.ReplaceAll(p.DeeplinkTemplate, "{id}", s.cfg.Affiliate[p.Key])
+				break
+			}
 		}
-		link += sep + p.SubIDParam + "=" + url.QueryEscape(req.TrackingID)
+	}
+	if target == "" {
+		return "", nil
 	}
 
-	// Any placeholder we could not fill would send the user to a broken URL.
-	if i := strings.Index(link, "{"); i >= 0 {
-		return "", fmt.Errorf("affiliate: unfilled placeholder in %s template: %s",
-			p.Key, link[i:min(i+24, len(link))])
+	parsed, err := url.Parse(target)
+	if err != nil {
+		return target, nil // a template we cannot parse is still better than nothing
 	}
-	return link, nil
+
+	q := parsed.Query()
+	for _, p := range partners {
+		if p.Key != req.Partner {
+			continue
+		}
+		if id := s.cfg.Affiliate[p.Key]; id != "" {
+			q.Set(defaultIDParam(p.Key), id)
+		}
+		if req.TrackingID != "" && p.SubIDParam != "" {
+			q.Set(p.SubIDParam, req.TrackingID)
+		}
+	}
+	parsed.RawQuery = q.Encode()
+	return parsed.String(), nil
 }
 
-func (s *service) PartnersFor(ctx context.Context, itemType string) ([]Partner, error) {
-	all, err := s.all(ctx)
-	if err != nil {
-		return nil, err
+func defaultIDParam(partner string) string {
+	switch partner {
+	case "agoda":
+		return "cid"
+	case "booking":
+		return "aid"
+	case "klook", "kkday":
+		return "aid"
+	case "rentalcars":
+		return "affiliateCode"
+	default:
+		return "ref"
 	}
+}
 
-	out := []Partner{}
-	for _, p := range all {
+func (s *service) PartnersFor(_ context.Context, itemType string) ([]Partner, error) {
+	out := make([]Partner, 0, len(partners))
+	for _, p := range partners {
+		// A partner without an affiliate id is not yet approved; showing its
+		// link would give away the click for nothing.
+		p.Enabled = s.cfg.Affiliate[p.Key] != "" || s.cfg.UseMock()
 		if !p.Enabled {
 			continue
 		}
-		if len(p.ItemTypes) > 0 && !contains(p.ItemTypes, itemType) {
+		for _, t := range p.ItemTypes {
+			if t == itemType {
+				out = append(out, p)
+				break
+			}
+		}
+	}
+	sort.SliceStable(out, func(a, b int) bool { return out[a].Priority > out[b].Priority })
+	return out, nil
+}
+
+// catalogue is the same seeded list the web app shows in mock mode, so a UAT
+// session and a live one differ only in whether the links carry a tracking id.
+var catalogue = []Offer{
+	{Kind: "stay", Title: "Shinjuku Granbell Hotel — ห้องคู่ 2 เตียง", Partner: "agoda", PricePerPersonTHB: 2400, Note: "ยกเลิกฟรีถึง 7 วันก่อนเข้าพัก"},
+	{Kind: "stay", Title: "MIMARU Tokyo Ueno — ห้องครอบครัว 4 คน", Partner: "booking", PricePerPersonTHB: 1950, Note: "ห้องเดียวพอทั้งกลุ่ม มีครัวเล็ก"},
+	{Kind: "activity", Title: "ตั๋ว teamLab Planets (จองล่วงหน้า)", Partner: "klook", PricePerPersonTHB: 890, Note: "ต้องเลือกรอบเวลาเข้าชม"},
+	{Kind: "activity", Title: "ทัวร์ฟูจิ–คาวากูจิโกะ 1 วัน", Partner: "kkday", PricePerPersonTHB: 1650, Note: "รถรับ-ส่งจากชินจูกุ"},
+	{Kind: "transport", Title: "JR Pass 7 วัน", Partner: "klook", PricePerPersonTHB: 11500, Note: "คุ้มถ้าไปโตเกียว–เกียวโต–โอซาก้า"},
+	{Kind: "esim", Title: "eSIM ญี่ปุ่น 10GB / 15 วัน", Partner: "airalo", PricePerPersonTHB: 420, Note: "เปิดใช้งานตอนถึงสนามบินได้เลย"},
+	{Kind: "insurance", Title: "ประกันเดินทางเอเชีย 8 วัน", Partner: "rabbitcare", PricePerPersonTHB: 520, Note: "ครอบคลุมค่ารักษา 2 ล้านบาท"},
+}
+
+func (s *service) Offers(ctx context.Context, kind string) ([]Offer, error) {
+	out := make([]Offer, 0, 4)
+	for _, offer := range catalogue {
+		if offer.Kind != kind {
 			continue
 		}
-		out = append(out, p)
-	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].Priority != out[j].Priority {
-			return out[i].Priority > out[j].Priority
+		link, err := s.BuildLink(ctx, LinkRequest{Partner: offer.Partner})
+		if err == nil && link != "" {
+			offer.URL = link
+		} else {
+			offer.URL = fallbackURL(offer.Partner)
 		}
-		return out[i].Key < out[j].Key
-	})
-	return out, nil
-}
-
-// Pick returns the partner to show plus the target URL. A POI that carries its
-// own link for a partner wins — a hand-curated URL beats a generated search.
-func (s *service) Pick(ctx context.Context, itemType string, poiPartnerLinks map[string]string) (Partner, string, bool) {
-	candidates, err := s.PartnersFor(ctx, itemType)
-	if err != nil || len(candidates) == 0 {
-		return Partner{}, "", false
-	}
-	for _, p := range candidates {
-		if target, ok := poiPartnerLinks[p.Key]; ok && target != "" {
-			return p, target, true
-		}
-	}
-	return candidates[0], "", true
-}
-
-func (s *service) all(ctx context.Context) (map[string]Partner, error) {
-	rows, err := s.store.ListPartners(ctx)
-	if err != nil {
-		return nil, err
-	}
-	out := make(map[string]Partner, len(rows))
-	for _, r := range rows {
-		var types []string
-		if len(r.ItemTypes) > 0 {
-			_ = json.Unmarshal(r.ItemTypes, &types)
-		}
-		out[r.Key] = Partner{
-			Key:              r.Key,
-			Name:             r.Name,
-			ItemTypes:        types,
-			DeeplinkTemplate: r.DeeplinkTemplate,
-			SubIDParam:       r.SubIDParam,
-			Enabled:          r.Enabled,
-			Priority:         r.Priority,
-		}
+		out = append(out, offer)
 	}
 	return out, nil
 }
 
-func contains(haystack []string, needle string) bool {
-	for _, h := range haystack {
-		if h == needle {
-			return true
-		}
+func fallbackURL(partner string) string {
+	switch partner {
+	case "agoda":
+		return "https://www.agoda.com/"
+	case "booking":
+		return "https://www.booking.com/"
+	case "klook":
+		return "https://www.klook.com/"
+	case "kkday":
+		return "https://www.kkday.com/"
+	case "rentalcars":
+		return "https://www.rentalcars.com/"
+	case "airalo":
+		return "https://www.airalo.com/"
+	default:
+		return "https://rabbitcare.com/"
 	}
-	return false
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

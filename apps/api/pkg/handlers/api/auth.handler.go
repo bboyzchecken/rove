@@ -10,178 +10,191 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
-	"gorm.io/gorm"
 
 	"github.com/bboyzchecken/rove/apps/api/pkg/handlers/api/request"
 	"github.com/bboyzchecken/rove/apps/api/pkg/models"
-	"github.com/bboyzchecken/rove/apps/api/pkg/utils/hashutil"
+	"github.com/bboyzchecken/rove/apps/api/pkg/utils/str"
 )
 
-// Auth is OAuth-first: LINE for Thai users, Google as the fallback. The
-// email+password path exists only so an admin can get in without a social
-// account, and it is disabled outside development unless the account is
-// explicitly an admin (DEV_SPEC §5.1).
-
-// registerAuthRoutes registers the auth endpoints.
+// Auth (A0.4 / A0.5 — DEV_SPEC §5.1).
 //
-//	POST /auth/oauth/line     {code, redirect_uri} -> {token, user}
-//	POST /auth/oauth/google   {code, redirect_uri} -> {token, user}
-//	POST /auth/login          email+password (dev/admin only)
-//	GET  /auth/me             [jwt]
-//	POST /auth/refresh        [jwt]
+// Sign-in is OAuth only: LINE first, because that is where these groups already
+// live, and Google second. There is no password anywhere in Phase 1, which is
+// also why there is no reset flow to build.
 func (s *Server) registerAuthRoutes(g *echo.Group) {
-	auth := g.Group("/auth")
+	g.GET("/auth/:provider/url", s.handleAuthURL)
+	g.POST("/auth/oauth/:provider", s.handleOAuthExchange)
+	g.GET("/auth/me", s.handleMe, s.JwtMiddleware)
+	g.POST("/auth/logout", s.handleLogout)
 
-	// Auth endpoints are the cheapest thing to brute-force, so they carry their
-	// own tight limit on top of the global one.
-	limited := s.RateLimit(RateLimitConfig{Key: "auth", Limit: 20, Window: time.Minute})
-
-	auth.POST("/oauth/line", s.handleOAuthLine, limited)
-	auth.POST("/oauth/google", s.handleOAuthGoogle, limited)
-	auth.POST("/login", s.handleLogin, limited)
-	auth.GET("/me", s.handleMe, s.JwtMiddleware)
-	auth.POST("/refresh", s.handleRefresh, s.JwtMiddleware)
+	// Mock mode needs a way in that does not involve a real provider console.
+	// It is registered only when mocking is on, so it cannot exist in production
+	// by accident.
+	if s.cfg.UseMock() {
+		g.POST("/auth/demo", s.handleDemoLogin)
+	}
 }
 
-type oauthRequest struct {
+type authURLResponse struct {
+	URL string `json:"url"`
+}
+
+// handleAuthURL hands the browser the provider's consent URL. The state is a
+// random string echoed back on the callback — the BFF checks it, not us.
+func (s *Server) handleAuthURL(c echo.Context) error {
+	provider := c.Param("provider")
+	redirect := c.QueryParam("redirect")
+	if redirect == "" {
+		redirect = s.cfg.WebBaseURL
+	}
+
+	callback := strings.TrimRight(s.cfg.WebBaseURL, "/") + "/api/auth/callback"
+	state := str.RandomToken(24)
+
+	switch provider {
+	case models.ProviderLine:
+		if s.cfg.Line.LoginChannelID == "" {
+			return request.BadRequest(c, "ยังไม่ได้ตั้งค่า LINE Login")
+		}
+		u := "https://access.line.me/oauth2/v2.1/authorize?response_type=code" +
+			"&client_id=" + url.QueryEscape(s.cfg.Line.LoginChannelID) +
+			"&redirect_uri=" + url.QueryEscape(callback+"?provider=line") +
+			"&state=" + url.QueryEscape(state) +
+			"&scope=" + url.QueryEscape("profile openid email")
+		return c.JSON(http.StatusOK, authURLResponse{URL: u})
+
+	case models.ProviderGoogle:
+		if s.cfg.Google.OAuthClientID == "" {
+			return request.BadRequest(c, "ยังไม่ได้ตั้งค่า Google OAuth")
+		}
+		u := "https://accounts.google.com/o/oauth2/v2/auth?response_type=code" +
+			"&client_id=" + url.QueryEscape(s.cfg.Google.OAuthClientID) +
+			"&redirect_uri=" + url.QueryEscape(callback+"?provider=google") +
+			"&state=" + url.QueryEscape(state) +
+			"&scope=" + url.QueryEscape("openid email profile")
+		return c.JSON(http.StatusOK, authURLResponse{URL: u})
+
+	default:
+		return request.BadRequest(c, "ไม่รองรับผู้ให้บริการนี้")
+	}
+}
+
+type oauthExchangeRequest struct {
 	Code        string `json:"code" validate:"required"`
-	RedirectURI string `json:"redirect_uri" validate:"required,url"`
+	RedirectURI string `json:"redirect_uri"`
+	// Optional: who invited this person, so the referral can be credited.
+	ReferredBy string `json:"referred_by"`
 }
 
 type authResponse struct {
-	Token string            `json:"token"`
-	User  models.PublicUser `json:"user"`
-	// IsNew tells the web app to send the user through onboarding (character
-	// picker first) instead of straight to their trips.
-	IsNew bool `json:"is_new"`
+	Token string `json:"token"`
+	User  meDTO  `json:"user"`
 }
 
-// oauthProfile is the common shape both providers are normalised into.
-type oauthProfile struct {
-	Provider    string
-	UID         string
-	DisplayName string
-	AvatarURL   string
-	Email       string
-}
+// handleOAuthExchange trades the provider's code for a profile, finds or creates
+// the matching user, and mints our own JWT. The provider's token is never
+// stored: we do not act on the user's behalf anywhere.
+func (s *Server) handleOAuthExchange(c echo.Context) error {
+	provider := c.Param("provider")
 
-func (s *Server) handleOAuthLine(c echo.Context) error {
-	var req oauthRequest
+	var req oauthExchangeRequest
 	if err := request.BindAndValidate(c, &req); err != nil {
 		return err
 	}
-	if s.cfg.Line.LoginChannelID == "" || s.cfg.Line.LoginChannelSecret == "" {
-		return request.Error(c, http.StatusServiceUnavailable, "ยังไม่ได้ตั้งค่า LINE Login")
-	}
 
-	ctx, cancel := contextWithTimeout(c, 10*time.Second)
+	ctx, cancel := contextWithTimeout(c, 15*time.Second)
 	defer cancel()
 
-	profile, err := s.exchangeLine(ctx, req)
+	var (
+		profile oauthProfile
+		err     error
+	)
+	switch provider {
+	case models.ProviderLine:
+		profile, err = s.exchangeLine(ctx, req)
+	case models.ProviderGoogle:
+		profile, err = s.exchangeGoogle(ctx, req)
+	default:
+		return request.BadRequest(c, "ไม่รองรับผู้ให้บริการนี้")
+	}
 	if err != nil {
-		return request.Unauthorized(c, "เข้าสู่ระบบด้วย LINE ไม่สำเร็จ")
-	}
-	return s.completeOAuth(c, profile)
-}
-
-func (s *Server) handleOAuthGoogle(c echo.Context) error {
-	var req oauthRequest
-	if err := request.BindAndValidate(c, &req); err != nil {
-		return err
-	}
-	if s.cfg.Google.OAuthClientID == "" || s.cfg.Google.OAuthClientSecret == "" {
-		return request.Error(c, http.StatusServiceUnavailable, "ยังไม่ได้ตั้งค่า Google Login")
+		return request.Unauthorized(c, "เข้าสู่ระบบไม่สำเร็จ: "+err.Error())
 	}
 
-	ctx, cancel := contextWithTimeout(c, 10*time.Second)
-	defer cancel()
-
-	profile, err := s.exchangeGoogle(ctx, req)
+	user, err := s.findOrCreateUser(ctx, provider, profile, req.ReferredBy)
 	if err != nil {
-		return request.Unauthorized(c, "เข้าสู่ระบบด้วย Google ไม่สำเร็จ")
-	}
-	return s.completeOAuth(c, profile)
-}
-
-// completeOAuth finds or creates the user, then issues the JWT. Matching is on
-// (provider, provider_uid) first and email second, so signing in with Google
-// after using LINE with the same address links to one account rather than
-// silently creating a duplicate.
-func (s *Server) completeOAuth(c echo.Context, p *oauthProfile) error {
-	ctx := c.Request().Context()
-
-	user, err := s.users.GetByProvider(ctx, p.Provider, p.UID)
-	switch {
-	case err == nil:
-		// Keep the display name and photo fresh on every sign-in.
-		user.DisplayName = firstNonEmpty(p.DisplayName, user.DisplayName)
-		if p.AvatarURL != "" {
-			user.AvatarURL = p.AvatarURL
-		}
-		if err := s.users.Update(ctx, user); err != nil {
-			return request.Internal(c, "บันทึกข้อมูลผู้ใช้ไม่สำเร็จ")
-		}
-		return s.issue(c, user, false)
-
-	case err != gorm.ErrRecordNotFound:
-		return request.Internal(c, "อ่านข้อมูลผู้ใช้ไม่สำเร็จ")
-	}
-
-	if p.Email != "" {
-		if existing, err := s.users.GetByEmail(ctx, p.Email); err == nil {
-			existing.Provider = p.Provider
-			existing.ProviderUID = p.UID
-			if p.AvatarURL != "" {
-				existing.AvatarURL = p.AvatarURL
-			}
-			if err := s.users.Update(ctx, existing); err != nil {
-				return request.Internal(c, "ผูกบัญชีไม่สำเร็จ")
-			}
-			return s.issue(c, existing, false)
-		}
-	}
-
-	user = &models.User{
-		DisplayName:  firstNonEmpty(p.DisplayName, "นักเดินทาง"),
-		AvatarURL:    p.AvatarURL,
-		Provider:     p.Provider,
-		ProviderUID:  p.UID,
-		Role:         models.RoleUser,
-		Status:       models.UserStatusActive,
-		Locale:       "th",
-		HomeCurrency: "THB",
-	}
-	if p.Email != "" {
-		email := p.Email
-		user.Email = &email
-		// ADMIN_EMAILS is how the first admin exists at all; there is no
-		// bootstrap UI and no self-service escalation.
-		for _, admin := range s.cfg.AdminEmails {
-			if strings.EqualFold(admin, email) {
-				user.Role = models.RoleAdmin
-				break
-			}
-		}
-	}
-	if err := s.users.Create(ctx, user); err != nil {
 		return request.Internal(c, "สร้างบัญชีไม่สำเร็จ")
 	}
-	return s.issue(c, user, true)
-}
 
-func (s *Server) issue(c echo.Context, u *models.User, isNew bool) error {
-	if u.Status != models.UserStatusActive {
-		return request.Forbidden(c, "บัญชีนี้ถูกปิดใช้งาน")
-	}
-	token, err := s.IssueToken(u)
+	token, err := s.IssueToken(user)
 	if err != nil {
-		return request.Internal(c, "ออก token ไม่สำเร็จ")
+		return request.Internal(c, "ออกโทเคนไม่สำเร็จ")
 	}
-	return request.OK(c, authResponse{Token: token, User: u.Public(), IsNew: isNew})
+
+	balance, _ := s.points.Balance(ctx, user.ID)
+	return c.JSON(http.StatusOK, authResponse{Token: token, User: toMeDTO(*user, balance)})
 }
 
-// exchangeLine swaps the authorization code for a LINE profile.
-func (s *Server) exchangeLine(ctx context.Context, req oauthRequest) (*oauthProfile, error) {
+// handleDemoLogin signs in a fixed demo account. Mock mode only — the route is
+// not registered otherwise.
+func (s *Server) handleDemoLogin(c echo.Context) error {
+	ctx, cancel := contextWithTimeout(c, 10*time.Second)
+	defer cancel()
+
+	user, err := s.findOrCreateUser(ctx, models.ProviderPassword, oauthProfile{
+		ProviderUID: "demo-user",
+		DisplayName: "ผู้ใช้ทดลอง",
+		Email:       "demo@rove.app",
+	}, "")
+	if err != nil {
+		return request.Internal(c, "สร้างบัญชีทดลองไม่สำเร็จ")
+	}
+
+	token, err := s.IssueToken(user)
+	if err != nil {
+		return request.Internal(c, "ออกโทเคนไม่สำเร็จ")
+	}
+
+	balance, _ := s.points.Balance(ctx, user.ID)
+	return c.JSON(http.StatusOK, authResponse{Token: token, User: toMeDTO(*user, balance)})
+}
+
+func (s *Server) handleMe(c echo.Context) error {
+	ctx, cancel := contextWithTimeout(c, 5*time.Second)
+	defer cancel()
+
+	user, err := s.users.GetByID(ctx, request.UserID(c))
+	if err != nil {
+		return request.Unauthorized(c, "ไม่พบผู้ใช้")
+	}
+	balance, _ := s.points.Balance(ctx, user.ID)
+	return c.JSON(http.StatusOK, toMeDTO(*user, balance))
+}
+
+// handleLogout clears the cookie the BFF set. The JWT itself is stateless, so
+// this is the whole of "signing out" — a revocation list would be a lie about
+// how much control we have over an already-issued token.
+func (s *Server) handleLogout(c echo.Context) error {
+	c.SetCookie(&http.Cookie{
+		Name:     s.cookieName,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
+	return c.NoContent(http.StatusNoContent)
+}
+
+/* ----------------------------------------------------------------- oauth -- */
+
+type oauthProfile struct {
+	ProviderUID string
+	DisplayName string
+	Email       string
+	AvatarURL   string
+}
+
+func (s *Server) exchangeLine(ctx context.Context, req oauthExchangeRequest) (oauthProfile, error) {
 	form := url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {req.Code},
@@ -192,12 +205,13 @@ func (s *Server) exchangeLine(ctx context.Context, req oauthRequest) (*oauthProf
 
 	var token struct {
 		AccessToken string `json:"access_token"`
+		Error       string `json:"error_description"`
 	}
 	if err := postForm(ctx, "https://api.line.me/oauth2/v2.1/token", form, &token); err != nil {
-		return nil, err
+		return oauthProfile{}, err
 	}
 	if token.AccessToken == "" {
-		return nil, fmt.Errorf("auth: LINE returned no access token")
+		return oauthProfile{}, fmt.Errorf("line: %s", orDefault(token.Error, "no access token"))
 	}
 
 	var profile struct {
@@ -205,22 +219,18 @@ func (s *Server) exchangeLine(ctx context.Context, req oauthRequest) (*oauthProf
 		DisplayName string `json:"displayName"`
 		PictureURL  string `json:"pictureUrl"`
 	}
-	if err := getJSON(ctx, "https://api.line.me/v2/profile", token.AccessToken, &profile); err != nil {
-		return nil, err
-	}
-	if profile.UserID == "" {
-		return nil, fmt.Errorf("auth: LINE profile has no user id")
+	if err := getJSONAuth(ctx, "https://api.line.me/v2/profile", token.AccessToken, &profile); err != nil {
+		return oauthProfile{}, err
 	}
 
-	return &oauthProfile{
-		Provider:    models.ProviderLine,
-		UID:         profile.UserID,
+	return oauthProfile{
+		ProviderUID: profile.UserID,
 		DisplayName: profile.DisplayName,
 		AvatarURL:   profile.PictureURL,
 	}, nil
 }
 
-func (s *Server) exchangeGoogle(ctx context.Context, req oauthRequest) (*oauthProfile, error) {
+func (s *Server) exchangeGoogle(ctx context.Context, req oauthExchangeRequest) (oauthProfile, error) {
 	form := url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {req.Code},
@@ -231,110 +241,101 @@ func (s *Server) exchangeGoogle(ctx context.Context, req oauthRequest) (*oauthPr
 
 	var token struct {
 		AccessToken string `json:"access_token"`
+		Error       string `json:"error_description"`
 	}
 	if err := postForm(ctx, "https://oauth2.googleapis.com/token", form, &token); err != nil {
-		return nil, err
+		return oauthProfile{}, err
 	}
 	if token.AccessToken == "" {
-		return nil, fmt.Errorf("auth: Google returned no access token")
+		return oauthProfile{}, fmt.Errorf("google: %s", orDefault(token.Error, "no access token"))
 	}
 
 	var profile struct {
-		Sub           string `json:"sub"`
-		Name          string `json:"name"`
-		Picture       string `json:"picture"`
-		Email         string `json:"email"`
-		EmailVerified bool   `json:"email_verified"`
+		Sub     string `json:"sub"`
+		Name    string `json:"name"`
+		Email   string `json:"email"`
+		Picture string `json:"picture"`
 	}
-	err := getJSON(ctx, "https://openidconnect.googleapis.com/v1/userinfo", token.AccessToken, &profile)
-	if err != nil {
+	if err := getJSONAuth(ctx, "https://openidconnect.googleapis.com/v1/userinfo", token.AccessToken, &profile); err != nil {
+		return oauthProfile{}, err
+	}
+
+	return oauthProfile{
+		ProviderUID: profile.Sub,
+		DisplayName: profile.Name,
+		Email:       profile.Email,
+		AvatarURL:   profile.Picture,
+	}, nil
+}
+
+// findOrCreateUser links by provider uid first, then by e-mail: someone who
+// signed up with Google and later uses LINE with the same address is one
+// person, not two.
+func (s *Server) findOrCreateUser(
+	ctx context.Context,
+	provider string,
+	profile oauthProfile,
+	referredBy string,
+) (*models.User, error) {
+	if existing, err := s.users.GetByProvider(ctx, provider, profile.ProviderUID); err == nil {
+		return existing, nil
+	}
+
+	if profile.Email != "" {
+		if existing, err := s.users.GetByEmail(ctx, profile.Email); err == nil {
+			existing.Provider = provider
+			existing.ProviderUID = profile.ProviderUID
+			if existing.AvatarURL == "" {
+				existing.AvatarURL = profile.AvatarURL
+			}
+			if err := s.users.Update(ctx, existing); err != nil {
+				return nil, err
+			}
+			return existing, nil
+		}
+	}
+
+	user := &models.User{
+		DisplayName: orDefault(profile.DisplayName, "นักเดินทาง"),
+		AvatarURL:   profile.AvatarURL,
+		Provider:    provider,
+		ProviderUID: profile.ProviderUID,
+		Role:        models.RoleUser,
+		Status:      models.UserStatusActive,
+		Locale:      "th",
+		HomeCurrency: "THB",
+	}
+	if profile.Email != "" {
+		user.Email = &profile.Email
+	}
+	if referredBy != "" {
+		user.ReferredBy = &referredBy
+	}
+
+	// The first account to sign in on a fresh install is the admin: someone has
+	// to be able to open the admin screens, and a hardcoded seed user would be
+	// a credential in the repository.
+	if n, err := s.users.Count(ctx); err == nil && n == 0 {
+		user.Role = models.RoleAdmin
+	}
+	for _, email := range s.cfg.AdminEmails {
+		if profile.Email != "" && strings.EqualFold(email, profile.Email) {
+			user.Role = models.RoleAdmin
+		}
+	}
+
+	if err := s.users.Create(ctx, user); err != nil {
 		return nil, err
 	}
-	if profile.Sub == "" {
-		return nil, fmt.Errorf("auth: Google profile has no subject")
-	}
-
-	p := &oauthProfile{
-		Provider:    models.ProviderGoogle,
-		UID:         profile.Sub,
-		DisplayName: profile.Name,
-		AvatarURL:   profile.Picture,
-	}
-	// An unverified address must not be able to claim an existing account by
-	// matching on email.
-	if profile.EmailVerified {
-		p.Email = strings.ToLower(profile.Email)
-	}
-	return p, nil
+	return user, nil
 }
 
-type loginRequest struct {
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,min=8"`
-}
-
-// handleLogin is the escape hatch for admins and local development. It is never
-// offered in the UI.
-func (s *Server) handleLogin(c echo.Context) error {
-	var req loginRequest
-	if err := request.BindAndValidate(c, &req); err != nil {
-		return err
-	}
-
-	user, err := s.users.GetByEmail(c.Request().Context(), strings.ToLower(req.Email))
-	if err != nil || user.Password == "" {
-		// One message for both cases: a different error for "no such user"
-		// turns this endpoint into an account-enumeration oracle.
-		return request.Unauthorized(c, "อีเมลหรือรหัสผ่านไม่ถูกต้อง")
-	}
-	if !hashutil.ComparePassword(user.Password, req.Password) {
-		return request.Unauthorized(c, "อีเมลหรือรหัสผ่านไม่ถูกต้อง")
-	}
-	if s.cfg.IsProduction() && user.Role != models.RoleAdmin {
-		return request.Forbidden(c, "บัญชีนี้ต้องเข้าสู่ระบบผ่าน LINE หรือ Google")
-	}
-	return s.issue(c, user, false)
-}
-
-func (s *Server) handleMe(c echo.Context) error {
-	user, err := s.users.GetByID(c.Request().Context(), request.UserID(c))
-	if err != nil {
-		return request.Unauthorized(c, "ไม่พบผู้ใช้")
-	}
-
-	points, _ := s.points.Get(c.Request().Context(), user.ID)
-	return request.OK(c, map[string]any{
-		"id":            user.ID,
-		"display_name":  user.DisplayName,
-		"avatar_url":    user.AvatarURL,
-		"character_id":  user.CharacterID,
-		"handle":        user.Handle,
-		"email":         user.Email,
-		"role":          user.Role,
-		"locale":        user.Locale,
-		"home_currency": user.HomeCurrency,
-		"is_creator":    user.IsCreator,
-		"points":        points,
-	})
-}
-
-// handleRefresh issues a fresh 7-day token for a still-valid one, so an active
-// user is never logged out mid-trip.
-func (s *Server) handleRefresh(c echo.Context) error {
-	user, err := s.users.GetByID(c.Request().Context(), request.UserID(c))
-	if err != nil {
-		return request.Unauthorized(c, "ไม่พบผู้ใช้")
-	}
-	return s.issue(c, user, false)
-}
-
-// --- small HTTP helpers -----------------------------------------------------
+/* ------------------------------------------------------------------ http -- */
 
 var oauthClient = &http.Client{Timeout: 10 * time.Second}
 
 func postForm(ctx context.Context, endpoint string, form url.Values, dst any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint,
-		strings.NewReader(form.Encode()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
 	if err != nil {
 		return err
 	}
@@ -345,18 +346,15 @@ func postForm(ctx context.Context, endpoint string, form url.Values, dst any) er
 		return err
 	}
 	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("auth: token endpoint returned %d", res.StatusCode)
-	}
 	return json.NewDecoder(res.Body).Decode(dst)
 }
 
-func getJSON(ctx context.Context, endpoint, bearer string, dst any) error {
+func getJSONAuth(ctx context.Context, endpoint, token string, dst any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("authorization", "Bearer "+bearer)
+	req.Header.Set("authorization", "Bearer "+token)
 
 	res, err := oauthClient.Do(req)
 	if err != nil {
@@ -364,16 +362,14 @@ func getJSON(ctx context.Context, endpoint, bearer string, dst any) error {
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("auth: profile endpoint returned %d", res.StatusCode)
+		return fmt.Errorf("provider returned %d", res.StatusCode)
 	}
 	return json.NewDecoder(res.Body).Decode(dst)
 }
 
-func firstNonEmpty(values ...string) string {
-	for _, v := range values {
-		if strings.TrimSpace(v) != "" {
-			return v
-		}
+func orDefault(value, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
 	}
-	return ""
+	return value
 }

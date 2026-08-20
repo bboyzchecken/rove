@@ -38,7 +38,7 @@ sh-db: ## MySQL shell
 migrate: ## Run database migrations only
 	$(COMPOSE) exec api go run . up
 
-seed: ## Import POIs, characters and affiliate partners (idempotent)
+seed: ## Import data/poi/jp.csv
 	$(COMPOSE) exec api go run . seed
 
 test: test-api test-web ## Run every test

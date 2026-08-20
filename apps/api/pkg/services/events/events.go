@@ -5,28 +5,30 @@ package events
 import (
 	"context"
 	"encoding/json"
+	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/fx"
+
+	"github.com/bboyzchecken/rove/apps/api/pkg/logger"
 )
 
 // Event types published on channel "trip:{tripId}".
 const (
 	TypeTripUpdated     = "trip.updated"
 	TypeMemberJoined    = "member.joined"
-	TypeMemberRemoved   = "member.removed"
 	TypeWishlistChanged = "wishlist.changed"
 	TypePlanReady       = "plan.ready"
 	TypePlanUpdated     = "plan.updated"
 	TypeItemUpdated     = "item.updated"
 	TypeCommentCreated  = "comment.created"
 	TypeAIProgress      = "ai.progress"
-	TypeExpenseCreated  = "expense.created"
-	TypeExpenseUpdated  = "expense.updated"
-	TypePrepUpdated     = "prep.updated"
-	TypeBookingUpdated  = "booking.updated"
-	TypeExportReady     = "export.ready"
+	TypeDatesChanged    = "dates.changed"
+	TypeDatesLocked     = "dates.locked"
+	TypeExpenseChanged  = "expense.changed"
+	TypePrepChanged     = "prep.changed"
+	TypeBookingChanged  = "booking.changed"
 )
 
 type Event struct {
@@ -35,33 +37,42 @@ type Event struct {
 	TargetID   string    `json:"target_id"`
 	ActorID    string    `json:"actor_id"`
 	TS         time.Time `json:"ts"`
-	// Meta carries the few extra fields a client needs to react without an
-	// extra fetch — the AI progress step, an export URL.
-	Meta map[string]any `json:"meta,omitempty"`
+	// Payload carries the changed object when the client would otherwise have
+	// to refetch immediately — AI progress being the case that matters.
+	Payload json.RawMessage `json:"payload,omitempty"`
 }
 
 // Hub is injected into every service that mutates trip data. Rule from
 // DEV_SPEC §6.2: every mutation writes an activity_log AND publishes here.
 type Hub interface {
 	Publish(ctx context.Context, tripID string, e Event) error
-	// Subscribe returns a channel of events and a cancel func. The caller MUST
-	// call cancel or the Redis subscription leaks.
 	Subscribe(ctx context.Context, tripID string) (<-chan Event, func(), error)
 }
 
-// Channel is the Redis pub/sub channel for one trip.
-func Channel(tripID string) string { return "trip:" + tripID }
+func channel(tripID string) string { return "trip:" + tripID }
 
-type hub struct{ rdb *redis.Client }
+/* ------------------------------------------------------------- redis hub -- */
 
-func New(rdb *redis.Client) Hub { return &hub{rdb: rdb} }
+type redisHub struct {
+	client *redis.Client
+	// Local fan-out as well as Redis: a single-instance deployment should not
+	// depend on a round trip through another process to see its own events.
+	local *memoryHub
+}
 
-var Module = fx.Module("services.events", fx.Provide(New))
+// NewHub returns the Redis-backed hub, falling back to an in-process one when
+// Redis is not configured — a developer without Docker still gets working SSE.
+func NewHub(client *redis.Client) Hub {
+	local := newMemoryHub()
+	if client == nil {
+		return local
+	}
+	return &redisHub{client: client, local: local}
+}
 
-// Publish is fire-and-forget from the caller's perspective: a mutation that
-// succeeded must not be reported as failed because the fan-out hiccuped, so
-// handlers log the error rather than returning it.
-func (h *hub) Publish(ctx context.Context, tripID string, e Event) error {
+var Module = fx.Module("services.events", fx.Provide(NewHub))
+
+func (h *redisHub) Publish(ctx context.Context, tripID string, e Event) error {
 	if e.TS.IsZero() {
 		e.TS = time.Now().UTC()
 	}
@@ -69,46 +80,55 @@ func (h *hub) Publish(ctx context.Context, tripID string, e Event) error {
 	if err != nil {
 		return err
 	}
-	return h.rdb.Publish(ctx, Channel(tripID), payload).Err()
+
+	// Deliver locally first so this instance's own subscribers never wait on
+	// the network, then broadcast for the others.
+	_ = h.local.Publish(ctx, tripID, e)
+	return h.client.Publish(ctx, channel(tripID), payload).Err()
 }
 
-// subscribeBuffer absorbs a burst (a plan persist emits one event per item)
-// without blocking the Redis reader goroutine.
-const subscribeBuffer = 32
-
-func (h *hub) Subscribe(ctx context.Context, tripID string) (<-chan Event, func(), error) {
-	sub := h.rdb.Subscribe(ctx, Channel(tripID))
-	if _, err := sub.Receive(ctx); err != nil {
+func (h *redisHub) Subscribe(ctx context.Context, tripID string) (<-chan Event, func(), error) {
+	sub := h.client.Subscribe(ctx, channel(tripID))
+	localCh, localCancel, err := h.local.Subscribe(ctx, tripID)
+	if err != nil {
 		_ = sub.Close()
 		return nil, nil, err
 	}
 
-	out := make(chan Event, subscribeBuffer)
+	out := make(chan Event, 16)
 	done := make(chan struct{})
 
 	go func() {
 		defer close(out)
-		ch := sub.Channel()
+		redisCh := sub.Channel()
+
 		for {
 			select {
 			case <-done:
 				return
 			case <-ctx.Done():
 				return
-			case msg, ok := <-ch:
+			case msg, ok := <-redisCh:
 				if !ok {
 					return
 				}
 				var e Event
 				if err := json.Unmarshal([]byte(msg.Payload), &e); err != nil {
 					// A malformed frame must never take the stream down.
+					logger.L().WithError(err).Warn("events: bad payload")
 					continue
 				}
 				select {
 				case out <- e:
+				default: // a slow client is dropped from, not blocking, the hub
+				}
+			case e, ok := <-localCh:
+				if !ok {
+					return
+				}
+				select {
+				case out <- e:
 				default:
-					// A client too slow to keep up drops events rather than
-					// stalling every other subscriber on this connection.
 				}
 			}
 		}
@@ -116,7 +136,61 @@ func (h *hub) Subscribe(ctx context.Context, tripID string) (<-chan Event, func(
 
 	cancel := func() {
 		close(done)
+		localCancel()
 		_ = sub.Close()
 	}
 	return out, cancel, nil
+}
+
+/* ------------------------------------------------------------ memory hub -- */
+
+type memoryHub struct {
+	mu          sync.RWMutex
+	subscribers map[string]map[chan Event]struct{}
+}
+
+func newMemoryHub() *memoryHub {
+	return &memoryHub{subscribers: map[string]map[chan Event]struct{}{}}
+}
+
+func (h *memoryHub) Publish(_ context.Context, tripID string, e Event) error {
+	if e.TS.IsZero() {
+		e.TS = time.Now().UTC()
+	}
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	for ch := range h.subscribers[tripID] {
+		select {
+		case ch <- e:
+		default: // never block a mutation on a stalled reader
+		}
+	}
+	return nil
+}
+
+func (h *memoryHub) Subscribe(_ context.Context, tripID string) (<-chan Event, func(), error) {
+	ch := make(chan Event, 16)
+
+	h.mu.Lock()
+	if h.subscribers[tripID] == nil {
+		h.subscribers[tripID] = map[chan Event]struct{}{}
+	}
+	h.subscribers[tripID][ch] = struct{}{}
+	h.mu.Unlock()
+
+	var once sync.Once
+	cancel := func() {
+		once.Do(func() {
+			h.mu.Lock()
+			delete(h.subscribers[tripID], ch)
+			if len(h.subscribers[tripID]) == 0 {
+				delete(h.subscribers, tripID)
+			}
+			h.mu.Unlock()
+			close(ch)
+		})
+	}
+	return ch, cancel, nil
 }

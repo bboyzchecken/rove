@@ -1,8 +1,7 @@
 package api
 
 import (
-	"fmt"
-	"net/http"
+	"encoding/json"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -11,80 +10,73 @@ import (
 	"github.com/bboyzchecken/rove/apps/api/pkg/models"
 )
 
-// registerEventRoutes exposes the SSE stream (DEV_SPEC §5.14 / A2.5).
+// Server-Sent Events (A2.5).
 //
-//	GET /trips/:tripId/events   [viewer]
-//
-// EventSource cannot set an Authorization header, so the browser authenticates
-// with the httpOnly cookie the BFF set — which JwtMiddleware already accepts.
-func (s *Server) registerEventRoutes(trips *echo.Group) {
-	trips.GET("/:tripId/events", s.handleEvents,
-		s.TripRoleMiddleware(models.TripRoleViewer))
+// SSE rather than WebSockets on purpose: clients only ever read this channel —
+// every write goes through a normal request — so half of a duplex protocol
+// would be unused complexity (§16).
+func (s *Server) registerEventRoutes(g *echo.Group) {
+	g.GET("/:tripId/events", s.handleTripEvents, s.TripRoleMiddleware(models.TripRoleViewer))
 }
 
-// heartbeatInterval keeps proxies and load balancers from dropping an idle
-// connection. 20s is the §5.14 figure.
-const heartbeatInterval = 20 * time.Second
-
-// streamMaxAge caps a single connection. EventSource reconnects on its own, and
-// a bounded lifetime means a leaked subscription cannot live forever.
-const streamMaxAge = 30 * time.Minute
-
-func (s *Server) handleEvents(c echo.Context) error {
+func (s *Server) handleTripEvents(c echo.Context) error {
+	ctx := c.Request().Context()
 	tripID := request.TripID(c)
 
-	res := c.Response()
-	res.Header().Set(echo.HeaderContentType, "text/event-stream")
-	res.Header().Set(echo.HeaderCacheControl, "no-cache")
-	res.Header().Set(echo.HeaderConnection, "keep-alive")
-	// Nginx and Caddy buffer by default, which would hold events until the
-	// buffer fills — for a stream that is indistinguishable from being broken.
-	res.Header().Set("X-Accel-Buffering", "no")
-	res.WriteHeader(http.StatusOK)
-
-	ctx := c.Request().Context()
 	stream, cancel, err := s.hub.Subscribe(ctx, tripID)
 	if err != nil {
-		return request.Internal(c, "เชื่อมต่อ realtime ไม่สำเร็จ")
+		return request.Internal(c, "เปิดสตรีมไม่สำเร็จ")
 	}
 	defer cancel()
 
-	// Tell the client how long to wait before reconnecting, and prove the
-	// stream is live before the first real event arrives.
-	fmt.Fprintf(res, "retry: 3000\n\n")
-	fmt.Fprintf(res, ": connected\n\n")
+	res := c.Response()
+	setSSEHeaders(res)
+
+	// An empty frame up front tells the browser the stream is live, which stops
+	// EventSource from sitting in `CONNECTING` until the first real event.
+	_, _ = res.Write([]byte(": connected\n\n"))
 	res.Flush()
 
-	heartbeat := time.NewTicker(heartbeatInterval)
+	// Proxies drop a connection that says nothing for a minute.
+	heartbeat := time.NewTicker(20 * time.Second)
 	defer heartbeat.Stop()
-	deadline := time.NewTimer(streamMaxAge)
-	defer deadline.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 
-		case <-deadline.C:
-			// A clean close; the browser reconnects and picks up from there.
-			return nil
-
 		case <-heartbeat.C:
-			fmt.Fprintf(res, ": ping\n\n")
+			_, _ = res.Write([]byte(": ping\n\n"))
 			res.Flush()
 
 		case event, ok := <-stream:
 			if !ok {
 				return nil
 			}
-			payload, err := jsonMarshal(event)
-			if err != nil {
-				continue
-			}
-			// The event type goes on its own line so a client can addEventListener
-			// per type, while onmessage still receives everything.
-			fmt.Fprintf(res, "event: %s\ndata: %s\n\n", event.Type, payload)
-			res.Flush()
+			writeSSE(res, event)
 		}
 	}
+}
+
+func setSSEHeaders(res *echo.Response) {
+	h := res.Header()
+	h.Set("Content-Type", "text/event-stream")
+	h.Set("Cache-Control", "no-cache")
+	h.Set("Connection", "keep-alive")
+	// Nginx buffers responses by default, which would hold every frame until
+	// the stream closed — exactly the opposite of the point.
+	h.Set("X-Accel-Buffering", "no")
+	res.WriteHeader(200)
+}
+
+func writeSSE(res *echo.Response, payload any) {
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return
+	}
+	_, _ = res.Write([]byte("data: "))
+	_, _ = res.Write(raw)
+	_, _ = res.Write([]byte("\n\n"))
+	res.Flush()
 }

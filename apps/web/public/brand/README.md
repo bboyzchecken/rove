@@ -1,18 +1,24 @@
-# public/brand
+# Brand assets (DEV_SPEC §15)
 
-The ROVE brand assets (DEV_SPEC §15). Colours and type live in
-`styles/brand.css` — these files are the only place the mark itself is drawn.
+| file                   | what it is                                                    |
+| ---------------------- | ------------------------------------------------------------- |
+| `mark.svg`             | the 8-armed compass mark, terracotta — hand-authored geometry |
+| `../../app/icon.svg`   | favicon / app icon: the mark on a cream disc                  |
+| `hero-landing.webp`    | landing hero illustration                                     |
+| `og-default.png`       | 1200×630 social card background (no text baked in)            |
+| `texture-linen.webp`   | 420px cream linen tile, multiplied under `.bg-linen`          |
+| `covers/*.webp`        | illustrated city covers for trip cards                        |
+| `empty/*.webp`         | empty-state illustrations                                     |
+| `../characters/*.webp` | the 20 characters (M14) — ids match `apps/api/data/characters.json` |
 
-| file | when to use |
-|---|---|
-| `logo.svg` | default wordmark, light backgrounds (espresso body, terracotta asterisk) |
-| `logo-dark.svg` | dark backgrounds (white body, terracotta asterisk) |
-| `mark.svg` | app icon, favicon, OG image, anywhere the wordmark will not fit |
+The wordmark is **not** an image: it is `components/brand/rove-logo.tsx`
+(Prompt ExtraBold + the SVG mark) so it stays sharp at every size, per §15.
 
-The `O` is drawn as eight rounded petals rather than a Unicode `✳`, which
-renders differently on every platform and goes soft at favicon size. Eight
-directions is the point of the mark: a trip with no fixed route.
+Everything else was generated with FLUX and can be regenerated:
 
-Changing a brand colour means changing `styles/brand.css` **and** the two
-hardcoded hex values in each SVG here — an SVG in `public/` cannot read a CSS
-custom property from the page.
+```bash
+node scripts/gen-brand-assets.mjs
+```
+
+The prompts and the exact resize rules live in that script — change them there,
+not by hand-editing the output.

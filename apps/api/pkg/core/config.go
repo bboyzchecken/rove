@@ -10,9 +10,13 @@ type Config struct {
 
 	JwtSecret   string
 	AdminEmails []string
-	// WebhookSecret guards /webhooks/affiliate/:partner until each partner's
-	// own signature scheme is wired in.
-	WebhookSecret string
+
+	// MockMode keeps the API fully functional without any third party: the
+	// database is still real and every write still lands in MySQL, but the
+	// providers that need a key or a bill (Anthropic, Google, FX, weather,
+	// storage, e-mail) are replaced by deterministic stand-ins. It is what UAT
+	// runs on, and it is never on in production.
+	MockMode bool
 
 	// Name of the httpOnly cookie the Next.js BFF sets; the API accepts it as
 	// an alternative to the Authorization header.
@@ -28,13 +32,8 @@ type Config struct {
 	Google    GoogleConfig
 	Line      LineConfig
 	FX        FXConfig
-	Email     EmailConfig
-	Points    PointsConfig
 
 	OpenMeteoBase string
-	// GotenbergURL points at the PDF renderer container; empty disables PDF
-	// export and the API offers HTML instead (DEV_SPEC §16).
-	GotenbergURL string
 
 	// partner key ("agoda", "booking", ...) -> affiliate id
 	Affiliate map[string]string
@@ -55,14 +54,12 @@ type RedisConfig struct {
 }
 
 type R2Config struct {
-	Endpoint       string
-	Region         string
-	AccessKey      string
-	SecretKey      string
-	ExportBucket   string
-	ImageBucket    string
-	DocumentBucket string
-	PhotoBucket    string
+	Endpoint     string
+	Region       string
+	AccessKey    string
+	SecretKey    string
+	ExportBucket string
+	ImageBucket  string
 }
 
 type AnthropicConfig struct {
@@ -88,23 +85,14 @@ type LineConfig struct {
 type FXConfig struct {
 	ApiURL string
 	ApiKey string
-	// CacheTTLHours defaults to 24 (DEV_SPEC §6.1).
-	CacheTTLHours int
-}
-
-type EmailConfig struct {
-	ResendAPIKey string
-	From         string
-}
-
-// PointsConfig mirrors domain.PointsConfig; kept here so the values arrive
-// through the same env path as everything else (DEV_SPEC §6.1).
-type PointsConfig struct {
-	EarnRatePct      float64
-	MinRedeemBalance float64
 }
 
 func (c Config) IsProduction() bool { return c.Environment == "production" }
+
+// UseMock reports whether a provider should be stubbed. Production always
+// wins: MOCK_MODE=true in a production environment is a misconfiguration, not
+// an instruction.
+func (c Config) UseMock() bool { return c.MockMode && !c.IsProduction() }
 func (c Config) IsDevelopment() bool {
 	return c.Environment == "" || c.Environment == "development" || c.Environment == "local"
 }

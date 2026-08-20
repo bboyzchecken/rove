@@ -1,3 +1,5 @@
+// Package wishlist holds the GORM implementation of the wishlist (A3.2) and
+// the coverage write-back (A3.5).
 package wishlist
 
 import (
@@ -15,21 +17,14 @@ func New(db *gorm.DB) models.WishlistStore { return &store{db: db} }
 
 var Module = fx.Module("store.wishlist", fx.Provide(New))
 
-func (s *store) ListByTrip(ctx context.Context, tripID string) ([]models.WishlistItem, error) {
-	var ws []models.WishlistItem
-	err := s.db.WithContext(ctx).Where("trip_id = ?", tripID).
-		Order("member_id ASC, sort_order ASC").Find(&ws).Error
-	return ws, err
-}
-
 func (s *store) Create(ctx context.Context, w *models.WishlistItem) error {
 	return s.db.WithContext(ctx).Create(w).Error
 }
 
-func (s *store) Get(ctx context.Context, tripID, id string) (*models.WishlistItem, error) {
+func (s *store) Get(ctx context.Context, tripID, wishID string) (*models.WishlistItem, error) {
 	var w models.WishlistItem
 	err := s.db.WithContext(ctx).
-		Where("id = ? AND trip_id = ?", id, tripID).
+		Where("trip_id = ? AND id = ?", tripID, wishID).
 		First(&w).Error
 	if err != nil {
 		return nil, err
@@ -37,65 +32,43 @@ func (s *store) Get(ctx context.Context, tripID, id string) (*models.WishlistIte
 	return &w, nil
 }
 
+func (s *store) ListByTrip(ctx context.Context, tripID string) ([]models.WishlistItem, error) {
+	var out []models.WishlistItem
+	err := s.db.WithContext(ctx).
+		Where("trip_id = ?", tripID).
+		Order("sort_order ASC, created_at ASC").
+		Find(&out).Error
+	return out, err
+}
+
 func (s *store) Update(ctx context.Context, w *models.WishlistItem) error {
 	return s.db.WithContext(ctx).
-		Where("id = ? AND trip_id = ?", w.ID, w.TripID).
+		Where("trip_id = ? AND id = ?", w.TripID, w.ID).
 		Save(w).Error
 }
 
-func (s *store) Delete(ctx context.Context, tripID, id string) error {
+func (s *store) Delete(ctx context.Context, tripID, wishID string) error {
 	return s.db.WithContext(ctx).
-		Where("id = ? AND trip_id = ?", id, tripID).
+		Where("trip_id = ? AND id = ?", tripID, wishID).
 		Delete(&models.WishlistItem{}).Error
 }
 
-// SaveCoverage writes only the four coverage columns, so a concurrent text edit
-// by the wish's author is not clobbered by a recompute.
-func (s *store) SaveCoverage(ctx context.Context, tripID string, updates []models.WishlistItem) error {
-	if len(updates) == 0 {
+// SetCoverage writes every recomputed row in one transaction. Coverage is
+// derived from the plan, so it is rewritten wholesale after each plan change
+// rather than patched item by item.
+func (s *store) SetCoverage(ctx context.Context, tripID string, states map[string]models.CoverageWrite) error {
+	if len(states) == 0 {
 		return nil
 	}
-	return s.db.WithContext(ctx).Transaction(func(db *gorm.DB) error {
-		for _, w := range updates {
-			err := db.Model(&models.WishlistItem{}).
-				Where("id = ? AND trip_id = ?", w.ID, tripID).
-				Updates(map[string]any{
-					"coverage":            w.Coverage,
-					"covered_by_item_ids": w.CoveredByItemIDs,
-					"coverage_note":       w.CoverageNote,
-				}).Error
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for wishID, state := range states {
+			err := tx.Model(&models.WishlistItem{}).
+				Where("trip_id = ? AND id = ?", tripID, wishID).
+				Updates(map[string]any{"coverage": state.Coverage, "item_id": state.ItemID}).Error
 			if err != nil {
 				return err
 			}
 		}
 		return nil
 	})
-}
-
-func (s *store) NextSortOrder(ctx context.Context, tripID, memberID string) (int, error) {
-	var max *int
-	err := s.db.WithContext(ctx).Model(&models.WishlistItem{}).
-		Where("trip_id = ? AND member_id = ?", tripID, memberID).
-		Select("MAX(sort_order)").Scan(&max).Error
-	if err != nil || max == nil {
-		return 0, err
-	}
-	return *max + 1, nil
-}
-
-func (s *store) CountByTrip(ctx context.Context, tripID string) (int64, error) {
-	var n int64
-	err := s.db.WithContext(ctx).Model(&models.WishlistItem{}).
-		Where("trip_id = ?", tripID).Count(&n).Error
-	return n, err
-}
-
-// MembersWithItems answers "who still has not added a wish?" on the Overview
-// tab (W3.4) with one query instead of one per member.
-func (s *store) MembersWithItems(ctx context.Context, tripID string) ([]string, error) {
-	var ids []string
-	err := s.db.WithContext(ctx).Model(&models.WishlistItem{}).
-		Where("trip_id = ?", tripID).
-		Distinct().Pluck("member_id", &ids).Error
-	return ids, err
 }

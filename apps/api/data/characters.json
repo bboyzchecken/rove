@@ -1,22 +1,142 @@
 [
-  { "id": 1,  "name": "แมวนักเดินทาง",    "emoji": "🐱", "image_url": "", "is_active": true },
-  { "id": 2,  "name": "หมาน้อยขี้ตื่นเต้น", "emoji": "🐶", "image_url": "", "is_active": true },
-  { "id": 3,  "name": "หมีขั้วโลกสายชิล",  "emoji": "🐻‍❄️", "image_url": "", "is_active": true },
-  { "id": 4,  "name": "แพนด้ากินไม่หยุด",  "emoji": "🐼", "image_url": "", "is_active": true },
-  { "id": 5,  "name": "จิ้งจอกวางแผน",     "emoji": "🦊", "image_url": "", "is_active": true },
-  { "id": 6,  "name": "กระต่ายตื่นเช้า",    "emoji": "🐰", "image_url": "", "is_active": true },
-  { "id": 7,  "name": "เพนกวินเดินตาม",    "emoji": "🐧", "image_url": "", "is_active": true },
-  { "id": 8,  "name": "นกฮูกสายดึก",       "emoji": "🦉", "image_url": "", "is_active": true },
-  { "id": 9,  "name": "กบสายกิน",          "emoji": "🐸", "image_url": "", "is_active": true },
-  { "id": 10, "name": "ชิบะคุมงบ",          "emoji": "🐕", "image_url": "", "is_active": true },
-  { "id": 11, "name": "โคอาลาสายนอน",      "emoji": "🐨", "image_url": "", "is_active": true },
-  { "id": 12, "name": "เสือสายลุย",         "emoji": "🐯", "image_url": "", "is_active": true },
-  { "id": 13, "name": "ยูนิคอร์นสายฝัน",    "emoji": "🦄", "image_url": "", "is_active": true },
-  { "id": 14, "name": "ปลาหมึกหลายมือ",    "emoji": "🐙", "image_url": "", "is_active": true },
-  { "id": 15, "name": "เต่าสายเรื่อย ๆ",     "emoji": "🐢", "image_url": "", "is_active": true },
-  { "id": 16, "name": "ผึ้งสายจัดตาราง",    "emoji": "🐝", "image_url": "", "is_active": true },
-  { "id": 17, "name": "แมวน้ำสายทะเล",     "emoji": "🦭", "image_url": "", "is_active": true },
-  { "id": 18, "name": "กวางนาระ",           "emoji": "🦌", "image_url": "", "is_active": true },
-  { "id": 19, "name": "ไดโนเสาร์สายถ่ายรูป", "emoji": "🦕", "image_url": "", "is_active": true },
-  { "id": 20, "name": "มังกรสายชอปปิ้ง",    "emoji": "🐲", "image_url": "", "is_active": true }
+  {
+    "id": "shiba",
+    "name_th": "ชิบะ",
+    "image_url": "/characters/char-01-shiba.webp",
+    "accent": "primary",
+    "sort_order": 1
+  },
+  {
+    "id": "cat",
+    "name_th": "แมวส้ม",
+    "image_url": "/characters/char-02-cat.webp",
+    "accent": "sun",
+    "sort_order": 2
+  },
+  {
+    "id": "red-panda",
+    "name_th": "เรดแพนด้า",
+    "image_url": "/characters/char-03-red-panda.webp",
+    "accent": "primary",
+    "sort_order": 3
+  },
+  {
+    "id": "bear",
+    "name_th": "หมีน้อย",
+    "image_url": "/characters/char-04-bear.webp",
+    "accent": "sun",
+    "sort_order": 4
+  },
+  {
+    "id": "rabbit",
+    "name_th": "กระต่าย",
+    "image_url": "/characters/char-05-rabbit.webp",
+    "accent": "joyfull",
+    "sort_order": 5
+  },
+  {
+    "id": "fox",
+    "name_th": "จิ้งจอก",
+    "image_url": "/characters/char-06-fox.webp",
+    "accent": "primary",
+    "sort_order": 6
+  },
+  {
+    "id": "penguin",
+    "name_th": "เพนกวิน",
+    "image_url": "/characters/char-07-penguin.webp",
+    "accent": "sky",
+    "sort_order": 7
+  },
+  {
+    "id": "owl",
+    "name_th": "นกฮูก",
+    "image_url": "/characters/char-08-owl.webp",
+    "accent": "sun",
+    "sort_order": 8
+  },
+  {
+    "id": "deer",
+    "name_th": "กวางน้อย",
+    "image_url": "/characters/char-09-deer.webp",
+    "accent": "primary",
+    "sort_order": 9
+  },
+  {
+    "id": "hedgehog",
+    "name_th": "เม่นแคระ",
+    "image_url": "/characters/char-10-hedgehog.webp",
+    "accent": "joyfull",
+    "sort_order": 10
+  },
+  {
+    "id": "capybara",
+    "name_th": "คาปิบารา",
+    "image_url": "/characters/char-11-capybara.webp",
+    "accent": "matcha",
+    "sort_order": 11
+  },
+  {
+    "id": "koala",
+    "name_th": "โคอาลา",
+    "image_url": "/characters/char-12-koala.webp",
+    "accent": "sky",
+    "sort_order": 12
+  },
+  {
+    "id": "panda",
+    "name_th": "แพนด้า",
+    "image_url": "/characters/char-13-panda.webp",
+    "accent": "matcha",
+    "sort_order": 13
+  },
+  {
+    "id": "tiger",
+    "name_th": "เสือน้อย",
+    "image_url": "/characters/char-14-tiger.webp",
+    "accent": "sun",
+    "sort_order": 14
+  },
+  {
+    "id": "otter",
+    "name_th": "นาก",
+    "image_url": "/characters/char-15-otter.webp",
+    "accent": "sky",
+    "sort_order": 15
+  },
+  {
+    "id": "whale",
+    "name_th": "วาฬ",
+    "image_url": "/characters/char-16-whale.webp",
+    "accent": "sky",
+    "sort_order": 16
+  },
+  {
+    "id": "frog",
+    "name_th": "กบ",
+    "image_url": "/characters/char-17-frog.webp",
+    "accent": "matcha",
+    "sort_order": 17
+  },
+  {
+    "id": "sheep",
+    "name_th": "แกะ",
+    "image_url": "/characters/char-18-sheep.webp",
+    "accent": "joyfull",
+    "sort_order": 18
+  },
+  {
+    "id": "raccoon",
+    "name_th": "แรคคูน",
+    "image_url": "/characters/char-19-raccoon.webp",
+    "accent": "matcha",
+    "sort_order": 19
+  },
+  {
+    "id": "turtle",
+    "name_th": "เต่า",
+    "image_url": "/characters/char-20-turtle.webp",
+    "accent": "matcha",
+    "sort_order": 20
+  }
 ]

@@ -1,137 +1,172 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, Copy, Eye, Globe, Link2, Lock } from 'lucide-react';
+import { Check, Copy, Download, Eye, Globe, Lock, RefreshCw } from 'lucide-react';
 
-import { useSetVisibility } from '@/features/trip/queries';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import { Card } from '@/components/ui/card';
+import { Sheet } from '@/components/ui/sheet';
+import { useExportTrip, useRotateShareToken, useSetVisibility, useShareState } from '@/features/trip/queries';
+import type { ExportFormat, TripVisibility } from '@/lib/data';
 import { cn } from '@/lib/utils';
-import type { TripVisibility } from '@/types/api';
 
 /**
- * W10.1 — sharing, and the pitch for going public.
+ * Share + export (M10 — W10.1, W10.3).
  *
- * Two things are stated plainly here because they decide whether someone
- * publishes: expense is never visible to outsiders (§4.3, and it is structural,
- * not a toggle), and a public trip earns its author points when a stranger
- * clones and books from it (§1).
+ * The expense tab is never part of a shared view (W16.5), which is stated here
+ * rather than left for someone to discover after they have shared a link.
  */
+const OPTIONS: { key: TripVisibility; icon: typeof Lock; label: string; hint: string }[] = [
+  { key: 'private', icon: Lock, label: 'ส่วนตัว', hint: 'เฉพาะสมาชิกในห้อง' },
+  { key: 'link', icon: Eye, label: 'ใครมีลิงก์', hint: 'เปิดดูได้ แต่แก้ไม่ได้' },
+  { key: 'public', icon: Globe, label: 'สาธารณะ', hint: 'ขึ้นหน้าสำรวจ ให้คนอื่นก๊อปไปใช้ได้' },
+];
 
-const options: Array<{
-  key: TripVisibility;
-  icon: typeof Lock;
-  title: string;
-  description: string;
-}> = [
-  {
-    key: 'private',
-    icon: Lock,
-    title: 'ส่วนตัว',
-    description: 'เห็นเฉพาะคนในห้องนี้',
-  },
-  {
-    key: 'link',
-    icon: Link2,
-    title: 'ใครมีลิงก์ก็ดูได้',
-    description: 'ส่งให้พ่อแม่หรือเพื่อนดูได้ แต่ไม่ขึ้นในหน้าค้นหา',
-  },
-  {
-    key: 'public',
-    icon: Globe,
-    title: 'เปิดสาธารณะ',
-    description: 'ขึ้นในหน้าทริปสาธารณะ ใครก๊อปไปแล้วจองผ่านลิงก์ คุณได้แต้ม',
-  },
+const FORMATS: { key: ExportFormat; label: string; hint: string }[] = [
+  { key: 'pdf', label: 'PDF', hint: 'พิมพ์หรือส่งต่อ' },
+  { key: 'ics', label: 'ปฏิทิน', hint: 'ใส่ลง Google Calendar' },
+  { key: 'json', label: 'ข้อมูลดิบ', hint: 'สำรองไว้เอง' },
 ];
 
 export function ShareDialog({
   tripId,
   open,
   onClose,
-  visibility,
-  shareToken,
 }: {
   tripId: string;
   open: boolean;
   onClose: () => void;
-  visibility: TripVisibility;
-  shareToken: string | null;
 }) {
-  const [copied, setCopied] = useState(false);
+  const { data: share } = useShareState(tripId);
   const setVisibility = useSetVisibility(tripId);
-
-  const current = setVisibility.data?.visibility ?? visibility;
-  const token = setVisibility.data?.share_token ?? shareToken;
-  const shareUrl =
-    setVisibility.data?.share_url ??
-    (token ? `${typeof window !== 'undefined' ? window.location.origin : ''}/s/${token}` : '');
+  const rotate = useRotateShareToken(tripId);
+  const exportTrip = useExportTrip(tripId);
+  const [copied, setCopied] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
 
   async function copy() {
-    if (!shareUrl) return;
+    if (!share?.shareUrl) return;
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      await navigator.clipboard.writeText(share.shareUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Selectable input below is the fallback.
+      // Clipboard blocked — the field below is still selectable.
     }
   }
 
+  async function runExport(format: ExportFormat) {
+    const result = await exportTrip.mutateAsync(format);
+
+    if (result.url) {
+      const link = document.createElement('a');
+      link.href = result.url;
+      link.download = result.filename;
+      link.click();
+      setNote(`ดาวน์โหลด ${result.filename} แล้ว`);
+      return;
+    }
+
+    // PDF has no file to hand over yet: the print dialog renders the same page.
+    if (format === 'pdf') {
+      window.print();
+      setNote('เปิดหน้าต่างพิมพ์ให้แล้ว — เลือก "บันทึกเป็น PDF" ได้เลย');
+      return;
+    }
+
+    setNote('ยังสร้างไฟล์ไม่ได้ในโหมดนี้');
+  }
+
   return (
-    <Dialog
+    <Sheet
       open={open}
       onClose={onClose}
       title="แชร์ทริปนี้"
-      description="เลือกว่าใครเห็นได้บ้าง"
-      footer={<Button onClick={onClose}>เสร็จแล้ว</Button>}
+      description="ค่าใช้จ่ายจะไม่ถูกแชร์ไปด้วยเสมอ ไม่ว่าตั้งค่าแบบไหน"
     >
-      <div className="space-y-2">
-        {options.map((option) => {
-          const active = current === option.key;
-          return (
-            <button
-              key={option.key}
-              type="button"
-              aria-pressed={active}
-              disabled={setVisibility.isPending}
-              onClick={() => setVisibility.mutate(option.key)}
-              className={cn(
-                'flex w-full items-start gap-3 rounded-brand p-3 text-left transition-colors',
-                active ? 'bg-primary/12 ring-1 ring-primary/30' : 'hover:bg-espresso/4',
-              )}
-            >
-              <option.icon
-                className={cn('mt-0.5 h-5 w-5 shrink-0', active ? 'text-primary' : 'text-muted')}
-              />
-              <span>
-                <span className="block text-sm font-medium text-espresso">{option.title}</span>
-                <span className="block text-xs text-muted">{option.description}</span>
-              </span>
-              {active ? <Check className="ml-auto h-4 w-4 shrink-0 text-primary" /> : null}
-            </button>
-          );
-        })}
-      </div>
-
-      {current !== 'private' && shareUrl ? (
-        <div className="mt-4 space-y-2">
-          <div className="flex items-center gap-2">
-            <Input readOnly value={shareUrl} onFocus={(e) => e.currentTarget.select()} />
-            <Button variant="soft" size="icon" onClick={copy} aria-label="คัดลอกลิงก์">
-              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            </Button>
-          </div>
-          <p className="flex items-start gap-1.5 text-xs text-muted">
-            <Eye className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            คนนอกจะไม่เห็นแท็บรายจ่ายเลย ไม่ว่าตั้งค่ายังไงก็ตาม
-          </p>
+      <div className="space-y-4">
+        <div className="space-y-2">
+          {OPTIONS.map((option) => {
+            const active = share?.visibility === option.key;
+            return (
+              <button
+                key={option.key}
+                onClick={() => setVisibility.mutate(option.key)}
+                className={cn(
+                  'rounded-brand flex w-full items-center gap-3 p-3 text-left transition',
+                  active ? 'bg-primary/12 ring-primary ring-2' : 'bg-surface',
+                )}
+              >
+                <span
+                  className={cn(
+                    'flex size-9 shrink-0 items-center justify-center rounded-2xl',
+                    active ? 'bg-primary text-primary-fg' : 'bg-bg text-muted',
+                  )}
+                >
+                  <option.icon className="size-4" />
+                </span>
+                <span className="flex-1">
+                  <span className="text-espresso block text-sm font-semibold">{option.label}</span>
+                  <span className="text-muted block text-[11px]">{option.hint}</span>
+                </span>
+                {active ? <Check className="text-primary size-4" strokeWidth={3} /> : null}
+              </button>
+            );
+          })}
         </div>
-      ) : null}
 
-      {setVisibility.error ? (
-        <p className="mt-3 text-sm text-danger">{(setVisibility.error as Error).message}</p>
-      ) : null}
-    </Dialog>
+        {share?.shareUrl ? (
+          <Card className="p-3">
+            <p className="section-label mb-1.5">ลิงก์สำหรับดู</p>
+            <div className="flex items-center gap-2">
+              <input
+                readOnly
+                value={share.shareUrl}
+                onFocus={(e) => e.currentTarget.select()}
+                className="bg-bg text-espresso min-w-0 flex-1 rounded-full px-3 py-2 text-[11px] outline-none"
+              />
+              <Button size="sm" onClick={() => void copy()}>
+                {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => rotate.mutate()}
+                title="สร้างลิงก์ใหม่ ลิงก์เดิมจะใช้ไม่ได้"
+              >
+                <RefreshCw className="size-4" />
+              </Button>
+            </div>
+            <p className="text-muted mt-2 text-[11px]">
+              เปิดดูแล้ว {share.viewCount} ครั้ง · ก๊อปไปใช้ {share.cloneCount} ครั้ง
+            </p>
+          </Card>
+        ) : null}
+
+        <div>
+          <p className="section-label mb-2">บันทึกไฟล์</p>
+          <div className="grid grid-cols-3 gap-2">
+            {FORMATS.map((format) => (
+              <button
+                key={format.key}
+                onClick={() => void runExport(format.key)}
+                disabled={exportTrip.isPending}
+                className="rounded-brand bg-surface hover:bg-border p-3 text-center transition disabled:opacity-50"
+              >
+                <Download className="text-muted mx-auto size-4" />
+                <span className="text-espresso mt-1.5 block text-xs font-semibold">
+                  {format.label}
+                </span>
+                <span className="text-muted block text-[10px]">{format.hint}</span>
+              </button>
+            ))}
+          </div>
+          {note ? <p className="text-muted mt-2 text-[11px]">{note}</p> : null}
+        </div>
+
+        <Badge tone="sky">ค่าใช้จ่ายและยอดหารกันไม่เคยอยู่ในลิงก์ที่แชร์</Badge>
+      </div>
+    </Sheet>
   );
 }

@@ -1,3 +1,5 @@
+// Package points holds the GORM implementation of the ROVE points ledger
+// (§6.5). A balance is always a SUM, never a column.
 package points
 
 import (
@@ -6,66 +8,47 @@ import (
 
 	"go.uber.org/fx"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 
 	"github.com/bboyzchecken/rove/apps/api/pkg/models"
-	"github.com/bboyzchecken/rove/apps/api/pkg/store"
 )
 
-type pointsStore struct{ db *gorm.DB }
+type store struct{ db *gorm.DB }
 
-func New(db *gorm.DB) models.PointsStore { return &pointsStore{db: db} }
+func New(db *gorm.DB) models.PointsStore { return &store{db: db} }
 
 var Module = fx.Module("store.points", fx.Provide(New))
 
-// Get returns a zero balance rather than an error for a user who has never
-// earned anything — every user has points, most of them have none.
-func (s *pointsStore) Get(ctx context.Context, userID string) (*models.UserPoints, error) {
-	var p models.UserPoints
-	err := s.db.WithContext(ctx).Where("user_id = ?", userID).First(&p).Error
-	if err == gorm.ErrRecordNotFound {
-		return &models.UserPoints{UserID: userID}, nil
+func (s *store) Add(ctx context.Context, entry *models.UserPoints) error {
+	if entry.OccurredAt.IsZero() {
+		entry.OccurredAt = time.Now().UTC()
 	}
-	if err != nil {
-		return nil, err
-	}
-	return &p, nil
+	return s.db.WithContext(ctx).Create(entry).Error
 }
 
-// Award writes the ledger row and moves the balance atomically. The ledger is
-// the source of truth; user_points is a cached sum (DEV_SPEC §6.5).
-func (s *pointsStore) Award(ctx context.Context, tx *models.PointsTransaction) error {
-	return s.db.WithContext(ctx).Transaction(func(db *gorm.DB) error {
-		if err := db.Create(tx).Error; err != nil {
-			return err
-		}
-
-		row := models.UserPoints{
-			UserID:    tx.UserID,
-			UpdatedAt: time.Now().UTC(),
-		}
-		if err := db.Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error; err != nil {
-			return err
-		}
-
-		updates := map[string]any{
-			"balance":    gorm.Expr("balance + ?", tx.Amount),
-			"updated_at": time.Now().UTC(),
-		}
-		if tx.Amount > 0 {
-			updates["lifetime_earned"] = gorm.Expr("lifetime_earned + ?", tx.Amount)
-		}
-		return db.Model(&models.UserPoints{}).
-			Where("user_id = ?", tx.UserID).
-			Updates(updates).Error
-	})
+func (s *store) Balance(ctx context.Context, userID string) (int, error) {
+	var total *int
+	err := s.db.WithContext(ctx).
+		Model(&models.UserPoints{}).
+		Where("user_id = ?", userID).
+		Select("SUM(delta)").
+		Scan(&total).Error
+	if err != nil || total == nil {
+		return 0, err
+	}
+	return *total, nil
 }
 
-func (s *pointsStore) History(ctx context.Context, userID, cursor string, limit int) ([]models.PointsTransaction, error) {
-	var txs []models.PointsTransaction
+func (s *store) List(ctx context.Context, userID string, limit int) ([]models.UserPoints, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	var out []models.UserPoints
 	err := s.db.WithContext(ctx).
 		Where("user_id = ?", userID).
-		Scopes(store.CursorPaginate("created_at", cursor, limit)).
-		Find(&txs).Error
-	return txs, err
+		Order("occurred_at DESC").
+		Limit(limit).
+		Find(&out).Error
+	return out, err
 }
+
+var _ = gorm.ErrRecordNotFound

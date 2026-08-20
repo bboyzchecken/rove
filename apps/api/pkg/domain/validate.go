@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // Plan validation catches the mistakes an LLM reliably makes. Every rule here
@@ -37,318 +36,235 @@ const (
 	IssueZoneHop           = "zone_hop"           // day crosses non-neighbouring zones
 )
 
-// ValidationItem is one itinerary item with everything the rules need.
-type ValidationItem struct {
-	ID        string
-	Title     string
-	POIID     string
-	StartTime string // "HH:MM" in Asia/Tokyo
-	EndTime   string
-	TravelMin int
-	// TravelMinRealistic is the distance-service answer for the hop into this
-	// item. Zero means "we never looked it up" and the rule is skipped.
-	TravelMinRealistic int
-	Zone               string
+// ValidateItem is one stop, flattened for the pure check.
+type ValidateItem struct {
+	ID         string
+	DayIndex   int
+	Title      string
+	StartTime  string // "HH:mm"
+	EndTime    string // "HH:mm", optional
+	OpenHours  string // "09:00–16:00" or free text
+	TravelMin  int    // minutes to the NEXT item
+	POIID      string
+	Zone       string
 }
 
-// ValidationDay is one day of the plan.
-type ValidationDay struct {
-	Index int
-	Date  time.Time
-	Items []ValidationItem
+// ValidateInput is a whole plan plus what it was supposed to satisfy.
+type ValidateInput struct {
+	Items []ValidateItem
+	// Titles of 'must' wishes, so a missing one can be reported.
+	MustWishes []string
+	// Longest a day may run before it stops being a holiday, in minutes.
+	MaxDayMinutes int
 }
 
-// POIFacts is the subset of a POI the rules consult. It always comes from our
-// catalogue or a tool call — never from the model (DEV_SPEC §6.3).
-type POIFacts struct {
-	ID   string
-	Name string
-	// ClosedDays are lowercase English weekday names: "monday", "tuesday", ...
-	ClosedDays []string
-	// OpenHours maps a weekday to "HH:MM-HH:MM". An absent day means unknown,
-	// which is not the same as closed.
-	OpenHours map[string]string
-	Zone      string
-}
-
-// ValidationInput is everything ValidatePlan needs, with no DB access.
-type ValidationInput struct {
-	Days   []ValidationDay
-	POIs   map[string]POIFacts
-	Wishes []WishInput
-	// MaxItemsPerDay comes from the strictest member profile's pace.
-	MaxItemsPerDay int
-	// TravelSlackMin is how far below the real travel time a plan may claim
-	// before it is called unrealistic.
-	TravelSlackMin int
-}
-
-// DefaultTravelSlackMin allows for the model rounding a 23-minute hop to 20.
-const DefaultTravelSlackMin = 10
-
-// ValidatePlan returns every issue found, ordered by day then by rule.
-func ValidatePlan(in ValidationInput) []Issue {
-	issues := []Issue{}
-	issues = append(issues, checkDays(in)...)
-	issues = append(issues, checkDuplicatePOIs(in)...)
-	issues = append(issues, checkMustDos(in)...)
-	return issues
-}
-
-func checkDays(in ValidationInput) []Issue {
-	issues := []Issue{}
-	maxItems := in.MaxItemsPerDay
-	slack := in.TravelSlackMin
-	if slack <= 0 {
-		slack = DefaultTravelSlackMin
+// ValidatePlan returns every issue found, ordered by day.
+func ValidatePlan(in ValidateInput) []Issue {
+	issues := make([]Issue, 0)
+	if len(in.Items) == 0 {
+		return issues
 	}
 
-	for _, day := range in.Days {
-		dayIdx := day.Index
+	maxDay := in.MaxDayMinutes
+	if maxDay <= 0 {
+		maxDay = 12 * 60
+	}
 
-		if maxItems > 0 && len(day.Items) > maxItems {
-			issues = append(issues, Issue{
-				Code:     IssueDayTooLong,
-				Severity: SeverityWarning,
-				Message: fmt.Sprintf("วันที่ %d มี %d รายการ เกินจังหวะที่ตั้งไว้ (%d)",
-					dayIdx+1, len(day.Items), maxItems),
-				DayIndex: intPtr(dayIdx),
-			})
+	byDay := map[int][]ValidateItem{}
+	dayOrder := make([]int, 0, 8)
+	for _, item := range in.Items {
+		if _, seen := byDay[item.DayIndex]; !seen {
+			dayOrder = append(dayOrder, item.DayIndex)
+		}
+		byDay[item.DayIndex] = append(byDay[item.DayIndex], item)
+	}
+
+	seenPOI := map[string]string{}
+
+	for _, dayIndex := range dayOrder {
+		items := byDay[dayIndex]
+		day := dayIndex
+
+		for i, item := range items {
+			// 1. Can we physically get here from the previous stop?
+			if i > 0 {
+				prev := items[i-1]
+				prevEnd := prev.EndTime
+				if prevEnd == "" {
+					prevEnd = prev.StartTime
+				}
+				if arrival, ok := addMinutes(prevEnd, prev.TravelMin); ok && arrival > item.StartTime {
+					issues = append(issues, Issue{
+						Code:     IssueTravelUnrealistic,
+						Severity: SeverityWarning,
+						Message:  fmt.Sprintf("เวลาชนกับ \"%s\" — ต้องออกก่อน %s ถึงจะทัน", prev.Title, arrival),
+						DayIndex: &day,
+						ItemID:   item.ID,
+					})
+				}
+			}
+
+			// 2. Is it even open?
+			if open, close, ok := parseHours(item.OpenHours); ok {
+				switch {
+				case item.StartTime < open:
+					issues = append(issues, Issue{
+						Code:     IssueOutsideHours,
+						Severity: SeverityWarning,
+						Message:  fmt.Sprintf("ยังไม่เปิด — เปิด %s", open),
+						DayIndex: &day,
+						ItemID:   item.ID,
+					})
+				case item.StartTime > close:
+					issues = append(issues, Issue{
+						Code:     IssueOutsideHours,
+						Severity: SeverityWarning,
+						Message:  fmt.Sprintf("ปิดแล้ว — ปิด %s", close),
+						DayIndex: &day,
+						ItemID:   item.ID,
+					})
+				}
+			}
+
+			// 3. Have we already been here?
+			if item.POIID != "" {
+				if firstDay, seen := seenPOI[item.POIID]; seen {
+					issues = append(issues, Issue{
+						Code:     IssueDuplicatePOI,
+						Severity: SeverityWarning,
+						Message:  fmt.Sprintf("\"%s\" ซ้ำกับ%s", item.Title, firstDay),
+						DayIndex: &day,
+						ItemID:   item.ID,
+					})
+				} else {
+					seenPOI[item.POIID] = fmt.Sprintf("วันที่ %d", dayIndex)
+				}
+			}
 		}
 
-		issues = append(issues, checkDayZones(day)...)
-
-		for _, it := range day.Items {
-			if it.TravelMinRealistic > 0 && it.TravelMin > 0 &&
-				it.TravelMin+slack < it.TravelMinRealistic {
+		// 4. Is the day humane?
+		if len(items) > 1 {
+			first := items[0]
+			last := items[len(items)-1]
+			end := last.EndTime
+			if end == "" {
+				end = last.StartTime
+			}
+			if length, ok := minutesBetween(first.StartTime, end); ok && length > maxDay {
 				issues = append(issues, Issue{
-					Code:     IssueTravelUnrealistic,
+					Code:     IssueDayTooLong,
 					Severity: SeverityWarning,
-					Message: fmt.Sprintf("%s: เผื่อเวลาเดินทาง %d นาที แต่จริง ๆ ราว %d นาที",
-						it.Title, it.TravelMin, it.TravelMinRealistic),
-					DayIndex: intPtr(dayIdx),
-					ItemID:   it.ID,
+					Message:  fmt.Sprintf("วันนี้ยาว %d ชม. — เผื่อเวลาพักบ้าง", length/60),
+					DayIndex: &day,
 				})
 			}
+		}
 
-			poi, ok := in.POIs[it.POIID]
-			if !ok || it.POIID == "" {
-				continue
-			}
-			if iss, bad := checkClosedDay(poi, it, day); bad {
-				issues = append(issues, iss)
-				// A closed day makes the opening-hours check meaningless.
-				continue
-			}
-			if iss, bad := checkOpenHours(poi, it, day); bad {
-				issues = append(issues, iss)
+		// 5. Does it zig-zag across the city?
+		zones := map[string]bool{}
+		for _, item := range items {
+			if item.Zone != "" {
+				zones[item.Zone] = true
 			}
 		}
-	}
-	return issues
-}
-
-// checkDayZones flags a day that hops between zones which cannot reasonably
-// share a day (e.g. Fuji in the morning, Kamakura in the afternoon).
-func checkDayZones(day ValidationDay) []Issue {
-	issues := []Issue{}
-	prev := ""
-	for _, it := range day.Items {
-		if it.Zone == "" {
-			continue
-		}
-		if prev != "" && !CanShareDay(prev, it.Zone) {
+		if len(zones) >= 3 {
 			issues = append(issues, Issue{
 				Code:     IssueZoneHop,
 				Severity: SeverityWarning,
-				Message: fmt.Sprintf("วันที่ %d ข้ามโซน %s → %s ในวันเดียว",
-					day.Index+1, prev, it.Zone),
-				DayIndex: intPtr(day.Index),
-				ItemID:   it.ID,
-			})
-		}
-		prev = it.Zone
-	}
-	return issues
-}
-
-func checkClosedDay(poi POIFacts, it ValidationItem, day ValidationDay) (Issue, bool) {
-	weekday := strings.ToLower(day.Date.Weekday().String())
-	for _, d := range poi.ClosedDays {
-		if strings.ToLower(strings.TrimSpace(d)) != weekday {
-			continue
-		}
-		return Issue{
-			Code:     IssueClosedDay,
-			Severity: SeverityError,
-			Message: fmt.Sprintf("%s ปิดทุกวัน%s — วันที่ %d ตรงกับวันปิด",
-				poi.Name, weekday, day.Index+1),
-			DayIndex: intPtr(day.Index),
-			ItemID:   it.ID,
-		}, true
-	}
-	return Issue{}, false
-}
-
-func checkOpenHours(poi POIFacts, it ValidationItem, day ValidationDay) (Issue, bool) {
-	if it.StartTime == "" || len(poi.OpenHours) == 0 {
-		return Issue{}, false
-	}
-	weekday := strings.ToLower(day.Date.Weekday().String())
-	window, ok := poi.OpenHours[weekday]
-	if !ok {
-		return Issue{}, false // unknown hours are not a violation
-	}
-
-	openMin, closeMin, ok := parseWindow(window)
-	if !ok {
-		return Issue{}, false
-	}
-	start, ok := parseHHMM(it.StartTime)
-	if !ok {
-		return Issue{}, false
-	}
-	// The end of the visit matters as much as the start; fall back to the start
-	// when the item has no end time.
-	end := start
-	if e, ok := parseHHMM(it.EndTime); ok {
-		end = e
-	}
-
-	if start >= openMin && end <= closeMin {
-		return Issue{}, false
-	}
-	return Issue{
-		Code:     IssueOutsideHours,
-		Severity: SeverityWarning,
-		Message: fmt.Sprintf("%s เปิด %s แต่แพลนไว้ %s–%s",
-			poi.Name, window, it.StartTime, it.EndTime),
-		DayIndex: intPtr(day.Index),
-		ItemID:   it.ID,
-	}, true
-}
-
-func checkDuplicatePOIs(in ValidationInput) []Issue {
-	issues := []Issue{}
-	seen := map[string]bool{}
-
-	for _, day := range in.Days {
-		for _, it := range day.Items {
-			if it.POIID == "" {
-				continue
-			}
-			if seen[it.POIID] {
-				name := it.Title
-				if p, ok := in.POIs[it.POIID]; ok && p.Name != "" {
-					name = p.Name
-				}
-				issues = append(issues, Issue{
-					Code:     IssueDuplicatePOI,
-					Severity: SeverityWarning,
-					Message:  fmt.Sprintf("%s ถูกใส่ไว้มากกว่าหนึ่งครั้ง", name),
-					DayIndex: intPtr(day.Index),
-					ItemID:   it.ID,
-				})
-				continue
-			}
-			seen[it.POIID] = true
-		}
-	}
-	return issues
-}
-
-// checkMustDos is the rule that matters most to the group: a 'must' wish that
-// silently vanished from the plan.
-func checkMustDos(in ValidationInput) []Issue {
-	if len(in.Wishes) == 0 {
-		return []Issue{}
-	}
-
-	planItems := []PlanItemInput{}
-	for _, day := range in.Days {
-		for _, it := range day.Items {
-			planItems = append(planItems, PlanItemInput{
-				ID: it.ID, Title: it.Title, POIID: it.POIID,
+				Message:  fmt.Sprintf("วันนี้ข้าม %d โซน — เสียเวลาเดินทางเยอะ", len(zones)),
+				DayIndex: &day,
 			})
 		}
 	}
 
-	results := ComputeCoverage(in.Wishes, planItems)
-	byWish := make(map[string]CoverageStatus, len(results))
-	for _, r := range results {
-		byWish[r.WishlistItemID] = r.Status
-	}
-
-	issues := []Issue{}
-	for _, w := range in.Wishes {
-		if w.Kind != KindMust {
-			continue
+	// 6. Did anything anyone insisted on get dropped?
+	for _, wish := range in.MustWishes {
+		normalised := NormalizeName(wish)
+		found := false
+		for _, item := range in.Items {
+			if namesMatch(normalised, NormalizeName(item.Title)) {
+				found = true
+				break
+			}
 		}
-		if byWish[w.ID] == CoverageUncovered {
+		if !found {
 			issues = append(issues, Issue{
 				Code:     IssueMustDoMissing,
 				Severity: SeverityError,
-				Message:  fmt.Sprintf("รายการที่ต้องไปให้ได้ยังไม่อยู่ในแพลน: %s", w.Text),
+				Message:  fmt.Sprintf("\"%s\" เป็นสิ่งที่ต้องไป แต่ยังไม่อยู่ในแพลน", wish),
 			})
 		}
 	}
+
 	return issues
 }
 
-// parseHHMM turns "09:30" into minutes since midnight.
-func parseHHMM(s string) (int, bool) {
-	parts := strings.Split(strings.TrimSpace(s), ":")
+// WarningsByItem flattens the issues into the one-line-per-item shape the
+// timeline card renders.
+func WarningsByItem(issues []Issue) map[string]string {
+	out := make(map[string]string, len(issues))
+	for _, issue := range issues {
+		if issue.ItemID == "" {
+			continue
+		}
+		if _, exists := out[issue.ItemID]; exists {
+			continue // first issue wins; a card shows one line
+		}
+		out[issue.ItemID] = issue.Message
+	}
+	return out
+}
+
+/* ----------------------------------------------------------------- time -- */
+
+func parseClock(hhmm string) (int, bool) {
+	parts := strings.Split(strings.TrimSpace(hhmm), ":")
 	if len(parts) != 2 {
 		return 0, false
 	}
-	h, err := strconv.Atoi(parts[0])
-	if err != nil || h < 0 || h > 47 {
-		return 0, false
-	}
-	m, err := strconv.Atoi(parts[1])
-	if err != nil || m < 0 || m > 59 {
+	h, err1 := strconv.Atoi(parts[0])
+	m, err2 := strconv.Atoi(parts[1])
+	if err1 != nil || err2 != nil || h < 0 || h > 23 || m < 0 || m > 59 {
 		return 0, false
 	}
 	return h*60 + m, true
 }
 
-// parseWindow turns "09:00-17:00" into open and close minutes. A window that
-// crosses midnight ("18:00-02:00") is normalised by pushing the close past 24h.
-func parseWindow(s string) (open, close int, ok bool) {
-	parts := strings.Split(strings.TrimSpace(s), "-")
-	if len(parts) != 2 {
-		return 0, 0, false
-	}
-	open, ok = parseHHMM(parts[0])
+func addMinutes(hhmm string, minutes int) (string, bool) {
+	total, ok := parseClock(hhmm)
 	if !ok {
-		return 0, 0, false
+		return "", false
 	}
-	close, ok = parseHHMM(parts[1])
-	if !ok {
-		return 0, 0, false
-	}
-	if close < open {
-		close += 24 * 60
-	}
-	return open, close, true
+	total = (total + minutes) % (24 * 60)
+	return fmt.Sprintf("%02d:%02d", total/60, total%60), true
 }
 
-func intPtr(i int) *int { return &i }
+func minutesBetween(start, end string) (int, bool) {
+	a, ok1 := parseClock(start)
+	b, ok2 := parseClock(end)
+	if !ok1 || !ok2 {
+		return 0, false
+	}
+	if b < a {
+		b += 24 * 60 // ran past midnight
+	}
+	return b - a, true
+}
 
-// HasErrors reports whether repairPlan (A4.6) should run another loop.
-func HasErrors(issues []Issue) bool {
-	for _, i := range issues {
-		if i.Severity == SeverityError {
-			return true
+// parseHours reads "09:00–16:00" (en dash or hyphen). Anything else — "เปิด
+// 24 ชม.", "ตลอดวัน" — is not a constraint we can check, and pretending
+// otherwise would produce false warnings.
+func parseHours(s string) (open, close string, ok bool) {
+	for _, sep := range []string{"–", "-", "—"} {
+		if parts := strings.Split(s, sep); len(parts) == 2 {
+			open = strings.TrimSpace(parts[0])
+			close = strings.TrimSpace(parts[1])
+			if _, ok1 := parseClock(open); ok1 {
+				if _, ok2 := parseClock(close); ok2 {
+					return open, close, true
+				}
+			}
 		}
 	}
-	return false
+	return "", "", false
 }
-
-// Pace budgets: how many items a day may hold before it is called overstuffed.
-// Owned here rather than in pkg/models so the rule and its tests stay pure.
-const (
-	MaxChillItems  = 4
-	MaxNormalItems = 6
-	MaxPackedItems = 9
-)

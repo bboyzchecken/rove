@@ -2,7 +2,8 @@
 @import './brand.css';
 
 /* Map the brand tokens into Tailwind v4's theme so `bg-surface`, `text-muted`,
- * `rounded-brand` etc. resolve everywhere without another config file. */
+ * `rounded-brand` etc. work everywhere. Nothing outside brand.css may name a
+ * colour. */
 @theme inline {
   --color-bg: hsl(var(--brand-bg));
   --color-surface: hsl(var(--brand-surface));
@@ -23,81 +24,80 @@
   --color-danger: hsl(var(--brand-danger));
 
   --radius-brand: var(--brand-radius);
+  --radius-brand-sm: var(--brand-radius-sm);
   --radius-brand-lg: var(--brand-radius-lg);
-
-  --shadow-brand: var(--brand-shadow);
-  --shadow-brand-lg: var(--brand-shadow-lg);
 
   --font-sans: var(--brand-font-sans);
   --font-display: var(--brand-font-display);
   --font-mono: var(--brand-font-mono);
+
+  --shadow-warm-sm: var(--brand-shadow-sm);
+  --shadow-warm: var(--brand-shadow);
+  --shadow-warm-lg: var(--brand-shadow-lg);
 }
 
-html {
-  /* Anchors land below the sticky trip-room header. */
-  scroll-padding-top: 5rem;
-}
-
+html,
 body {
   background-color: var(--color-bg);
   color: var(--color-espresso);
   font-family: var(--font-sans);
-  /* Cream linen: a barely-there weave so the page reads as paper rather than
-   * a flat panel (§15 Visual Direction). Pure CSS — no image request. */
-  background-image:
-    repeating-linear-gradient(
-      45deg,
-      rgb(44 26 14 / 0.012) 0px,
-      rgb(44 26 14 / 0.012) 1px,
-      transparent 1px,
-      transparent 3px
-    ),
-    repeating-linear-gradient(
-      -45deg,
-      rgb(44 26 14 / 0.012) 0px,
-      rgb(44 26 14 / 0.012) 1px,
-      transparent 1px,
-      transparent 3px
-    );
-  /* Mobile-first: the trip room is used on a phone, standing in a station. */
+}
+
+/* Mobile-first: the trip room is used on a phone, standing in a station. */
+body {
   -webkit-tap-highlight-color: transparent;
 }
 
-h1,
-h2,
-h3,
-h4 {
-  font-family: var(--font-display);
-  font-weight: 700;
-  color: var(--color-espresso);
-  letter-spacing: -0.01em;
-}
-
-/* Section headers are uppercase display type (§15 Typography). */
+/* Section headers: small, bold, wide-tracked uppercase Inter. */
 .section-label {
-  font-family: var(--font-display);
-  font-size: 0.6875rem;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: hsl(var(--brand-muted));
 }
 
-/* Keyboard focus has to stay visible against a warm background. */
-:where(a, button, input, textarea, select, [tabindex]):focus-visible {
-  outline: 2px solid hsl(var(--brand-primary));
-  outline-offset: 2px;
-  border-radius: 4px;
+/* Figures line up in columns — money, times, counts. */
+.nums {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
-/* Respect a user who asked the OS to stop animating things. */
+/* Horizontal scrollers (day tabs, calendar strip) — hide the bar, keep the
+ * scroll. Touch is the primary input. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes rove-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes rove-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-rove-spin {
+  animation: rove-spin 2.4s linear infinite;
+}
+.animate-rove-rise {
+  animation: rove-rise 0.32s ease-out both;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  .animate-rove-spin,
+  .animate-rove-rise {
+    animation: none;
   }
 }

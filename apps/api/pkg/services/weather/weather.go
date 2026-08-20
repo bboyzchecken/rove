@@ -6,153 +6,203 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"time"
 
-	"go.uber.org/fx"
+	"github.com/redis/go-redis/v9"
+	uberfx "go.uber.org/fx"
 
 	"github.com/bboyzchecken/rove/apps/api/pkg/core"
-	"github.com/bboyzchecken/rove/apps/api/pkg/services/cache"
+	"github.com/bboyzchecken/rove/apps/api/pkg/logger"
 )
 
 type Forecast struct {
-	Date       time.Time `json:"date"`
-	TempMinC   float64   `json:"temp_min_c"`
-	TempMaxC   float64   `json:"temp_max_c"`
-	RainChance float64   `json:"rain_chance"`
-	Summary    string    `json:"summary"`
+	Date       time.Time
+	TempMinC   float64
+	TempMaxC   float64
+	RainChance float64
+	Summary    string
 }
 
 type Service interface {
 	Daily(ctx context.Context, lat, lng float64, from, to time.Time) ([]Forecast, error)
 }
 
-// TTL is 6h — a forecast that changes faster than that is noise for a packing
-// list, and Open-Meteo asks callers not to hammer it.
-const TTL = 6 * time.Hour
-
-// forecastHorizonDays is how far ahead Open-Meteo returns useful data. Past it
-// we fall back to a climate normal rather than a fabricated forecast.
-const forecastHorizonDays = 14
+const cacheTTL = 6 * time.Hour
 
 type service struct {
-	cfg   core.Config
-	cache *cache.Cache
-	http  *http.Client
+	cfg    core.Config
+	redis  *redis.Client
+	client *http.Client
 }
 
-func New(cfg core.Config, c *cache.Cache) Service {
-	return &service{cfg: cfg, cache: c, http: &http.Client{Timeout: 10 * time.Second}}
+func New(cfg core.Config, rdb *redis.Client) Service {
+	return &service{cfg: cfg, redis: rdb, client: &http.Client{Timeout: 8 * time.Second}}
 }
 
-var Module = fx.Module("services.weather", fx.Provide(New))
+var Module = uberfx.Module("services.weather", uberfx.Provide(New))
 
 func (s *service) Daily(ctx context.Context, lat, lng float64, from, to time.Time) ([]Forecast, error) {
 	if to.Before(from) {
-		return nil, fmt.Errorf("weather: end date is before start date")
-	}
-	// Beyond the forecast horizon the API returns nothing useful; the prep
-	// block says so rather than inventing numbers.
-	if from.After(time.Now().AddDate(0, 0, forecastHorizonDays)) {
-		return nil, ErrTooFarAhead
+		return nil, nil
 	}
 
-	key := fmt.Sprintf("weather:%.3f,%.3f:%s:%s",
-		lat, lng, from.Format("2006-01-02"), to.Format("2006-01-02"))
+	key := fmt.Sprintf("wx:%.2f:%.2f:%s:%s", lat, lng, from.Format("2006-01-02"), to.Format("2006-01-02"))
+	if cached, ok := s.fromCache(ctx, key); ok {
+		return cached, nil
+	}
 
-	return cache.Fetch(ctx, s.cache, key, TTL, func(ctx context.Context) ([]Forecast, error) {
-		return s.fetch(ctx, lat, lng, from, to)
-	})
+	if s.cfg.UseMock() {
+		return seasonal(lat, from, to), nil
+	}
+
+	out, err := s.fetch(ctx, lat, lng, from, to)
+	if err != nil {
+		// A forecast is a nice-to-have on the prep tab; failing the whole
+		// screen over it would be the wrong trade.
+		logger.L().WithError(err).Warn("weather: falling back to a seasonal estimate")
+		return seasonal(lat, from, to), nil
+	}
+
+	s.toCache(ctx, key, out)
+	return out, nil
 }
 
-// ErrTooFarAhead lets the prep generator swap in a seasonal note instead of a
-// forecast, which is honest about what we actually know.
-var ErrTooFarAhead = fmt.Errorf("weather: date is beyond the forecast horizon")
-
 func (s *service) fetch(ctx context.Context, lat, lng float64, from, to time.Time) ([]Forecast, error) {
-	base := s.cfg.OpenMeteoBase
-	if base == "" {
-		base = "https://api.open-meteo.com"
-	}
 	url := fmt.Sprintf(
-		"%s/v1/forecast?latitude=%.4f&longitude=%.4f"+
-			"&daily=temperature_2m_min,temperature_2m_max,precipitation_probability_max,weather_code"+
-			"&timezone=Asia%%2FTokyo&start_date=%s&end_date=%s",
-		base, lat, lng, from.Format("2006-01-02"), to.Format("2006-01-02"),
+		"%s/v1/forecast?latitude=%.4f&longitude=%.4f&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&start_date=%s&end_date=%s",
+		s.cfg.OpenMeteoBase, lat, lng, from.Format("2006-01-02"), to.Format("2006-01-02"),
 	)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
-	res, err := s.http.Do(req)
+	res, err := s.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer res.Body.Close()
+
 	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("weather: open-meteo returned %d", res.StatusCode)
+		return nil, fmt.Errorf("weather: provider returned %d", res.StatusCode)
 	}
 
-	var payload struct {
+	var body struct {
 		Daily struct {
-			Time        []string  `json:"time"`
-			TempMin     []float64 `json:"temperature_2m_min"`
-			TempMax     []float64 `json:"temperature_2m_max"`
-			RainChance  []float64 `json:"precipitation_probability_max"`
-			WeatherCode []int     `json:"weather_code"`
+			Time      []string  `json:"time"`
+			TempMax   []float64 `json:"temperature_2m_max"`
+			TempMin   []float64 `json:"temperature_2m_min"`
+			RainChance []float64 `json:"precipitation_probability_max"`
 		} `json:"daily"`
 	}
-	if err := json.NewDecoder(res.Body).Decode(&payload); err != nil {
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
 		return nil, err
 	}
 
-	d := payload.Daily
-	out := make([]Forecast, 0, len(d.Time))
-	for i, day := range d.Time {
-		parsed, err := time.Parse("2006-01-02", day)
+	out := make([]Forecast, 0, len(body.Daily.Time))
+	for i, day := range body.Daily.Time {
+		date, err := time.Parse("2006-01-02", day)
 		if err != nil {
 			continue
 		}
-		f := Forecast{Date: parsed}
-		if i < len(d.TempMin) {
-			f.TempMinC = d.TempMin[i]
+		f := Forecast{Date: date}
+		if i < len(body.Daily.TempMax) {
+			f.TempMaxC = body.Daily.TempMax[i]
 		}
-		if i < len(d.TempMax) {
-			f.TempMaxC = d.TempMax[i]
+		if i < len(body.Daily.TempMin) {
+			f.TempMinC = body.Daily.TempMin[i]
 		}
-		if i < len(d.RainChance) {
-			f.RainChance = d.RainChance[i]
+		if i < len(body.Daily.RainChance) {
+			f.RainChance = body.Daily.RainChance[i]
 		}
-		if i < len(d.WeatherCode) {
-			f.Summary = describeCode(d.WeatherCode[i])
-		}
+		f.Summary = Summarise(f)
 		out = append(out, f)
 	}
 	return out, nil
 }
 
-// describeCode maps a WMO weather code to Thai, grouped the way a traveller
-// cares about: do I need an umbrella, a coat, or neither.
-func describeCode(code int) string {
+// seasonal is the stand-in used by mock mode and by the fallback path: a rough
+// northern-hemisphere curve, which for a Japan-first product is close enough
+// to be useful and is clearly labelled as an estimate in the UI.
+func seasonal(lat float64, from, to time.Time) []Forecast {
+	out := make([]Forecast, 0)
+
+	for d := from; !d.After(to); d = d.AddDate(0, 0, 1) {
+		// Peak in July, trough in January.
+		phase := math.Cos((float64(d.YearDay()) - 195) / 365 * 2 * math.Pi)
+		mean := 16 + 12*phase
+		if lat < 0 {
+			mean = 16 - 12*phase // southern hemisphere runs the other way
+		}
+
+		f := Forecast{
+			Date:       d,
+			TempMaxC:   math.Round(mean + 5),
+			TempMinC:   math.Round(mean - 4),
+			RainChance: 20,
+		}
+		f.Summary = Summarise(f)
+		out = append(out, f)
+	}
+	return out
+}
+
+// Summarise turns numbers into the one line the day header shows.
+func Summarise(f Forecast) string {
 	switch {
-	case code == 0:
-		return "แดดดี"
-	case code <= 3:
-		return "มีเมฆบางส่วน"
-	case code <= 48:
-		return "หมอก"
-	case code <= 57:
-		return "ฝนละออง"
-	case code <= 67:
-		return "ฝนตก"
-	case code <= 77:
-		return "หิมะ"
-	case code <= 82:
-		return "ฝนซู่"
-	case code <= 86:
-		return "หิมะตกหนัก"
+	case f.RainChance >= 60:
+		return "ฝนตกได้ทั้งวัน พกร่ม"
+	case f.TempMaxC <= 5:
+		return "หนาวจัด เตรียมเสื้อกันหนาวหนา ๆ"
+	case f.TempMaxC <= 15:
+		return "หนาวสบาย ใส่เสื้อคลุมพอ"
+	case f.TempMaxC >= 32:
+		return "ร้อน พกน้ำติดตัว"
 	default:
-		return "พายุฝนฟ้าคะนอง"
+		return "อากาศกำลังดี"
+	}
+}
+
+// Icon is the emoji the day card renders.
+func Icon(f Forecast) string {
+	switch {
+	case f.RainChance >= 60:
+		return "🌧️"
+	case f.RainChance >= 30:
+		return "⛅"
+	case f.TempMaxC <= 5:
+		return "❄️"
+	default:
+		return "☀️"
+	}
+}
+
+func (s *service) fromCache(ctx context.Context, key string) ([]Forecast, bool) {
+	if s.redis == nil {
+		return nil, false
+	}
+	raw, err := s.redis.Get(ctx, key).Bytes()
+	if err != nil {
+		return nil, false
+	}
+	var out []Forecast
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, false
+	}
+	return out, true
+}
+
+func (s *service) toCache(ctx context.Context, key string, out []Forecast) {
+	if s.redis == nil {
+		return
+	}
+	raw, err := json.Marshal(out)
+	if err != nil {
+		return
+	}
+	if err := s.redis.Set(ctx, key, raw, cacheTTL).Err(); err != nil {
+		logger.L().WithError(err).Debug("weather: cache write failed")
 	}
 }

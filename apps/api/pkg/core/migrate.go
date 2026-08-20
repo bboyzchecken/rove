@@ -45,139 +45,66 @@ func Migrate(db *gorm.DB) error {
 			},
 		},
 		{
-			// A14.3 — characters seed table + users.character_id.
-			ID: "202601020000_characters",
+			// Phase 1 — every table the MVP needs, in one migration because they
+			// ship together: a half-migrated database has no useful state.
+			ID: "202601020000_phase1_core",
 			Migrate: func(tx *gorm.DB) error {
-				if err := tx.AutoMigrate(&models.Character{}); err != nil {
-					return err
-				}
-				return tx.AutoMigrate(&models.User{})
+				return tx.AutoMigrate(
+					&models.Character{},
+					&models.UserPoints{},
+					&models.Invite{},
+					&models.DreamItem{},
+					&models.Availability{},
+					&models.AvailabilitySubmission{},
+					&models.WishlistItem{},
+					&models.Plan{},
+					&models.PlanDay{},
+					&models.PlanItem{},
+					&models.ItemVersion{},
+					&models.ExpenseEntry{},
+					&models.Settlement{},
+					&models.PrepTask{},
+					&models.PrepNote{},
+					&models.Booking{},
+					&models.BookingClick{},
+					&models.Comment{},
+					&models.Vote{},
+					&models.Activity{},
+					&models.AIJob{},
+					&models.AICredit{},
+				)
 			},
 			Rollback: func(tx *gorm.DB) error {
-				if tx.Migrator().HasColumn(&models.User{}, "character_id") {
-					if err := tx.Migrator().DropColumn(&models.User{}, "character_id"); err != nil {
+				return tx.Migrator().DropTable(
+					"ai_credits", "ai_jobs", "activity_logs", "votes", "comments",
+					"booking_clicks", "bookings", "prep_notes", "prep_tasks",
+					"expense_settlements", "expense_entries", "item_versions",
+					"plan_items", "plan_days", "plans", "wishlist_items",
+					"trip_availability_submissions", "trip_availability",
+					"dream_items", "invites", "user_points", "characters",
+				)
+			},
+		},
+		{
+			// The columns Phase 1 adds to tables that already existed.
+			ID: "202601020001_phase1_trip_user_columns",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.AutoMigrate(&models.Trip{}, &models.User{})
+			},
+			Rollback: func(tx *gorm.DB) error {
+				for _, col := range []string{
+					"budget_per_person_thb", "dates_locked_at", "dates_locked_by", "destination_id",
+				} {
+					if err := tx.Migrator().DropColumn(&models.Trip{}, col); err != nil {
 						return err
 					}
 				}
-				return tx.Migrator().DropTable("characters")
-			},
-		},
-		{
-			// A15.1 / §4.2 — per-user tables that live outside any trip.
-			ID: "202601020001_user_points_and_dreams",
-			Migrate: func(tx *gorm.DB) error {
-				return tx.AutoMigrate(
-					&models.UserPoints{},
-					&models.PointsTransaction{},
-					&models.DreamItem{},
-				)
-			},
-			Rollback: func(tx *gorm.DB) error {
-				return tx.Migrator().DropTable("dream_items", "points_transactions", "user_points")
-			},
-		},
-		{
-			// A2.x / A3.x — the trip room: invites, flights, profiles, wishlist.
-			ID: "202601020002_trip_room",
-			Migrate: func(tx *gorm.DB) error {
-				return tx.AutoMigrate(
-					&models.TripInvite{},
-					&models.TripFlight{},
-					&models.MemberProfile{},
-					&models.WishlistItem{},
-					&models.ActivityLog{},
-				)
-			},
-			Rollback: func(tx *gorm.DB) error {
-				return tx.Migrator().DropTable(
-					"activity_logs", "wishlist_items", "member_profiles",
-					"trip_flights", "trip_invites",
-				)
-			},
-		},
-		{
-			// A4.x / A5.x — the itinerary itself.
-			ID: "202601020003_plans_and_items",
-			Migrate: func(tx *gorm.DB) error {
-				return tx.AutoMigrate(
-					&models.Plan{},
-					&models.Day{},
-					&models.Item{},
-					&models.ItemVersion{},
-					&models.Rationale{},
-					&models.AIJob{},
-				)
-			},
-			Rollback: func(tx *gorm.DB) error {
-				return tx.Migrator().DropTable(
-					"ai_jobs", "rationales", "item_versions", "items", "days", "plans",
-				)
-			},
-		},
-		{
-			// A16.1 — real spending, deliberately separate from the estimate.
-			ID: "202601020004_expenses",
-			Migrate: func(tx *gorm.DB) error {
-				return tx.AutoMigrate(&models.ExpenseEntry{})
-			},
-			Rollback: func(tx *gorm.DB) error {
-				return tx.Migrator().DropTable("expense_entries")
-			},
-		},
-		{
-			// A8.x / A9.x — prep blocks, comments, votes.
-			ID: "202601020005_prep_and_collab",
-			Migrate: func(tx *gorm.DB) error {
-				return tx.AutoMigrate(
-					&models.PrepBlock{},
-					&models.Comment{},
-					&models.Vote{},
-				)
-			},
-			Rollback: func(tx *gorm.DB) error {
-				return tx.Migrator().DropTable("votes", "comments", "prep_blocks")
-			},
-		},
-		{
-			// A12.x — affiliate tracking and the clone edge points walk.
-			ID: "202601020006_booking",
-			Migrate: func(tx *gorm.DB) error {
-				return tx.AutoMigrate(
-					&models.AffiliatePartner{},
-					&models.BookingClick{},
-					&models.BookingConfirmation{},
-					&models.PlanClone{},
-				)
-			},
-			Rollback: func(tx *gorm.DB) error {
-				return tx.Migrator().DropTable(
-					"plan_clones", "booking_confirmations", "booking_clicks", "affiliate_partners",
-				)
-			},
-		},
-		{
-			// §4.2 caches — the durable copy behind the Redis cache.
-			ID: "202601020007_caches",
-			Migrate: func(tx *gorm.DB) error {
-				return tx.AutoMigrate(
-					&models.DistanceCache{},
-					&models.WeatherCache{},
-					&models.FXCache{},
-				)
-			},
-			Rollback: func(tx *gorm.DB) error {
-				return tx.Migrator().DropTable("fx_cache", "weather_cache", "distance_cache")
-			},
-		},
-		{
-			// M16 — public trips must never leak expense. Column added last so
-			// the default applies to every row that already existed.
-			ID: "202601020008_trip_public_hide_expense",
-			Migrate: func(tx *gorm.DB) error {
-				return tx.AutoMigrate(&models.Trip{})
-			},
-			Rollback: func(tx *gorm.DB) error {
-				return tx.Migrator().DropColumn(&models.Trip{}, "public_hide_expense")
+				for _, col := range []string{"character_id", "referred_by"} {
+					if err := tx.Migrator().DropColumn(&models.User{}, col); err != nil {
+						return err
+					}
+				}
+				return nil
 			},
 		},
 	})

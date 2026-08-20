@@ -1,7 +1,8 @@
 package api
 
 import (
-	"strings"
+	"net/http"
+	"sort"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -9,52 +10,42 @@ import (
 	"github.com/bboyzchecken/rove/apps/api/pkg/domain"
 	"github.com/bboyzchecken/rove/apps/api/pkg/handlers/api/request"
 	"github.com/bboyzchecken/rove/apps/api/pkg/models"
-	"github.com/bboyzchecken/rove/apps/api/pkg/store"
 )
 
-// registerUserRoutes covers everything under /users/me (DEV_SPEC §5.2):
-// the profile, the character choice, the dream list, stats, the calendar and
-// the points balance.
-//
-// Every route here is scoped to the authenticated user. There is no
-// /users/:id — nothing in Phase 1 needs to read someone else's account.
+// The signed-in user and everything hanging off them: profile (A3.1),
+// character (A14.2), dream list (A15.2), stats and calendar (A17.x).
 func (s *Server) registerUserRoutes(g *echo.Group) {
-	me := g.Group("/users/me", s.JwtMiddleware)
-
-	me.PATCH("", s.handleUpdateMe)
-	me.PATCH("/character", s.handleSetCharacter)
-	me.GET("/stats", s.handleUserStats)
-	me.GET("/calendar", s.handleUserCalendar)
-
-	me.GET("/dream", s.handleListDreams)
-	me.POST("/dream", s.handleCreateDream)
-	me.PATCH("/dream/:id", s.handleUpdateDream)
-	me.DELETE("/dream/:id", s.handleDeleteDream)
-	me.POST("/dream/reorder", s.handleReorderDreams)
-
-	me.GET("/points", s.handleGetPoints)
-	me.GET("/points/history", s.handlePointsHistory)
-}
-
-// registerCharacterRoutes exposes the seed catalogue (A14.2). It is readable
-// without auth so the onboarding picker can render before sign-in completes.
-func (s *Server) registerCharacterRoutes(g *echo.Group) {
 	g.GET("/characters", s.handleListCharacters)
+
+	me := g.Group("/users/me", s.JwtMiddleware)
+	me.PATCH("", s.handleUpdateMe)
+	me.GET("/stats", s.handleMyStats)
+	me.GET("/points", s.handleMyPoints)
+	me.GET("/trips/upcoming", s.handleUpcomingTrips)
+	me.GET("/trips/past", s.handlePastTrips)
+	me.GET("/dreams", s.handleListDreams)
+	me.POST("/dreams", s.handleCreateDream)
+	me.PATCH("/dreams/:dreamId", s.handleUpdateDream)
+	me.DELETE("/dreams/:dreamId", s.handleDeleteDream)
+
+	// Invites live here because accepting one is done by a user, not by a
+	// member of the trip they are about to join.
+	s.registerInviteRoutes(g)
 }
 
 func (s *Server) handleListCharacters(c echo.Context) error {
-	characters, err := s.characters.List(c.Request().Context(), true)
+	characters, err := s.characters.List(c.Request().Context())
 	if err != nil {
-		return request.Internal(c, "อ่านรายชื่อตัวละครไม่สำเร็จ")
+		return request.Internal(c, "โหลดตัวละครไม่สำเร็จ")
 	}
-	return request.OK(c, map[string]any{"items": characters})
+	return c.JSON(http.StatusOK, characters)
 }
 
 type updateMeRequest struct {
-	DisplayName  *string `json:"display_name" validate:"omitempty,min=1,max=120"`
-	Handle       *string `json:"handle" validate:"omitempty,min=3,max=60,alphanum"`
-	Locale       *string `json:"locale" validate:"omitempty,oneof=th en"`
-	HomeCurrency *string `json:"home_currency" validate:"omitempty,len=3"`
+	DisplayName  *string `json:"display_name"`
+	Handle       *string `json:"handle"`
+	CharacterID  *string `json:"character_id"`
+	HomeCurrency *string `json:"home_currency"`
 }
 
 func (s *Server) handleUpdateMe(c echo.Context) error {
@@ -69,147 +60,230 @@ func (s *Server) handleUpdateMe(c echo.Context) error {
 		return request.NotFound(c, "ไม่พบผู้ใช้")
 	}
 
-	if req.DisplayName != nil {
+	if req.DisplayName != nil && *req.DisplayName != "" {
 		user.DisplayName = *req.DisplayName
 	}
-	if req.Locale != nil {
-		user.Locale = *req.Locale
-	}
-	if req.HomeCurrency != nil {
-		user.HomeCurrency = strings.ToUpper(*req.HomeCurrency)
-	}
 	if req.Handle != nil {
-		handle := strings.ToLower(*req.Handle)
-		// The unique index would reject this anyway, but a 409 with a clear
-		// message beats a 500 from a constraint violation.
-		if existing, err := s.users.GetByHandle(ctx, handle); err == nil && existing.ID != user.ID {
-			return request.Conflict(c, "ชื่อผู้ใช้นี้ถูกใช้แล้ว")
+		if *req.Handle == "" {
+			user.Handle = nil
+		} else {
+			// A handle is public and unique; taking someone else's silently
+			// would be worse than refusing.
+			if existing, err := s.users.GetByHandle(ctx, *req.Handle); err == nil && existing.ID != user.ID {
+				return request.BadRequest(c, "ชื่อผู้ใช้นี้มีคนใช้แล้ว")
+			}
+			user.Handle = req.Handle
 		}
-		user.Handle = &handle
+	}
+	if req.CharacterID != nil {
+		user.CharacterID = req.CharacterID
+	}
+	if req.HomeCurrency != nil && *req.HomeCurrency != "" {
+		user.HomeCurrency = *req.HomeCurrency
 	}
 
 	if err := s.users.Update(ctx, user); err != nil {
 		return request.Internal(c, "บันทึกโปรไฟล์ไม่สำเร็จ")
 	}
-	return request.OK(c, user.Public())
+
+	balance, _ := s.points.Balance(ctx, user.ID)
+	return c.JSON(http.StatusOK, toMeDTO(*user, balance))
 }
 
-type setCharacterRequest struct {
-	CharacterID int16 `json:"character_id" validate:"required,min=1"`
-}
-
-func (s *Server) handleSetCharacter(c echo.Context) error {
-	var req setCharacterRequest
-	if err := request.BindAndValidate(c, &req); err != nil {
-		return err
-	}
-
+func (s *Server) handleMyPoints(c echo.Context) error {
 	ctx := c.Request().Context()
-	character, err := s.characters.GetByID(ctx, req.CharacterID)
-	if err != nil || !character.IsActive {
-		return request.BadRequest(c, "ไม่พบตัวละครนี้")
+	entries, err := s.points.List(ctx, request.UserID(c), 30)
+	if err != nil {
+		return request.Internal(c, "โหลดประวัติแต้มไม่สำเร็จ")
 	}
+	balance, _ := s.points.Balance(ctx, request.UserID(c))
 
-	if err := s.users.SetCharacter(ctx, request.UserID(c), req.CharacterID); err != nil {
-		return request.Internal(c, "บันทึกตัวละครไม่สำเร็จ")
-	}
-	return request.OK(c, map[string]any{"character": character})
+	return c.JSON(http.StatusOK, map[string]any{
+		"balance": balance,
+		"entries": entries,
+	})
 }
 
-// handleUserStats aggregates from trips rather than a counter column, so the
-// numbers cannot drift out of sync with reality (A17.1).
-func (s *Server) handleUserStats(c echo.Context) error {
+/* ----------------------------------------------------------------- trips -- */
+
+// handleUpcomingTrips powers the home dashboard's countdown (A17.2).
+func (s *Server) handleUpcomingTrips(c echo.Context) error {
 	ctx := c.Request().Context()
 	userID := request.UserID(c)
 
-	trips, err := s.trips.ListForStats(ctx, userID)
+	trips, _, err := s.trips.ListForUser(ctx, userID, 50, 0)
 	if err != nil {
-		return request.Internal(c, "อ่านสถิติไม่สำเร็จ")
-	}
-	spend, _ := s.expenses.TotalHomeForUser(ctx, userID)
-
-	stats := make([]domain.TripStat, 0, len(trips))
-	for _, t := range trips {
-		stats = append(stats, domain.TripStat{
-			ID: t.ID, Country: t.DestinationCountry, Status: t.Status,
-			StartDate: t.StartDate, EndDate: t.EndDate,
-		})
+		return request.Internal(c, "โหลดทริปไม่สำเร็จ")
 	}
 
-	return request.OK(c, domain.ComputeStats(stats, spend, time.Now().UTC()))
+	today := domain.Day(time.Now().UTC())
+	out := make([]calendarTripDTO, 0, len(trips))
+
+	for _, trip := range trips {
+		if trip.StartDate == nil || trip.EndDate == nil || trip.EndDate.Before(today) {
+			continue
+		}
+
+		roster, _ := s.loadMembers(ctx, trip.ID)
+		dto := calendarTripDTO{
+			ID:                 trip.ID,
+			Title:              trip.Title,
+			Cities:             citiesOf(trip),
+			StartDate:          trip.StartDate.Format("2006-01-02"),
+			EndDate:            trip.EndDate.Format("2006-01-02"),
+			DaysUntil:          domain.DaysBetween(today, *trip.StartDate) - 1,
+			CoverImageURL:      trip.CoverImageURL,
+			MemberIDs:          roster.ids(),
+			MemberCharacterIDs: roster.characterIDs(),
+		}
+
+		// The first day's forecast doubles as the trip's weather chip.
+		if days, err := s.plans.ListDays(ctx, trip.ID); err == nil && len(days) > 0 {
+			d := days[0]
+			if d.WeatherHigh != nil {
+				dto.WeatherHigh = d.WeatherHigh
+				dto.WeatherLow = d.WeatherLow
+				dto.WeatherIcon = strPtr(d.WeatherIcon)
+				dto.WeatherText = strPtr(d.WeatherText)
+			}
+		}
+		out = append(out, dto)
+	}
+
+	sort.SliceStable(out, func(a, b int) bool { return out[a].StartDate < out[b].StartDate })
+	return c.JSON(http.StatusOK, out)
 }
 
-// CalendarEntry is one row of the home calendar strip (W17.3).
-type CalendarEntry struct {
-	TripID    string     `json:"trip_id"`
-	Title     string     `json:"title"`
-	StartDate *time.Time `json:"start_date"`
-	EndDate   *time.Time `json:"end_date"`
-	DaysUntil int        `json:"days_until"`
-	Status    string     `json:"status"`
-	Weather   string     `json:"weather"`
-	Members   int64      `json:"members"`
-}
-
-func (s *Server) handleUserCalendar(c echo.Context) error {
+func (s *Server) handlePastTrips(c echo.Context) error {
 	ctx := c.Request().Context()
-	now := time.Now().UTC()
+	userID := request.UserID(c)
 
-	trips, err := s.trips.Upcoming(ctx, request.UserID(c), now, 10)
+	trips, _, err := s.trips.ListForUser(ctx, userID, 50, 0)
 	if err != nil {
-		return request.Internal(c, "อ่านปฏิทินไม่สำเร็จ")
+		return request.Internal(c, "โหลดทริปไม่สำเร็จ")
 	}
 
-	entries := make([]CalendarEntry, 0, len(trips))
-	for _, t := range trips {
-		count, _ := s.members.CountByTrip(ctx, t.ID)
-		entries = append(entries, CalendarEntry{
-			TripID: t.ID, Title: t.Title,
-			StartDate: t.StartDate, EndDate: t.EndDate,
-			DaysUntil: domain.DaysUntil(t.StartDate, now),
-			Status:    t.Status,
-			// The forecast only means something inside the horizon; the trip
-			// card says nothing rather than showing an invented temperature.
-			Weather: s.weatherSnippet(c, t),
-			Members: count,
+	today := domain.Day(time.Now().UTC())
+	out := make([]pastTripDTO, 0)
+
+	for _, trip := range trips {
+		if trip.EndDate == nil || !trip.EndDate.Before(today) {
+			continue
+		}
+
+		roster, _ := s.loadMembers(ctx, trip.ID)
+		items, _ := s.plans.ListItems(ctx, trip.ID)
+
+		spent := 0.0
+		if entries, err := s.expenses.ListByTrip(ctx, trip.ID); err == nil {
+			rate := tripFxRate(trip)
+			for _, e := range entries {
+				if e.Currency == "THB" {
+					spent += e.Amount
+					continue
+				}
+				spent += domain.ToHomeCurrency(e.Amount, rate)
+			}
+		}
+
+		days := 0
+		if trip.StartDate != nil {
+			days = domain.DaysBetween(*trip.StartDate, *trip.EndDate)
+		}
+
+		out = append(out, pastTripDTO{
+			ID:                 trip.ID,
+			Title:              trip.Title,
+			Cities:             citiesOf(trip),
+			DateLabel:          dateLabel(trip),
+			Days:               days,
+			Places:             len(items),
+			SpentTHB:           spent,
+			CoverImageURL:      trip.CoverImageURL,
+			MemberIDs:          roster.ids(),
+			MemberCharacterIDs: roster.characterIDs(),
 		})
 	}
-	return request.OK(c, map[string]any{"items": entries})
+
+	sort.SliceStable(out, func(a, b int) bool { return out[a].DateLabel > out[b].DateLabel })
+	return c.JSON(http.StatusOK, out)
 }
 
-// weatherSnippet is a one-line forecast for the first day of a trip.
-func (s *Server) weatherSnippet(c echo.Context, t models.Trip) string {
-	if t.StartDate == nil {
-		return ""
-	}
-	blocks, err := s.preps.ListByTrip(c.Request().Context(), t.ID)
+// handleMyStats aggregates the year (A17.1). Everything is derived from trips
+// and expenses — there is no counter to keep in sync.
+func (s *Server) handleMyStats(c echo.Context) error {
+	ctx := c.Request().Context()
+	userID := request.UserID(c)
+
+	trips, _, err := s.trips.ListForUser(ctx, userID, 200, 0)
 	if err != nil {
-		return ""
+		return request.Internal(c, "โหลดสถิติไม่สำเร็จ")
 	}
-	for _, b := range blocks {
-		if b.Type == models.PrepWeather && b.Trigger == "season" {
-			return b.ContentMD
+
+	now := time.Now().UTC()
+	stats := yearStatsDTO{Year: now.Year() + 543, MonthlyDays: make([]int, 12)}
+	countries := map[string]bool{}
+
+	for _, trip := range trips {
+		if trip.StartDate == nil || trip.EndDate == nil {
+			continue
+		}
+		if trip.StartDate.Year() != now.Year() {
+			continue
+		}
+		// Only finished travel counts: a plan is not a memory.
+		if trip.EndDate.After(now) {
+			continue
+		}
+
+		days := domain.DaysBetween(*trip.StartDate, *trip.EndDate)
+		stats.Trips++
+		stats.Days += days
+		countries[trip.DestinationCountry] = true
+		stats.MonthlyDays[int(trip.StartDate.Month())-1] += days
+
+		if items, err := s.plans.ListItems(ctx, trip.ID); err == nil {
+			stats.Places += len(items)
+		}
+		if entries, err := s.expenses.ListByTrip(ctx, trip.ID); err == nil {
+			rate := tripFxRate(trip)
+			for _, e := range entries {
+				if e.PaidBy != userID {
+					continue
+				}
+				if e.Currency == "THB" {
+					stats.SpentTHB += e.Amount
+					continue
+				}
+				stats.SpentTHB += domain.ToHomeCurrency(e.Amount, rate)
+			}
 		}
 	}
-	return ""
+
+	stats.Countries = len(countries)
+	return c.JSON(http.StatusOK, stats)
 }
 
+/* ---------------------------------------------------------------- dreams -- */
+
 func (s *Server) handleListDreams(c echo.Context) error {
-	p := request.BindPagination(c)
-	items, total, err := s.dreams.List(c.Request().Context(), request.UserID(c), p.Limit, p.Offset())
+	dreams, err := s.dreams.ListByUser(c.Request().Context(), request.UserID(c))
 	if err != nil {
-		return request.Internal(c, "อ่าน dream list ไม่สำเร็จ")
+		return request.Internal(c, "โหลดรายการที่อยากไปไม่สำเร็จ")
 	}
-	return request.OK(c, store.NewListResult(items, total, p))
+	out := make([]dreamDTO, 0, len(dreams))
+	for _, d := range dreams {
+		out = append(out, toDreamDTO(d))
+	}
+	return c.JSON(http.StatusOK, out)
 }
 
 type dreamRequest struct {
-	Title              string `json:"title" validate:"required,max=200"`
-	DestinationCountry string `json:"destination_country" validate:"omitempty,max=80"`
-	DestinationCity    string `json:"destination_city" validate:"omitempty,max=80"`
-	URL                string `json:"url" validate:"omitempty,url,max=500"`
-	ImageURL           string `json:"image_url" validate:"omitempty,url,max=500"`
-	Notes              string `json:"notes" validate:"omitempty,max=2000"`
+	Title       string `json:"title" validate:"required"`
+	Destination string `json:"destination"`
+	Note        string `json:"note"`
+	URL         string `json:"url"`
+	Accent      string `json:"accent"`
 }
 
 func (s *Server) handleCreateDream(c echo.Context) error {
@@ -218,21 +292,18 @@ func (s *Server) handleCreateDream(c echo.Context) error {
 		return err
 	}
 
-	ctx := c.Request().Context()
-	userID := request.UserID(c)
-	order, _ := s.dreams.NextSortOrder(ctx, userID)
-
 	dream := &models.DreamItem{
-		UserID: userID, Title: req.Title,
-		DestinationCountry: req.DestinationCountry,
-		DestinationCity:    req.DestinationCity,
-		URL:                req.URL, ImageURL: req.ImageURL,
-		Notes: req.Notes, SortOrder: order,
+		UserID:      request.UserID(c),
+		Title:       req.Title,
+		Destination: req.Destination,
+		Note:        req.Note,
+		URL:         req.URL,
+		Accent:      orDefault(req.Accent, "primary"),
 	}
-	if err := s.dreams.Create(ctx, dream); err != nil {
-		return request.Internal(c, "บันทึก dream ไม่สำเร็จ")
+	if err := s.dreams.Create(c.Request().Context(), dream); err != nil {
+		return request.Internal(c, "บันทึกไม่สำเร็จ")
 	}
-	return request.Created(c, dream)
+	return c.JSON(http.StatusCreated, toDreamDTO(*dream))
 }
 
 func (s *Server) handleUpdateDream(c echo.Context) error {
@@ -244,75 +315,46 @@ func (s *Server) handleUpdateDream(c echo.Context) error {
 	ctx := c.Request().Context()
 	userID := request.UserID(c)
 
-	dream, err := s.dreams.Get(ctx, userID, c.Param("id"))
+	dreams, err := s.dreams.ListByUser(ctx, userID)
 	if err != nil {
-		return request.NotFound(c, "ไม่พบรายการ")
+		return request.Internal(c, "โหลดรายการไม่สำเร็จ")
 	}
-
-	dream.Title = req.Title
-	dream.DestinationCountry = req.DestinationCountry
-	dream.DestinationCity = req.DestinationCity
-	dream.URL = req.URL
-	dream.ImageURL = req.ImageURL
-	dream.Notes = req.Notes
-
-	if err := s.dreams.Update(ctx, dream); err != nil {
-		return request.Internal(c, "บันทึก dream ไม่สำเร็จ")
+	for _, dream := range dreams {
+		if dream.ID != c.Param("dreamId") {
+			continue
+		}
+		dream.Title = req.Title
+		dream.Destination = req.Destination
+		dream.Note = req.Note
+		dream.URL = req.URL
+		if req.Accent != "" {
+			dream.Accent = req.Accent
+		}
+		if err := s.dreams.Update(ctx, &dream); err != nil {
+			return request.Internal(c, "บันทึกไม่สำเร็จ")
+		}
+		return c.JSON(http.StatusOK, toDreamDTO(dream))
 	}
-	return request.OK(c, dream)
+	return request.NotFound(c, "ไม่พบรายการนี้")
 }
 
 func (s *Server) handleDeleteDream(c echo.Context) error {
-	err := s.dreams.Delete(c.Request().Context(), request.UserID(c), c.Param("id"))
+	err := s.dreams.Delete(c.Request().Context(), request.UserID(c), c.Param("dreamId"))
 	if err != nil {
-		return request.Internal(c, "ลบ dream ไม่สำเร็จ")
+		return request.Internal(c, "ลบไม่สำเร็จ")
 	}
-	return request.NoContent(c)
+	return c.NoContent(http.StatusNoContent)
 }
 
-type reorderRequest struct {
-	IDs []string `json:"ids" validate:"required,max=200,dive,uuid4"`
+/* ------------------------------------------------------------------ util -- */
+
+func citiesOf(trip models.Trip) []string {
+	return jsonStrings(toJSONRaw(trip.DestinationCities))
 }
 
-func (s *Server) handleReorderDreams(c echo.Context) error {
-	var req reorderRequest
-	if err := request.BindAndValidate(c, &req); err != nil {
-		return err
+func dateLabel(trip models.Trip) string {
+	if trip.StartDate == nil || trip.EndDate == nil {
+		return ""
 	}
-	err := s.dreams.Reorder(c.Request().Context(), request.UserID(c), req.IDs)
-	if err != nil {
-		return request.Internal(c, "จัดลำดับไม่สำเร็จ")
-	}
-	return request.OK(c, map[string]any{"reordered": len(req.IDs)})
-}
-
-func (s *Server) handleGetPoints(c echo.Context) error {
-	points, err := s.points.Get(c.Request().Context(), request.UserID(c))
-	if err != nil {
-		return request.Internal(c, "อ่านแต้มไม่สำเร็จ")
-	}
-	cfg := domain.PointsConfig{
-		EarnRatePct:      s.cfg.Points.EarnRatePct,
-		MinRedeemBalance: s.cfg.Points.MinRedeemBalance,
-	}
-	return request.OK(c, map[string]any{
-		"balance":            points.Balance,
-		"lifetime_earned":    points.LifetimeEarned,
-		"can_redeem":         domain.CanRedeem(points.Balance, cfg),
-		"min_redeem_balance": cfg.MinRedeemBalance,
-	})
-}
-
-func (s *Server) handlePointsHistory(c echo.Context) error {
-	txs, err := s.points.History(c.Request().Context(), request.UserID(c),
-		c.QueryParam("cursor"), atoiDefault(c.QueryParam("limit"), 30))
-	if err != nil {
-		return request.Internal(c, "อ่านประวัติแต้มไม่สำเร็จ")
-	}
-
-	var next string
-	if len(txs) > 0 {
-		next = txs[len(txs)-1].CreatedAt.Format(time.RFC3339Nano)
-	}
-	return request.OK(c, map[string]any{"items": txs, "next_cursor": next})
+	return domain.ThaiRangeLabel(*trip.StartDate, *trip.EndDate) + " " + itoa(trip.StartDate.Year()+543)
 }

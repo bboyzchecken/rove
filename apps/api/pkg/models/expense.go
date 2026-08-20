@@ -2,63 +2,56 @@ package models
 
 import (
 	"context"
+	"time"
 
 	"gorm.io/datatypes"
 )
 
-// Expense categories.
+// Expense scopes (DEV_SPEC M16).
 const (
-	ExpenseFood      = "food"
-	ExpenseStay      = "stay"
-	ExpenseTransport = "transport"
-	ExpenseTicket    = "ticket"
-	ExpenseShopping  = "shopping"
-	ExpenseOther     = "other"
+	ScopeShared   = "shared"
+	ScopePersonal = "personal"
 )
 
-// Split types (DEV_SPEC M16).
-const (
-	SplitShared   = "shared"
-	SplitPersonal = "personal"
-)
-
-// ExpenseEntry is money actually spent, which is a different thing from the
-// Budget estimate derived from plan items — the two never mix in the UI.
-//
-// Privacy: expense rows are NEVER part of a public payload
-// (trips.public_hide_expense, DEV_SPEC §4.3).
+// ExpenseEntry is real money that was actually spent — never mixed with the
+// Budget tab's estimate, which is derived from plan items instead.
 type ExpenseEntry struct {
 	Base
-	TripID         string         `gorm:"type:char(36);not null;index:idx_expense_trip_day,priority:1" json:"trip_id"`
-	DayID          *string        `gorm:"type:char(36);index:idx_expense_trip_day,priority:2" json:"day_id"`
-	PaidByUserID   string         `gorm:"type:char(36);not null;index" json:"paid_by_user_id"`
-	Title          string         `gorm:"type:varchar(200);not null" json:"title"`
-	Amount         float64        `gorm:"type:decimal(12,2);not null" json:"amount"`
-	Currency       string         `gorm:"type:varchar(3);not null;default:'JPY'" json:"currency"`
-	Category       string         `gorm:"type:varchar(20);not null;default:'other'" json:"category"`
-	SplitType      string         `gorm:"type:varchar(10);not null;default:'shared'" json:"split_type"`
-	Participants   datatypes.JSON `gorm:"column:participants_json;type:json" json:"participants_json"`
-	FxRateSnapshot *float64       `gorm:"type:decimal(10,4)" json:"fx_rate_snapshot"`
-	Note           string         `gorm:"type:varchar(500)" json:"note"`
+	TripID   string         `gorm:"type:char(36);not null;index" json:"trip_id"`
+	Date     time.Time      `gorm:"type:date;not null" json:"date"`
+	Title    string         `gorm:"type:varchar(200);not null" json:"title"`
+	Category string         `gorm:"type:varchar(40);not null;default:'อื่นๆ'" json:"category"`
+	Scope    string         `gorm:"type:varchar(10);not null;default:'shared'" json:"scope"`
+	Amount   float64        `gorm:"type:decimal(12,2);not null" json:"amount"`
+	Currency string         `gorm:"type:varchar(3);not null;default:'JPY'" json:"currency"`
+	PaidBy   string         `gorm:"type:char(36);not null;index" json:"paid_by"`
+	// Empty for a personal entry; a shared one divides evenly across these.
+	Participants datatypes.JSON `gorm:"type:json" json:"participants"`
+	Note         string         `gorm:"type:varchar(255)" json:"note"`
 }
 
 func (ExpenseEntry) TableName() string { return "expense_entries" }
 
-type ExpenseFilter struct {
-	DayID  string
-	UserID string
-	Split  string
+// Settlement records that a debt was paid back outside the app, so the
+// settle-up card stops suggesting it.
+type Settlement struct {
+	Base
+	TripID     string    `gorm:"type:char(36);not null;index" json:"trip_id"`
+	FromUserID string    `gorm:"type:char(36);not null" json:"from_user_id"`
+	ToUserID   string    `gorm:"type:char(36);not null" json:"to_user_id"`
+	AmountTHB  float64   `gorm:"type:decimal(12,2)" json:"amount_thb"`
+	SettledAt  time.Time `gorm:"not null" json:"settled_at"`
 }
 
+func (Settlement) TableName() string { return "expense_settlements" }
+
 type ExpenseStore interface {
-	ListByTrip(ctx context.Context, tripID string, f ExpenseFilter, limit, offset int) ([]ExpenseEntry, int64, error)
-	AllByTrip(ctx context.Context, tripID string) ([]ExpenseEntry, error)
 	Create(ctx context.Context, e *ExpenseEntry) error
-	Get(ctx context.Context, tripID, id string) (*ExpenseEntry, error)
-	// TripID resolves the owning trip for the /expense/:id routes.
-	TripID(ctx context.Context, id string) (string, error)
+	Get(ctx context.Context, tripID, expenseID string) (*ExpenseEntry, error)
+	ListByTrip(ctx context.Context, tripID string) ([]ExpenseEntry, error)
 	Update(ctx context.Context, e *ExpenseEntry) error
-	Delete(ctx context.Context, tripID, id string) error
-	// TotalHomeForUser powers the "how much did I spend this year" stat (A17.1).
-	TotalHomeForUser(ctx context.Context, userID string) (float64, error)
+	Delete(ctx context.Context, tripID, expenseID string) error
+
+	AddSettlement(ctx context.Context, s *Settlement) error
+	ListSettlements(ctx context.Context, tripID string) ([]Settlement, error)
 }
