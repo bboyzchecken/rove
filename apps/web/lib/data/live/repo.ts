@@ -122,11 +122,14 @@ export const liveRepo: RoveRepo = {
       }
     },
 
-    async startLogin(provider) {
-      const { url } = await api.get<{ url: string }>(`/auth/${provider}/url`, {
-        searchParams: { redirect: `${env.appUrl}/home` },
-      });
-      return { redirectUrl: url, user: null };
+    async startLogin(provider, next) {
+      // Not the provider's URL directly: `/api/auth/start` fetches it, keeps
+      // the `state` in an httpOnly cookie so the callback can verify it, and
+      // only then hands the browser on. The API cannot hold that state itself.
+      const url = new URL('/api/auth/start', env.appUrl);
+      url.searchParams.set('provider', provider);
+      if (next) url.searchParams.set('next', next);
+      return { redirectUrl: `${url.pathname}${url.search}`, user: null };
     },
 
     async logout() {

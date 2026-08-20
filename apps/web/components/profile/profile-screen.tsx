@@ -1,13 +1,14 @@
 'use client';
 
-import { Sparkles } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { LogOut, Sparkles } from 'lucide-react';
 
 import { SectionHeader, Stat } from '@/components/common/section';
 import { CharacterPicker } from '@/components/profile/character-picker';
-import { ButtonLink } from '@/components/ui/button';
+import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
-import { useDreams, useMe, usePastTrips, useYearStats } from '@/features/auth/queries';
+import { useDreams, useLogout, useMe, usePastTrips, useYearStats } from '@/features/auth/queries';
 import { formatMoney } from '@/lib/format';
 
 /** Profile: character (M14), dream list (M15), lifetime stats and points. */
@@ -87,6 +88,39 @@ export function ProfileScreen() {
           </ButtonLink>
         </Card>
       </section>
+
+      {/* session ------------------------------------------------------- */}
+      <SignOut />
     </div>
+  );
+}
+
+/**
+ * The way out. It lives at the bottom of the profile because that is the one
+ * screen that is unambiguously "me" — a sign-out in the nav bar is a tap away
+ * from every other destination and gets hit by accident on a phone.
+ */
+function SignOut() {
+  const router = useRouter();
+  const logout = useLogout();
+
+  return (
+    <section className="pt-1">
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={logout.isPending}
+        onClick={() =>
+          logout.mutate(undefined, {
+            // A full load, not a client navigation: the session cookie is gone
+            // and every cached query with it, so the app should start clean.
+            onSuccess: () => router.replace('/'),
+          })
+        }
+      >
+        <LogOut className="size-4" strokeWidth={2.5} />
+        {logout.isPending ? 'กำลังออกจากระบบ…' : 'ออกจากระบบ'}
+      </Button>
+    </section>
   );
 }

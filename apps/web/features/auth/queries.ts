@@ -39,10 +39,12 @@ export function useUpdateMe() {
 export function useLogin() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (provider: 'line' | 'google') => repo.auth.startLogin(provider),
+    mutationFn: ({ provider, next }: { provider: 'line' | 'google'; next?: string }) =>
+      repo.auth.startLogin(provider, next),
     onSuccess: (result) => {
-      // Live mode hands back an OAuth URL to follow; mock mode signs the seeded
-      // user in on the spot.
+      // Live mode hands back a URL to follow — a full page load, because the
+      // round trip ends at a route handler that sets the session cookie. Mock
+      // mode signs the seeded user in on the spot and the caller navigates.
       if (result.redirectUrl) window.location.href = result.redirectUrl;
       else if (result.user) queryClient.setQueryData(queryKeys.me(), result.user);
     },

@@ -83,8 +83,15 @@ export interface RoveRepo {
 export interface AuthRepo {
   /** null for an anonymous visitor — never throws. */
   me(): Promise<CurrentUser | null>;
-  /** Mock mode signs in a seeded user; live mode returns the OAuth URL. */
-  startLogin(provider: 'line' | 'google'): Promise<{ redirectUrl: string | null; user: CurrentUser | null }>;
+  /**
+   * Mock mode signs in a seeded user and returns them; live mode returns a URL
+   * to follow. `next` is where the user should land once signed in — live mode
+   * carries it across the OAuth round trip, mock mode leaves it to the caller.
+   */
+  startLogin(
+    provider: 'line' | 'google',
+    next?: string,
+  ): Promise<{ redirectUrl: string | null; user: CurrentUser | null }>;
   logout(): Promise<void>;
   updateMe(patch: Partial<Pick<CurrentUser, 'name' | 'handle' | 'characterId' | 'homeCurrency'>>): Promise<CurrentUser>;
 }
