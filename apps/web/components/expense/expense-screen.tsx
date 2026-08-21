@@ -98,9 +98,7 @@ export function ExpenseScreen({ tripId }: { tripId: string }) {
         <SectionHeader label="น้องหารสรุปให้" />
         <Card accent="matcha" className="p-4">
           {summary.settlements.length === 0 ? (
-            <p className="text-espresso text-sm">
-              ตอนนี้ไม่มีใครติดใคร — เคลียร์กันหมดแล้ว 🎉
-            </p>
+            <p className="text-espresso text-sm">ตอนนี้ไม่มีใครติดใคร — เคลียร์กันหมดแล้ว 🎉</p>
           ) : (
             <>
               <ul className="space-y-2.5">

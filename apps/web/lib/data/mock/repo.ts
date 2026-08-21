@@ -1,3 +1,4 @@
+import { DEFAULT_COVER } from '@/lib/covers';
 import { getCharacter, CHARACTERS } from '@/lib/mock/characters';
 import { AI_CREDITS, DAYS } from '@/lib/mock/trip';
 import { PAST_TRIP_ARCHIVES, POINTS_PER_PUBLISH } from '@/lib/mock/user';
@@ -366,7 +367,7 @@ export const mockRepo: RoveRepo = {
             nights: start && end ? Math.max(0, daysBetween(start, end) - 1) : 0,
             partySize: input.partySize ?? 1,
             status: 'planning',
-            cover: '/brand/covers/cover-japan.webp',
+            cover: DEFAULT_COVER,
             homeCurrency: 'THB',
             destCurrency: 'JPY',
             fxRate: 0.235,
@@ -437,7 +438,10 @@ export const mockRepo: RoveRepo = {
           if (patch.startDate && patch.endDate) {
             record.trip.nights = Math.max(0, daysBetween(patch.startDate, patch.endDate) - 1);
           }
-          log(record, db.user.id, 'แก้กรอบทริป');
+          // The cover rides on the same PATCH as the frame, but the feed reads
+          // better when it says which of the two actually changed.
+          const coverOnly = patch.cover !== undefined && Object.keys(patch).length === 1;
+          log(record, db.user.id, coverOnly ? 'เปลี่ยนรูปปกทริป' : 'แก้กรอบทริป');
           return clone(record.trip);
         }),
       );

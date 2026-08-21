@@ -44,4 +44,11 @@ export const mockSkips = {
   notifications: isMockMode,
   /** No R2 upload — export returns a data URL built in the browser. */
   fileExport: isMockMode,
+  /**
+   * No R2 bucket either, so an uploaded trip cover is resized in the browser
+   * and kept as a data URL in this browser's copy of the trip. Live mode has
+   * nowhere to put the bytes — `cover_image_url` is a 500-char column — so the
+   * cover picker offers the built-in covers only until storage exists.
+   */
+  imageUpload: isMockMode,
 } as const;

@@ -143,7 +143,7 @@ export function RouteBuilder({
   return (
     <div className="space-y-2.5">
       {legs.map((leg, index) => (
-        <Card key={leg.key} className="p-3.5 md:p-5">
+        <Card key={leg.key} className="@container p-3.5 @lg:p-5">
           <div className="mb-2.5 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               {leg.mode === 'ground' ? (
@@ -182,13 +182,15 @@ export function RouteBuilder({
           </div>
 
           {/*
-            Two airports side by side is a desktop shape: at 375px each column
-            is barely wide enough for "Suvarnabhumi Airport", let alone the
-            search list under it. Below `md` the legs read top-to-bottom, with
-            the arrow turned to match, and the pair snaps back into a row from
-            `md` up where there is room for both.
+            These break on the *card's* width, not the window's — hence the
+            `@container` above. The same builder is mounted twice: as wide as
+            the page in the entry flow, and inside the route sheet, which is
+            narrower than the window it floats in. Window breakpoints handed
+            that sheet a desktop layout it had no room for — two airports and
+            three fields crushed into 400px. Under `@lg` (32rem of card) the
+            legs read top-to-bottom instead, with the arrow turned to match.
           */}
-          <div className="grid gap-1.5 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-end md:gap-2">
+          <div className="grid gap-1.5 @lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] @lg:items-end @lg:gap-2">
             <AirportPicker
               label="จาก"
               value={airports[leg.from] ?? null}
@@ -196,7 +198,7 @@ export function RouteBuilder({
               autoFocus={index === 0 && !leg.from}
               onChange={(airport) => patch(leg.key, { from: airport?.iata ?? '' })}
             />
-            <ArrowRight className="text-muted mx-auto size-4 rotate-90 md:mx-0 md:mb-3 md:rotate-0" />
+            <ArrowRight className="text-muted mx-auto size-4 rotate-90 @lg:mx-0 @lg:mb-3 @lg:rotate-0" />
             <AirportPicker
               label="ถึง"
               value={airports[leg.to] ?? null}
@@ -206,11 +208,12 @@ export function RouteBuilder({
           </div>
 
           {/* Date, time and flight number are one row of facts off the ticket,
-              so from `lg` up they sit on one line instead of wrapping. */}
+              so they share a line once the card is wide enough to hold three
+              fields without squeezing them, and pair up when it is not. */}
           <div
             className={cn(
-              'mt-2.5 grid grid-cols-2 gap-2 md:mt-3',
-              leg.mode === 'flight' && 'lg:grid-cols-3',
+              'mt-2.5 grid gap-2 @2xs:grid-cols-2 @lg:mt-3',
+              leg.mode === 'flight' && '@2xl:grid-cols-3',
             )}
           >
             <Field label={leg.mode === 'ground' ? 'เดินทางวันที่' : 'บินวันที่'}>
@@ -231,7 +234,7 @@ export function RouteBuilder({
             </Field>
 
             {leg.mode === 'flight' ? (
-              <Field label="เที่ยวบิน (ใส่ทีหลังได้)" className="col-span-2 lg:col-span-1">
+              <Field label="เที่ยวบิน (ใส่ทีหลังได้)" className="@2xs:col-span-2 @2xl:col-span-1">
                 <Input
                   value={leg.flightNo ?? ''}
                   onChange={(e) => patch(leg.key, { flightNo: e.target.value.toUpperCase() })}

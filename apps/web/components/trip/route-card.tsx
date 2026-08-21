@@ -174,6 +174,10 @@ function RouteEditor({
       onClose={onClose}
       title="เส้นทางของทริป"
       description="วันเดินทางและปลายทางของทริปจะอัปเดตตามเที่ยวบินที่ใส่ไว้"
+      /* Wider than the default sheet: this one holds a whole route — two or
+         three legs, each with two airports and three fields — and at 28rem the
+         builder has to stack every one of them. */
+      className="sm:max-w-2xl"
       footer={
         <Button block size="lg" onClick={() => void submit()} disabled={save.isPending}>
           {save.isPending ? 'กำลังบันทึก…' : 'บันทึกเส้นทาง'}

@@ -16,10 +16,7 @@ import {
 
 import { DateStepBar, type DateStep } from '@/components/dates/date-step-bar';
 import { DestinationPicker } from '@/components/dates/destination-picker';
-import {
-  AvailabilityCalendar,
-  type DaySelection,
-} from '@/components/dates/availability-calendar';
+import { AvailabilityCalendar, type DaySelection } from '@/components/dates/availability-calendar';
 import { SectionHeader } from '@/components/common/section';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -263,7 +260,10 @@ export function DateBoard({ tripId }: { tripId: string }) {
 
           {/* --------------------------------------------- selection bar -- */}
           {mode === 'range' && range && rangeMembers ? (
-            <Card accent="primary" className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <Card
+              accent="primary"
+              className="flex flex-wrap items-center justify-between gap-3 p-4"
+            >
               <div>
                 <p className="font-display text-espresso text-base font-extrabold">
                   {thaiRangeLabel(range.start, range.end)} ·{' '}

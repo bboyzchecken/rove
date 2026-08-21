@@ -777,7 +777,7 @@ Lightsail Ubuntu 2 vCPU / 2 GB / 60 GB SSD  ($12/mo)  + static IP (ฟรีเ�
 - [x] A2.5 SSE hub (redis pubsub) + `GET /events` + emit helper ในทุก mutation
 - [x] W2.1 Layout `/t/[tripId]` + tabs + mobile bottom nav (Overview|Wishlist|Plan|Budget|Expense|Prep|Bookings|Discussion)
 - [x] W2.2 Overview: Trip Frame card, members (character avatar), สถานะ, quick actions
-- [x] W2.3 Inline edit frame (optimistic)
+- [x] W2.3 Inline edit frame (optimistic)  ·  **หมายเหตุ:** รูปปกทริปแก้ได้แล้ว — ปุ่ม “เปลี่ยนรูปปก” บนรูปปกในห้องทริป → `components/trip/trip-cover-sheet.tsx` (คลังปก 15 แบบ หรืออัปโหลดเอง)
 - [x] W2.4 Invite dialog + `/invite/[token]`
 - [x] W2.5 Activity feed (infinite query)  ·  **หมายเหตุ:** API เป็น cursor แล้ว แต่ UI ยังดึงรอบเดียว ยังไม่ได้ต่อ infinite scroll
 - [x] W2.6 `useTripEvents` hook → invalidate ตาม event type  ·  **หมายเหตุ:** `components/trip/trip-realtime.tsx` + `lib/sse.ts`
@@ -1234,6 +1234,7 @@ AUTH_COOKIE_DOMAIN=rove.app
 | 19 ส.ค. 2569 | หน้า error/สถานะ | `not-found.tsx`, `error.tsx`, `global-error.tsx` + route `/maintenance` (static) | `/maintenance` ให้ Caddy เสิร์ฟตอน deploy/ล่มได้โดยไม่ต้องรอ Next ขึ้น (§8.1 instance เดียว) |
 | 19 ส.ค. 2569 | แยก 503 ออกจาก 500 | error boundary เช็ค ApiError ≥500 / network → แสดงจอ "หลังบ้านไม่ตอบ" | ผู้ใช้แก้เองไม่ได้ ต้องบอกว่าไม่ใช่ที่เขา + ปุ่ม retry แทน "กลับหน้าแรก" · **ข้อจำกัด:** production Next mask error ฝั่ง server ทำให้ branch นี้ยิงจริงเฉพาะ error ฝั่ง client (ที่ TanStack Query อยู่) |
 | 19 ส.ค. 2569 | เอกสารกฎหมาย | `/terms` + `/privacy` เป็น **ฉบับร่าง** เขียนจากพฤติกรรมจริงของระบบ | ให้ที่ปรึกษากฎหมายตรวจต่อจากของจริง ไม่ใช่ template · ช่อง `[...]` = ข้อมูลนิติบุคคลที่ยังไม่มี |
+| 20 ส.ค. 2569 | รูปปกทริป | เพิ่มคลังปก “ตามอารมณ์ทริป” 9 แบบ (FLUX seed เดิม) + `cover-placeholder` เป็นปกตั้งต้นของทุกทริป · อัปโหลดเองย่อ/ครอบเป็น 1200×800 WebP ในเบราว์เซอร์แล้วเก็บเป็น data URL | ทริปที่ไม่ได้ไปญี่ปุ่นเคยได้ปกญี่ปุ่นทุกใบ · R2 ยังเป็น stub และ `cover_image_url` เป็น varchar(500) การอัปโหลดจึงเปิดเฉพาะโหมด mock จนกว่า Phase 2 จะต่อ bucket |
 | 20 ส.ค. 2569 | สอง branch ที่ทำ Phase 1 ทับกัน | ยึด `feat/ui-prototype` เป็น tree ตั้งต้นทั้งก้อน แล้วยกเฉพาะชุดเทสต์ security ตามมา — merge commit ปกติ ไม่ rewrite ประวัติ | ui-prototype มีภาพที่เจนแล้ว (characters 20 + covers + empty states) และ mock/live layer ที่ demo ได้โดยไม่ต้องมี API · เลือกทับทั้ง tree ดีกว่าไล่ merge 111 ไฟล์ที่ชนกันทีละไฟล์ |
 | 20 ส.ค. 2569 | สร้างลิงก์เชิญ | **owner เท่านั้น** (เดิม ui-prototype ให้ editor ทำได้) | editor ที่ออกลิงก์เชิญได้ = ขยายสิทธิ์เขียนในทริปของคนอื่นโดยเจ้าของไม่รู้ · ตรงกับสัญญาใน §5.3 อยู่แล้ว |
 | 20 ส.ค. 2569 | DB ของ integration test | `glebarez/sqlite` (pure Go) in-memory | `go test ./...` รันได้โดยไม่ต้องมี cgo และไม่ต้องยก container — เทสต์ security จึงรันทุก PR ไม่ใช่เฉพาะตอนมี MySQL |

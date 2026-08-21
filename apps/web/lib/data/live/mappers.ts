@@ -1,3 +1,5 @@
+import { DEFAULT_COVER } from '@/lib/covers';
+
 import type {
   ActivityEvent,
   AiCredits,
@@ -104,7 +106,7 @@ export function toTrip(dto: TripDto): Trip {
     nights: dto.nights,
     partySize: dto.party_size,
     status: dto.status === 'draft' ? 'planning' : dto.status === 'final' ? 'ready' : dto.status,
-    cover: dto.cover_image_url || '/brand/covers/cover-japan.webp',
+    cover: dto.cover_image_url || DEFAULT_COVER,
     homeCurrency: dto.home_currency,
     destCurrency: dto.dest_currency,
     fxRate: dto.fx_rate ?? 0.235,
@@ -766,7 +768,7 @@ export function toCalendarTrip(dto: CalendarTripDto): CalendarTrip {
     startDate: dto.start_date,
     endDate: dto.end_date,
     daysUntil: dto.days_until,
-    cover: dto.cover_image_url,
+    cover: dto.cover_image_url || DEFAULT_COVER,
     memberIds: dto.member_ids ?? [],
     characterIds: dto.member_character_ids ?? [],
     weather:
@@ -791,7 +793,7 @@ export function toPastTrip(dto: PastTripDto): PastTrip {
     days: dto.days,
     places: dto.places,
     spentThb: dto.spent_thb,
-    cover: dto.cover_image_url,
+    cover: dto.cover_image_url || DEFAULT_COVER,
     memberIds: dto.member_ids ?? [],
     characterIds: dto.member_character_ids ?? [],
     visibility: dto.visibility,

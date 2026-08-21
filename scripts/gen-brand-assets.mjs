@@ -12,8 +12,9 @@
  * SVG (DEV_SPEC §15) so they stay crisp at favicon size.
  */
 import fs from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RAW = path.join(ROOT, '.assets-raw');
@@ -110,6 +111,67 @@ const scenes = [
     width: 1200,
     height: 800,
     prompt: `A simple flat illustration for a Europe trip card: pastel row houses along a canal, a clock tower, a tram, a bicycle leaning on a railing. Pure white background. ${STYLE}`,
+  },
+
+  /* The vibe covers. The six above are destinations we happen to have drawn;
+     these are what a trip *feels* like, which is the only thing we know about
+     a trip to somewhere we never illustrated. They are what the cover picker
+     offers, and `cover-placeholder` is what every new trip starts with —
+     neutral on purpose, so a trip with no cover yet does not look like it is
+     going to Japan. */
+  {
+    name: 'cover-placeholder',
+    width: 1200,
+    height: 800,
+    prompt: `A simple flat illustration for a trip card that has no cover picked yet: a folded paper map lying at a slight angle with a dotted route curving across it, three small map pins along the route, a compass beside it and a tiny plane above. Nothing that names a destination, calm and balanced, generous empty space. Pure white background. ${STYLE}`,
+  },
+  {
+    name: 'cover-beach',
+    width: 1200,
+    height: 800,
+    prompt: `A simple flat illustration for a beach trip card: a small island with two palm trees, layered wave lines, a striped beach umbrella with a ring float beside it, a little sailboat on the horizon. Pure white background. ${STYLE}`,
+  },
+  {
+    name: 'cover-mountain',
+    width: 1200,
+    height: 800,
+    prompt: `A simple flat illustration for a hiking trip card: layered mountain peaks with pine trees, a winding trail, a small tent and a backpack resting beside it, a sun disc behind the peaks. Pure white background. ${STYLE}`,
+  },
+  {
+    name: 'cover-city',
+    width: 1200,
+    height: 800,
+    prompt: `A simple flat illustration for a city trip card: a cluster of tall rounded buildings at different heights, a bridge in front of them, a tram on a street with a few round street trees. Pure white background. ${STYLE}`,
+  },
+  {
+    name: 'cover-roadtrip',
+    width: 1200,
+    height: 800,
+    prompt: `A simple flat illustration for a road trip card: a rounded car with luggage strapped on the roof driving along a curving road that runs into low rolling hills, a signpost and two road markers beside it, small clouds above. Pure white background. ${STYLE}`,
+  },
+  {
+    name: 'cover-snow',
+    width: 1200,
+    height: 800,
+    prompt: `A simple flat illustration for a snow trip card: snowy hills with pine trees, a cable car cabin hanging on a line, a small wooden lodge with a round window, a few falling snowflakes. Pure white background. ${STYLE}`,
+  },
+  {
+    name: 'cover-desert',
+    width: 1200,
+    height: 800,
+    prompt: `A simple flat illustration for a desert trip card: layered sand dunes, a camel walking to the right, one lone palm tree, a large plain sun disc low in the sky. Pure white background. ${STYLE}`,
+  },
+  {
+    name: 'cover-food',
+    width: 1200,
+    height: 800,
+    prompt: `A simple flat illustration for a food trip card: a bowl of noodles with chopsticks resting across it, a grilled skewer, a coffee cup, and a small food cart with a striped awning behind them. Pure white background. ${STYLE}`,
+  },
+  {
+    name: 'cover-festival',
+    width: 1200,
+    height: 800,
+    prompt: `A simple flat illustration for a festival trip card: paper lanterns strung across the top, two firework bursts, a small stage tent, confetti pieces scattered around. Pure white background. ${STYLE}`,
   },
   {
     name: 'empty-wishlist',
@@ -228,20 +290,29 @@ const PLACEMENT = [
 
 async function optimise() {
   // sharp is not a project dependency — it is only needed to re-cut assets.
-  // Resolve it from wherever it happens to be installed, else skip the step.
+  // A bare import covers a global or hoisted install; otherwise SHARP_PATH (a
+  // directory whose node_modules has sharp) and apps/web are tried through
+  // createRequire, because sharp is CommonJS and an absolute Windows path is
+  // not an importable specifier.
   let sharp;
-  for (const from of ['sharp', path.join(WEB, 'node_modules/sharp/lib/index.js')]) {
-    try {
-      ({ default: sharp } = await import(from));
-      break;
-    } catch {
-      /* try the next location */
+  try {
+    ({ default: sharp } = await import('sharp'));
+  } catch {
+    for (const root of [process.env.SHARP_PATH, WEB].filter(Boolean)) {
+      try {
+        const require = createRequire(pathToFileURL(path.join(root, 'resolve.cjs')));
+        sharp = require('sharp');
+        break;
+      } catch {
+        /* try the next location */
+      }
     }
   }
   if (!sharp) {
     console.log(
       '\nsharp not found — raw PNGs are in .assets-raw/, nothing copied.' +
-        '\nInstall it with `pnpm --dir apps/web add -D sharp` and re-run to place them.'
+        '\nInstall it anywhere and re-run with' +
+        ' SHARP_PATH=<dir> (a folder whose node_modules has sharp).'
     );
     return;
   }

@@ -136,7 +136,11 @@ export function PlanBoard({ tripId, fxRate }: { tripId: string; fxRate: number }
         />
         <AiGenerateDialog tripId={tripId} open={generating} onClose={() => setGenerating(false)} />
 
-      <PlanHistorySheet tripId={tripId} open={historyOpen} onClose={() => setHistoryOpen(false)} />
+        <PlanHistorySheet
+          tripId={tripId}
+          open={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+        />
       </div>
     );
   }
@@ -215,7 +219,9 @@ export function PlanBoard({ tripId, fxRate }: { tripId: string; fxRate: number }
                 onClick={() => revalidate.mutate()}
                 disabled={revalidate.isPending}
               >
-                <RefreshCw className={cn('size-3.5', revalidate.isPending && 'animate-rove-spin')} />{' '}
+                <RefreshCw
+                  className={cn('size-3.5', revalidate.isPending && 'animate-rove-spin')}
+                />{' '}
                 ตรวจแพลนอีกรอบ
               </Button>
               <Button
