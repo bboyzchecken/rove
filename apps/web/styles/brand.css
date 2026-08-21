@@ -21,6 +21,14 @@
   --brand-muted: 22 18% 43%; /* #6B5B4E secondary text */
   --brand-border: 30 8% 90%;
 
+  /* --- Form fields --------------------------------------------------------
+   * A field is the one thing on the page you are meant to reach into, so it
+   * never borrows the colour of what it sits on: always white, always with a
+   * line around it. That holds on a white sheet and on a surface card alike —
+   * without it a field on `--brand-surface` disappears into the card. */
+  --brand-field: 0 0% 100%;
+  --brand-field-border: 26 14% 82%; /* #D8D0C9 — visible on white and on surface */
+
   /* --- Accent palette ----------------------------------------------------
    * The colour blocks. Components tint these over white rather than using a
    * second set of pastel hexes, so there is exactly one value per colour. */

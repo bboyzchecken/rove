@@ -13,11 +13,18 @@ import {
 } from 'lucide-react';
 
 import { RoveMark } from '@/components/brand/rove-mark';
-import { RouteBuilder, RouteSummary, newLeg, useRouteDraft, type DraftLeg } from '@/components/trip/route-builder';
+import {
+  RouteBuilder,
+  RouteSummary,
+  newLeg,
+  useRouteDraft,
+  type DraftLeg,
+} from '@/components/trip/route-builder';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
+import { FieldLabel, Input, Textarea, fieldClass } from '@/components/ui/field';
 import { useCharacters, useUpdateMe } from '@/features/auth/queries';
 import { useCreateTrip } from '@/features/trip/queries';
 import { track } from '@/lib/analytics';
@@ -48,7 +55,12 @@ import { cn } from '@/lib/utils';
 type Entry = 'route' | 'date' | 'coordinate';
 
 const ENTRIES: { key: Entry; icon: typeof CalendarDays; title: string; hint: string }[] = [
-  { key: 'route', icon: Plane, title: 'รู้เที่ยวบินแล้ว', hint: 'ใส่สนามบินและวันบิน เดี๋ยวจัดวันให้' },
+  {
+    key: 'route',
+    icon: Plane,
+    title: 'รู้เที่ยวบินแล้ว',
+    hint: 'ใส่สนามบินและวันบิน เดี๋ยวจัดวันให้',
+  },
   { key: 'date', icon: CalendarDays, title: 'รู้วันแล้ว', hint: 'ลาไว้แล้ว ยังไม่รู้จะไปไหน' },
   { key: 'coordinate', icon: CalendarSearch, title: 'ยังไม่รู้วัน', hint: 'หาวันที่ทุกคนว่างก่อน' },
 ];
@@ -73,8 +85,16 @@ export function NewTripFlow() {
   const [entry, setEntry] = useState<Entry | null>(initial);
   const [step, setStep] = useState(initial ? 1 : 0);
   const [legs, setLegs] = useState<DraftLeg[]>(() => [
-    newLeg('out', { from: HOME_AIRPORT, to: presetAirport?.toUpperCase() ?? '', depDate: DEFAULT_START }),
-    newLeg('back', { from: presetAirport?.toUpperCase() ?? '', to: HOME_AIRPORT, depDate: DEFAULT_END }),
+    newLeg('out', {
+      from: HOME_AIRPORT,
+      to: presetAirport?.toUpperCase() ?? '',
+      depDate: DEFAULT_START,
+    }),
+    newLeg('back', {
+      from: presetAirport?.toUpperCase() ?? '',
+      to: HOME_AIRPORT,
+      depDate: DEFAULT_END,
+    }),
   ]);
   const [startDate, setStartDate] = useState(DEFAULT_START);
   const [endDate, setEndDate] = useState(DEFAULT_END);
@@ -129,22 +149,21 @@ export function NewTripFlow() {
     try {
       const parsed = await repo.trips.parseTicket(text);
       if (parsed.flights.length === 0) {
-        setTicketNote('อ่านเที่ยวบินไม่ออก — ใส่เองด้านล่างได้เลย หรือวางเฉพาะบรรทัดที่มีรหัสเที่ยวบิน');
+        setTicketNote(
+          'อ่านเที่ยวบินไม่ออก — ใส่เองด้านล่างได้เลย หรือวางเฉพาะบรรทัดที่มีรหัสเที่ยวบิน',
+        );
         return;
       }
 
       setLegs(
         parsed.flights.map((flight, index) =>
-          newLeg(
-            index === 0 ? 'out' : index === parsed.flights.length - 1 ? 'back' : 'inter',
-            {
-              from: flight.from,
-              to: flight.to,
-              depDate: flight.date,
-              depTime: flight.time,
-              flightNo: flight.code,
-            },
-          ),
+          newLeg(index === 0 ? 'out' : index === parsed.flights.length - 1 ? 'back' : 'inter', {
+            from: flight.from,
+            to: flight.to,
+            depDate: flight.date,
+            depTime: flight.time,
+            flightNo: flight.code,
+          }),
         ),
       );
       if (parsed.partySize) setParty(parsed.partySize);
@@ -339,12 +358,12 @@ export function NewTripFlow() {
 
                   {pasting ? (
                     <div className="mt-2 space-y-2">
-                      <textarea
+                      <Textarea
                         value={ticket}
                         onChange={(e) => void readTicket(e.target.value)}
                         rows={5}
                         placeholder="วางอีเมลยืนยันตั๋ว หรือข้อความจากสายการบินได้เลย"
-                        className="bg-surface text-espresso nums w-full rounded-2xl p-3.5 text-xs outline-none"
+                        className={cn(fieldClass, 'nums text-xs')}
                       />
                       <Button
                         variant="soft"
@@ -369,23 +388,21 @@ export function NewTripFlow() {
                 <>
                   <div className="grid grid-cols-2 gap-2">
                     <Field label="ไปวันที่">
-                      <input
+                      <Input
                         type="date"
                         value={startDate}
                         onChange={(e) => {
                           setStartDate(e.target.value);
                           if (e.target.value > endDate) setEndDate(addDays(e.target.value, 4));
                         }}
-                        className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
                       />
                     </Field>
                     <Field label="กลับวันที่">
-                      <input
+                      <Input
                         type="date"
                         value={endDate}
                         min={startDate}
                         onChange={(e) => setEndDate(e.target.value)}
-                        className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
                       />
                     </Field>
                   </div>
@@ -582,7 +599,7 @@ function normaliseEntry(value: string | null): Entry | null {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="text-muted mb-1.5 block text-[11px] font-semibold">{label}</span>
+      <FieldLabel>{label}</FieldLabel>
       {children}
     </label>
   );

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CharacterAvatar, CharacterStack } from '@/components/ui/character-avatar';
+import { FieldLabel, Input, Select, fieldClass } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
 import { useMe } from '@/features/auth/queries';
 import { useAddExpense, useExpenses, useRemoveExpense } from '@/features/expense/queries';
@@ -84,8 +85,8 @@ export function ExpenseBoard({ tripId, fxRate }: { tripId: string; fxRate: numbe
                     {entry.scope === 'personal' ? <Badge tone="joyfull">ส่วนตัว</Badge> : null}
                   </div>
                   <p className="text-muted mt-0.5 text-[11px]">
-                    {nameOf(entry.paidBy)} จ่าย ·{' '}
-                    {formatThaiDate(entry.date, { year: undefined })} · {entry.category}
+                    {nameOf(entry.paidBy)} จ่าย · {formatThaiDate(entry.date, { year: undefined })}{' '}
+                    · {entry.category}
                   </p>
                   {entry.scope === 'shared' && entry.participants.length > 0 ? (
                     <div className="mt-1.5 flex items-center gap-1.5">
@@ -101,9 +102,7 @@ export function ExpenseBoard({ tripId, fxRate }: { tripId: string; fxRate: numbe
                 </div>
 
                 <div className="shrink-0 text-right">
-                  <p className="text-espresso nums text-sm font-bold">
-                    {formatMoney(thb, 'THB')}
-                  </p>
+                  <p className="text-espresso nums text-sm font-bold">{formatMoney(thb, 'THB')}</p>
                   {entry.currency === 'JPY' ? (
                     <p className="text-muted nums text-[10px]">
                       ¥{entry.amount.toLocaleString('en-US')}
@@ -203,28 +202,27 @@ function AddExpenseForm({
     >
       <div className="space-y-3.5">
         <label className="block">
-          <span className="text-muted mb-1.5 block text-[11px] font-semibold">จ่ายอะไร</span>
-          <input
+          <FieldLabel>จ่ายอะไร</FieldLabel>
+          <Input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="เช่น ข้าวเย็นวันแรก"
-            className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
           />
         </label>
 
         <div className="grid grid-cols-[1fr_auto] gap-2">
           <label className="block">
-            <span className="text-muted mb-1.5 block text-[11px] font-semibold">จำนวนเงิน</span>
-            <input
+            <FieldLabel>จำนวนเงิน</FieldLabel>
+            <Input
               type="number"
               min={0}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="bg-surface text-espresso nums w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
+              className={cn(fieldClass, 'nums')}
             />
           </label>
           <div>
-            <span className="text-muted mb-1.5 block text-[11px] font-semibold">สกุล</span>
+            <FieldLabel>สกุล</FieldLabel>
             <div className="bg-surface flex rounded-full p-1">
               {(['JPY', 'THB'] as const).map((option) => (
                 <button
@@ -244,30 +242,21 @@ function AddExpenseForm({
 
         <div className="grid grid-cols-2 gap-2">
           <label className="block">
-            <span className="text-muted mb-1.5 block text-[11px] font-semibold">วันที่</span>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
-            />
+            <FieldLabel>วันที่</FieldLabel>
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </label>
           <label className="block">
-            <span className="text-muted mb-1.5 block text-[11px] font-semibold">หมวด</span>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
-            >
+            <FieldLabel>หมวด</FieldLabel>
+            <Select value={category} onChange={(e) => setCategory(e.target.value)}>
               {CATEGORIES.map((c) => (
                 <option key={c}>{c}</option>
               ))}
-            </select>
+            </Select>
           </label>
         </div>
 
         <div>
-          <span className="text-muted mb-1.5 block text-[11px] font-semibold">ประเภท</span>
+          <FieldLabel>ประเภท</FieldLabel>
           <div className="bg-surface flex rounded-full p-1">
             {(
               [
@@ -290,7 +279,7 @@ function AddExpenseForm({
         </div>
 
         <div>
-          <span className="text-muted mb-1.5 block text-[11px] font-semibold">ใครจ่าย</span>
+          <FieldLabel>ใครจ่าย</FieldLabel>
           <div className="flex flex-wrap gap-1.5">
             {members.map((member) => (
               <button
@@ -310,9 +299,7 @@ function AddExpenseForm({
 
         {scope === 'shared' ? (
           <div>
-            <span className="text-muted mb-1.5 block text-[11px] font-semibold">
-              หารกับใครบ้าง ({participants.length} คน)
-            </span>
+            <FieldLabel>หารกับใครบ้าง ({participants.length} คน)</FieldLabel>
             <div className="flex flex-wrap gap-1.5">
               {members.map((member) => {
                 const on = participants.includes(member.id);

@@ -3,7 +3,13 @@
 import { useState } from 'react';
 import { ArrowRight, Bus, Plane, Plus } from 'lucide-react';
 
-import { RouteBuilder, RouteSummary, newLeg, useRouteDraft, type DraftLeg } from '@/components/trip/route-builder';
+import {
+  RouteBuilder,
+  RouteSummary,
+  newLeg,
+  useRouteDraft,
+  type DraftLeg,
+} from '@/components/trip/route-builder';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -158,9 +164,7 @@ function RouteEditor({
   const { airports, route, warnings } = useRouteDraft(legs);
 
   async function submit() {
-    await save.mutateAsync(
-      legs.filter((leg) => leg.from && leg.to && leg.depDate).map(toLegInput),
-    );
+    await save.mutateAsync(legs.filter((leg) => leg.from && leg.to && leg.depDate).map(toLegInput));
     onClose();
   }
 

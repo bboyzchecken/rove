@@ -3,10 +3,12 @@
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { FieldLabel, Input, fieldClass } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
 import { useUpdateTrip } from '@/features/trip/queries';
 import type { Trip } from '@/lib/data';
 import { daysBetween } from '@/lib/data/domain';
+import { cn } from '@/lib/utils';
 
 /**
  * Inline frame edit (M2 — W2.3). The mutation behind it is optimistic, so the
@@ -63,29 +65,19 @@ export function TripFrameDialog({
     >
       <div className="space-y-3.5">
         <Field label="ชื่อทริป">
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
-          />
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} />
         </Field>
 
         <div className="grid grid-cols-2 gap-2">
           <Field label="ไปวันที่">
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
-            />
+            <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           </Field>
           <Field label="กลับวันที่">
-            <input
+            <Input
               type="date"
               value={endDate}
               min={startDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
             />
           </Field>
         </div>
@@ -96,11 +88,10 @@ export function TripFrameDialog({
         ) : null}
 
         <Field label="เมือง (คั่นด้วยเครื่องหมายจุลภาค)">
-          <input
+          <Input
             value={cities}
             onChange={(e) => setCities(e.target.value)}
             placeholder="โตเกียว, เกียวโต"
-            className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
           />
         </Field>
 
@@ -108,30 +99,31 @@ export function TripFrameDialog({
             than let someone type a city the next leg edit will overwrite. */}
         {hasRoute ? (
           <p className="text-muted -mt-1 text-[11px]">
-            ทริปนี้มีเที่ยวบินอยู่แล้ว — วันเดินทางและเมืองจะถูกตั้งใหม่ตามเส้นทางทุกครั้งที่แก้เที่ยวบิน
-            แก้ที่ &ldquo;เส้นทาง&rdquo; ในหน้าภาพรวมจะตรงกว่า
+            ทริปนี้มีเที่ยวบินอยู่แล้ว —
+            วันเดินทางและเมืองจะถูกตั้งใหม่ตามเส้นทางทุกครั้งที่แก้เที่ยวบิน แก้ที่
+            &ldquo;เส้นทาง&rdquo; ในหน้าภาพรวมจะตรงกว่า
           </p>
         ) : null}
 
         <div className="grid grid-cols-2 gap-2">
           <Field label="ไปกันกี่คน">
-            <input
+            <Input
               type="number"
               min={1}
               max={12}
               value={partySize}
               onChange={(e) => setPartySize(Number(e.target.value))}
-              className="bg-surface text-espresso nums w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
+              className={cn(fieldClass, 'nums')}
             />
           </Field>
           <Field label="งบต่อคน (บาท)">
-            <input
+            <Input
               type="number"
               min={0}
               step={1000}
               value={budget}
               onChange={(e) => setBudget(Number(e.target.value))}
-              className="bg-surface text-espresso nums w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
+              className={cn(fieldClass, 'nums')}
             />
           </Field>
         </div>
@@ -143,7 +135,7 @@ export function TripFrameDialog({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="text-muted mb-1.5 block text-[11px] font-semibold">{label}</span>
+      <FieldLabel>{label}</FieldLabel>
       {children}
     </label>
   );

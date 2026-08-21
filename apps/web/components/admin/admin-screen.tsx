@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { SectionHeader, Stat } from '@/components/common/section';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/field';
 import { Progress } from '@/components/ui/progress';
 import { useMe } from '@/features/auth/queries';
 import { usePoiSearch } from '@/features/plan/queries';
@@ -39,8 +40,7 @@ export function AdminScreen() {
     );
   }
 
-  const costRatio =
-    stats && stats.aiCostCapUsd > 0 ? stats.aiCostTodayUsd / stats.aiCostCapUsd : 0;
+  const costRatio = stats && stats.aiCostCapUsd > 0 ? stats.aiCostTodayUsd / stats.aiCostCapUsd : 0;
 
   return (
     <div className="space-y-7 px-4 py-5">
@@ -49,9 +49,7 @@ export function AdminScreen() {
           <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight">
             แอดมิน
           </h1>
-          <p className="text-muted mt-1 text-sm">
-            ตัวเลขรวมของระบบ · รีเฟรชอัตโนมัติทุกนาที
-          </p>
+          <p className="text-muted mt-1 text-sm">ตัวเลขรวมของระบบ · รีเฟรชอัตโนมัติทุกนาที</p>
         </div>
         {stats?.mockMode ? (
           <Badge tone="sun" size="md">
@@ -100,7 +98,11 @@ export function AdminScreen() {
                   </p>
                 ) : null}
               </div>
-              <Progress value={costRatio} tone={costRatio >= 0.8 ? 'primary' : 'espresso'} className="mt-3" />
+              <Progress
+                value={costRatio}
+                tone={costRatio >= 0.8 ? 'primary' : 'espresso'}
+                className="mt-3"
+              />
               <p className="text-muted mt-2 text-[11px]">
                 พอถึงเพดาน ระบบจะหยุดรับงานร่างใหม่จนถึงเที่ยงคืน UTC
               </p>
@@ -111,11 +113,10 @@ export function AdminScreen() {
             <SectionHeader label="ค้นหาสถานที่" />
             <label className="mb-2 flex items-center gap-2">
               <Search className="text-muted size-4" />
-              <input
+              <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="ชื่อสถานที่ หรือเมือง"
-                className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
               />
             </label>
 

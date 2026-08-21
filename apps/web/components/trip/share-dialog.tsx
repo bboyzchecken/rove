@@ -6,8 +6,14 @@ import { Check, Copy, Download, Eye, Globe, Lock, RefreshCw } from 'lucide-react
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input, fieldClass } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
-import { useExportTrip, useRotateShareToken, useSetVisibility, useShareState } from '@/features/trip/queries';
+import {
+  useExportTrip,
+  useRotateShareToken,
+  useSetVisibility,
+  useShareState,
+} from '@/features/trip/queries';
 import type { ExportFormat, TripVisibility } from '@/lib/data';
 import { cn } from '@/lib/utils';
 
@@ -120,11 +126,11 @@ export function ShareDialog({
           <Card className="p-3">
             <p className="section-label mb-1.5">ลิงก์สำหรับดู</p>
             <div className="flex items-center gap-2">
-              <input
+              <Input
                 readOnly
                 value={share.shareUrl}
                 onFocus={(e) => e.currentTarget.select()}
-                className="bg-bg text-espresso min-w-0 flex-1 rounded-full px-3 py-2 text-[11px] outline-none"
+                className={cn(fieldClass, 'min-w-0 flex-1 rounded-full px-3 py-2 text-[11px]')}
               />
               <Button size="sm" onClick={() => void copy()}>
                 {copied ? <Check className="size-4" /> : <Copy className="size-4" />}

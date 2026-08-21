@@ -7,6 +7,7 @@ import { ArrowRight, Bus, Info, Plane, Plus, TriangleAlert, X } from 'lucide-rea
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Field, Input } from '@/components/ui/field';
 import { AirportPicker } from '@/components/trip/airport-picker';
 import { repo } from '@/lib/data';
 import type { Airport, FlightLegInput, LegDirection, TripRoute } from '@/lib/data';
@@ -62,10 +63,7 @@ export function useRouteDraft(legs: DraftLeg[]) {
   });
 
   const found = useMemo(() => airports ?? {}, [airports]);
-  const route = useMemo(
-    () => buildRoute(legs, (iata) => found[iata] ?? null),
-    [legs, found],
-  );
+  const route = useMemo(() => buildRoute(legs, (iata) => found[iata] ?? null), [legs, found]);
   const warnings = useMemo(() => routeWarnings(route, legs), [route, legs]);
 
   return { airports: found, route, warnings };
@@ -215,41 +213,32 @@ export function RouteBuilder({
               leg.mode === 'flight' && 'lg:grid-cols-3',
             )}
           >
-            <label className="block">
-              <span className="text-muted mb-1.5 block text-[11px] font-semibold">
-                {leg.mode === 'ground' ? 'เดินทางวันที่' : 'บินวันที่'}
-              </span>
-              <input
+            <Field label={leg.mode === 'ground' ? 'เดินทางวันที่' : 'บินวันที่'}>
+              <Input
                 type="date"
                 value={leg.depDate}
                 onChange={(e) => patch(leg.key, { depDate: e.target.value })}
-                className="bg-bg text-espresso nums w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
+                className="nums"
               />
-            </label>
-            <label className="block">
-              <span className="text-muted mb-1.5 block text-[11px] font-semibold">
-                ถึงกี่โมง (ใส่ทีหลังได้)
-              </span>
-              <input
+            </Field>
+            <Field label="ถึงกี่โมง (ใส่ทีหลังได้)">
+              <Input
                 type="time"
                 value={leg.arrTime ?? ''}
                 onChange={(e) => patch(leg.key, { arrTime: e.target.value })}
-                className="bg-bg text-espresso nums w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
+                className="nums"
               />
-            </label>
+            </Field>
 
             {leg.mode === 'flight' ? (
-              <label className="col-span-2 block lg:col-span-1">
-                <span className="text-muted mb-1.5 block text-[11px] font-semibold">
-                  เที่ยวบิน (ใส่ทีหลังได้)
-                </span>
-                <input
+              <Field label="เที่ยวบิน (ใส่ทีหลังได้)" className="col-span-2 lg:col-span-1">
+                <Input
                   value={leg.flightNo ?? ''}
                   onChange={(e) => patch(leg.key, { flightNo: e.target.value.toUpperCase() })}
                   placeholder="เช่น TG682"
-                  className="bg-bg text-espresso nums w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
+                  className="nums"
                 />
-              </label>
+              </Field>
             ) : null}
           </div>
 
@@ -264,6 +253,7 @@ export function RouteBuilder({
                     arrDate: e.target.checked ? nextDay(leg.depDate) : leg.depDate,
                   })
                 }
+                className="accent-primary border-field-border size-4 rounded-md"
               />
               ถึงวันรุ่งขึ้น (บินข้ามคืน)
             </label>
@@ -318,7 +308,10 @@ export function RouteSummary({ route, className }: { route: TripRoute; className
 
       <ul className="space-y-1.5">
         {route.stops.map((stop) => (
-          <li key={`${stop.airport}-${stop.arriveDate}`} className="flex items-center gap-2 text-xs">
+          <li
+            key={`${stop.airport}-${stop.arriveDate}`}
+            className="flex items-center gap-2 text-xs"
+          >
             <span className="leading-none">{flagOf(stop.countryCode)}</span>
             <span className="text-espresso font-semibold">{stop.city}</span>
             <span className="text-muted nums">

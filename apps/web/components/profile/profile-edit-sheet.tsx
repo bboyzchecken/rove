@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { FieldLabel, Input, bareInputClass, fieldShellClass } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
 import { useMe, useUpdateMe } from '@/features/auth/queries';
 import type { CurrentUser } from '@/lib/data';
@@ -96,25 +97,22 @@ function EditForm({ me, onDone }: { me: CurrentUser; onDone: () => void }) {
   return (
     <div className="space-y-3">
       <label className="block">
-        <span className="text-muted mb-1.5 block text-[11px] font-semibold">ชื่อที่แสดง</span>
-        <input
+        <FieldLabel>ชื่อที่แสดง</FieldLabel>
+        <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
           placeholder="ชื่อที่อยากให้เพื่อนเห็น"
         />
       </label>
 
       <label className="block">
-        <span className="text-muted mb-1.5 block text-[11px] font-semibold">
-          ชื่อผู้ใช้ (ใส่ก็ได้ ไม่ใส่ก็ได้)
-        </span>
-        <div className="bg-surface flex items-center rounded-2xl px-3.5">
+        <FieldLabel>ชื่อผู้ใช้ (ใส่ก็ได้ ไม่ใส่ก็ได้)</FieldLabel>
+        <div className={fieldShellClass}>
           <span className="text-muted text-sm">@</span>
           <input
             value={handle}
             onChange={(e) => setHandle(normaliseHandle(e.target.value))}
-            className="text-espresso w-full bg-transparent py-2.5 pl-0.5 text-sm outline-none"
+            className={cn(bareInputClass, 'pl-0.5')}
             placeholder="rove_traveller"
             inputMode="text"
             autoCapitalize="none"
@@ -131,7 +129,7 @@ function EditForm({ me, onDone }: { me: CurrentUser; onDone: () => void }) {
       </label>
 
       <div>
-        <span className="text-muted mb-1.5 block text-[11px] font-semibold">สกุลเงินหลัก</span>
+        <FieldLabel>สกุลเงินหลัก</FieldLabel>
         <div className="flex flex-wrap gap-1.5">
           {CURRENCIES.map((c) => (
             <button
@@ -141,7 +139,9 @@ function EditForm({ me, onDone }: { me: CurrentUser; onDone: () => void }) {
               aria-pressed={currency === c.code}
               className={cn(
                 'rounded-full px-3 py-1.5 text-xs font-semibold transition',
-                currency === c.code ? 'bg-espresso text-bg' : 'bg-surface text-muted hover:bg-border',
+                currency === c.code
+                  ? 'bg-espresso text-bg'
+                  : 'bg-surface text-muted hover:bg-border',
               )}
             >
               {c.code}

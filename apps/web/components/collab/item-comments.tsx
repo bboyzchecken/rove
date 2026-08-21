@@ -6,6 +6,7 @@ import { Check, Send } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
+import { Input, fieldClass } from '@/components/ui/field';
 import { useAddComment, useComments, useResolveComment } from '@/features/collab/queries';
 import { useTripMembers } from '@/features/trip/queries';
 import type { CommentTarget } from '@/lib/data';
@@ -56,9 +57,7 @@ export function ItemComments({
             <div className="flex items-start gap-2">
               <CharacterAvatar characterId={who?.characterId ?? 'shiba'} size="xs" />
               <div className="min-w-0 flex-1">
-                <p className="text-espresso text-[11px] font-semibold">
-                  {who?.name ?? 'สมาชิก'}
-                </p>
+                <p className="text-espresso text-[11px] font-semibold">{who?.name ?? 'สมาชิก'}</p>
                 <p className="text-espresso text-xs leading-relaxed">{comment.body}</p>
               </div>
               <button
@@ -79,7 +78,7 @@ export function ItemComments({
       })}
 
       <div className="flex items-end gap-2">
-        <input
+        <Input
           value={body}
           onChange={(e) => setBody(e.target.value)}
           onKeyDown={(e) => {
@@ -89,9 +88,13 @@ export function ItemComments({
             }
           }}
           placeholder="ถามหรือเสนอเรื่องรายการนี้…"
-          className="bg-surface text-espresso min-w-0 flex-1 rounded-full px-3.5 py-2 text-xs outline-none"
+          className={cn(fieldClass, 'min-w-0 flex-1 rounded-full py-2 text-xs')}
         />
-        <Button size="sm" onClick={() => void send()} disabled={addComment.isPending || !body.trim()}>
+        <Button
+          size="sm"
+          onClick={() => void send()}
+          disabled={addComment.isPending || !body.trim()}
+        >
           <Send className="size-3.5" />
         </Button>
       </div>

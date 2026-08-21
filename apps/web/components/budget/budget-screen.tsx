@@ -7,11 +7,13 @@ import { SectionHeader, Stat } from '@/components/common/section';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { FieldLabel, Input, fieldClass } from '@/components/ui/field';
 import { Progress } from '@/components/ui/progress';
 import { Sheet } from '@/components/ui/sheet';
 import { useBudget, useRefreshFx, useSetBudget } from '@/features/plan/queries';
 import { useTrip } from '@/features/trip/queries';
 import { formatMoney, formatThaiDate } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
 /**
  * Budget tab (M7 — W7.1 … W7.3).
@@ -175,7 +177,9 @@ export function BudgetScreen({ tripId }: { tripId: string }) {
             onClick={() => refreshFx.mutate()}
             disabled={refreshFx.isPending}
           >
-            <RefreshCw className={refreshFx.isPending ? 'size-3.5 animate-rove-spin' : 'size-3.5'} />
+            <RefreshCw
+              className={refreshFx.isPending ? 'animate-rove-spin size-3.5' : 'size-3.5'}
+            />
             อัปเดตเรต
           </Button>
         </div>
@@ -226,14 +230,14 @@ function BudgetDialog({
       }
     >
       <label className="block">
-        <span className="text-muted mb-1.5 block text-[11px] font-semibold">งบต่อคน (บาท)</span>
-        <input
+        <FieldLabel>งบต่อคน (บาท)</FieldLabel>
+        <Input
           type="number"
           min={0}
           step={1000}
           value={value}
           onChange={(e) => setValue(Number(e.target.value))}
-          className="bg-surface text-espresso nums w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
+          className={cn(fieldClass, 'nums')}
         />
       </label>
       <div className="mt-3 flex flex-wrap gap-1.5">

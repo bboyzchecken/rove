@@ -7,6 +7,7 @@ import { Link2, Plus, Trash2 } from 'lucide-react';
 import { EmptyState } from '@/components/common/empty-state';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { FieldLabel, Input } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
 import { useAddDream, useDreams, useRemoveDream } from '@/features/auth/queries';
 import type { DreamItem } from '@/lib/data';
@@ -127,16 +128,41 @@ function AddDreamSheet({ open, onClose }: { open: boolean; onClose: () => void }
       title="เพิ่มที่อยากไป"
       description="ยังไม่ต้องมีวัน ไม่ต้องมีแผน — เก็บไว้ก่อนได้"
       footer={
-        <Button block size="lg" onClick={() => void save()} disabled={addDream.isPending || !title.trim()}>
+        <Button
+          block
+          size="lg"
+          onClick={() => void save()}
+          disabled={addDream.isPending || !title.trim()}
+        >
           {addDream.isPending ? 'กำลังเก็บ…' : 'เก็บไว้ก่อน'}
         </Button>
       }
     >
       <div className="space-y-3">
-        <Field label="อยากไปทำอะไร" value={title} onChange={setTitle} placeholder="เช่น นอนดูแสงเหนือในกระท่อมกระจก" />
-        <Field label="ที่ไหน" value={destination} onChange={setDestination} placeholder="ประเทศ · เมือง" />
-        <Field label="ลิงก์ที่เจอมา (ใส่ก็ได้ ไม่ใส่ก็ได้)" value={url} onChange={setUrl} placeholder="วาง URL ที่เลื่อนเจอ" />
-        <Field label="โน้ตของตัวเอง" value={note} onChange={setNote} placeholder="ช่วงไหนไปดี ต้องจองล่วงหน้าไหม" />
+        <Field
+          label="อยากไปทำอะไร"
+          value={title}
+          onChange={setTitle}
+          placeholder="เช่น นอนดูแสงเหนือในกระท่อมกระจก"
+        />
+        <Field
+          label="ที่ไหน"
+          value={destination}
+          onChange={setDestination}
+          placeholder="ประเทศ · เมือง"
+        />
+        <Field
+          label="ลิงก์ที่เจอมา (ใส่ก็ได้ ไม่ใส่ก็ได้)"
+          value={url}
+          onChange={setUrl}
+          placeholder="วาง URL ที่เลื่อนเจอ"
+        />
+        <Field
+          label="โน้ตของตัวเอง"
+          value={note}
+          onChange={setNote}
+          placeholder="ช่วงไหนไปดี ต้องจองล่วงหน้าไหม"
+        />
       </div>
     </Sheet>
   );
@@ -155,13 +181,8 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-muted mb-1.5 block text-[11px] font-semibold">{label}</span>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
-        placeholder={placeholder}
-      />
+      <FieldLabel>{label}</FieldLabel>
+      <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
     </label>
   );
 }

@@ -1111,6 +1111,10 @@ AUTH_COOKIE_DOMAIN=rove.app
   --brand-muted:          22 18% 43%;   /* #6B5B4E secondary text */
   --brand-border:         30 8%  90%;
 
+  /* Form field — ไม่ยืมสีพื้นของสิ่งที่มันวางอยู่ ขาวเสมอ + มีเส้นขอบเสมอ */
+  --brand-field:          0  0%  100%;
+  --brand-field-border:   26 14% 82%;   /* #D8D0CB เห็นชัดทั้งบนขาวและบน surface */
+
   /* Accent palette — colour block ของ component (tint ทับขาวเอา ไม่มี hex ชุดสอง) */
   --brand-matcha:         137 36% 65%;  /* #8BC99A success / nature */
   --brand-sky:            207 68% 81%;  /* #A8D4F0 info / calm */
@@ -1134,6 +1138,10 @@ AUTH_COOKIE_DOMAIN=rove.app
 - **Cards:** Colour block จาก accent palette — แต่ละหมวด/แต่ละ stat คนละสี ไม่ใช้ border
 - **Icons:** lucide-react เส้นหนา (`strokeWidth` 2–2.5) วางบน colour block
 - **Shadows:** แทบไม่ใช้ — เฉพาะ dialog/sheet ที่ลอยเหนือหน้า (`rgba(61,43,36,0.10)`)
+- **Form fields:** ข้อยกเว้นเดียวของกฎ "ไม่ใช้ border" — ช่องกรอกต้องดูกรอกได้ ไม่กลืนกับพื้นหลัง
+  - พื้นช่อง = `--brand-field` (ขาว) เสมอ ไม่ว่าจะวางบนขาวหรือบน colour block — ห้ามใช้ `bg-surface` เป็นพื้นช่อง (บน card สี surface มันจะหายไปทั้งช่อง)
+  - เส้นขอบ 1px `--brand-field-border` + radius 16px, focus = ขอบ terracotta + ring `primary/25`
+  - เขียนที่เดียวใน `components/ui/field.tsx` (`fieldClass`, `Input`, `Textarea`, `Select`, `FieldLabel`, `Field`, `fieldShellClass`) — ห้ามเขียน class ช่องกรอกเองในหน้าจอ
 - **Illustration:** flat vector บนพื้นขาว สีจาก palette เดียวกัน — ปลายทางทั่วโลก ไม่ผูกกับญี่ปุ่น
 
 ### Tone of Voice
