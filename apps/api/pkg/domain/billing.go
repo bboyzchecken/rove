@@ -1,0 +1,184 @@
+package domain
+
+import (
+	"fmt"
+	"time"
+)
+
+// Bill & Payment (M20 — A20.x).
+//
+// Everything the product sells becomes an *order*, whatever it was: extra AI
+// drafts today, a monthly plan next. The rules that decide what an order says —
+// its number, its price, whether it is on sale — live here so the handler,
+// the receipt and the price list cannot each hold a different opinion.
+
+// Order kinds. One per thing that can be sold.
+const (
+	OrderKindAICredit     = "ai_credit"
+	OrderKindSubscription = "subscription"
+	OrderKindPointsTopup  = "points_topup"
+)
+
+// Order statuses. `pending` exists for the day a gateway does; until then an
+// order is written only once it has already succeeded.
+const (
+	OrderPending  = "pending"
+	OrderPaid     = "paid"
+	OrderFailed   = "failed"
+	OrderRefunded = "refunded"
+)
+
+// How an order was paid for. `points` and `free` never reach a gateway.
+const (
+	PayMethodCard      = "card"
+	PayMethodPromptPay = "promptpay"
+	PayMethodTrueMoney = "truemoney"
+	PayMethodPoints    = "points"
+	PayMethodFree      = "free"
+)
+
+// PayChannel is one accepted way to pay. The id is what the receipt records and
+// the label is what the user tapped; carrying them together is what stops a
+// receipt saying "บัตรเครดิต" about a PromptPay charge.
+type PayChannel struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+}
+
+// PayChannels is what the paywall accepts. Printed in the sheet rather than
+// discovered after committing — finding out your method is unsupported at the
+// last step is the failure this list exists to prevent.
+var PayChannels = []PayChannel{
+	{ID: PayMethodCard, Label: "บัตรเครดิต/เดบิต"},
+	{ID: PayMethodPromptPay, Label: "พร้อมเพย์ (QR)"},
+	{ID: PayMethodTrueMoney, Label: "TrueMoney Wallet"},
+}
+
+// IsCashMethod reports whether a method would move real money — which, while
+// there is no gateway, is exactly the set of orders that must be flagged
+// `simulated` so nothing implies a charge that did not happen.
+func IsCashMethod(method string) bool {
+	switch method {
+	case PayMethodCard, PayMethodPromptPay, PayMethodTrueMoney:
+		return true
+	default:
+		return false
+	}
+}
+
+// NormalisePayMethod maps whatever the client sent onto a known method, so an
+// unrecognised string can never end up printed on a receipt as fact.
+func NormalisePayMethod(method string) string {
+	switch method {
+	case PayMethodCard, PayMethodPromptPay, PayMethodTrueMoney, PayMethodPoints, PayMethodFree:
+		return method
+	default:
+		return PayMethodCard
+	}
+}
+
+// PayMethodLabel is the fallback wording when a client sends an id and no
+// label — a receipt always says how it was paid, in words.
+func PayMethodLabel(method string) string {
+	for _, channel := range PayChannels {
+		if channel.ID == method {
+			return channel.Label
+		}
+	}
+	switch method {
+	case PayMethodPoints:
+		return "แต้ม ROVE"
+	case PayMethodFree:
+		return "ไม่มีค่าใช้จ่าย"
+	default:
+		return method
+	}
+}
+
+/* --------------------------------------------------------------- numbers -- */
+
+// FreePlanID is what everyone is on until billing turns on.
+const FreePlanID = "free"
+
+// ReceiptNumber renders "RV-2569-000123": the Buddhist year, then that year's
+// sequence. It is what a person quotes when they write in about a charge, so it
+// is short, unambiguous when spoken, and never reused.
+func ReceiptNumber(issuedAt time.Time, sequence int) string {
+	return fmt.Sprintf("RV-%d-%06d", issuedAt.Year()+543, sequence)
+}
+
+// ReceiptYearPrefix is the LIKE prefix the store counts with to find the next
+// sequence for a year.
+func ReceiptYearPrefix(issuedAt time.Time) string {
+	return fmt.Sprintf("RV-%d-", issuedAt.Year()+543)
+}
+
+/* ------------------------------------------------------------------ plans -- */
+
+// SubscriptionPlan is one row of the price list.
+type SubscriptionPlan struct {
+	ID                      string   `json:"id"`
+	Name                    string   `json:"name"`
+	Tagline                 string   `json:"tagline"`
+	PriceTHB                int      `json:"price_thb"`
+	Interval                string   `json:"interval"`
+	Perks                   []string `json:"perks"`
+	IncludedDraftsPerPeriod int      `json:"included_drafts_per_period"`
+	// False until a gateway exists. The catalogue ships anyway: the screen that
+	// will sell these is the screen already rendering them.
+	Available bool `json:"available"`
+}
+
+// Plans is the catalogue. Only the free row is on sale in Phase 1 (§16).
+func Plans() []SubscriptionPlan {
+	return []SubscriptionPlan{
+		{
+			ID:       FreePlanID,
+			Name:     "ROVE ฟรี",
+			Tagline:  "ทุกอย่างที่ต้องใช้วางแผนทริปกับเพื่อน",
+			Interval: "month",
+			Perks: []string{
+				fmt.Sprintf("ให้ AI ร่างแพลนฟรี %d ครั้งต่อทริป", DefaultIncludedDrafts),
+				"ห้องทริป สมาชิกไม่จำกัด",
+				"หารบิล งบ และรายจ่ายจริง",
+				fmt.Sprintf("ร่างเพิ่มครั้งละ ฿%d หรือ %d แต้ม", PricePerDraftTHB, PointsPerAIDraft),
+			},
+			Available: true,
+		},
+		{
+			ID:                      "rove_plus_monthly",
+			Name:                    "ROVE Plus รายเดือน",
+			Tagline:                 "ร่างด้วย AI ได้ทุกทริปโดยไม่ต้องซื้อทีละครั้ง",
+			PriceTHB:                129,
+			Interval:                "month",
+			Perks:                   []string{"ให้ AI ร่างแพลน 15 ครั้งต่อเดือน ใช้ได้ทุกทริป", "ปรับแพลนซ้ำได้ไม่จำกัด", "เอกสารและ export ไม่มีลายน้ำ"},
+			IncludedDraftsPerPeriod: 15,
+		},
+		{
+			ID:                      "rove_plus_yearly",
+			Name:                    "ROVE Plus รายปี",
+			Tagline:                 "จ่ายทีเดียว ถูกกว่ารายเดือนสองเดือน",
+			PriceTHB:                1290,
+			Interval:                "year",
+			Perks:                   []string{"ทุกอย่างของรายเดือน", "คิดเป็น ฿107 ต่อเดือน", "ล็อกราคาไว้ทั้งปี"},
+			IncludedDraftsPerPeriod: 15,
+		},
+	}
+}
+
+// PlanByID returns a plan from the catalogue, falling back to the free row —
+// an unknown plan id must degrade to "not being charged", never to a blank.
+func PlanByID(id string) SubscriptionPlan {
+	plans := Plans()
+	for _, plan := range plans {
+		if plan.ID == id {
+			return plan
+		}
+	}
+	return plans[0]
+}
+
+// DefaultIncludedDrafts mirrors models.DefaultIncludedDrafts for the copy above.
+// It lives here as a plain constant so pkg/domain keeps its rule of importing
+// nothing from the rest of the app (§6.2).
+const DefaultIncludedDrafts = 2

@@ -10,6 +10,17 @@ export const queryKeys = {
   characters: () => ['characters'] as const,
   dreams: () => ['dreams'] as const,
 
+  /**
+   * Bill & Payment (M20). Not trip-scoped: a receipt outlives the trip it was
+   * bought for, and a subscription belongs to nobody's trip at all.
+   */
+  billing: () => ['billing'] as const,
+  billingSummary: () => ['billing', 'summary'] as const,
+  billingOrders: () => ['billing', 'orders'] as const,
+  billingOrder: (orderId: string) => ['billing', 'orders', orderId] as const,
+  billingSubscription: () => ['billing', 'subscription'] as const,
+  billingPlans: () => ['billing', 'plans'] as const,
+
   trips: () => ['trips'] as const,
   tripsUpcoming: () => ['trips', 'upcoming'] as const,
   tripsPast: () => ['trips', 'past'] as const,

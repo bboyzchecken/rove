@@ -1,5 +1,5 @@
 import { getCharacter, CHARACTERS } from '@/lib/mock/characters';
-import { DAYS } from '@/lib/mock/trip';
+import { AI_CREDITS, DAYS } from '@/lib/mock/trip';
 import { PAST_TRIP_ARCHIVES, POINTS_PER_PUBLISH } from '@/lib/mock/user';
 
 import { getAirport, getAirports, searchAirports } from '../airports';
@@ -48,6 +48,7 @@ import type {
   Vote,
   WishlistItem,
 } from '../types';
+import { buildOrder, PLANS } from './billing';
 import { BOOKING_OFFERS, POIS, PREP_TEMPLATE, rankDestinations } from './catalog';
 import {
   AI_META,
@@ -1318,25 +1319,91 @@ export const mockRepo: RoveRepo = {
       );
     },
 
-    async buyCredits(tripId, quantity, channel) {
+    async buyCredits(tripId, input) {
       // No payment gateway in mock mode — the sheet always succeeds and the
-      // caller is told the charge was simulated.
+      // caller is told the charge was simulated. The receipt, however, is real:
+      // it is written to the same order log live mode keeps (M20).
+      const quantity = Math.max(1, input.quantity);
+      const points = input.method === 'points' ? AI_CREDITS.pointsPerRun * quantity : 0;
+
       return delay(
         mutate((db) => {
+          if (points > 0 && db.user.points < points) throw new Error('แต้มไม่พอ');
+
           const record = tripRecord(db, tripId);
           record.ai.extra += quantity;
-          log(record, db.user.id, `ซื้อโควตาร่างเพิ่ม ${quantity} ครั้ง (${channel})`);
+          db.user.points -= points;
+
+          const order = buildOrder(
+            mockId('ord'),
+            {
+              kind: 'ai_credit',
+              title: `ร่างแพลนด้วย AI เพิ่ม ${quantity} ครั้ง`,
+              lineLabel: `สิทธิ์ให้ AI ร่างแพลน (ทริป${record.trip.title})`,
+              quantity,
+              unitAmountThb: AI_META.pricePerDraftThb,
+              method: input.method,
+              methodLabel: input.channel,
+              pointsSpent: points,
+              tripId,
+              tripTitle: record.trip.title,
+              issuedAt: nowIso(),
+            },
+            db.orders,
+          );
+          db.orders.push(order);
+
+          log(record, db.user.id, `ซื้อโควตาร่างเพิ่ม ${quantity} ครั้ง (${input.channel})`);
           return {
             used: record.ai.used,
             included: record.ai.included,
             extra: record.ai.extra,
             pricePerDraftThb: AI_META.pricePerDraftThb,
             payChannels: AI_META.payChannels,
-            simulated: true,
+            simulated: order.simulated,
+            order: clone(order),
           };
         }),
         700,
       );
+    },
+  },
+
+  /* ----------------------------------------------------------- billing -- */
+  billing: {
+    async summary() {
+      const db = loadDb();
+      const paid = db.orders.filter((o) => o.status === 'paid');
+      const issued = paid.map((o) => o.issuedAt).sort();
+
+      return delay({
+        orders: paid.length,
+        aiDraftsPurchased: paid
+          .filter((o) => o.kind === 'ai_credit')
+          .reduce((sum, o) => sum + o.lines.reduce((n, line) => n + line.quantity, 0), 0),
+        totalSpentThb: paid.reduce((sum, o) => sum + o.totalThb, 0),
+        pointsSpent: paid.reduce((sum, o) => sum + o.pointsSpent, 0),
+        since: issued[0] ?? null,
+        subscription: clone(db.subscription),
+      });
+    },
+
+    async orders() {
+      const db = loadDb();
+      return delay(clone(db.orders).sort((a, b) => b.issuedAt.localeCompare(a.issuedAt)));
+    },
+
+    async order(orderId) {
+      const found = loadDb().orders.find((o) => o.id === orderId);
+      return delay(found ? clone(found) : null);
+    },
+
+    async subscription() {
+      return delay(clone(loadDb().subscription));
+    },
+
+    async plans() {
+      return delay(clone(PLANS), 80);
     },
   },
 

@@ -28,6 +28,7 @@ import (
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/places"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/weather"
 	aijobstore "github.com/bboyzchecken/rove/apps/api/pkg/store/aijob"
+	billingstore "github.com/bboyzchecken/rove/apps/api/pkg/store/billing"
 	bookingstore "github.com/bboyzchecken/rove/apps/api/pkg/store/booking"
 	characterstore "github.com/bboyzchecken/rove/apps/api/pkg/store/character"
 	collabstore "github.com/bboyzchecken/rove/apps/api/pkg/store/collab"
@@ -57,10 +58,12 @@ var allModels = []any{
 	&models.PrepTask{}, &models.PrepNote{}, &models.Booking{}, &models.BookingClick{},
 	&models.Comment{}, &models.Vote{}, &models.Activity{},
 	&models.AIJob{}, &models.AICredit{}, &models.TripFlight{},
+	&models.Order{}, &models.Subscription{},
 }
 
 // allTables is the drop order — children before parents.
 var allTables = []string{
+	"orders", "subscriptions",
 	"ai_credits", "ai_jobs", "activity_logs", "votes", "comments",
 	"booking_clicks", "bookings", "trip_flights", "prep_notes", "prep_tasks",
 	"expense_settlements", "expense_entries", "item_versions", "plan_items",
@@ -97,6 +100,7 @@ func newParams(cfg core.Config, db *gorm.DB) handlers.ServerParams {
 		Flights:    flightstore.New(db),
 		Collab:     collabstore.New(db),
 		AIJobs:     aijobstore.New(db),
+		Billing:    billingstore.New(db),
 
 		Hub: stubHub{},
 		// The airport index is embedded data with no I/O — the real one is the

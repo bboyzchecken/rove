@@ -23,6 +23,9 @@ func (s *Server) registerUserRoutes(g *echo.Group) {
 	me.GET("/points", s.handleMyPoints)
 	me.GET("/trips/upcoming", s.handleUpcomingTrips)
 	me.GET("/trips/past", s.handlePastTrips)
+	// Bill & payment (A20.x) — receipts belong to the user, not to a trip.
+	s.registerBillingRoutes(me.Group("/billing"))
+
 	me.GET("/dreams", s.handleListDreams)
 	me.POST("/dreams", s.handleCreateDream)
 	me.PATCH("/dreams/:dreamId", s.handleUpdateDream)

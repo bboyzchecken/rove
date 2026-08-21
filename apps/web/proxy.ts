@@ -25,7 +25,17 @@ import { isLiveMode } from '@/lib/data/mode';
  *    The mode is read through `lib/data/mode` rather than from the environment
  *    directly, so the switch keeps living in one place.
  */
-const GUARDED = ['/home', '/trips', '/t', '/recap', '/dreams', '/profile', '/new', '/admin'];
+const GUARDED = [
+  '/home',
+  '/trips',
+  '/t',
+  '/recap',
+  '/dreams',
+  '/profile',
+  '/billing',
+  '/new',
+  '/admin',
+];
 
 function isGuarded(pathname: string) {
   return GUARDED.some((base) => pathname === base || pathname.startsWith(`${base}/`));

@@ -22,10 +22,8 @@ const (
 	PricePerDraftTHB = 39
 )
 
-// PayChannels is what the paywall accepts. Printed in the sheet rather than
-// discovered after committing — finding out your method is unsupported at the
-// last step is the failure this list exists to prevent.
-var PayChannels = []string{"บัตรเครดิต/เดบิต", "พร้อมเพย์ (QR)", "TrueMoney Wallet"}
+// PayChannels — see billing.go: what a draft can be paid with is a billing
+// fact, and it grew an id once receipts had to name the method (M20).
 
 // CanAffordDraft reports whether a balance covers one extra draft.
 func CanAffordDraft(balance int) bool { return balance >= PointsPerAIDraft }

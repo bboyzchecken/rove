@@ -8,6 +8,7 @@ import {
   Luggage,
   LogOut,
   Pencil,
+  ReceiptText,
   ShieldCheck,
   Sparkles,
   type LucideIcon,
@@ -15,6 +16,7 @@ import {
 
 import { Card } from '@/components/ui/card';
 import { useDreams, useLogout, useMe } from '@/features/auth/queries';
+import { useBillingSummary } from '@/features/billing/queries';
 import { useTrips } from '@/features/trip/queries';
 import { cn } from '@/lib/utils';
 
@@ -37,6 +39,7 @@ export function ProfileMenu({ onEditProfile }: { onEditProfile: () => void }) {
   const { data: me } = useMe();
   const { data: trips = [] } = useTrips();
   const { data: dreams = [] } = useDreams();
+  const { data: billing } = useBillingSummary();
 
   return (
     <Card className="divide-border divide-y overflow-hidden">
@@ -46,12 +49,25 @@ export function ProfileMenu({ onEditProfile }: { onEditProfile: () => void }) {
         hint="ชื่อ ชื่อผู้ใช้ สกุลเงิน"
         onClick={onEditProfile}
       />
-      <MenuRow icon={Luggage} label="ทริปของฉัน" hint={countLabel(trips.length, 'ทริป')} href="/trips" />
+      <MenuRow
+        icon={Luggage}
+        label="ทริปของฉัน"
+        hint={countLabel(trips.length, 'ทริป')}
+        href="/trips"
+      />
       <MenuRow
         icon={Sparkles}
         label="ที่อยากไปสักวัน"
         hint={countLabel(dreams.length, 'รายการ')}
         href="/dreams"
+      />
+      {/* The hint is the receipt count, not the amount: a number of baht on a
+          menu row is money the user did not ask to be reminded of. */}
+      <MenuRow
+        icon={ReceiptText}
+        label="บิลและการชำระเงิน"
+        hint={countLabel(billing?.orders ?? 0, 'ใบเสร็จ')}
+        href="/billing"
       />
       {me?.isAdmin ? (
         <MenuRow icon={ShieldCheck} label="แอดมิน" hint="เฉพาะทีมงาน" href="/admin" />

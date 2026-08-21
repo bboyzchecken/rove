@@ -1,6 +1,5 @@
 import {
   AI_CREDITS,
-  AI_PAY_CHANNELS,
   BUDGET,
   DAYS,
   EXPENSES,
@@ -12,6 +11,8 @@ import {
   WISHLIST,
 } from '@/lib/mock/trip';
 import { CURRENT_USER, DREAMS, PAST_TRIPS, UPCOMING, YEAR_STATS } from '@/lib/mock/user';
+
+import { AI_PAY_CHANNELS, FREE_SUBSCRIPTION, seedOrders } from './billing';
 
 import type {
   ActivityEvent,
@@ -25,10 +26,12 @@ import type {
   FlightLeg,
   LockedDates,
   Member,
+  Order,
   PlanDay,
   PlanItem,
   PrepTask,
   ShareState,
+  Subscription,
   Trip,
   Vote,
   WishlistItem,
@@ -45,7 +48,7 @@ import type {
  * Never imported outside lib/data/mock.
  */
 
-const STORAGE_KEY = 'rove.mock.v4';
+const STORAGE_KEY = 'rove.mock.v5';
 
 export interface TripRecord {
   trip: Trip;
@@ -69,7 +72,16 @@ export interface TripRecord {
   prep: PrepTask[];
   prepNote: string;
   /** Snapshots of items as they were, newest last (W5.5 / W5.7). */
-  versions: { id: string; itemId: string; action: 'update' | 'move' | 'delete'; actorId: string; createdAt: string; dayId: string; index: number; item: PlanItem }[];
+  versions: {
+    id: string;
+    itemId: string;
+    action: 'update' | 'move' | 'delete';
+    actorId: string;
+    createdAt: string;
+    dayId: string;
+    index: number;
+    item: PlanItem;
+  }[];
   bookings: BookingEntry[];
   comments: Comment[];
   votes: Vote[];
@@ -83,6 +95,10 @@ export interface MockDb {
   user: CurrentUser;
   trips: TripRecord[];
   dreams: DreamItem[];
+  /** Everything this user has bought, newest last (M20). */
+  orders: Order[];
+  /** The standing plan. Free until a gateway exists. */
+  subscription: Subscription;
   /** Trips the user finished — the profile timeline reads these as-is. */
   past: typeof PAST_TRIPS;
   upcoming: typeof UPCOMING;
@@ -286,7 +302,7 @@ function seedDateTrip(): TripRecord {
 
 export function seedDb(): MockDb {
   return {
-    version: 4,
+    version: 5,
     user: {
       id: CURRENT_USER.id,
       name: CURRENT_USER.name,
@@ -299,6 +315,8 @@ export function seedDb(): MockDb {
     },
     trips: [seedDemoTrip(), seedDateTrip()],
     dreams: structuredClone(DREAMS),
+    orders: seedOrders(),
+    subscription: structuredClone(FREE_SUBSCRIPTION),
     past: structuredClone(PAST_TRIPS),
     upcoming: structuredClone(UPCOMING),
     stats: structuredClone(YEAR_STATS),
@@ -333,7 +351,7 @@ export function loadDb(): MockDb {
         const parsed = JSON.parse(raw) as MockDb;
         // A seed change bumps the version; an old blob is thrown away rather
         // than migrated — this is demo data, not anyone's real trip.
-        if (parsed.version === 4) {
+        if (parsed.version === 5) {
           memory = parsed;
           return memory;
         }

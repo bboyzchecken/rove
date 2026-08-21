@@ -52,6 +52,7 @@ type ServerParams struct {
 	Flights    models.FlightStore
 	Collab     models.CollabStore
 	AIJobs     models.AIJobStore
+	Billing    models.BillingStore
 
 	Hub       events.Hub
 	FX        fxsvc.Service
@@ -86,6 +87,7 @@ type Server struct {
 	flights    models.FlightStore
 	collab     models.CollabStore
 	aiJobs     models.AIJobStore
+	billing    models.BillingStore
 
 	hub       events.Hub
 	fx        fxsvc.Service
@@ -127,6 +129,7 @@ func NewServer(p ServerParams) *Server {
 		flights:    p.Flights,
 		collab:     p.Collab,
 		aiJobs:     p.AIJobs,
+		billing:    p.Billing,
 		hub:        p.Hub,
 		fx:         p.FX,
 		airports:   p.Airports,

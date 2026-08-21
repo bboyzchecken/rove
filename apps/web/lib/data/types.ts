@@ -290,7 +290,17 @@ export interface AiCredits {
   extra: number;
   pricePerDraftThb: number;
   /** Channels the payment sheet offers. */
-  payChannels: string[];
+  payChannels: PayChannel[];
+}
+
+/**
+ * One way to pay. The id is what the receipt records; the label is what the
+ * user tapped. They are carried together so the two can never disagree — a
+ * receipt that says "บัตรเครดิต" about a PromptPay charge is a support ticket.
+ */
+export interface PayChannel {
+  id: PaymentMethod;
+  label: string;
 }
 
 export interface AiGenerateInput {
@@ -490,4 +500,121 @@ export interface PlanVersion {
   createdAt: string;
   /** The item as it looked *before* the change. */
   title: string;
+}
+
+/* --------------------------------------------------------------- billing -- */
+
+/**
+ * Bill & Payment (M20).
+ *
+ * Everything a user has ever bought lands in one shape — an **order** — no
+ * matter what was sold. Phase 1 sells exactly one thing (extra AI drafts), but
+ * a monthly plan is next, and a purchase history that has to be rewritten when
+ * the second product ships is a purchase history that loses the first one.
+ *
+ * So: `kind` says what was sold, `periodStart`/`periodEnd` are filled in only
+ * for a subscription invoice, and `provider`/`providerRef` are the hooks a real
+ * gateway will write into. Nothing here needs a schema change to bill monthly.
+ */
+export type OrderKind = 'ai_credit' | 'subscription' | 'points_topup';
+
+export type OrderStatus = 'pending' | 'paid' | 'failed' | 'refunded';
+
+/** How it was paid for. `points` and `free` never touch a gateway. */
+export type PaymentMethod = 'card' | 'promptpay' | 'truemoney' | 'points' | 'free';
+
+export interface OrderLine {
+  label: string;
+  quantity: number;
+  unitAmountThb: number;
+  amountThb: number;
+}
+
+export interface Order {
+  id: string;
+  /** What the receipt is called out loud — "RV-2569-000123". */
+  number: string;
+  kind: OrderKind;
+  status: OrderStatus;
+  title: string;
+  lines: OrderLine[];
+  subtotalThb: number;
+  discountThb: number;
+  totalThb: number;
+  currency: string;
+  method: PaymentMethod;
+  /** Verbatim label from the payment sheet — the receipt quotes it. */
+  methodLabel: string;
+  /** Points debited, for an order paid with points. */
+  pointsSpent: number;
+  tripId: string | null;
+  tripTitle: string | null;
+  /** Gateway name and charge id, once there is a gateway. */
+  provider: string | null;
+  providerRef: string | null;
+  /** Phase 1 has no gateway: a cash order is *recorded*, never charged. */
+  simulated: boolean;
+  /** A subscription invoice covers a period; a one-off does not. */
+  periodStart: string | null;
+  periodEnd: string | null;
+  issuedAt: string;
+  paidAt: string | null;
+  refundedAt: string | null;
+}
+
+export type SubscriptionStatus = 'none' | 'active' | 'past_due' | 'canceled';
+
+export type BillingInterval = 'month' | 'year';
+
+/** One row of the price list. `available` is false until a gateway exists. */
+export interface SubscriptionPlan {
+  id: string;
+  name: string;
+  tagline: string;
+  priceThb: number;
+  interval: BillingInterval;
+  perks: string[];
+  /** Drafts the plan hands out every period. */
+  includedDraftsPerPeriod: number;
+  available: boolean;
+}
+
+/**
+ * The user's standing plan. Everyone is on `free` in Phase 1 — the shape is
+ * already the one a paid subscriber will have, so the screen that renders it
+ * does not change when billing turns on.
+ */
+export interface Subscription {
+  id: string | null;
+  planId: string;
+  planName: string;
+  status: SubscriptionStatus;
+  interval: BillingInterval | null;
+  priceThb: number;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  /** True once the user has cancelled but the paid period is still running. */
+  cancelAtPeriodEnd: boolean;
+  includedDraftsPerPeriod: number;
+}
+
+/** The numbers at the top of the billing screen. */
+export interface BillingSummary {
+  /** Orders that completed — a failed attempt is not a purchase. */
+  orders: number;
+  /** AI drafts bought across every trip: "ซื้อแพลน AI ไปกี่ครั้ง". */
+  aiDraftsPurchased: number;
+  totalSpentThb: number;
+  pointsSpent: number;
+  /** The first completed order, ISO — null when nothing has been bought. */
+  since: string | null;
+  subscription: Subscription;
+}
+
+/** What the payment sheet sends when someone buys drafts. */
+export interface BuyCreditsInput {
+  quantity: number;
+  method: PaymentMethod;
+  /** The label the user actually tapped — kept for the receipt. */
+  channel: string;
 }

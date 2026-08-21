@@ -337,7 +337,80 @@ export interface AiCreditsDto {
   included: number;
   extra: number;
   price_per_draft_thb: number;
-  pay_channels: string[];
+  pay_channels: PayChannelDto[] | null;
+}
+
+export interface PayChannelDto {
+  id: 'card' | 'promptpay' | 'truemoney' | 'points' | 'free';
+  label: string;
+}
+
+/* --------------------------------------------------------------- billing -- */
+
+export interface OrderLineDto {
+  label: string;
+  quantity: number;
+  unit_amount_thb: number;
+  amount_thb: number;
+}
+
+export interface OrderDto {
+  id: string;
+  number: string;
+  kind: 'ai_credit' | 'subscription' | 'points_topup';
+  status: 'pending' | 'paid' | 'failed' | 'refunded';
+  title: string;
+  lines: OrderLineDto[] | null;
+  subtotal_thb: number;
+  discount_thb: number;
+  total_thb: number;
+  currency: string;
+  method: 'card' | 'promptpay' | 'truemoney' | 'points' | 'free';
+  method_label: string;
+  points_spent: number;
+  trip_id: string | null;
+  trip_title: string | null;
+  provider: string | null;
+  provider_ref: string | null;
+  simulated: boolean;
+  period_start: string | null;
+  period_end: string | null;
+  issued_at: string;
+  paid_at: string | null;
+  refunded_at: string | null;
+}
+
+export interface SubscriptionDto {
+  id: string | null;
+  plan_id: string;
+  plan_name: string;
+  status: 'none' | 'active' | 'past_due' | 'canceled';
+  interval: 'month' | 'year' | null;
+  price_thb: number;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  included_drafts_per_period: number;
+}
+
+export interface SubscriptionPlanDto {
+  id: string;
+  name: string;
+  tagline: string;
+  price_thb: number;
+  interval: 'month' | 'year';
+  perks: string[] | null;
+  included_drafts_per_period: number;
+  available: boolean;
+}
+
+export interface BillingSummaryDto {
+  orders: number;
+  ai_drafts_purchased: number;
+  total_spent_thb: number;
+  points_spent: number;
+  since: string | null;
+  subscription: SubscriptionDto;
 }
 
 export interface ShareStateDto {
