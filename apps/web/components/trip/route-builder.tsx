@@ -7,6 +7,7 @@ import { ArrowRight, Bus, Info, Plane, Plus, TriangleAlert, X } from 'lucide-rea
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Field, Input } from '@/components/ui/field';
 import { AirportPicker } from '@/components/trip/airport-picker';
 import { repo } from '@/lib/data';
 import type { Airport, FlightLegInput, LegDirection, TripRoute } from '@/lib/data';
@@ -62,10 +63,7 @@ export function useRouteDraft(legs: DraftLeg[]) {
   });
 
   const found = useMemo(() => airports ?? {}, [airports]);
-  const route = useMemo(
-    () => buildRoute(legs, (iata) => found[iata] ?? null),
-    [legs, found],
-  );
+  const route = useMemo(() => buildRoute(legs, (iata) => found[iata] ?? null), [legs, found]);
   const warnings = useMemo(() => routeWarnings(route, legs), [route, legs]);
 
   return { airports: found, route, warnings };
@@ -145,7 +143,7 @@ export function RouteBuilder({
   return (
     <div className="space-y-2.5">
       {legs.map((leg, index) => (
-        <Card key={leg.key} className="p-3.5">
+        <Card key={leg.key} className="@container p-3.5 @lg:p-5">
           <div className="mb-2.5 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               {leg.mode === 'ground' ? (
@@ -183,7 +181,16 @@ export function RouteBuilder({
             </div>
           </div>
 
-          <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
+          {/*
+            These break on the *card's* width, not the window's — hence the
+            `@container` above. The same builder is mounted twice: as wide as
+            the page in the entry flow, and inside the route sheet, which is
+            narrower than the window it floats in. Window breakpoints handed
+            that sheet a desktop layout it had no room for — two airports and
+            three fields crushed into 400px. Under `@lg` (32rem of card) the
+            legs read top-to-bottom instead, with the arrow turned to match.
+          */}
+          <div className="grid gap-1.5 @lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] @lg:items-end @lg:gap-2">
             <AirportPicker
               label="จาก"
               value={airports[leg.from] ?? null}
@@ -191,7 +198,7 @@ export function RouteBuilder({
               autoFocus={index === 0 && !leg.from}
               onChange={(airport) => patch(leg.key, { from: airport?.iata ?? '' })}
             />
-            <ArrowRight className="text-muted mb-3 size-4" />
+            <ArrowRight className="text-muted mx-auto size-4 rotate-90 @lg:mx-0 @lg:mb-3 @lg:rotate-0" />
             <AirportPicker
               label="ถึง"
               value={airports[leg.to] ?? null}
@@ -200,44 +207,43 @@ export function RouteBuilder({
             />
           </div>
 
-          <div className="mt-2.5 grid grid-cols-2 gap-2">
-            <label className="block">
-              <span className="text-muted mb-1.5 block text-[11px] font-semibold">
-                {leg.mode === 'ground' ? 'เดินทางวันที่' : 'บินวันที่'}
-              </span>
-              <input
+          {/* Date, time and flight number are one row of facts off the ticket,
+              so they share a line once the card is wide enough to hold three
+              fields without squeezing them, and pair up when it is not. */}
+          <div
+            className={cn(
+              'mt-2.5 grid gap-2 @2xs:grid-cols-2 @lg:mt-3',
+              leg.mode === 'flight' && '@2xl:grid-cols-3',
+            )}
+          >
+            <Field label={leg.mode === 'ground' ? 'เดินทางวันที่' : 'บินวันที่'}>
+              <Input
                 type="date"
                 value={leg.depDate}
                 onChange={(e) => patch(leg.key, { depDate: e.target.value })}
-                className="bg-bg text-espresso nums w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
+                className="nums"
               />
-            </label>
-            <label className="block">
-              <span className="text-muted mb-1.5 block text-[11px] font-semibold">
-                ถึงกี่โมง (ใส่ทีหลังได้)
-              </span>
-              <input
+            </Field>
+            <Field label="ถึงกี่โมง (ใส่ทีหลังได้)">
+              <Input
                 type="time"
                 value={leg.arrTime ?? ''}
                 onChange={(e) => patch(leg.key, { arrTime: e.target.value })}
-                className="bg-bg text-espresso nums w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
+                className="nums"
               />
-            </label>
-          </div>
+            </Field>
 
-          {leg.mode === 'flight' ? (
-            <label className="mt-2.5 block">
-              <span className="text-muted mb-1.5 block text-[11px] font-semibold">
-                เที่ยวบิน (ใส่ทีหลังได้)
-              </span>
-              <input
-                value={leg.flightNo ?? ''}
-                onChange={(e) => patch(leg.key, { flightNo: e.target.value.toUpperCase() })}
-                placeholder="เช่น TG682"
-                className="bg-bg text-espresso nums w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
-              />
-            </label>
-          ) : null}
+            {leg.mode === 'flight' ? (
+              <Field label="เที่ยวบิน (ใส่ทีหลังได้)" className="@2xs:col-span-2 @2xl:col-span-1">
+                <Input
+                  value={leg.flightNo ?? ''}
+                  onChange={(e) => patch(leg.key, { flightNo: e.target.value.toUpperCase() })}
+                  placeholder="เช่น TG682"
+                  className="nums"
+                />
+              </Field>
+            ) : null}
+          </div>
 
           {/* The overnight case, which is the one that shifts a whole day. */}
           {leg.arrTime && leg.depDate ? (
@@ -250,6 +256,7 @@ export function RouteBuilder({
                     arrDate: e.target.checked ? nextDay(leg.depDate) : leg.depDate,
                   })
                 }
+                className="accent-primary border-field-border size-4 rounded-md"
               />
               ถึงวันรุ่งขึ้น (บินข้ามคืน)
             </label>
@@ -304,7 +311,10 @@ export function RouteSummary({ route, className }: { route: TripRoute; className
 
       <ul className="space-y-1.5">
         {route.stops.map((stop) => (
-          <li key={`${stop.airport}-${stop.arriveDate}`} className="flex items-center gap-2 text-xs">
+          <li
+            key={`${stop.airport}-${stop.arriveDate}`}
+            className="flex items-center gap-2 text-xs"
+          >
             <span className="leading-none">{flagOf(stop.countryCode)}</span>
             <span className="text-espresso font-semibold">{stop.city}</span>
             <span className="text-muted nums">

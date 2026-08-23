@@ -1,3 +1,5 @@
+import { DEFAULT_COVER } from '@/lib/covers';
+
 import type {
   ActivityEvent,
   AiCredits,
@@ -5,6 +7,7 @@ import type {
   AiJob,
   AvailabilityBoard,
   AvailabilityEntry,
+  BillingSummary,
   BookingEntry,
   BudgetLine,
   BudgetSummary,
@@ -22,6 +25,7 @@ import type {
   InviteLink,
   LockedDates,
   Member,
+  Order,
   ParsedTicket,
   PastTrip,
   PlanDay,
@@ -30,6 +34,8 @@ import type {
   Poi,
   PrepTask,
   ShareState,
+  Subscription,
+  SubscriptionPlan,
   Trip,
   TripOverview,
   TripRecap,
@@ -46,6 +52,7 @@ import type {
   AiJobDto,
   AvailabilityBoardDto,
   AvailabilityEntryDto,
+  BillingSummaryDto,
   BookingDto,
   BudgetDto,
   BudgetLineDto,
@@ -62,6 +69,7 @@ import type {
   InviteDto,
   LockedDatesDto,
   MemberDto,
+  OrderDto,
   ParsedTicketDto,
   PastTripDto,
   PlanDayDto,
@@ -71,6 +79,8 @@ import type {
   PoiDto,
   PrepTaskDto,
   ShareStateDto,
+  SubscriptionDto,
+  SubscriptionPlanDto,
   TripDto,
   TripOverviewDto,
   TripRecapDto,
@@ -96,7 +106,7 @@ export function toTrip(dto: TripDto): Trip {
     nights: dto.nights,
     partySize: dto.party_size,
     status: dto.status === 'draft' ? 'planning' : dto.status === 'final' ? 'ready' : dto.status,
-    cover: dto.cover_image_url || '/brand/covers/cover-japan.webp',
+    cover: dto.cover_image_url || DEFAULT_COVER,
     homeCurrency: dto.home_currency,
     destCurrency: dto.dest_currency,
     fxRate: dto.fx_rate ?? 0.235,
@@ -619,7 +629,84 @@ export function toAiCredits(dto: AiCreditsDto): AiCredits {
     included: dto.included,
     extra: dto.extra,
     pricePerDraftThb: dto.price_per_draft_thb,
-    payChannels: dto.pay_channels ?? [],
+    payChannels: (dto.pay_channels ?? []).map((channel) => ({
+      id: channel.id,
+      label: channel.label,
+    })),
+  };
+}
+
+/* ----------------------------------------------------------- billing ----- */
+
+export function toOrder(dto: OrderDto): Order {
+  return {
+    id: dto.id,
+    number: dto.number,
+    kind: dto.kind,
+    status: dto.status,
+    title: dto.title,
+    lines: (dto.lines ?? []).map((line) => ({
+      label: line.label,
+      quantity: line.quantity,
+      unitAmountThb: line.unit_amount_thb,
+      amountThb: line.amount_thb,
+    })),
+    subtotalThb: dto.subtotal_thb,
+    discountThb: dto.discount_thb,
+    totalThb: dto.total_thb,
+    currency: dto.currency || 'THB',
+    method: dto.method,
+    methodLabel: dto.method_label,
+    pointsSpent: dto.points_spent,
+    tripId: dto.trip_id,
+    tripTitle: dto.trip_title,
+    provider: dto.provider,
+    providerRef: dto.provider_ref,
+    simulated: dto.simulated,
+    periodStart: dto.period_start,
+    periodEnd: dto.period_end,
+    issuedAt: dto.issued_at,
+    paidAt: dto.paid_at,
+    refundedAt: dto.refunded_at,
+  };
+}
+
+export function toSubscription(dto: SubscriptionDto): Subscription {
+  return {
+    id: dto.id,
+    planId: dto.plan_id,
+    planName: dto.plan_name,
+    status: dto.status,
+    interval: dto.interval,
+    priceThb: dto.price_thb,
+    currentPeriodStart: dto.current_period_start,
+    currentPeriodEnd: dto.current_period_end,
+    cancelAtPeriodEnd: dto.cancel_at_period_end,
+    includedDraftsPerPeriod: dto.included_drafts_per_period,
+  };
+}
+
+export function toSubscriptionPlan(dto: SubscriptionPlanDto): SubscriptionPlan {
+  return {
+    id: dto.id,
+    name: dto.name,
+    tagline: dto.tagline,
+    priceThb: dto.price_thb,
+    interval: dto.interval,
+    perks: dto.perks ?? [],
+    includedDraftsPerPeriod: dto.included_drafts_per_period,
+    available: dto.available,
+  };
+}
+
+export function toBillingSummary(dto: BillingSummaryDto): BillingSummary {
+  return {
+    orders: dto.orders,
+    aiDraftsPurchased: dto.ai_drafts_purchased,
+    totalSpentThb: dto.total_spent_thb,
+    pointsSpent: dto.points_spent,
+    since: dto.since,
+    subscription: toSubscription(dto.subscription),
   };
 }
 
@@ -681,7 +768,7 @@ export function toCalendarTrip(dto: CalendarTripDto): CalendarTrip {
     startDate: dto.start_date,
     endDate: dto.end_date,
     daysUntil: dto.days_until,
-    cover: dto.cover_image_url,
+    cover: dto.cover_image_url || DEFAULT_COVER,
     memberIds: dto.member_ids ?? [],
     characterIds: dto.member_character_ids ?? [],
     weather:
@@ -706,7 +793,7 @@ export function toPastTrip(dto: PastTripDto): PastTrip {
     days: dto.days,
     places: dto.places,
     spentThb: dto.spent_thb,
-    cover: dto.cover_image_url,
+    cover: dto.cover_image_url || DEFAULT_COVER,
     memberIds: dto.member_ids ?? [],
     characterIds: dto.member_character_ids ?? [],
     visibility: dto.visibility,

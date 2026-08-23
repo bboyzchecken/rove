@@ -1,11 +1,11 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { CalendarSearch, ChevronRight, Plus } from 'lucide-react';
 
 import { EmptyState } from '@/components/common/empty-state';
 import { SectionHeader } from '@/components/common/section';
+import { TripCover } from '@/components/trip/trip-cover';
 import { Badge } from '@/components/ui/badge';
 import { ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -80,23 +80,19 @@ export function TripList() {
               <li key={trip.id}>
                 <Link href={`/t/${trip.id}` as never}>
                   <Card className="overflow-hidden">
-                    <div className="flex gap-3">
-                      <Image
+                    <div className="flex items-center gap-3 p-3">
+                      <TripCover
                         src={trip.cover}
-                        alt=""
-                        width={400}
-                        height={400}
-                        className="size-28 shrink-0 object-cover"
+                        frame="thumb"
+                        className="rounded-brand-sm self-start"
                       />
 
-                      <div className="min-w-0 flex-1 py-3 pr-3">
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <div className="mb-1 flex flex-wrap items-center gap-1.5">
                               <Badge tone={status.tone}>{status.label}</Badge>
-                              {trip.role === 'owner' ? (
-                                <Badge tone="outline">เจ้าของ</Badge>
-                              ) : null}
+                              {trip.role === 'owner' ? <Badge tone="outline">เจ้าของ</Badge> : null}
                             </div>
                             <p className="font-display text-espresso truncate font-bold">
                               {trip.title}
@@ -148,13 +144,7 @@ export function TripList() {
                 href={`/recap/${trip.id}` as never}
                 className="flex items-center gap-3 p-3.5"
               >
-                <Image
-                  src={trip.cover}
-                  alt=""
-                  width={200}
-                  height={200}
-                  className="rounded-brand-sm size-12 shrink-0 object-cover"
-                />
+                <TripCover src={trip.cover} frame="mini" className="rounded-brand-sm" />
                 <div className="min-w-0 flex-1">
                   <p className="text-espresso truncate text-sm font-semibold">{trip.title}</p>
                   <p className="text-muted mt-0.5 text-[11px]">

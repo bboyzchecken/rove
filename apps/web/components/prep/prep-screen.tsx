@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
+import { FieldLabel, Input, Textarea, fieldClass } from '@/components/ui/field';
 import { Progress } from '@/components/ui/progress';
 import { Sheet } from '@/components/ui/sheet';
 import {
@@ -30,7 +31,10 @@ import { cn } from '@/lib/utils';
  * Ticking is optimistic because four people tick this list at the same time in
  * a group chat; waiting for a round trip would make it feel broken.
  */
-const CATEGORY_META: Record<PrepCategory, { label: string; tone: 'primary' | 'sky' | 'matcha' | 'sun' | 'joyfull' | 'neutral' }> = {
+const CATEGORY_META: Record<
+  PrepCategory,
+  { label: string; tone: 'primary' | 'sky' | 'matcha' | 'sun' | 'joyfull' | 'neutral' }
+> = {
   document: { label: 'เอกสาร', tone: 'primary' },
   packing: { label: 'ของที่ต้องเอาไป', tone: 'sky' },
   booking: { label: 'ต้องจอง', tone: 'matcha' },
@@ -219,12 +223,12 @@ function PrepNoteBlock({ tripId }: { tripId: string }) {
           ) : null
         }
       />
-      <textarea
+      <Textarea
         value={value}
         onChange={(e) => setDraft(e.target.value)}
         rows={5}
         placeholder="ที่อยู่โรงแรม เลขที่จอง เบอร์ติดต่อฉุกเฉิน — อะไรที่ไม่เข้าเช็กลิสต์ก็ใส่ตรงนี้"
-        className="bg-surface text-espresso w-full rounded-2xl p-3.5 text-sm leading-relaxed outline-none"
+        className={cn(fieldClass, 'leading-relaxed')}
       />
       <p className="text-muted mt-1.5 text-[11px]">ทุกคนในห้องแก้ได้ และเห็นตรงกัน</p>
     </section>
@@ -260,24 +264,28 @@ function AddPrepSheet({
       title="เพิ่มสิ่งที่ต้องเตรียม"
       description="มอบหมายให้ใครก็ได้ หรือปล่อยเป็นของทั้งกลุ่ม"
       footer={
-        <Button block size="lg" onClick={() => void save()} disabled={addTask.isPending || !title.trim()}>
+        <Button
+          block
+          size="lg"
+          onClick={() => void save()}
+          disabled={addTask.isPending || !title.trim()}
+        >
           {addTask.isPending ? 'กำลังเพิ่ม…' : 'เพิ่มลงเช็กลิสต์'}
         </Button>
       }
     >
       <div className="space-y-3.5">
         <label className="block">
-          <span className="text-muted mb-1.5 block text-[11px] font-semibold">ต้องเตรียมอะไร</span>
-          <input
+          <FieldLabel>ต้องเตรียมอะไร</FieldLabel>
+          <Input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="เช่น ซื้อ eSIM"
-            className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
           />
         </label>
 
         <div>
-          <span className="text-muted mb-1.5 block text-[11px] font-semibold">หมวด</span>
+          <FieldLabel>หมวด</FieldLabel>
           <div className="flex flex-wrap gap-1.5">
             {(Object.keys(CATEGORY_META) as PrepCategory[]).map((option) => (
               <button
@@ -295,7 +303,7 @@ function AddPrepSheet({
         </div>
 
         <div>
-          <span className="text-muted mb-1.5 block text-[11px] font-semibold">ใครรับผิดชอบ</span>
+          <FieldLabel>ใครรับผิดชอบ</FieldLabel>
           <div className="flex flex-wrap gap-1.5">
             <button
               onClick={() => setAssigneeId(null)}

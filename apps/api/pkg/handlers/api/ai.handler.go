@@ -11,6 +11,7 @@ import (
 
 	"github.com/bboyzchecken/rove/apps/api/pkg/domain"
 	"github.com/bboyzchecken/rove/apps/api/pkg/handlers/api/request"
+	"github.com/bboyzchecken/rove/apps/api/pkg/logger"
 	"github.com/bboyzchecken/rove/apps/api/pkg/models"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/ai"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
@@ -298,13 +299,19 @@ func (s *Server) handleApplyDraft(c echo.Context) error {
 }
 
 type buyCreditsRequest struct {
-	Quantity int    `json:"quantity"`
-	Channel  string `json:"channel"`
+	Quantity int `json:"quantity"`
+	// The channel id ("promptpay", "points", …). The label below is what the
+	// user actually tapped and is quoted verbatim on the receipt.
+	Method  string `json:"method"`
+	Channel string `json:"channel"`
 }
 
 // handleBuyCredits adds paid drafts. There is no payment gateway in Phase 1:
 // points are debited for real, and a cash purchase is recorded and flagged
 // `simulated` so nothing in the UI can imply a charge that did not happen.
+//
+// Either way it leaves a receipt (M20). A purchase the user cannot look up
+// afterwards is a purchase they have to take our word for.
 func (s *Server) handleBuyCredits(c echo.Context) error {
 	var req buyCreditsRequest
 	if err := request.BindAndValidate(c, &req); err != nil {
@@ -323,7 +330,14 @@ func (s *Server) handleBuyCredits(c echo.Context) error {
 		return request.Internal(c, "โหลดโควตาไม่สำเร็จ")
 	}
 
-	usingPoints := containsRunes(req.Channel, "แต้ม")
+	// The id decides; the label is only ever printed. Older clients that sent a
+	// label alone are still understood — that is what the rune check is for now.
+	method := domain.NormalisePayMethod(req.Method)
+	if req.Method == "" && containsRunes(req.Channel, "แต้ม") {
+		method = domain.PayMethodPoints
+	}
+
+	usingPoints := method == domain.PayMethodPoints
 	if usingPoints {
 		balance, err := s.points.Balance(ctx, userID)
 		if err != nil {
@@ -350,10 +364,43 @@ func (s *Server) handleBuyCredits(c echo.Context) error {
 		return request.Internal(c, "บันทึกโควตาไม่สำเร็จ")
 	}
 
+	tripTitle := ""
+	if trip, err := s.trips.GetByID(ctx, tripID); err == nil {
+		tripTitle = trip.Title
+	}
+	pointsSpent := 0
+	if usingPoints {
+		pointsSpent = domain.PointsPerAIDraft * req.Quantity
+	}
+
+	order, err := s.recordOrder(ctx, recordOrderInput{
+		UserID:      userID,
+		Kind:        domain.OrderKindAICredit,
+		Title:       fmt.Sprintf("ร่างแพลนด้วย AI เพิ่ม %d ครั้ง", req.Quantity),
+		LineLabel:   "สิทธิ์ให้ AI ร่างแพลน",
+		Quantity:    req.Quantity,
+		UnitTHB:     domain.PricePerDraftTHB,
+		Method:      method,
+		MethodLabel: orDefault(req.Channel, domain.PayMethodLabel(method)),
+		PointsSpent: pointsSpent,
+		TripID:      &tripID,
+		TripTitle:   tripTitle,
+	})
+	if err != nil {
+		// The drafts are already granted and the points are already spent, so a
+		// receipt that failed to write must not fail the purchase — it is logged
+		// and the credits are returned without one.
+		logger.L().WithError(err).Error("record order for ai credits")
+	}
+
 	out := toCreditsDTO(*credits)
 	// A cash purchase has no gateway behind it yet; say so rather than let the
 	// UI imply money moved.
-	out.Simulated = !usingPoints
+	out.Simulated = domain.IsCashMethod(method)
+	if order != nil {
+		dto := toOrderDTO(*order)
+		out.Order = &dto
+	}
 
 	s.track(c, tripID, "ซื้อโควตาร่างเพิ่ม "+itoa(req.Quantity)+" ครั้ง", "", "ai_job", tripID)
 	return c.JSON(http.StatusOK, out)

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
+import { FieldLabel, Input, Textarea } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
 import { useMe } from '@/features/auth/queries';
 import { useTripMembers } from '@/features/trip/queries';
@@ -216,24 +217,28 @@ function AddWishDialog({
       title="เพิ่มที่อยากไป"
       description="เขียนสั้น ๆ ได้เลย — AI จะไปหาสถานที่จริงให้ตอนร่างแพลน"
       footer={
-        <Button block size="lg" onClick={() => void save()} disabled={addWish.isPending || !title.trim()}>
+        <Button
+          block
+          size="lg"
+          onClick={() => void save()}
+          disabled={addWish.isPending || !title.trim()}
+        >
           {addWish.isPending ? 'กำลังเพิ่ม…' : 'เพิ่มลงรายการ'}
         </Button>
       }
     >
       <div className="space-y-3.5">
         <label className="block">
-          <span className="text-muted mb-1.5 block text-[11px] font-semibold">อยากไปไหน / อยากทำอะไร</span>
-          <input
+          <FieldLabel>อยากไปไหน / อยากทำอะไร</FieldLabel>
+          <Input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="เช่น กินซูชิที่ตลาดปลา"
-            className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
           />
         </label>
 
         <div>
-          <span className="text-muted mb-1.5 block text-[11px] font-semibold">สำคัญแค่ไหน</span>
+          <FieldLabel>สำคัญแค่ไหน</FieldLabel>
           <div className="flex gap-1.5">
             {(Object.keys(KIND_META) as WishKind[]).map((option) => (
               <button
@@ -251,23 +256,21 @@ function AddWishDialog({
         </div>
 
         <label className="block">
-          <span className="text-muted mb-1.5 block text-[11px] font-semibold">แท็ก (ไม่ใส่ก็ได้)</span>
-          <input
+          <FieldLabel>แท็ก (ไม่ใส่ก็ได้)</FieldLabel>
+          <Input
             value={tags}
             onChange={(e) => setTags(e.target.value)}
             placeholder="ของกิน ถ่ายรูป"
-            className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
           />
         </label>
 
         <label className="block">
-          <span className="text-muted mb-1.5 block text-[11px] font-semibold">โน้ตถึงเพื่อน</span>
-          <textarea
+          <FieldLabel>โน้ตถึงเพื่อน</FieldLabel>
+          <Textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={3}
             placeholder="เช่น ขอเป็นเช้า ๆ คนจะได้ไม่เยอะ"
-            className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
           />
         </label>
       </div>

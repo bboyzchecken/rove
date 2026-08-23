@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
+import { Textarea, fieldClass } from '@/components/ui/field';
 import { useAddComment, useComments, useResolveComment } from '@/features/collab/queries';
 import { useTripActivity, useTripMembers } from '@/features/trip/queries';
 import { cn } from '@/lib/utils';
@@ -42,12 +43,12 @@ export function DiscussionScreen({ tripId }: { tripId: string }) {
 
         <Card className="p-3.5">
           <div className="flex items-end gap-2">
-            <textarea
+            <Textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={2}
               placeholder="มีอะไรอยากบอกเพื่อนร่วมทริป…"
-              className="bg-surface text-espresso min-w-0 flex-1 rounded-2xl px-3.5 py-2.5 text-sm outline-none"
+              className={cn(fieldClass, 'min-w-0 flex-1')}
             />
             <Button
               size="md"

@@ -135,10 +135,7 @@ export function TripOverview({ tripId }: { tripId: string }) {
         <SectionHeader
           label="กรอบทริป"
           action={
-            <button
-              onClick={() => setEditing(true)}
-              className="text-primary text-xs font-semibold"
-            >
+            <button onClick={() => setEditing(true)} className="text-primary text-xs font-semibold">
               แก้ไข
             </button>
           }
@@ -296,7 +293,9 @@ export function TripOverview({ tripId }: { tripId: string }) {
         <SectionHeader label="ความเคลื่อนไหว" />
         {activity.length === 0 ? (
           <Card className="p-4">
-            <p className="text-muted text-sm">ยังไม่มีความเคลื่อนไหว — เริ่มจากชวนเพื่อนเข้าห้องก่อน</p>
+            <p className="text-muted text-sm">
+              ยังไม่มีความเคลื่อนไหว — เริ่มจากชวนเพื่อนเข้าห้องก่อน
+            </p>
           </Card>
         ) : (
           <Card className="divide-border divide-y">
@@ -309,7 +308,9 @@ export function TripOverview({ tripId }: { tripId: string }) {
                     <span className="font-semibold">{who?.name ?? 'ROVE'}</span>{' '}
                     <span className="text-muted">{entry.text}</span>
                   </p>
-                  <span className="text-muted shrink-0 text-[11px]">{relative(entry.createdAt)}</span>
+                  <span className="text-muted shrink-0 text-[11px]">
+                    {relative(entry.createdAt)}
+                  </span>
                 </div>
               );
             })}
@@ -319,7 +320,12 @@ export function TripOverview({ tripId }: { tripId: string }) {
 
       <InviteDialog tripId={tripId} open={inviting} onClose={() => setInviting(false)} />
       <ShareDialog tripId={tripId} open={sharing} onClose={() => setSharing(false)} />
-      <TripFrameDialog tripId={tripId} trip={trip} open={editing} onClose={() => setEditing(false)} />
+      <TripFrameDialog
+        tripId={tripId}
+        trip={trip}
+        open={editing}
+        onClose={() => setEditing(false)}
+      />
     </div>
   );
 }

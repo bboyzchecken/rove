@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import {
   CalendarCheck,
@@ -18,14 +17,17 @@ import {
 } from 'lucide-react';
 
 import { SectionHeader, Stat } from '@/components/common/section';
+import { TripCover } from '@/components/trip/trip-cover';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CharacterStack } from '@/components/ui/character-avatar';
+import { Input, fieldClass } from '@/components/ui/field';
 import { useSetVisibility, useTripRecap } from '@/features/trip/queries';
 import { track } from '@/lib/analytics';
 import type { RecapDecisionKind } from '@/lib/data';
 import { formatMoney } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
 /**
  * บันทึกทริป — a finished trip, read-only (M17 — W17.5, W17.6).
@@ -97,15 +99,7 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
   return (
     <div className="space-y-7 pb-5">
       {/* ------------------------------------------------------- header */}
-      <div className="relative">
-        <Image
-          src={recap.cover}
-          alt=""
-          width={1600}
-          height={900}
-          className="h-44 w-full object-cover"
-          priority
-        />
+      <TripCover src={recap.cover} frame="banner" priority>
         <Link
           href="/trips"
           className="bg-bg/90 text-espresso absolute top-4 left-4 flex size-9 items-center justify-center rounded-full"
@@ -113,7 +107,7 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
         >
           <ChevronLeft className="size-5" />
         </Link>
-      </div>
+      </TripCover>
 
       <div className="space-y-4 px-4">
         <div>
@@ -160,11 +154,11 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
             </p>
             {publicUrl ? (
               <div className="mt-3 flex items-center gap-2">
-                <input
+                <Input
                   readOnly
                   value={publicUrl}
                   onFocus={(e) => e.currentTarget.select()}
-                  className="bg-bg text-espresso min-w-0 flex-1 rounded-full px-3 py-2 text-[11px] outline-none"
+                  className={cn(fieldClass, 'min-w-0 flex-1 rounded-full px-3 py-2 text-[11px]')}
                 />
                 <Button size="sm" onClick={() => void copyPublicUrl()}>
                   {copied ? <Check className="size-4" /> : <Copy className="size-4" />}

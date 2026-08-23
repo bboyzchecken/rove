@@ -1,10 +1,10 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, ChevronRight, Receipt, Sparkles, UserPlus } from 'lucide-react';
 
 import { SectionHeader, Stat } from '@/components/common/section';
+import { TripCover } from '@/components/trip/trip-cover';
 import { ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CharacterStack } from '@/components/ui/character-avatar';
@@ -128,22 +128,14 @@ export function HomeScreen() {
 
           <Link href={`/t/${next.id}` as never}>
             <Card className="shadow-warm overflow-hidden">
-              <div className="relative">
-                <Image
-                  src={next.cover}
-                  alt=""
-                  width={1200}
-                  height={800}
-                  className="h-40 w-full object-cover sm:h-52"
-                  priority
-                />
+              <TripCover src={next.cover} frame="banner" priority>
                 <div className="bg-espresso text-bg absolute top-3 left-3 rounded-full px-3 py-1.5 backdrop-blur-sm">
                   <span className="font-display nums text-lg leading-none font-extrabold">
                     {next.daysUntil}
                   </span>
                   <span className="ml-1 text-[11px]">วัน</span>
                 </div>
-              </div>
+              </TripCover>
 
               <div className="p-4">
                 <div className="flex items-start justify-between gap-3">
@@ -276,13 +268,7 @@ export function HomeScreen() {
                   accent={PAST_ACCENTS[i % PAST_ACCENTS.length]}
                   className="w-64 overflow-hidden"
                 >
-                  <Image
-                    src={trip.cover}
-                    alt=""
-                    width={1200}
-                    height={800}
-                    className="h-24 w-full object-cover"
-                  />
+                  <TripCover src={trip.cover} frame="card" />
                   <div className="p-3">
                     <p className="text-espresso text-sm font-bold">{trip.title}</p>
                     <p className="text-muted mt-0.5 text-[11px]">{trip.dateLabel}</p>
@@ -319,7 +305,12 @@ export function HomeScreen() {
           />
           <div className="space-y-2">
             {dreams.slice(0, 3).map((dream) => (
-              <Link key={dream.id} href={`/new?from=route&city=${encodeURIComponent(dream.destination.split(' · ')[1] ?? '')}` as never}>
+              <Link
+                key={dream.id}
+                href={
+                  `/new?from=route&city=${encodeURIComponent(dream.destination.split(' · ')[1] ?? '')}` as never
+                }
+              >
                 <Card accent={dream.accent} className="flex items-center gap-3 p-3.5">
                   <div className="min-w-0 flex-1">
                     <p className="text-espresso truncate text-sm font-semibold">{dream.title}</p>

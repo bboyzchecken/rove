@@ -283,6 +283,18 @@ index: `(trip_id)`
 
 **ai_jobs** — `id, trip_id, plan_id, kind('generate'|'refine'|'explain'|'normalize'|'parse_ticket'), status('queued'|'running'|'done'|'error'), step, input(JSON), output(JSON), error, tokens_in, tokens_out, cost_usd, created_at, finished_at`
 
+**orders** *(M20 — บิลและการชำระเงิน)* — `id, user_id, number(uniq "RV-2569-000123"), kind('ai_credit'|'subscription'|'points_topup'), status('pending'|'paid'|'failed'|'refunded'), title, lines(JSON: [{label,quantity,unit_amount_thb,amount_thb}]), subtotal_thb, discount_thb, total_thb, currency, method('card'|'promptpay'|'truemoney'|'points'|'free'), method_label, points_spent INT, trip_id(null, ไม่ใช่ FK), trip_title, provider, provider_ref, simulated BOOL, subscription_id(null), period_start(null), period_end(null), issued_at, paid_at, refunded_at`
+index: `(user_id, issued_at)`, uniq `(number)`
+> ตารางเดียวรับของทุกอย่างที่ขาย — Phase 1 ขายแค่โควตาร่าง AI แต่ subscription รายเดือนใช้แถวเดียวกัน (`kind='subscription'` + `period_*`) จึงไม่ต้องแก้ schema ตอนเปิดขาย
+> **immutable** — คืนเงิน = เปลี่ยน status, ออกใหม่ = แถวใหม่ · ใบเสร็จที่ผู้ใช้โหลดไปแล้วต้องไม่กลายเป็นเอกสารคนละใบ
+> `lines` เป็น JSON ไม่ใช่ตารางลูก: ใบเสร็จอ่านทั้งใบเสมอ ไม่มี query ที่ join รายบรรทัด
+> `simulated=TRUE` เมื่อจ่ายด้วยเงินสด — Phase 1 ยังไม่มี gateway จึง**บันทึกแต่ไม่ตัดเงินจริง** (§16)
+> จ่ายด้วยแต้ม: `subtotal` คงราคาป้าย, `discount = subtotal`, `total = 0`, `points_spent = 300 × qty` — แต้มไม่ใช่บาท ไม่บวกรวมกัน
+
+**subscriptions** *(M20 — ว่างจนกว่าจะเปิดขาย)* — `id, user_id, plan_id, status('active'|'past_due'|'canceled'), interval('month'|'year'), price_thb, current_period_start, current_period_end, cancel_at_period_end BOOL, provider, provider_ref, canceled_at`
+index: `(user_id)`
+> ผู้ใช้ฟรี**ไม่มีแถว** — API สังเคราะห์แพ็กเกจฟรีจาก catalogue (`domain.Plans()`) ตารางนี้จึงมีเฉพาะคนที่ถูกเก็บเงินจริง
+
 **booking_clicks** — `id, trip_id, plan_id, item_id, user_id, partner, tracking_id(uniq), target_url, clicked_at, ua, referrer, source_trip_id(null), source_creator_id(null)`
 > `source_trip_id` + `source_creator_id` = trip ต้นแบบที่ clone มา ใช้ attributing แต้มให้ creator
 
@@ -502,6 +514,18 @@ DELETE /api/v1/documents/:id                    [uploader หรือ trip owne
 - Frontend: hook `useTripEvents(tripId)` → `queryClient.invalidateQueries({queryKey:[...]})` ตาม type
 - event types เพิ่มเติม: `expense.created`, `expense.updated`, `photo.uploaded`
 - heartbeat ทุก 20s, reconnect อัตโนมัติ + refetch on reconnect
+
+### 5.15 Billing (M20 — บิลและการชำระเงิน)
+```
+GET  /api/v1/users/me/billing/summary            → {orders, ai_drafts_purchased, total_spent_thb, points_spent, since, subscription}
+GET  /api/v1/users/me/billing/orders             → order[] (ใหม่สุดก่อน)
+GET  /api/v1/users/me/billing/orders/:orderId    → order (ใบเสร็จ) · ของคนอื่น = 404 ไม่ใช่ 403
+GET  /api/v1/users/me/billing/subscription       → subscription (ฟรี = สังเคราะห์ ไม่มีแถวในตาราง)
+GET  /api/v1/users/me/billing/plans              → subscription_plan[] (`available:false` จนกว่าจะมี gateway)
+```
+> **อ่านอย่างเดียว** — order ถูกเขียนโดย "สิ่งที่ขาย" เท่านั้น: วันนี้คือ `POST /trips/:tripId/ai/credits/purchase` ต่อไปคือ renewal ของ subscription
+> `purchase` รับ `{quantity, method, channel}` — `method` = id ช่องทาง (`card`|`promptpay`|`truemoney`|`points`), `channel` = ป้ายที่ผู้ใช้กดจริง เก็บลงใบเสร็จตามตัวอักษร · response พ่วง `order` มาด้วยเพื่อลิงก์ไปใบเสร็จได้ทันที
+> อยู่ใต้ `/users/me` เพราะใบเสร็จเป็นของคนจ่าย ไม่ใช่ของทริป และอยู่ได้นานกว่าทริปที่ใช้สิทธิ์นั้น
 
 ---
 
@@ -753,7 +777,7 @@ Lightsail Ubuntu 2 vCPU / 2 GB / 60 GB SSD  ($12/mo)  + static IP (ฟรีเ�
 - [x] A2.5 SSE hub (redis pubsub) + `GET /events` + emit helper ในทุก mutation
 - [x] W2.1 Layout `/t/[tripId]` + tabs + mobile bottom nav (Overview|Wishlist|Plan|Budget|Expense|Prep|Bookings|Discussion)
 - [x] W2.2 Overview: Trip Frame card, members (character avatar), สถานะ, quick actions
-- [x] W2.3 Inline edit frame (optimistic)
+- [x] W2.3 Inline edit frame (optimistic)  ·  **หมายเหตุ:** รูปปกทริปแก้ได้แล้ว — ปุ่ม “เปลี่ยนรูปปก” บนรูปปกในห้องทริป → `components/trip/trip-cover-sheet.tsx` (คลังปก 15 แบบ หรืออัปโหลดเอง)
 - [x] W2.4 Invite dialog + `/invite/[token]`
 - [x] W2.5 Activity feed (infinite query)  ·  **หมายเหตุ:** API เป็น cursor แล้ว แต่ UI ยังดึงรอบเดียว ยังไม่ได้ต่อ infinite scroll
 - [x] W2.6 `useTripEvents` hook → invalidate ตาม event type  ·  **หมายเหตุ:** `components/trip/trip-realtime.tsx` + `lib/sse.ts`
@@ -896,6 +920,21 @@ Lightsail Ubuntu 2 vCPU / 2 GB / 60 GB SSD  ($12/mo)  + static IP (ฟรีเ�
 - [x] W17.5 `/recap/[tripId]` — หน้าอ่านอย่างเดียว: การ์ดทริปที่ผ่านมาใน `/home` และ `/trips` กดเข้าได้
 - [x] W17.6 ปุ่ม "เปิดเป็นสาธารณะ" บนหน้าบันทึกทริป พร้อมอธิบายแต้ม/ส่วนลด (§6.5) — ทริปที่เปิดแล้วโชว์ลิงก์ `/p/[slug]` + ยอดดู/ยอดก๊อป แทนการชวนซ้ำ
 
+### M20 บิลและการชำระเงิน (NEW — ต่อยอดจากเครดิต AI §16)
+- [x] A20.1 ตาราง `orders` + `subscriptions` (§4.2) + migration `202608210000_billing`
+- [x] A20.2 `store/billing` — เลขใบเสร็จ `RV-{ปีพ.ศ.}-{ลำดับ 6 หลัก}` ออกใน transaction + uniq index กันเลขซ้ำ (ชนแล้ว retry 1 ครั้ง)
+- [x] A20.3 `pkg/domain/billing.go` — kind/status/method, `PayChannels` (id + label), catalogue แพ็กเกจ, `ReceiptNumber()`
+- [x] A20.4 `GET /users/me/billing/{summary,orders,orders/:id,subscription,plans}` (§5.15) — อ่านอย่างเดียว
+- [x] A20.5 `POST /ai/credits/purchase` ออกใบเสร็จทุกครั้ง (`recordOrder`) + รับ `method` แทนการเดาจากข้อความ
+- [x] A20.6 test: ใบเสร็จของคนอื่นอ่านไม่ได้ (404), จ่ายด้วยแต้มไม่นับเป็นเงินสด, สรุปนับ "ครั้ง" ไม่ใช่ "บิล"
+- [x] W20.1 `/billing` — แพ็กเกจปัจจุบัน + แพ็กเกจที่จะเปิดขาย + สรุปยอด + ประวัติแยกตามปี พ.ศ.
+- [x] W20.2 แถว "บิลและการชำระเงิน" ในเมนูโปรไฟล์ (พร้อมจำนวนใบเสร็จ) + `/billing` เข้ากำแพง sign-in
+- [x] W20.3 `/billing/[orderId]` — ใบเสร็จเต็มใบ สั่งพิมพ์/บันทึก PDF ได้จากหน้าเดียวกัน (`print:` utilities ไม่ใช่หน้า printable แยก)
+- [x] W20.4 หลังจ่ายในกล่อง AI ขึ้นลิงก์ "ดูใบเสร็จ RV-…" ทันที + เลือกช่องทางชำระก่อนกดจ่าย
+- [ ] A20.7 payment gateway จริง (Omise/Stripe) — เขียน `provider`/`provider_ref`, เอา `simulated` ออก, เปิด `status='pending'`
+- [ ] A20.8 subscription จริง: checkout, webhook renewal → ออก order `kind='subscription'` ต่อรอบ, cancel/resume, โควตาร่างรายเดือน
+- [ ] W20.5 หน้าเลือกแพ็กเกจ + วิธีจ่ายที่บันทึกไว้ (ทำพร้อม A20.7/A20.8)
+
 ### Cross-cutting
 - [ ] X.1 e2e: create → invite 2 users → wishlist → generate → edit → budget → add expense → share → book click  ·  **หมายเหตุ:** `e2e/trip-flow.spec.ts` ครอบ create → wishlist → generate → budget → expense → share → prep แล้ว — **ยังขาด invite 2 คน, edit timeline, book click** และรันบน mock mode ไม่ใช่ API จริง
 - [ ] X.2 Perf: Trip Room LCP < 2.5s บน 4G; plan 7 วัน × 10 items ลื่นบนมือถือ  ·  **หมายเหตุ:** ยังไม่ได้วัด
@@ -991,6 +1030,7 @@ Lightsail Ubuntu 2 vCPU / 2 GB / 60 GB SSD  ($12/mo)  + static IP (ฟรีเ�
 
 **ROVE Personal Features:**
 `character_selected {character_id}`, `dream_item_added`, `dream_item_converted_to_trip`,
+`billing_viewed {orders}`, `receipt_viewed {kind}`, `ai_credits_purchased {quantity,channel}`,
 `expense_added {split_type,category}`, `expense_summary_viewed`,
 `photo_uploaded {from_item}`, `photobook_export_started {format}`, `photobook_downloaded`,
 `document_uploaded {category}`,
@@ -1111,6 +1151,10 @@ AUTH_COOKIE_DOMAIN=rove.app
   --brand-muted:          22 18% 43%;   /* #6B5B4E secondary text */
   --brand-border:         30 8%  90%;
 
+  /* Form field — ไม่ยืมสีพื้นของสิ่งที่มันวางอยู่ ขาวเสมอ + มีเส้นขอบเสมอ */
+  --brand-field:          0  0%  100%;
+  --brand-field-border:   26 14% 82%;   /* #D8D0CB เห็นชัดทั้งบนขาวและบน surface */
+
   /* Accent palette — colour block ของ component (tint ทับขาวเอา ไม่มี hex ชุดสอง) */
   --brand-matcha:         137 36% 65%;  /* #8BC99A success / nature */
   --brand-sky:            207 68% 81%;  /* #A8D4F0 info / calm */
@@ -1134,6 +1178,10 @@ AUTH_COOKIE_DOMAIN=rove.app
 - **Cards:** Colour block จาก accent palette — แต่ละหมวด/แต่ละ stat คนละสี ไม่ใช้ border
 - **Icons:** lucide-react เส้นหนา (`strokeWidth` 2–2.5) วางบน colour block
 - **Shadows:** แทบไม่ใช้ — เฉพาะ dialog/sheet ที่ลอยเหนือหน้า (`rgba(61,43,36,0.10)`)
+- **Form fields:** ข้อยกเว้นเดียวของกฎ "ไม่ใช้ border" — ช่องกรอกต้องดูกรอกได้ ไม่กลืนกับพื้นหลัง
+  - พื้นช่อง = `--brand-field` (ขาว) เสมอ ไม่ว่าจะวางบนขาวหรือบน colour block — ห้ามใช้ `bg-surface` เป็นพื้นช่อง (บน card สี surface มันจะหายไปทั้งช่อง)
+  - เส้นขอบ 1px `--brand-field-border` + radius 16px, focus = ขอบ terracotta + ring `primary/25`
+  - เขียนที่เดียวใน `components/ui/field.tsx` (`fieldClass`, `Input`, `Textarea`, `Select`, `FieldLabel`, `Field`, `fieldShellClass`) — ห้ามเขียน class ช่องกรอกเองในหน้าจอ
 - **Illustration:** flat vector บนพื้นขาว สีจาก palette เดียวกัน — ปลายทางทั่วโลก ไม่ผูกกับญี่ปุ่น
 
 ### Tone of Voice
@@ -1186,12 +1234,19 @@ AUTH_COOKIE_DOMAIN=rove.app
 | 19 ส.ค. 2569 | หน้า error/สถานะ | `not-found.tsx`, `error.tsx`, `global-error.tsx` + route `/maintenance` (static) | `/maintenance` ให้ Caddy เสิร์ฟตอน deploy/ล่มได้โดยไม่ต้องรอ Next ขึ้น (§8.1 instance เดียว) |
 | 19 ส.ค. 2569 | แยก 503 ออกจาก 500 | error boundary เช็ค ApiError ≥500 / network → แสดงจอ "หลังบ้านไม่ตอบ" | ผู้ใช้แก้เองไม่ได้ ต้องบอกว่าไม่ใช่ที่เขา + ปุ่ม retry แทน "กลับหน้าแรก" · **ข้อจำกัด:** production Next mask error ฝั่ง server ทำให้ branch นี้ยิงจริงเฉพาะ error ฝั่ง client (ที่ TanStack Query อยู่) |
 | 19 ส.ค. 2569 | เอกสารกฎหมาย | `/terms` + `/privacy` เป็น **ฉบับร่าง** เขียนจากพฤติกรรมจริงของระบบ | ให้ที่ปรึกษากฎหมายตรวจต่อจากของจริง ไม่ใช่ template · ช่อง `[...]` = ข้อมูลนิติบุคคลที่ยังไม่มี |
+| 20 ส.ค. 2569 | รูปปกทริป | เพิ่มคลังปก “ตามอารมณ์ทริป” 9 แบบ (FLUX seed เดิม) + `cover-placeholder` เป็นปกตั้งต้นของทุกทริป · อัปโหลดเองย่อ/ครอบเป็น 1200×800 WebP ในเบราว์เซอร์แล้วเก็บเป็น data URL | ทริปที่ไม่ได้ไปญี่ปุ่นเคยได้ปกญี่ปุ่นทุกใบ · R2 ยังเป็น stub และ `cover_image_url` เป็น varchar(500) การอัปโหลดจึงเปิดเฉพาะโหมด mock จนกว่า Phase 2 จะต่อ bucket |
 | 20 ส.ค. 2569 | สอง branch ที่ทำ Phase 1 ทับกัน | ยึด `feat/ui-prototype` เป็น tree ตั้งต้นทั้งก้อน แล้วยกเฉพาะชุดเทสต์ security ตามมา — merge commit ปกติ ไม่ rewrite ประวัติ | ui-prototype มีภาพที่เจนแล้ว (characters 20 + covers + empty states) และ mock/live layer ที่ demo ได้โดยไม่ต้องมี API · เลือกทับทั้ง tree ดีกว่าไล่ merge 111 ไฟล์ที่ชนกันทีละไฟล์ |
 | 20 ส.ค. 2569 | สร้างลิงก์เชิญ | **owner เท่านั้น** (เดิม ui-prototype ให้ editor ทำได้) | editor ที่ออกลิงก์เชิญได้ = ขยายสิทธิ์เขียนในทริปของคนอื่นโดยเจ้าของไม่รู้ · ตรงกับสัญญาใน §5.3 อยู่แล้ว |
 | 20 ส.ค. 2569 | DB ของ integration test | `glebarez/sqlite` (pure Go) in-memory | `go test ./...` รันได้โดยไม่ต้องมี cgo และไม่ต้องยก container — เทสต์ security จึงรันทุก PR ไม่ใช่เฉพาะตอนมี MySQL |
 | 20 ส.ค. 2569 | ทริปที่จบแล้ว | เพิ่มหน้า **บันทึกทริป** (`/recap/:id`) แยกจากห้องทริป และ derive ทุกอย่างจากตารางเดิม | ห้องทริปออกแบบมาเพื่อ "แก้" ทริปที่จบแล้วต้องการแค่ "อ่าน" — และคำถามที่คนกลับมาถามคือ *ตอนนั้นตัดสินใจยังไง* ไม่ใช่ timeline ดิบ · ถ้าเก็บ snapshot แยกจะมีวันที่ไม่ตรงกับห้อง |
 | 20 ส.ค. 2569 | จุดที่ชวนเปิด public | ชวนบนหน้าบันทึกทริป ไม่ใช่ตอนกำลังวางแผน | ทริปที่ไปมาแล้วคือทริปที่คนอื่นอยากตามรอย และเป็นจังหวะที่อธิบายวงจรแต้ม→ส่วนลดได้ตรงที่สุด (§6.5) · share dialog ยังตั้ง public ได้เหมือนเดิม |
 | 20 ส.ค. 2569 | ขอบเขตของเทสต์ authorization | ยอมรับทั้ง 404 และ 403 ว่า "ปฏิเสธแล้ว" | §4.3 อยากได้ 404 เพื่อไม่ยืนยันว่า id มีอยู่จริง แต่ route ไหนตอบอะไรขึ้นกับว่า membership หรือ role พังก่อน · สิ่งที่เทสต์คุมคือ "เข้าไม่ได้" ไม่ใช่เลขสถานะ |
+| 21 ส.ค. 2569 | เก็บประวัติการซื้อ | ตาราง **`orders` ตารางเดียว** รับของทุกอย่างที่ขาย (แยกด้วย `kind`) + `subscriptions` ที่ยังว่าง — ไม่ใช่ `ai_credit_purchases` | subscription รายเดือนคือของถัดไปที่จะขาย · ประวัติที่ต้องเขียนใหม่ตอนมีสินค้าชิ้นที่สองคือประวัติที่ทำสินค้าชิ้นแรกหาย |
+| 21 ส.ค. 2569 | ใบเสร็จ = order ใบเดียวกัน | ไม่มีตาราง `receipts` แยก · order เป็น **immutable** — คืนเงิน = เปลี่ยน status, แก้ = ออกใบใหม่ | ใบเสร็จที่ผู้ใช้โหลดไปแล้วต้องไม่กลายเป็นเอกสารคนละใบเงียบ ๆ |
+| 21 ส.ค. 2569 | เลขที่ใบเสร็จ | `RV-2569-000123` — ปี พ.ศ. + ลำดับต่อปี, COUNT ใน transaction + uniq index (ชนแล้ว retry 1 ครั้ง) | เป็นเลขที่ลูกค้าพูดผ่านแชท ต้องสั้น อ่านออกเสียงไม่กำกวม และไม่ซ้ำ · ยอดซื้อระดับหลักสิบต่อคนต่อปี ยังไม่คุ้มกับตาราง counter |
+| 21 ส.ค. 2569 | จ่ายด้วยแต้มบนใบเสร็จ | คงราคาป้ายไว้ที่ `subtotal` แล้วลด `discount` เต็มจำนวน → `total = ฿0` + `points_spent` แยกช่อง | "฿0" เดี่ยว ๆ อ่านเหมือนบั๊ก · แต้มไม่ใช่บาท จึงไม่บวกรวมในยอดเงินสด แต่ต้องเห็นว่าจ่ายอะไรไป |
+| 21 ส.ค. 2569 | ช่องทางชำระเงิน | `pay_channels` เปลี่ยนจาก `string[]` เป็น `{id,label}` และ purchase รับ `method` | เดิมฝั่ง Go แยกแต้ม/เงินสดด้วยการค้นคำว่า "แต้ม" ในข้อความ · ใบเสร็จที่เขียนว่า "บัตรเครดิต" ทั้งที่จ่ายพร้อมเพย์คือเรื่องร้องเรียน |
+| 21 ส.ค. 2569 | แพ็กเกจรายเดือน | ใส่ catalogue (ฟรี / Plus รายเดือน ฿129 / รายปี ฿1,290) ตั้งแต่ตอนนี้ โดย `available:false` | หน้าจอที่จะขายคือหน้าจอที่เรนเดอร์อยู่แล้ว — วันเปิดขายเป็น deploy ไม่ใช่การรื้อหน้า · ผู้ใช้ฟรีไม่มีแถวใน `subscriptions` ให้ API สังเคราะห์เอา |
 
 ---
 

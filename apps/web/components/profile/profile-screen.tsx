@@ -1,13 +1,18 @@
 'use client';
 
-import { Sparkles } from 'lucide-react';
+import { useState } from 'react';
+import { Pencil, Sparkles } from 'lucide-react';
 
+import { ModeLine } from '@/components/common/mode-banner';
 import { SectionHeader, Stat } from '@/components/common/section';
 import { CharacterPicker } from '@/components/profile/character-picker';
+import { ProfileEditSheet } from '@/components/profile/profile-edit-sheet';
+import { ProfileMenu } from '@/components/profile/profile-menu';
 import { ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
 import { useDreams, useMe, usePastTrips, useYearStats } from '@/features/auth/queries';
+import { env } from '@/lib/env';
 import { formatMoney } from '@/lib/format';
 
 /** Profile: character (M14), dream list (M15), lifetime stats and points. */
@@ -18,6 +23,7 @@ export function ProfileScreen() {
   const { data: stats } = useYearStats();
   const { data: past = [] } = usePastTrips();
   const { data: dreams = [] } = useDreams();
+  const [editing, setEditing] = useState(false);
 
   const lifetimeDays = past.reduce((sum, t) => sum + t.days, 0);
 
@@ -26,15 +32,20 @@ export function ProfileScreen() {
       {/* header -------------------------------------------------------- */}
       <div className="flex items-center gap-4">
         <CharacterAvatar characterId={me?.characterId ?? 'shiba'} size="xl" />
-        <div>
-          <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight">
+        <div className="min-w-0 flex-1">
+          <h1 className="font-display text-espresso truncate text-2xl font-extrabold tracking-tight">
             {me?.name ?? '—'}
           </h1>
-          <p className="text-muted text-sm">
-            {me?.handle}
-            {me?.email ? ` · ${me.email}` : ''}
-          </p>
+          <p className="text-muted truncate text-sm">{subtitleOf(me)}</p>
         </div>
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          aria-label="แก้ไขโปรไฟล์"
+          className="text-muted hover:bg-surface flex size-9 shrink-0 items-center justify-center rounded-full transition"
+        >
+          <Pencil className="size-4" strokeWidth={2.5} />
+        </button>
       </div>
 
       {/* points -------------------------------------------------------- */}
@@ -87,6 +98,29 @@ export function ProfileScreen() {
           </ButtonLink>
         </Card>
       </section>
+
+      {/* menu ---------------------------------------------------------- */}
+      <section>
+        <SectionHeader label="บัญชีและการตั้งค่า" />
+        <ProfileMenu onEditProfile={() => setEditing(true)} />
+      </section>
+
+      {/* footer -------------------------------------------------------- */}
+      <footer className="text-muted/70 pb-2 text-center text-[11px]">
+        <p className="font-semibold">{env.brandName}</p>
+        <ModeLine />
+      </footer>
+
+      <ProfileEditSheet open={editing} onClose={() => setEditing(false)} />
     </div>
   );
+}
+
+/**
+ * The handle and the e-mail are both optional — a user who signed in with LINE
+ * may have neither. Joining only what exists keeps a stray "·" off the screen.
+ */
+function subtitleOf(me: { handle?: string; email?: string } | null | undefined) {
+  const parts = [me?.handle ? `@${me.handle}` : null, me?.email ?? null].filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : 'ยังไม่ได้ตั้งชื่อผู้ใช้';
 }

@@ -6,6 +6,7 @@ import { Search, Trash2 } from 'lucide-react';
 import { ItemComments } from '@/components/collab/item-comments';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { FieldLabel, Input, Select, Textarea, fieldClass } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
 import { useAddItem, usePoiSearch, useRemoveItem, useUpdateItem } from '@/features/plan/queries';
 import { useMoveItem } from '@/features/plan/queries';
@@ -142,11 +143,10 @@ function ItemForm({
             <label className="text-muted mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold">
               <Search className="size-3" /> ค้นหาสถานที่
             </label>
-            <input
+            <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="เช่น teamLab, ตลาด, ศาลเจ้า"
-              className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
             />
             {pois.length > 0 ? (
               <ul className="mt-2 space-y-1.5">
@@ -181,16 +181,12 @@ function ItemForm({
         ) : null}
 
         <label className="block">
-          <span className="text-muted mb-1.5 block text-[11px] font-semibold">ชื่อรายการ</span>
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
-          />
+          <FieldLabel>ชื่อรายการ</FieldLabel>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} />
         </label>
 
         <div>
-          <span className="text-muted mb-1.5 block text-[11px] font-semibold">ประเภท</span>
+          <FieldLabel>ประเภท</FieldLabel>
           <div className="flex flex-wrap gap-1.5">
             {TYPES.map((option) => (
               <button
@@ -209,69 +205,56 @@ function ItemForm({
 
         <div className="grid grid-cols-2 gap-2">
           <label className="block">
-            <span className="text-muted mb-1.5 block text-[11px] font-semibold">เริ่ม</span>
-            <input
+            <FieldLabel>เริ่ม</FieldLabel>
+            <Input
               type="time"
               value={start}
               onChange={(e) => setStart(e.target.value)}
-              className="bg-surface text-espresso nums w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
+              className={cn(fieldClass, 'nums')}
             />
           </label>
           <label className="block">
-            <span className="text-muted mb-1.5 block text-[11px] font-semibold">จบ (ไม่ใส่ก็ได้)</span>
-            <input
+            <FieldLabel>จบ (ไม่ใส่ก็ได้)</FieldLabel>
+            <Input
               type="time"
               value={end}
               onChange={(e) => setEnd(e.target.value)}
-              className="bg-surface text-espresso nums w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
+              className={cn(fieldClass, 'nums')}
             />
           </label>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
           <label className="block">
-            <span className="text-muted mb-1.5 block text-[11px] font-semibold">ย่าน</span>
-            <input
-              value={area}
-              onChange={(e) => setArea(e.target.value)}
-              className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
-            />
+            <FieldLabel>ย่าน</FieldLabel>
+            <Input value={area} onChange={(e) => setArea(e.target.value)} />
           </label>
           <label className="block">
-            <span className="text-muted mb-1.5 block text-[11px] font-semibold">ราคา/คน (เยน)</span>
-            <input
+            <FieldLabel>ราคา/คน (เยน)</FieldLabel>
+            <Input
               type="number"
               min={0}
               value={costJpy}
               onChange={(e) => setCostJpy(e.target.value)}
-              className="bg-surface text-espresso nums w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
+              className={cn(fieldClass, 'nums')}
             />
           </label>
         </div>
 
         <label className="block">
-          <span className="text-muted mb-1.5 block text-[11px] font-semibold">อยู่วันไหน</span>
-          <select
-            value={targetDay}
-            onChange={(e) => setTargetDay(e.target.value)}
-            className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
-          >
+          <FieldLabel>อยู่วันไหน</FieldLabel>
+          <Select value={targetDay} onChange={(e) => setTargetDay(e.target.value)}>
             {days.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.label} · {d.city}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
 
         <label className="block">
-          <span className="text-muted mb-1.5 block text-[11px] font-semibold">โน้ต</span>
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            rows={2}
-            className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
-          />
+          <FieldLabel>โน้ต</FieldLabel>
+          <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} />
         </label>
 
         {item ? (

@@ -7,10 +7,12 @@ import type {
   AiJob,
   AvailabilityBoard,
   AvailabilityMark,
+  BillingSummary,
   BookingEntry,
   BookingKind,
   BookingStatus,
   BudgetSummary,
+  BuyCreditsInput,
   CalendarTrip,
   Character,
   Comment,
@@ -31,6 +33,7 @@ import type {
   LockedDates,
   Member,
   MoveItemInput,
+  Order,
   ParsedTicket,
   PastTrip,
   PlanDay,
@@ -39,6 +42,8 @@ import type {
   Poi,
   PrepTask,
   ShareState,
+  Subscription,
+  SubscriptionPlan,
   Trip,
   TripOverview,
   TripRecap,
@@ -74,6 +79,7 @@ export interface RoveRepo {
   booking: BookingRepo;
   collab: CollabRepo;
   ai: AiRepo;
+  billing: BillingRepo;
   share: ShareRepo;
   poi: PoiRepo;
   profile: ProfileRepo;
@@ -83,8 +89,15 @@ export interface RoveRepo {
 export interface AuthRepo {
   /** null for an anonymous visitor — never throws. */
   me(): Promise<CurrentUser | null>;
-  /** Mock mode signs in a seeded user; live mode returns the OAuth URL. */
-  startLogin(provider: 'line' | 'google'): Promise<{ redirectUrl: string | null; user: CurrentUser | null }>;
+  /**
+   * Mock mode signs in a seeded user and returns them; live mode returns a URL
+   * to follow. `next` is where the user should land once signed in — live mode
+   * carries it across the OAuth round trip, mock mode leaves it to the caller.
+   */
+  startLogin(
+    provider: 'line' | 'google',
+    next?: string,
+  ): Promise<{ redirectUrl: string | null; user: CurrentUser | null }>;
   logout(): Promise<void>;
   updateMe(patch: Partial<Pick<CurrentUser, 'name' | 'handle' | 'characterId' | 'homeCurrency'>>): Promise<CurrentUser>;
 }
@@ -226,8 +239,34 @@ export interface AiRepo {
   subscribe(tripId: string, jobId: string, onUpdate: (job: AiJob) => void): () => void;
   /** Applies a finished draft to the plan. */
   apply(tripId: string, jobId: string): Promise<PlanDay[]>;
-  /** Buys extra drafts. Mock mode always succeeds and says it was simulated. */
-  buyCredits(tripId: string, quantity: number, channel: string): Promise<AiCredits & { simulated: boolean }>;
+  /**
+   * Buys extra drafts and files the receipt (M20): a purchase returns the order
+   * it created, so the payment sheet can link straight to it. Mock mode always
+   * succeeds and says the charge was simulated.
+   */
+  buyCredits(
+    tripId: string,
+    input: BuyCreditsInput,
+  ): Promise<AiCredits & { simulated: boolean; order: Order | null }>;
+}
+
+/**
+ * Bill & Payment (M20).
+ *
+ * Read-only on purpose. An order is written by whatever was sold — buying
+ * drafts today, a subscription renewal later — never by the screen that lists
+ * them. What this contract owes the UI is the history and the receipts.
+ */
+export interface BillingRepo {
+  /** Headline numbers plus the standing plan. */
+  summary(): Promise<BillingSummary>;
+  /** Newest first. */
+  orders(): Promise<Order[]>;
+  /** One receipt; null when the id belongs to nothing this user bought. */
+  order(orderId: string): Promise<Order | null>;
+  subscription(): Promise<Subscription>;
+  /** The price list. One entry today, and it is not on sale yet. */
+  plans(): Promise<SubscriptionPlan[]>;
 }
 
 export interface ShareRepo {

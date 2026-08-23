@@ -3,7 +3,13 @@
 import { useState } from 'react';
 import { ArrowRight, Bus, Plane, Plus } from 'lucide-react';
 
-import { RouteBuilder, RouteSummary, newLeg, useRouteDraft, type DraftLeg } from '@/components/trip/route-builder';
+import {
+  RouteBuilder,
+  RouteSummary,
+  newLeg,
+  useRouteDraft,
+  type DraftLeg,
+} from '@/components/trip/route-builder';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -158,9 +164,7 @@ function RouteEditor({
   const { airports, route, warnings } = useRouteDraft(legs);
 
   async function submit() {
-    await save.mutateAsync(
-      legs.filter((leg) => leg.from && leg.to && leg.depDate).map(toLegInput),
-    );
+    await save.mutateAsync(legs.filter((leg) => leg.from && leg.to && leg.depDate).map(toLegInput));
     onClose();
   }
 
@@ -170,6 +174,10 @@ function RouteEditor({
       onClose={onClose}
       title="เส้นทางของทริป"
       description="วันเดินทางและปลายทางของทริปจะอัปเดตตามเที่ยวบินที่ใส่ไว้"
+      /* Wider than the default sheet: this one holds a whole route — two or
+         three legs, each with two airports and three fields — and at 28rem the
+         builder has to stack every one of them. */
+      className="sm:max-w-2xl"
       footer={
         <Button block size="lg" onClick={() => void submit()} disabled={save.isPending}>
           {save.isPending ? 'กำลังบันทึก…' : 'บันทึกเส้นทาง'}

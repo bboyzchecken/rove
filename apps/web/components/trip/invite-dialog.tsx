@@ -6,6 +6,7 @@ import { Check, Copy, Link2, MessageCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input, fieldClass } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
 import { useInviteMember } from '@/features/trip/queries';
 import { mockSkips } from '@/lib/data';
@@ -79,11 +80,11 @@ export function InviteDialog({
         <Card className="p-3">
           <p className="section-label mb-1.5">ลิงก์เชิญ</p>
           <div className="flex items-center gap-2">
-            <input
+            <Input
               readOnly
               value={invite.isPending ? 'กำลังสร้างลิงก์…' : link}
               onFocus={(e) => e.currentTarget.select()}
-              className="bg-bg text-espresso min-w-0 flex-1 rounded-full px-3 py-2 text-[11px] outline-none"
+              className={cn(fieldClass, 'min-w-0 flex-1 rounded-full px-3 py-2 text-[11px]')}
             />
             <Button size="sm" onClick={() => void copy()} disabled={!link}>
               {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
@@ -92,7 +93,8 @@ export function InviteDialog({
           </div>
           {invite.data ? (
             <p className="text-muted mt-2 text-[11px]">
-              ลิงก์หมดอายุ {new Date(invite.data.expiresAt).toLocaleDateString('th-TH')} · สร้างใหม่ได้ตลอด
+              ลิงก์หมดอายุ {new Date(invite.data.expiresAt).toLocaleDateString('th-TH')} ·
+              สร้างใหม่ได้ตลอด
             </p>
           ) : null}
         </Card>

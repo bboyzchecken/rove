@@ -115,7 +115,8 @@ export function AvailabilityCalendar({
 
           const selected = inSelection(date);
           const isEdge =
-            selected && (date === selection?.start || date === (selection?.end ?? selection?.start));
+            selected &&
+            (date === selection?.start || date === (selection?.end ?? selection?.start));
           const day = parseIsoDate(date).getDate();
           const everyone = total > 0 && row.free.length === total;
 
@@ -134,7 +135,7 @@ export function AvailabilityCalendar({
                 isEdge && 'ring-espresso ring-2',
                 inLocked(date) && !selected && 'ring-espresso/40 ring-2',
                 mode === 'mine' && mine === 'free' && 'ring-espresso ring-2',
-                mode === 'mine' && mine === 'maybe' && 'ring-sun ring-2 ring-dashed',
+                mode === 'mine' && mine === 'maybe' && 'ring-sun ring-dashed ring-2',
                 'active:scale-[0.97]',
               )}
             >
@@ -159,7 +160,7 @@ export function AvailabilityCalendar({
               </span>
 
               {everyone ? (
-                <span className="bg-primary-fg absolute right-1 top-1 size-1.5 rounded-full opacity-80" />
+                <span className="bg-primary-fg absolute top-1 right-1 size-1.5 rounded-full opacity-80" />
               ) : null}
             </button>
           );

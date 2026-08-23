@@ -119,6 +119,19 @@ func Migrate(db *gorm.DB) error {
 				return tx.Migrator().DropTable("trip_flights")
 			},
 		},
+		{
+			// M20 — A20.1: bill & payment. Orders carry every purchase, whatever
+			// was sold; `subscriptions` is empty until billing turns on, and ships
+			// now so that the day it does is a deploy and not a migration on a
+			// table people are already buying from.
+			ID: "202608210000_billing",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.AutoMigrate(&models.Order{}, &models.Subscription{})
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return tx.Migrator().DropTable("orders", "subscriptions")
+			},
+		},
 	})
 
 	return m.Migrate()

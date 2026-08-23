@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plane, Search, X } from 'lucide-react';
 
+import { FieldLabel, fieldClass } from '@/components/ui/field';
 import { repo } from '@/lib/data';
 import type { Airport } from '@/lib/data';
 import { airportLabel, flagOf } from '@/lib/data/airports';
@@ -94,16 +95,21 @@ export function AirportPicker({
   }
 
   return (
-    <div className="block" ref={boxRef}>
-      {label ? (
-        <span className="text-muted mb-1.5 block text-[11px] font-semibold">{label}</span>
-      ) : null}
+    /**
+     * `relative` + `min-w-0`: the list below is positioned, not stacked. In a
+     * `1fr` grid column an in-flow list of airport names sets the column's own
+     * min-content width, so a long one ("Don Mueang International Airport")
+     * used to stretch the leg card past the page. Overlaying it also stops the
+     * date row from jumping down every time the field is focused.
+     */
+    <div className="relative block min-w-0" ref={boxRef}>
+      {label ? <FieldLabel>{label}</FieldLabel> : null}
 
       {chosen && !open ? (
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="bg-surface flex w-full items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-left"
+          className={cn(fieldClass, 'hover:border-muted/45 flex items-center gap-2.5 text-left')}
         >
           <span className="text-lg leading-none">{value ? flagOf(value.countryCode) : '✈️'}</span>
           <span className="min-w-0 flex-1">
@@ -137,13 +143,13 @@ export function AirportPicker({
             onFocus={() => setOpen(true)}
             onKeyDown={onKeyDown}
             placeholder={placeholder}
-            className="bg-surface text-espresso w-full rounded-2xl py-2.5 pr-3.5 pl-9 text-sm outline-none"
+            className={cn(fieldClass, 'pr-3.5 pl-9')}
           />
         </div>
       )}
 
       {open ? (
-        <div className="bg-surface animate-rove-rise mt-1.5 max-h-72 overflow-y-auto rounded-2xl p-1">
+        <div className="bg-bg border-field-border shadow-warm-lg animate-rove-rise absolute inset-x-0 top-full z-20 mt-1.5 max-h-72 overflow-y-auto rounded-2xl border p-1">
           {options.length === 0 ? (
             <p className="text-muted px-3 py-3 text-xs">
               {isFetching ? 'กำลังค้นหา…' : 'ไม่พบสนามบินที่ตรง — ลองใส่รหัส 3 ตัวจากตั๋ว เช่น NRT'}
@@ -163,7 +169,7 @@ export function AirportPicker({
                   onClick={() => choose(airport)}
                   className={cn(
                     'flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left transition',
-                    index === highlight ? 'bg-bg' : '',
+                    index === highlight ? 'bg-surface' : '',
                   )}
                 >
                   <span className="text-lg leading-none">{flagOf(airport.countryCode)}</span>

@@ -63,6 +63,10 @@ export interface AnalyticsEvents {
   dream_item_added: Record<string, never>;
   dream_item_converted_to_trip: Record<string, never>;
   points_balance_viewed: Record<string, never>;
+
+  // M20 — bill & payment.
+  billing_viewed: { orders: number };
+  receipt_viewed: { kind: 'ai_credit' | 'subscription' | 'points_topup' };
   home_dashboard_viewed: Record<string, never>;
   calendar_viewed: Record<string, never>;
 }

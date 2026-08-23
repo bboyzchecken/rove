@@ -13,6 +13,8 @@
   --color-espresso: hsl(var(--brand-espresso));
   --color-muted: hsl(var(--brand-muted));
   --color-border: hsl(var(--brand-border));
+  --color-field: hsl(var(--brand-field));
+  --color-field-border: hsl(var(--brand-field-border));
 
   --color-matcha: hsl(var(--brand-matcha));
   --color-sky: hsl(var(--brand-sky));

@@ -1,9 +1,13 @@
 'use client';
 
-import Image from 'next/image';
+import { useState } from 'react';
+import { ImageUp } from 'lucide-react';
 
+import { TripCover } from '@/components/trip/trip-cover';
+import { TripCoverSheet } from '@/components/trip/trip-cover-sheet';
 import { Badge } from '@/components/ui/badge';
 import { CharacterStack } from '@/components/ui/character-avatar';
+import { useMe } from '@/features/auth/queries';
 import { useTripOverview } from '@/features/trip/queries';
 import { thaiRangeLabel } from '@/lib/data/domain';
 
@@ -12,7 +16,9 @@ import { thaiRangeLabel } from '@/lib/data/domain';
  *
  * The title sits below the cover, not on it: the covers are light
  * illustrations on white, so overlaid text would need a scrim heavy enough to
- * hide the artwork it is sitting on.
+ * hide the artwork it is sitting on. The one thing that does sit on the cover
+ * is the button that changes it — a picture is edited where it is seen, and
+ * there is nothing under it to hide.
  */
 const STATUS_LABEL: Record<string, string> = {
   planning: 'กำลังวางแพลน',
@@ -23,6 +29,8 @@ const STATUS_LABEL: Record<string, string> = {
 
 export function TripHeader({ tripId }: { tripId: string }) {
   const { data, isLoading } = useTripOverview(tripId);
+  const { data: me } = useMe();
+  const [picking, setPicking] = useState(false);
 
   if (isLoading || !data) {
     return (
@@ -35,19 +43,22 @@ export function TripHeader({ tripId }: { tripId: string }) {
 
   const { trip, members, locked } = data;
   const hasDates = Boolean(trip.startDate && trip.endDate);
+  // A viewer reads the room but does not dress it — the same rule the API keeps.
+  const canEdit = members.find((member) => member.id === me?.id)?.role !== 'viewer';
 
   return (
     <div className="px-4 pt-3">
-      <div className="rounded-brand bg-sky/25 overflow-hidden">
-        <Image
-          src={trip.cover}
-          alt=""
-          width={1200}
-          height={800}
-          priority
-          className="h-32 w-full object-cover sm:h-44"
-        />
-      </div>
+      <TripCover src={trip.cover} frame="banner" priority className="rounded-brand">
+        {canEdit ? (
+          <button
+            type="button"
+            onClick={() => setPicking(true)}
+            className="bg-bg/90 text-espresso shadow-warm-sm absolute right-2 bottom-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold"
+          >
+            <ImageUp className="size-3.5" /> เปลี่ยนรูปปก
+          </button>
+        ) : null}
+      </TripCover>
 
       <div className="mt-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -79,6 +90,13 @@ export function TripHeader({ tripId }: { tripId: string }) {
         </div>
         <CharacterStack characterIds={members.map((m) => m.characterId)} />
       </div>
+
+      <TripCoverSheet
+        tripId={tripId}
+        trip={trip}
+        open={picking}
+        onClose={() => setPicking(false)}
+      />
     </div>
   );
 }

@@ -10,6 +10,7 @@ import type {
   AiCreditsDto,
   AiJobDto,
   AvailabilityBoardDto,
+  BillingSummaryDto,
   BookingDto,
   BudgetDto,
   CalendarTripDto,
@@ -24,6 +25,7 @@ import type {
   LockedDatesDto,
   MeDto,
   MemberDto,
+  OrderDto,
   ParsedTicketDto,
   PastTripDto,
   PlanDayDto,
@@ -33,6 +35,8 @@ import type {
   PrepTaskDto,
   RouteDto,
   ShareStateDto,
+  SubscriptionDto,
+  SubscriptionPlanDto,
   TripDto,
   TripOverviewDto,
   TripRecapDto,
@@ -51,6 +55,7 @@ import {
   toAirport,
   toAiCredits,
   toAiJob,
+  toBillingSummary,
   toBoard,
   toBooking,
   toBudget,
@@ -64,6 +69,7 @@ import {
   toInvite,
   toLocked,
   toMember,
+  toOrder,
   toParsedTicket,
   toPastTrip,
   toPlanDay,
@@ -73,6 +79,8 @@ import {
   toPrepTask,
   toRoute,
   toShareState,
+  toSubscription,
+  toSubscriptionPlan,
   toTrip,
   toTripOverview,
   toTripRecap,
@@ -122,11 +130,14 @@ export const liveRepo: RoveRepo = {
       }
     },
 
-    async startLogin(provider) {
-      const { url } = await api.get<{ url: string }>(`/auth/${provider}/url`, {
-        searchParams: { redirect: `${env.appUrl}/home` },
-      });
-      return { redirectUrl: url, user: null };
+    async startLogin(provider, next) {
+      // Not the provider's URL directly: `/api/auth/start` fetches it, keeps
+      // the `state` in an httpOnly cookie so the callback can verify it, and
+      // only then hands the browser on. The API cannot hold that state itself.
+      const url = new URL('/api/auth/start', env.appUrl);
+      url.searchParams.set('provider', provider);
+      if (next) url.searchParams.set('next', next);
+      return { redirectUrl: `${url.pathname}${url.search}`, user: null };
     },
 
     async logout() {
@@ -582,12 +593,46 @@ export const liveRepo: RoveRepo = {
       return dto.map(toPlanDay);
     },
 
-    async buyCredits(tripId, quantity, channel) {
-      const dto = await api.post<AiCreditsDto & { simulated: boolean }>(
+    async buyCredits(tripId, input) {
+      const dto = await api.post<AiCreditsDto & { simulated: boolean; order?: OrderDto }>(
         `/trips/${tripId}/ai/credits/purchase`,
-        { quantity, channel },
+        { quantity: input.quantity, method: input.method, channel: input.channel },
       );
-      return { ...toAiCredits(dto), simulated: dto.simulated };
+      // The drafts are granted even if filing the receipt failed, and the API
+      // says so by omitting it. Failing the purchase here would be a lie about
+      // something that already happened.
+      return {
+        ...toAiCredits(dto),
+        simulated: dto.simulated,
+        order: dto.order ? toOrder(dto.order) : null,
+      };
+    },
+  },
+
+  /* ----------------------------------------------------------- billing -- */
+  billing: {
+    async summary() {
+      return toBillingSummary(await api.get<BillingSummaryDto>('/users/me/billing/summary'));
+    },
+    async orders() {
+      return (await api.get<OrderDto[]>('/users/me/billing/orders')).map(toOrder);
+    },
+    async order(orderId) {
+      try {
+        return toOrder(await api.get<OrderDto>(`/users/me/billing/orders/${orderId}`));
+      } catch {
+        // A receipt that is not this user's is a 404 to them, not an error the
+        // screen has to explain.
+        return null;
+      }
+    },
+    async subscription() {
+      return toSubscription(await api.get<SubscriptionDto>('/users/me/billing/subscription'));
+    },
+    async plans() {
+      return (await api.get<SubscriptionPlanDto[]>('/users/me/billing/plans')).map(
+        toSubscriptionPlan,
+      );
     },
   },
 

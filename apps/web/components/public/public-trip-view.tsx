@@ -1,10 +1,10 @@
 'use client';
 
-import Image from 'next/image';
 import { Bus, Car, EyeOff, Footprints, TrainFront } from 'lucide-react';
 
 import { RoveLogo } from '@/components/brand/rove-logo';
 import { SectionHeader } from '@/components/common/section';
+import { TripCover } from '@/components/trip/trip-cover';
 import { Badge } from '@/components/ui/badge';
 import { ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -38,9 +38,7 @@ export function PublicTripView({ tokenOrSlug }: { tokenOrSlug: string }) {
     return (
       <main className="mx-auto max-w-2xl px-6 py-16 text-center">
         <RoveLogo size="md" className="mx-auto" />
-        <h1 className="font-display text-espresso mt-6 text-xl font-extrabold">
-          ไม่พบแพลนนี้
-        </h1>
+        <h1 className="font-display text-espresso mt-6 text-xl font-extrabold">ไม่พบแพลนนี้</h1>
         <p className="text-muted mt-2 text-sm">ลิงก์อาจถูกปิดหรือสร้างใหม่ไปแล้ว</p>
         <ButtonLink href="/" className="mt-5">
           กลับหน้าแรก
@@ -61,16 +59,7 @@ export function PublicTripView({ tokenOrSlug }: { tokenOrSlug: string }) {
         <Badge tone="outline">แพลนที่แชร์มา</Badge>
       </div>
 
-      <div className="rounded-brand bg-sky/25 mt-4 overflow-hidden">
-        <Image
-          src={trip.cover}
-          alt=""
-          width={1200}
-          height={800}
-          priority
-          className="h-40 w-full object-cover sm:h-52"
-        />
-      </div>
+      <TripCover src={trip.cover} frame="banner" priority className="rounded-brand mt-4" />
 
       <div className="mt-3 flex items-start justify-between gap-3">
         <div>

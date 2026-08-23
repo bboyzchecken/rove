@@ -31,8 +31,8 @@ export function DreamScreen() {
 
       <Card accent="sky" className="p-4">
         <p className="text-espresso text-xs leading-relaxed">
-          รายการนี้เป็นของคุณคนเดียว เพื่อนในทริปไม่เห็น — ต่างจาก
-          &ldquo;ที่อยากไป&rdquo; ในห้องทริป ที่ทุกคนเห็นและ AI เอาไปใช้ร่างแพลน
+          รายการนี้เป็นของคุณคนเดียว เพื่อนในทริปไม่เห็น — ต่างจาก &ldquo;ที่อยากไป&rdquo;
+          ในห้องทริป ที่ทุกคนเห็นและ AI เอาไปใช้ร่างแพลน
         </p>
       </Card>
     </div>

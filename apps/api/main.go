@@ -23,6 +23,7 @@ import (
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/storage"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/weather"
 	aijobstore "github.com/bboyzchecken/rove/apps/api/pkg/store/aijob"
+	billingstore "github.com/bboyzchecken/rove/apps/api/pkg/store/billing"
 	bookingstore "github.com/bboyzchecken/rove/apps/api/pkg/store/booking"
 	characterstore "github.com/bboyzchecken/rove/apps/api/pkg/store/character"
 	collabstore "github.com/bboyzchecken/rove/apps/api/pkg/store/collab"
@@ -174,6 +175,7 @@ func storeModules() fx.Option {
 		flightstore.Module,
 		collabstore.Module,
 		aijobstore.Module,
+		billingstore.Module,
 	)
 }
 

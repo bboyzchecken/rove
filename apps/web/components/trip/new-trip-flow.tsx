@@ -13,11 +13,18 @@ import {
 } from 'lucide-react';
 
 import { RoveMark } from '@/components/brand/rove-mark';
-import { RouteBuilder, RouteSummary, newLeg, useRouteDraft, type DraftLeg } from '@/components/trip/route-builder';
+import {
+  RouteBuilder,
+  RouteSummary,
+  newLeg,
+  useRouteDraft,
+  type DraftLeg,
+} from '@/components/trip/route-builder';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
+import { FieldLabel, Input, Textarea, fieldClass } from '@/components/ui/field';
 import { useCharacters, useUpdateMe } from '@/features/auth/queries';
 import { useCreateTrip } from '@/features/trip/queries';
 import { track } from '@/lib/analytics';
@@ -48,7 +55,12 @@ import { cn } from '@/lib/utils';
 type Entry = 'route' | 'date' | 'coordinate';
 
 const ENTRIES: { key: Entry; icon: typeof CalendarDays; title: string; hint: string }[] = [
-  { key: 'route', icon: Plane, title: 'รู้เที่ยวบินแล้ว', hint: 'ใส่สนามบินและวันบิน เดี๋ยวจัดวันให้' },
+  {
+    key: 'route',
+    icon: Plane,
+    title: 'รู้เที่ยวบินแล้ว',
+    hint: 'ใส่สนามบินและวันบิน เดี๋ยวจัดวันให้',
+  },
   { key: 'date', icon: CalendarDays, title: 'รู้วันแล้ว', hint: 'ลาไว้แล้ว ยังไม่รู้จะไปไหน' },
   { key: 'coordinate', icon: CalendarSearch, title: 'ยังไม่รู้วัน', hint: 'หาวันที่ทุกคนว่างก่อน' },
 ];
@@ -73,8 +85,16 @@ export function NewTripFlow() {
   const [entry, setEntry] = useState<Entry | null>(initial);
   const [step, setStep] = useState(initial ? 1 : 0);
   const [legs, setLegs] = useState<DraftLeg[]>(() => [
-    newLeg('out', { from: HOME_AIRPORT, to: presetAirport?.toUpperCase() ?? '', depDate: DEFAULT_START }),
-    newLeg('back', { from: presetAirport?.toUpperCase() ?? '', to: HOME_AIRPORT, depDate: DEFAULT_END }),
+    newLeg('out', {
+      from: HOME_AIRPORT,
+      to: presetAirport?.toUpperCase() ?? '',
+      depDate: DEFAULT_START,
+    }),
+    newLeg('back', {
+      from: presetAirport?.toUpperCase() ?? '',
+      to: HOME_AIRPORT,
+      depDate: DEFAULT_END,
+    }),
   ]);
   const [startDate, setStartDate] = useState(DEFAULT_START);
   const [endDate, setEndDate] = useState(DEFAULT_END);
@@ -129,22 +149,21 @@ export function NewTripFlow() {
     try {
       const parsed = await repo.trips.parseTicket(text);
       if (parsed.flights.length === 0) {
-        setTicketNote('อ่านเที่ยวบินไม่ออก — ใส่เองด้านล่างได้เลย หรือวางเฉพาะบรรทัดที่มีรหัสเที่ยวบิน');
+        setTicketNote(
+          'อ่านเที่ยวบินไม่ออก — ใส่เองด้านล่างได้เลย หรือวางเฉพาะบรรทัดที่มีรหัสเที่ยวบิน',
+        );
         return;
       }
 
       setLegs(
         parsed.flights.map((flight, index) =>
-          newLeg(
-            index === 0 ? 'out' : index === parsed.flights.length - 1 ? 'back' : 'inter',
-            {
-              from: flight.from,
-              to: flight.to,
-              depDate: flight.date,
-              depTime: flight.time,
-              flightNo: flight.code,
-            },
-          ),
+          newLeg(index === 0 ? 'out' : index === parsed.flights.length - 1 ? 'back' : 'inter', {
+            from: flight.from,
+            to: flight.to,
+            depDate: flight.date,
+            depTime: flight.time,
+            flightNo: flight.code,
+          }),
         ),
       );
       if (parsed.partySize) setParty(parsed.partySize);
@@ -191,9 +210,17 @@ export function NewTripFlow() {
   }
 
   return (
-    <div className="mx-auto max-w-lg px-4 py-6">
+    /*
+     * The shell is `px-4 py-5` and nothing else, exactly like /home, /trips and
+     * /profile: the width comes from the one `max-w-5xl` in AppShell, so the
+     * three steps line up with each other and with every other tab instead of
+     * each picking its own gutter. Where a full-width row would be silly — two
+     * date inputs stretched over 60rem — the *content* is capped, never the
+     * shell, so the headings never move sideways between steps.
+     */
+    <div className="px-4 py-5">
       {/* progress ------------------------------------------------------ */}
-      <div className="mb-6 flex items-center gap-2">
+      <div className="mb-6 flex items-center gap-2 md:mb-8">
         {[0, 1, 2].map((i) => (
           <span
             key={i}
@@ -208,12 +235,15 @@ export function NewTripFlow() {
       {/* step 0 -------------------------------------------------------- */}
       {step === 0 ? (
         <div className="animate-rove-rise">
-          <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight">
+          <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight md:text-3xl">
             ตอนนี้รู้อะไรแล้วบ้าง
           </h1>
-          <p className="text-muted mt-1 text-sm">เลือกอันที่ใกล้ที่สุด เดี๋ยวที่เหลือค่อยเติมทีหลัง</p>
+          <p className="text-muted mt-1 text-sm">
+            เลือกอันที่ใกล้ที่สุด เดี๋ยวที่เหลือค่อยเติมทีหลัง
+          </p>
 
-          <div className="mt-5 space-y-2.5">
+          {/* A list of three on a phone, three doors side by side on a desk. */}
+          <div className="mt-5 grid gap-2.5 sm:grid-cols-3 md:mt-7 md:gap-4">
             {ENTRIES.map((option) => (
               <button
                 key={option.key}
@@ -221,17 +251,17 @@ export function NewTripFlow() {
                   setEntry(option.key);
                   setStep(1);
                 }}
-                className="w-full text-left"
+                className="h-full text-left"
               >
-                <Card className="hover:shadow-warm flex items-center gap-3.5 p-4 transition">
+                <Card className="hover:shadow-warm flex h-full items-center gap-3.5 p-4 transition sm:flex-col sm:items-start sm:gap-3 sm:p-5">
                   <span className="bg-primary/12 text-primary flex size-11 shrink-0 items-center justify-center rounded-2xl">
                     <option.icon className="size-5" strokeWidth={2.2} />
                   </span>
-                  <div className="flex-1">
+                  <div className="flex-1 sm:flex-none">
                     <p className="font-display text-espresso font-bold">{option.title}</p>
                     <p className="text-muted text-xs">{option.hint}</p>
                   </div>
-                  <ArrowRight className="text-muted size-4" />
+                  <ArrowRight className="text-muted size-4 shrink-0 sm:mt-auto" />
                 </Card>
               </button>
             ))}
@@ -249,7 +279,7 @@ export function NewTripFlow() {
             <ArrowLeft className="size-3.5" /> เปลี่ยนวิธีเริ่ม
           </button>
 
-          <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight">
+          <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight md:text-3xl">
             {routing ? 'บินไปลงที่ไหน' : coordinating ? 'ไปกันกี่คน' : 'ไปวันไหน'}
           </h1>
           {routing ? (
@@ -258,19 +288,65 @@ export function NewTripFlow() {
             </p>
           ) : null}
 
-          <div className="mt-5 space-y-4">
+          {/*
+            The route door is the only one with two things to look at — the legs
+            being typed and the trip they add up to. On a phone they queue up;
+            from `lg` the summary moves beside the form and sticks, so the night
+            count reacts in place instead of scrolling away. The other doors
+            have one column of content and keep one column.
+          */}
+          <div
+            className={cn(
+              'mt-5 md:mt-7',
+              routing ? 'grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-6' : 'space-y-4',
+            )}
+          >
             {/* --- route door ------------------------------------------- */}
             {routing ? (
               <>
-                <RouteBuilder
-                  legs={legs}
-                  onChange={setLegs}
-                  airports={airports}
-                  warnings={warnings}
-                />
+                <div className="lg:col-start-1 lg:row-start-1">
+                  <RouteBuilder
+                    legs={legs}
+                    onChange={setLegs}
+                    airports={airports}
+                    warnings={warnings}
+                  />
+                </div>
 
-                <RouteSummary route={route} />
+                {/*
+                  One summary, two places: directly under the legs on a phone,
+                  and — via the row/column placement rather than a second copy —
+                  sticky beside them from `lg` up, where it stays in view while
+                  the dates below are still being typed.
+                */}
+                <aside className="lg:col-start-2 lg:row-span-2 lg:row-start-1">
+                  <div className="lg:sticky lg:top-20">
+                    <RouteSummary route={route} />
+                    {/* An empty column would read as a broken layout, so until a
+                        destination is picked the column says what will land in
+                        it. Phones skip it: there the summary is just the next
+                        block down, and a placeholder would only be noise. */}
+                    {route.stops.length === 0 ? (
+                      <Card accent="sky" className="hidden p-4 lg:block">
+                        <p className="text-espresso text-xs leading-relaxed">
+                          เลือกสนามบินปลายทางแล้ว สรุปทริป — วันเดินทาง จำนวนคืน และประเทศ —
+                          จะขึ้นตรงนี้ให้เห็นระหว่างกรอก
+                        </p>
+                      </Card>
+                    ) : null}
+                  </div>
+                </aside>
+              </>
+            ) : null}
 
+            <div
+              className={cn(
+                'space-y-4 lg:col-start-1 lg:row-start-2',
+                routing ? '' : 'md:max-w-2xl',
+              )}
+            >
+              {/* Pasting a ticket fills the same legs, so it lives under them. */}
+              {routing ? (
                 <div>
                   <button
                     onClick={() => setPasting((v) => !v)}
@@ -282,12 +358,12 @@ export function NewTripFlow() {
 
                   {pasting ? (
                     <div className="mt-2 space-y-2">
-                      <textarea
+                      <Textarea
                         value={ticket}
                         onChange={(e) => void readTicket(e.target.value)}
                         rows={5}
                         placeholder="วางอีเมลยืนยันตั๋ว หรือข้อความจากสายการบินได้เลย"
-                        className="bg-surface text-espresso nums w-full rounded-2xl p-3.5 text-xs outline-none"
+                        className={cn(fieldClass, 'nums text-xs')}
                       />
                       <Button
                         variant="soft"
@@ -305,94 +381,107 @@ export function NewTripFlow() {
                     </div>
                   ) : null}
                 </div>
-              </>
-            ) : null}
+              ) : null}
 
-            {/* --- date door -------------------------------------------- */}
-            {entry === 'date' ? (
-              <>
-                <div className="grid grid-cols-2 gap-2">
-                  <Field label="ไปวันที่">
-                    <input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => {
-                        setStartDate(e.target.value);
-                        if (e.target.value > endDate) setEndDate(addDays(e.target.value, 4));
-                      }}
-                      className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
-                    />
-                  </Field>
-                  <Field label="กลับวันที่">
-                    <input
-                      type="date"
-                      value={endDate}
-                      min={startDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="bg-surface text-espresso w-full rounded-2xl px-3.5 py-2.5 text-sm outline-none"
-                    />
-                  </Field>
-                </div>
+              {/* --- date door -------------------------------------------- */}
+              {entry === 'date' ? (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Field label="ไปวันที่">
+                      <Input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => {
+                          setStartDate(e.target.value);
+                          if (e.target.value > endDate) setEndDate(addDays(e.target.value, 4));
+                        }}
+                      />
+                    </Field>
+                    <Field label="กลับวันที่">
+                      <Input
+                        type="date"
+                        value={endDate}
+                        min={startDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                      />
+                    </Field>
+                  </div>
 
-                <p className="text-muted text-xs">
-                  {nights + 1} วัน {nights} คืน · {thaiRangeLabel(startDate, endDate)}
-                </p>
+                  <p className="text-muted text-xs">
+                    {nights + 1} วัน {nights} คืน · {thaiRangeLabel(startDate, endDate)}
+                  </p>
 
+                  <Card accent="sky" className="p-4">
+                    <p className="text-espresso text-xs leading-relaxed">
+                      ยังไม่ต้องเลือกปลายทางตอนนี้ — สร้างห้องแล้ว ROVE จะแนะนำที่ที่เหมาะกับ{' '}
+                      {nights + 1} วันนี้ให้ พอจองตั๋วได้แล้วค่อยใส่เที่ยวบินทีหลัง
+                    </p>
+                    <button
+                      onClick={() => setEntry('route')}
+                      className="text-primary mt-2 text-xs font-semibold"
+                    >
+                      จองตั๋วแล้ว? ใส่เที่ยวบินเลยดีกว่า →
+                    </button>
+                  </Card>
+                </>
+              ) : null}
+
+              {/* --- coordinate door -------------------------------------- */}
+              {coordinating ? (
                 <Card accent="sky" className="p-4">
                   <p className="text-espresso text-xs leading-relaxed">
-                    ยังไม่ต้องเลือกปลายทางตอนนี้ — สร้างห้องแล้ว ROVE จะแนะนำที่ที่เหมาะกับ{' '}
-                    {nights + 1} วันนี้ให้ พอจองตั๋วได้แล้วค่อยใส่เที่ยวบินทีหลัง
+                    สร้างห้องก่อนโดยยังไม่ต้องมีวัน — ทุกคนเข้ามาแตะวันที่ตัวเองว่าง แล้ว ROVE
+                    จะหาช่วงที่ซ้อนกันมากที่สุดให้ พร้อมแนะนำปลายทางที่เหมาะกับจำนวนวันนั้น
                   </p>
-                  <button
-                    onClick={() => setEntry('route')}
-                    className="text-primary mt-2 text-xs font-semibold"
-                  >
-                    จองตั๋วแล้ว? ใส่เที่ยวบินเลยดีกว่า →
-                  </button>
                 </Card>
-              </>
-            ) : null}
+              ) : null}
 
-            {/* --- coordinate door -------------------------------------- */}
-            {coordinating ? (
-              <Card accent="sky" className="p-4">
-                <p className="text-espresso text-xs leading-relaxed">
-                  สร้างห้องก่อนโดยยังไม่ต้องมีวัน — ทุกคนเข้ามาแตะวันที่ตัวเองว่าง
-                  แล้ว ROVE จะหาช่วงที่ซ้อนกันมากที่สุดให้ พร้อมแนะนำปลายทางที่เหมาะกับจำนวนวันนั้น
-                </p>
-              </Card>
-            ) : null}
-
-            <Field label="ไปกันกี่คน">
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setParty((p) => Math.max(1, p - 1))}
-                  className="bg-surface text-espresso size-10 rounded-full text-lg font-bold"
-                >
-                  −
-                </button>
-                <span className="font-display text-espresso w-8 text-center text-xl font-extrabold">
-                  {party}
-                </span>
-                <button
-                  onClick={() => setParty((p) => Math.min(12, p + 1))}
-                  className="bg-surface text-espresso size-10 rounded-full text-lg font-bold"
-                >
-                  +
-                </button>
-                <span className="text-muted text-xs">ชวนเพิ่มทีหลังได้ตลอด</span>
-              </div>
-            </Field>
+              <Field label="ไปกันกี่คน">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setParty((p) => Math.max(1, p - 1))}
+                    className="bg-surface text-espresso size-10 rounded-full text-lg font-bold"
+                  >
+                    −
+                  </button>
+                  <span className="font-display text-espresso w-8 text-center text-xl font-extrabold">
+                    {party}
+                  </span>
+                  <button
+                    onClick={() => setParty((p) => Math.min(12, p + 1))}
+                    className="bg-surface text-espresso size-10 rounded-full text-lg font-bold"
+                  >
+                    +
+                  </button>
+                  <span className="text-muted text-xs">ชวนเพิ่มทีหลังได้ตลอด</span>
+                </div>
+              </Field>
+            </div>
           </div>
 
-          <Button block size="lg" className="mt-6" onClick={() => setStep(2)} disabled={!canContinue()}>
-            ต่อไป <ArrowRight className="size-4" />
-          </Button>
-          {routing && !canContinue() ? (
-            <p className="text-muted mt-2 text-center text-[11px]">
-              ใส่สนามบินปลายทางและวันบินของขาไปก่อน
-            </p>
-          ) : null}
+          {/* Full-width thumb target on a phone; a button the size of its own
+              label once there is a mouse. */}
+          <div
+            className={cn(
+              'mt-6 flex flex-col items-center gap-2 md:mt-8 md:flex-row md:justify-end md:gap-4',
+              routing ? '' : 'md:max-w-2xl',
+            )}
+          >
+            {routing && !canContinue() ? (
+              <p className="text-muted order-2 text-center text-[11px] md:order-1 md:text-right">
+                ใส่สนามบินปลายทางและวันบินของขาไปก่อน
+              </p>
+            ) : null}
+            <Button
+              block
+              size="lg"
+              className="order-1 md:order-2 md:w-auto md:px-10"
+              onClick={() => setStep(2)}
+              disabled={!canContinue()}
+            >
+              ต่อไป <ArrowRight className="size-4" />
+            </Button>
+          </div>
         </div>
       ) : null}
 
@@ -406,14 +495,15 @@ export function NewTripFlow() {
             <ArrowLeft className="size-3.5" /> กลับไปแก้รายละเอียด
           </button>
 
-          <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight">
+          <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight md:text-3xl">
             เลือกตัวละครของคุณ
           </h1>
           <p className="text-muted mt-1 text-sm">
             เพื่อนในทริปจะเห็นตัวนี้แทนรูปโปรไฟล์ เปลี่ยนทีหลังได้
           </p>
 
-          <div className="mt-5 grid grid-cols-5 gap-2">
+          {/* Twenty characters: four rows on a phone, two on a desk. */}
+          <div className="mt-5 grid max-w-3xl grid-cols-5 gap-2 sm:grid-cols-8 md:mt-7 md:grid-cols-10 md:gap-3">
             {(characters ?? []).map((c) => (
               <button
                 key={c.id}
@@ -429,7 +519,7 @@ export function NewTripFlow() {
             ))}
           </div>
 
-          <Card className="mt-5 p-4">
+          <Card className="mt-5 max-w-3xl p-4 md:mt-7 md:p-5">
             <p className="section-label mb-2">สรุปทริปที่จะสร้าง</p>
             <div className="flex flex-wrap gap-1.5">
               <Badge tone="primary">
@@ -461,25 +551,26 @@ export function NewTripFlow() {
           </Card>
 
           {error ? (
-            <Card accent="primary" className="mt-3 p-3">
+            <Card accent="primary" className="mt-3 max-w-3xl p-3">
               <p className="text-espresso text-xs">{error}</p>
             </Card>
           ) : null}
 
-          <Button
-            block
-            size="lg"
-            className="mt-6"
-            onClick={() => void create()}
-            disabled={createTrip.isPending}
-          >
-            <RoveMark className="size-4" />
-            {createTrip.isPending ? 'กำลังสร้าง…' : 'สร้างห้องทริป'}
-          </Button>
-
-          <p className="text-muted mt-3 flex items-center justify-center gap-1.5 text-[11px]">
-            <Check className="size-3.5" /> สร้างเสร็จแล้วชวนเพื่อนด้วยลิงก์เดียว
-          </p>
+          <div className="mt-6 flex max-w-3xl flex-col items-center gap-3 md:mt-8 md:flex-row md:justify-end md:gap-4">
+            <p className="text-muted order-2 flex items-center gap-1.5 text-[11px] md:order-1">
+              <Check className="size-3.5" /> สร้างเสร็จแล้วชวนเพื่อนด้วยลิงก์เดียว
+            </p>
+            <Button
+              block
+              size="lg"
+              className="order-1 md:order-2 md:w-auto md:px-10"
+              onClick={() => void create()}
+              disabled={createTrip.isPending}
+            >
+              <RoveMark className="size-4" />
+              {createTrip.isPending ? 'กำลังสร้าง…' : 'สร้างห้องทริป'}
+            </Button>
+          </div>
         </div>
       ) : null}
     </div>
@@ -508,7 +599,7 @@ function normaliseEntry(value: string | null): Entry | null {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="text-muted mb-1.5 block text-[11px] font-semibold">{label}</span>
+      <FieldLabel>{label}</FieldLabel>
       {children}
     </label>
   );

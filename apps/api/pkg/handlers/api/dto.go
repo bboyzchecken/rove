@@ -504,12 +504,14 @@ type aiJobDTO struct {
 }
 
 type aiCreditsDTO struct {
-	Used             int      `json:"used"`
-	Included         int      `json:"included"`
-	Extra            int      `json:"extra"`
-	PricePerDraftTHB int      `json:"price_per_draft_thb"`
-	PayChannels      []string `json:"pay_channels"`
-	Simulated        bool     `json:"simulated,omitempty"`
+	Used             int                 `json:"used"`
+	Included         int                 `json:"included"`
+	Extra            int                 `json:"extra"`
+	PricePerDraftTHB int                 `json:"price_per_draft_thb"`
+	PayChannels      []domain.PayChannel `json:"pay_channels"`
+	Simulated        bool                `json:"simulated,omitempty"`
+	// The receipt the purchase produced (M20). Only on the purchase response.
+	Order *orderDTO `json:"order,omitempty"`
 }
 
 func toCreditsDTO(c models.AICredit) aiCreditsDTO {
@@ -520,6 +522,116 @@ func toCreditsDTO(c models.AICredit) aiCreditsDTO {
 		PricePerDraftTHB: domain.PricePerDraftTHB,
 		PayChannels:      domain.PayChannels,
 	}
+}
+
+/* --------------------------------------------------------------- billing -- */
+
+type orderLineDTO struct {
+	Label         string  `json:"label"`
+	Quantity      int     `json:"quantity"`
+	UnitAmountTHB float64 `json:"unit_amount_thb"`
+	AmountTHB     float64 `json:"amount_thb"`
+}
+
+type orderDTO struct {
+	ID          string         `json:"id"`
+	Number      string         `json:"number"`
+	Kind        string         `json:"kind"`
+	Status      string         `json:"status"`
+	Title       string         `json:"title"`
+	Lines       []orderLineDTO `json:"lines"`
+	SubtotalTHB float64        `json:"subtotal_thb"`
+	DiscountTHB float64        `json:"discount_thb"`
+	TotalTHB    float64        `json:"total_thb"`
+	Currency    string         `json:"currency"`
+	Method      string         `json:"method"`
+	MethodLabel string         `json:"method_label"`
+	PointsSpent int            `json:"points_spent"`
+	TripID      *string        `json:"trip_id"`
+	TripTitle   *string        `json:"trip_title"`
+	Provider    *string        `json:"provider"`
+	ProviderRef *string        `json:"provider_ref"`
+	Simulated   bool           `json:"simulated"`
+	PeriodStart *string        `json:"period_start"`
+	PeriodEnd   *string        `json:"period_end"`
+	IssuedAt    string         `json:"issued_at"`
+	PaidAt      *string        `json:"paid_at"`
+	RefundedAt  *string        `json:"refunded_at"`
+}
+
+func toOrderDTO(order models.Order) orderDTO {
+	lines := models.DecodeOrderLines(order.Lines)
+	out := orderDTO{
+		ID:          order.ID,
+		Number:      order.Number,
+		Kind:        order.Kind,
+		Status:      order.Status,
+		Title:       order.Title,
+		Lines:       make([]orderLineDTO, 0, len(lines)),
+		SubtotalTHB: order.SubtotalTHB,
+		DiscountTHB: order.DiscountTHB,
+		TotalTHB:    order.TotalTHB,
+		Currency:    order.Currency,
+		Method:      order.Method,
+		MethodLabel: order.MethodLabel,
+		PointsSpent: order.PointsSpent,
+		TripID:      order.TripID,
+		TripTitle:   strPtr(order.TripTitle),
+		Provider:    strPtr(order.Provider),
+		ProviderRef: strPtr(order.ProviderRef),
+		Simulated:   order.Simulated,
+		IssuedAt:    order.IssuedAt.UTC().Format(time.RFC3339),
+	}
+	for _, line := range lines {
+		out.Lines = append(out.Lines, orderLineDTO(line))
+	}
+	out.PeriodStart = timePtr(order.PeriodStart)
+	out.PeriodEnd = timePtr(order.PeriodEnd)
+	out.PaidAt = timePtr(order.PaidAt)
+	out.RefundedAt = timePtr(order.RefundedAt)
+	return out
+}
+
+// timePtr renders an optional timestamp the way every other DTO here does.
+func timePtr(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	out := t.UTC().Format(time.RFC3339)
+	return &out
+}
+
+type subscriptionDTO struct {
+	ID                      *string `json:"id"`
+	PlanID                  string  `json:"plan_id"`
+	PlanName                string  `json:"plan_name"`
+	Status                  string  `json:"status"`
+	Interval                *string `json:"interval"`
+	PriceTHB                float64 `json:"price_thb"`
+	CurrentPeriodStart      *string `json:"current_period_start"`
+	CurrentPeriodEnd        *string `json:"current_period_end"`
+	CancelAtPeriodEnd       bool    `json:"cancel_at_period_end"`
+	IncludedDraftsPerPeriod int     `json:"included_drafts_per_period"`
+}
+
+type subscriptionPlanDTO struct {
+	ID                      string   `json:"id"`
+	Name                    string   `json:"name"`
+	Tagline                 string   `json:"tagline"`
+	PriceTHB                int      `json:"price_thb"`
+	Interval                string   `json:"interval"`
+	Perks                   []string `json:"perks"`
+	IncludedDraftsPerPeriod int      `json:"included_drafts_per_period"`
+	Available               bool     `json:"available"`
+}
+
+type billingSummaryDTO struct {
+	Orders            int             `json:"orders"`
+	AIDraftsPurchased int             `json:"ai_drafts_purchased"`
+	TotalSpentTHB     float64         `json:"total_spent_thb"`
+	PointsSpent       int             `json:"points_spent"`
+	Since             *string         `json:"since"`
+	Subscription      subscriptionDTO `json:"subscription"`
 }
 
 /* ----------------------------------------------------------------- share -- */

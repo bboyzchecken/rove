@@ -106,7 +106,7 @@ export default function LandingPage() {
       <header className="mx-auto flex h-16 max-w-5xl items-center justify-between px-5">
         <RoveLogo size="sm" />
         <div className="flex items-center gap-2">
-          <ButtonLink href="/home" variant="ghost" size="sm">
+          <ButtonLink href="/login" variant="ghost" size="sm">
             เข้าสู่ระบบ
           </ButtonLink>
           <ButtonLink href="/new" size="sm">

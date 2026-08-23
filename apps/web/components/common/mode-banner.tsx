@@ -9,10 +9,12 @@ import { dataModeLabel, isMockMode, resetMockData } from '@/lib/data';
  * The UAT strip.
  *
  * Mock mode is indistinguishable from the real thing by design — which is
- * exactly why it has to say so. This is the only component in the app allowed
+ * exactly why it has to say so. This file is the only place in the app allowed
  * to read the data mode; everything else asks the repository.
  *
- * In live mode it renders nothing at all.
+ * In live mode the banner renders nothing at all — a strip across every screen
+ * saying "this is the real thing" is noise. `ModeLine` below is the quiet
+ * counterpart for the one place the answer is worth having.
  */
 export function ModeBanner() {
   const [resetting, setResetting] = useState(false);
@@ -44,4 +46,15 @@ export function ModeBanner() {
       </button>
     </div>
   );
+}
+
+/**
+ * The mode, stated once, in the profile footer.
+ *
+ * Live mode is silent everywhere else by design, which is exactly how someone
+ * ends up unsure which mode they are looking at — so the screen that answers
+ * "who am I" answers "and which data is this" too.
+ */
+export function ModeLine() {
+  return <p className="mt-0.5">{dataModeLabel}</p>;
 }

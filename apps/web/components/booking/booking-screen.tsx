@@ -34,7 +34,10 @@ const KINDS: { key: BookingKind; label: string }[] = [
   { key: 'insurance', label: 'ประกัน' },
 ];
 
-const STATUS_META: Record<BookingStatus, { label: string; tone: 'neutral' | 'matcha' | 'outline' }> = {
+const STATUS_META: Record<
+  BookingStatus,
+  { label: string; tone: 'neutral' | 'matcha' | 'outline' }
+> = {
   idea: { label: 'ยังไม่จอง', tone: 'outline' },
   booked: { label: 'จองแล้ว', tone: 'matcha' },
   cancelled: { label: 'ยกเลิกแล้ว', tone: 'neutral' },
