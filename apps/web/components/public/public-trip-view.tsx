@@ -1,14 +1,18 @@
 'use client';
 
-import { Bus, Car, EyeOff, Footprints, TrainFront } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Bus, Car, Copy, Eye, EyeOff, Footprints, TrainFront } from 'lucide-react';
 
 import { RoveLogo } from '@/components/brand/rove-logo';
 import { SectionHeader } from '@/components/common/section';
 import { TripCover } from '@/components/trip/trip-cover';
 import { Badge } from '@/components/ui/badge';
-import { ButtonLink } from '@/components/ui/button';
+import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { CharacterStack } from '@/components/ui/character-avatar';
+import { CharacterAvatar, CharacterStack } from '@/components/ui/character-avatar';
+import { useMe } from '@/features/auth/queries';
+import { useCloneFromPublic } from '@/features/public/queries';
 import { usePublicTrip } from '@/features/trip/queries';
 import { thaiRangeLabel } from '@/lib/data/domain';
 import { formatMoney } from '@/lib/format';
@@ -24,6 +28,9 @@ const TRAVEL_ICON = { train: TrainFront, walk: Footprints, bus: Bus, car: Car };
 
 export function PublicTripView({ tokenOrSlug }: { tokenOrSlug: string }) {
   const { data, isLoading } = usePublicTrip(tokenOrSlug);
+  const { data: me } = useMe();
+  const cloneTrip = useCloneFromPublic();
+  const router = useRouter();
 
   if (isLoading) {
     return (
@@ -47,10 +54,16 @@ export function PublicTripView({ tokenOrSlug }: { tokenOrSlug: string }) {
     );
   }
 
-  const { trip, days, members } = data;
+  const { trip, days, members, creator, viewCount, cloneCount } = data;
   const perPersonJpy = days
     .flatMap((d) => d.items)
     .reduce((sum, item) => sum + (item.costJpy ?? 0), 0);
+
+  const follow = () => {
+    cloneTrip.mutate(tokenOrSlug, {
+      onSuccess: (copied) => router.push(`/t/${copied.id}` as never),
+    });
+  };
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-6">
@@ -74,6 +87,38 @@ export function PublicTripView({ tokenOrSlug }: { tokenOrSlug: string }) {
           </p>
         </div>
         <CharacterStack characterIds={members.map((m) => m.characterId)} />
+      </div>
+
+      <div className="mt-2 flex items-center justify-between gap-3">
+        {creator.handle ? (
+          <Link
+            href={`/u/${creator.handle}` as never}
+            className="flex items-center gap-2 transition hover:opacity-80"
+          >
+            <CharacterAvatar characterId={creator.characterId} size="xs" />
+            <span className="text-muted text-xs">
+              โดย <span className="text-espresso font-semibold">{creator.name}</span>
+            </span>
+          </Link>
+        ) : (
+          <span className="flex items-center gap-2">
+            <CharacterAvatar characterId={creator.characterId} size="xs" />
+            <span className="text-muted text-xs">
+              โดย <span className="text-espresso font-semibold">{creator.name}</span>
+            </span>
+          </span>
+        )}
+
+        <span className="text-muted flex items-center gap-3 text-[11px]">
+          <span className="flex items-center gap-1">
+            <Eye className="size-3" />
+            {viewCount.toLocaleString('th-TH')}
+          </span>
+          <span className="flex items-center gap-1">
+            <Copy className="size-3" />
+            {cloneCount.toLocaleString('th-TH')} คนตามรอย
+          </span>
+        </span>
       </div>
 
       {perPersonJpy > 0 ? (
@@ -127,13 +172,30 @@ export function PublicTripView({ tokenOrSlug }: { tokenOrSlug: string }) {
       </p>
 
       <Card accent="sun" className="mt-4 p-4">
-        <p className="text-espresso text-sm font-semibold">อยากได้แพลนแบบนี้ของตัวเองไหม</p>
-        <p className="text-muted mt-1 text-xs">
-          สร้างห้องทริป ชวนเพื่อน หาวันที่ทุกคนว่าง แล้วให้ AI ร่างให้
+        <p className="text-espresso text-sm font-semibold">อยากไปตามแพลนนี้ไหม</p>
+        <p className="text-muted mt-1 text-xs leading-relaxed">
+          ก๊อปทั้งทริปไปเป็นของตัวเอง — แก้วัน เพิ่มเพื่อน ปรับที่เที่ยวต่อได้เลย
+          และเจ้าของแพลนได้แต้มเป็นกำลังใจ
         </p>
-        <ButtonLink href="/new" className="mt-3" size="sm">
-          เริ่มทริปของฉัน
-        </ButtonLink>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {me ? (
+            <Button size="sm" onClick={follow} disabled={cloneTrip.isPending}>
+              <Copy className="size-3.5" />
+              {cloneTrip.isPending ? 'กำลังก๊อป…' : 'เที่ยวตามแพลนนี้'}
+            </Button>
+          ) : (
+            <ButtonLink href={`/login?next=/p/${tokenOrSlug}` as never} size="sm">
+              <Copy className="size-3.5" />
+              เข้าสู่ระบบเพื่อตามรอย
+            </ButtonLink>
+          )}
+          <ButtonLink href="/new" size="sm" variant="soft">
+            เริ่มทริปของฉันเอง
+          </ButtonLink>
+        </div>
+        {cloneTrip.isError ? (
+          <p className="text-warning mt-2 text-xs">ก๊อปไม่สำเร็จ — ลองใหม่อีกครั้ง</p>
+        ) : null}
       </Card>
     </main>
   );

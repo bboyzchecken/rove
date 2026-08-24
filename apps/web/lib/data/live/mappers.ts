@@ -24,9 +24,12 @@ import type {
   FlightLegInput,
   InviteLink,
   LockedDates,
+  CreatorProfile,
+  ExploreTrip,
   Member,
   MemberProfile,
   PlanVariant,
+  PublicCreator,
   VariantList,
   VariantMetrics,
   Order,
@@ -72,8 +75,11 @@ import type {
   FlightDto,
   InviteDto,
   LockedDatesDto,
+  CreatorProfileDto,
+  ExploreTripDto,
   MemberDto,
   MemberProfileDto,
+  PublicCreatorDto,
   VariantDto,
   VariantListDto,
   VariantMetricsDto,
@@ -452,6 +458,45 @@ export function toPlanVersion(dto: PlanVersionDto): PlanVersion {
     actorId: dto.actor_id,
     createdAt: dto.created_at,
     title: dto.snapshot?.title ?? 'รายการหนึ่ง',
+  };
+}
+
+/* ---------------------------------------------------- public model (M11) - */
+
+export function toPublicCreator(dto: PublicCreatorDto): PublicCreator {
+  return {
+    name: dto.name,
+    handle: dto.handle,
+    characterId: dto.character_id || 'shiba',
+  };
+}
+
+export function toExploreTrip(dto: ExploreTripDto): ExploreTrip {
+  return {
+    slug: dto.slug,
+    title: dto.title,
+    cover: dto.cover_image_url || DEFAULT_COVER,
+    cities: dto.cities ?? [],
+    country: dto.country,
+    days: dto.days,
+    budgetPerPersonThb: dto.budget_per_person_thb,
+    viewCount: dto.view_count,
+    cloneCount: dto.clone_count,
+    creator: toPublicCreator(dto.creator),
+    updatedAt: dto.updated_at,
+  };
+}
+
+export function toCreatorProfile(dto: CreatorProfileDto): CreatorProfile {
+  return {
+    name: dto.name,
+    handle: dto.handle,
+    characterId: dto.character_id || 'shiba',
+    publicTrips: dto.public_trips,
+    totalViews: dto.total_views,
+    totalClones: dto.total_clones,
+    pointsEarned: dto.points_earned,
+    trips: (dto.trips ?? []).map(toExploreTrip),
   };
 }
 

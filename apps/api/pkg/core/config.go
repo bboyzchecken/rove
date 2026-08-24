@@ -37,6 +37,10 @@ type Config struct {
 
 	// partner key ("agoda", "booking", ...) -> affiliate id
 	Affiliate map[string]string
+
+	// Shared secret partner postbacks must present (A12.6). Empty = the
+	// webhook is not enabled and answers 404.
+	AffiliateWebhookSecret string
 }
 
 type MySQLConfig struct {

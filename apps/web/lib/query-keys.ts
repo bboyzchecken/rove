@@ -65,6 +65,8 @@ export const queryKeys = {
 
   share: (tripId: string) => ['trip', tripId, 'share'] as const,
   publicTrip: (tokenOrSlug: string) => ['public', tokenOrSlug] as const,
+  explore: (filters: string) => ['explore', filters] as const,
+  creator: (handle: string) => ['creator', handle] as const,
 
   poiSearch: (q: string, city?: string) => ['poi', 'search', q, city ?? ''] as const,
 } as const;

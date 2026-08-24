@@ -992,15 +992,15 @@ Cloudflare DNS (rovetravel.site)
 - [x] W6.2 Vote UI + freeze  ·  **หมายเหตุ:** thumbs up/down ต่อ variant (patch cache ไม่รีโหลดตาราง), ปุ่ม "ตกลงตามนี้ — สรุปแพลน" [owner] + แบนเนอร์ล็อกบนแท็บแพลน · mock/live ทำงานครบทั้งคู่
 
 ### Public Model + Points
-- [ ] A10.4 publish flow: slug + privacy opts + `GET /public/plans/:slug` (expense hidden ทุกกรณี)
-- [ ] A10.5 เมื่อ owner กด publish → แสดง modal อธิบาย "เปิด public = ได้แต้มเมื่อคนจองตาม" + confirm
-- [ ] A11.1 `POST /trips/:id/clone` (reset booking/cost_status, source_trip_id/creator, counters)
-- [ ] A11.2 `GET /public/explore` filters + sort + index ที่จำเป็น
-- [ ] A12.6 `booking_confirmations` → award points ให้ source_creator_id (§6.5)
-- [ ] A12.7 `GET /users/me/points` + `/history` + แสดงบน profile
-- [ ] W10.5 Public plan page (ISR + SEO + OG) + ปุ่ม Clone + ปุ่มจอง (expense section ไม่โชว์)
-- [ ] W11.1 `/explore` + filters + infinite scroll
-- [ ] W11.2 Creator profile `/u/[handle]` + แต้มที่เคยได้
+- [x] A10.4 publish flow: slug + privacy opts + `GET /public/plans/:slug` (expense hidden ทุกกรณี)  ·  **หมายเหตุ:** ทำไว้ตั้งแต่ Phase 1 — endpoint จริงคือ `GET /public/trips/:tokenOrSlug` (token กับ slug ใช้ payload เดียวกัน) · Phase 2 เพิ่ม creator + view/clone counts ลง payload
+- [x] A10.5 เมื่อ owner กด publish → แสดง modal อธิบาย "เปิด public = ได้แต้มเมื่อคนจองตาม" + confirm  ·  **หมายเหตุ:** อยู่บนหน้าบันทึกทริป (W17.6) ตาม Decision Log 20 ส.ค. — จุดชวนเปิด public คือทริปที่จบแล้ว
+- [x] A11.1 `POST /trips/:id/clone` (reset booking/cost_status, source_trip_id/creator, counters)  ·  **หมายเหตุ:** clone ของสมาชิกมีตั้งแต่ Phase 1 — Phase 2 แยก core เป็น `cloneTripForUser` และเพิ่ม `POST /public/trips/:tokenOrSlug/clone` [JWT] ให้คนนอกตามรอยได้ + award แต้ม clone ให้ creator
+- [x] A11.2 `GET /public/explore` filters + sort + index ที่จำเป็น  ·  **หมายเหตุ:** `TripStore.ListPublic` — q (title/cities), country, sort popular (views+clones×5) / new, limit/offset + total · ranked feed ถ่วงน้ำหนักแต้มยังเป็นเรื่องของ Phase 3
+- [x] A12.6 `booking_confirmations` → award points ให้ source_creator_id (§6.5)  ·  **หมายเหตุ:** สองทาง — (1) mark "จองแล้ว" ในแอป award ทันที (stand-in), (2) `POST /webhooks/affiliate/:partner` [secret header, 404 จนกว่าจะตั้ง `AFFILIATE_WEBHOOK_SECRET`] confirm click ครั้งเดียว + award · ตอน postback จริงต่อ partner (A12.9) ต้อง review ไม่ให้จ่ายซ้ำ
+- [x] A12.7 `GET /users/me/points` + `/history` + แสดงบน profile  ·  **หมายเหตุ:** มีตั้งแต่ Phase 1 (`/users/me/points` คืน balance + ledger 30 แถว) · Phase 2 เพิ่ม `PointsStore.Earned` (ยอดขาบวก) ให้หน้า creator
+- [x] W10.5 Public plan page (ISR + SEO + OG) + ปุ่ม Clone + ปุ่มจอง (expense section ไม่โชว์)  ·  **หมายเหตุ:** เพิ่มปุ่ม "เที่ยวตามแพลนนี้" (ล็อกอินแล้ว clone ทันที, ยังไม่ล็อกอินพาไป /login?next=) + creator byline + ยอดดู/ยอดตามรอย · OG per-trip ยังเป็น static (W10.4)
+- [x] W11.1 `/explore` + filters + infinite scroll  ·  **หมายเหตุ:** ค้นหา + quick chips + sort ยอดนิยม/มาใหม่ + ปุ่ม "ดูเพิ่ม" (นับ x/total) · mock seed แพลนสาธารณะ 3 ใบให้ feed ไม่ว่างตั้งแต่แรก
+- [x] W11.2 Creator profile `/u/[handle]` + แต้มที่เคยได้  ·  **หมายเหตุ:** การ์ดโปรไฟล์ + สถิติ (ทริป/ยอดดู/คนตามรอย/แต้มที่เคยได้) + กริดทริป + CTA ชวนเปิด public
 
 ### Travel Photo Feature
 - [ ] A18.1 migration: ตาราง `trip_photos`, S3 upload config (R2 photo bucket)

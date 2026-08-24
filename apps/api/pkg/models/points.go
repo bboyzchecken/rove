@@ -37,4 +37,7 @@ type PointsStore interface {
 	Add(ctx context.Context, entry *UserPoints) error
 	Balance(ctx context.Context, userID string) (int, error)
 	List(ctx context.Context, userID string, limit int) ([]UserPoints, error)
+	// Earned sums only the positive rows — the creator page shows what a
+	// profile has earned, not what is left after spending (W11.2).
+	Earned(ctx context.Context, userID string) (int, error)
 }

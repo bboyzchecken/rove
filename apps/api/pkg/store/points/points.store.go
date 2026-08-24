@@ -52,3 +52,18 @@ func (s *store) List(ctx context.Context, userID string, limit int) ([]models.Us
 }
 
 var _ = gorm.ErrRecordNotFound
+
+// Earned sums the positive rows only (W11.2): what a creator has earned,
+// regardless of what they have since spent.
+func (s *store) Earned(ctx context.Context, userID string) (int, error) {
+	var sum *int
+	err := s.db.WithContext(ctx).
+		Model(&models.UserPoints{}).
+		Where("user_id = ? AND delta > 0", userID).
+		Select("SUM(delta)").
+		Scan(&sum).Error
+	if err != nil || sum == nil {
+		return 0, err
+	}
+	return *sum, nil
+}

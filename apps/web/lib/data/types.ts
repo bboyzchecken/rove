@@ -430,6 +430,64 @@ export interface TripRecap {
 
 export type TripVisibility = 'private' | 'link' | 'public';
 
+/** The public face of whoever published a trip. */
+export interface PublicCreator {
+  name: string;
+  handle: string | null;
+  characterId: string;
+}
+
+/** What /s/:token and /p/:slug render. Never contains expenses (W16.5). */
+export interface PublicTripPayload {
+  trip: Trip;
+  days: PlanDay[];
+  members: Member[];
+  creator: PublicCreator;
+  viewCount: number;
+  cloneCount: number;
+}
+
+/* ------------------------------------------------------ explore (M11) --- */
+
+export interface ExploreTrip {
+  slug: string;
+  title: string;
+  cover: string;
+  cities: string[];
+  country: string;
+  days: number;
+  budgetPerPersonThb: number;
+  viewCount: number;
+  cloneCount: number;
+  creator: PublicCreator;
+  updatedAt: string;
+}
+
+export interface ExploreFilters {
+  q?: string;
+  country?: string;
+  sort?: 'popular' | 'new';
+  limit?: number;
+  offset?: number;
+}
+
+export interface ExploreResult {
+  items: ExploreTrip[];
+  total: number;
+}
+
+/** The public creator page (W11.2). */
+export interface CreatorProfile {
+  name: string;
+  handle: string;
+  characterId: string;
+  publicTrips: number;
+  totalViews: number;
+  totalClones: number;
+  pointsEarned: number;
+  trips: ExploreTrip[];
+}
+
 export interface ShareState {
   visibility: TripVisibility;
   shareToken: string | null;

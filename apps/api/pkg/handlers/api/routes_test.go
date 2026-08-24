@@ -37,6 +37,9 @@ var publicPaths = map[string]bool{
 	"/api/v1/invites/:token":            true, // preview before signing in
 	"/api/v1/public/trips/:tokenOrSlug": true,
 	"/api/v1/public/explore":            true,
+	"/api/v1/public/creators/:handle":   true, // creator page is the SEO surface (W11.2)
+	// Guarded by a shared secret header, not a JWT; 404s until configured.
+	"/webhooks/affiliate/:partner": true,
 }
 
 // isSynthetic filters the entries Echo adds for a group itself — the 404 and

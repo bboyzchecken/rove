@@ -138,6 +138,42 @@ function emit(job: AiJob) {
   for (const listener of jobListeners.get(job.id) ?? []) listener(clone(job));
 }
 
+/* ---------------------------------------------------- public model (M11) - */
+
+/** Published records live in two lists: my trips and the seeded explore set. */
+function findPublished(db: MockDb, tokenOrSlug: string): TripRecord | null {
+  const match = (t: TripRecord) =>
+    t.share.shareToken === tokenOrSlug || t.share.publicSlug === tokenOrSlug;
+  return db.trips.find(match) ?? db.publicTrips.find(match) ?? null;
+}
+
+function creatorOf(db: MockDb, record: TripRecord) {
+  if (record.creator) {
+    return {
+      name: record.creator.name,
+      handle: record.creator.handle,
+      characterId: record.creator.characterId,
+    };
+  }
+  return { name: db.user.name, handle: db.user.handle || null, characterId: db.user.characterId };
+}
+
+function exploreOf(db: MockDb, record: TripRecord) {
+  return {
+    slug: record.share.publicSlug ?? record.trip.id,
+    title: record.trip.title,
+    cover: record.trip.cover,
+    cities: [...record.trip.cities],
+    country: '',
+    days: record.trip.nights + 1,
+    budgetPerPersonThb: record.trip.budgetPerPersonThb,
+    viewCount: record.share.viewCount,
+    cloneCount: record.share.cloneCount,
+    creator: creatorOf(db, record),
+    updatedAt: nowIso(),
+  };
+}
+
 /* -------------------------------------------------------- variants (M6) -- */
 
 /** Mirrors the API's variantFlavours — pace really changes the itinerary. */
@@ -1829,17 +1865,132 @@ export const mockRepo: RoveRepo = {
       return delay(
         mutate((db) => {
           const record =
-            db.trips.find(
-              (t) => t.share.shareToken === tokenOrSlug || t.share.publicSlug === tokenOrSlug,
-            ) ?? db.trips[0];
+            findPublished(db, tokenOrSlug) ?? db.trips[0];
           if (!record) return null;
           record.share.viewCount += 1;
           return {
             trip: clone(record.trip),
             days: clone(record.days),
             members: clone(record.members),
+            creator: creatorOf(db, record),
+            viewCount: record.share.viewCount,
+            cloneCount: record.share.cloneCount,
           };
         }),
+      );
+    },
+
+    /* --------------------------------------------- public model (M11) -- */
+
+    async explore(filters) {
+      const db = loadDb();
+      let records = [...db.publicTrips, ...db.trips.filter((t) => t.share.visibility === 'public')];
+
+      if (filters.country) {
+        // Seeded records carry no country code; match on the cities instead.
+        const q = filters.country.toLowerCase();
+        records = records.filter(
+          (r) =>
+            r.trip.cities.some((c) => c.toLowerCase().includes(q)) ||
+            r.trip.title.toLowerCase().includes(q),
+        );
+      }
+      if (filters.q) {
+        const q = filters.q.toLowerCase();
+        records = records.filter(
+          (r) =>
+            r.trip.title.toLowerCase().includes(q) ||
+            r.trip.cities.some((c) => c.toLowerCase().includes(q)),
+        );
+      }
+
+      records.sort((a, b) =>
+        filters.sort === 'new'
+          ? b.trip.startDate.localeCompare(a.trip.startDate)
+          : b.share.viewCount +
+            b.share.cloneCount * 5 -
+            (a.share.viewCount + a.share.cloneCount * 5),
+      );
+
+      const offset = filters.offset ?? 0;
+      const limit = filters.limit ?? 12;
+      return delay({
+        items: records.slice(offset, offset + limit).map((r) => exploreOf(db, r)),
+        total: records.length,
+      });
+    },
+
+    async creator(handle) {
+      const db = loadDb();
+      const mine = db.user.handle === handle;
+      const records = mine
+        ? db.trips.filter((t) => t.share.visibility === 'public')
+        : db.publicTrips.filter((t) => t.creator?.handle === handle);
+      if (!mine && records.length === 0) return delay(null);
+
+      const first = records[0];
+      const identity = mine
+        ? { name: db.user.name, handle, characterId: db.user.characterId }
+        : (first?.creator ?? { name: 'นักเดินทาง', handle, characterId: 'shiba' });
+
+      return delay({
+        ...identity,
+        publicTrips: records.length,
+        totalViews: records.reduce((sum, r) => sum + r.share.viewCount, 0),
+        totalClones: records.reduce((sum, r) => sum + r.share.cloneCount, 0),
+        pointsEarned: mine ? db.user.points : records.length * 500,
+        trips: records.map((r) => exploreOf(db, r)),
+      });
+    },
+
+    async cloneFromPublic(tokenOrSlug) {
+      return delay(
+        mutate((db) => {
+          const source = findPublished(db, tokenOrSlug);
+          if (!source) throw new Error('ไม่พบแพลนนี้');
+
+          const copy = clone(source);
+          copy.trip = {
+            ...copy.trip,
+            id: mockId('trip'),
+            title: `${copy.trip.title} (ตามรอย)`,
+            status: 'planning',
+          };
+          copy.role = 'owner';
+          copy.members = [
+            {
+              id: db.user.id,
+              name: db.user.name,
+              role: 'owner',
+              characterId: db.user.characterId,
+              hasWishlist: false,
+            },
+          ];
+          copy.creator = undefined;
+          copy.expenses = [];
+          copy.settled = [];
+          copy.comments = [];
+          copy.activity = [];
+          copy.votes = [];
+          copy.variants = [];
+          copy.versions = [];
+          copy.bookings = [];
+          copy.profiles = {};
+          copy.ai = { used: 0, included: 2, extra: 0 };
+          copy.share = {
+            visibility: 'private',
+            shareToken: null,
+            shareUrl: null,
+            publicSlug: null,
+            viewCount: 0,
+            cloneCount: 0,
+          };
+          source.share.cloneCount += 1;
+          log(copy, db.user.id, `เที่ยวตามแพลน "${source.trip.title}"`);
+          db.trips.unshift(copy);
+          return clone(copy.trip);
+        }),
+        320,
       );
     },
   },

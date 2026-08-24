@@ -172,6 +172,8 @@ func (s *Server) registerRoutes() {
 	// Affiliate redirect. Deliberately outside /api/v1: it is a link people
 	// click, not an endpoint the app calls (A12.2).
 	s.e.GET("/go/:clickId", s.handleAffiliateRedirect)
+	// Partner postback (A12.6) — shared-secret guarded; 404 until configured.
+	s.e.POST("/webhooks/affiliate/:partner", s.handleAffiliateWebhook)
 
 	v1 := s.e.Group("/api/v1")
 

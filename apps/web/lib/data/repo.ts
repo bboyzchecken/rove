@@ -20,12 +20,15 @@ import type {
   CoverageSummary,
   CreateItemInput,
   CreateTripInput,
+  CreatorProfile,
   CurrentUser,
   DateWindow,
   DestinationSuggestion,
   DreamItem,
   ExpenseEntry,
   ExpenseSummary,
+  ExploreFilters,
+  ExploreResult,
   ExportFormat,
   ExportResult,
   FlightLegInput,
@@ -43,6 +46,7 @@ import type {
   PlanVersion,
   Poi,
   PrepTask,
+  PublicTripPayload,
   ShareState,
   Subscription,
   SubscriptionPlan,
@@ -306,7 +310,16 @@ export interface ShareRepo {
   rotateToken(tripId: string): Promise<ShareState>;
   exportTrip(tripId: string, format: ExportFormat): Promise<ExportResult>;
   /** Read-only payload behind /s/:token and /p/:slug. */
-  publicTrip(tokenOrSlug: string): Promise<{ trip: Trip; days: PlanDay[]; members: Member[] } | null>;
+  publicTrip(tokenOrSlug: string): Promise<PublicTripPayload | null>;
+
+  /* ---- public model (M11) ---- */
+
+  /** The explore feed of published trips (A11.2). */
+  explore(filters: ExploreFilters): Promise<ExploreResult>;
+  /** A creator's public page (W11.2); null when the handle matches nobody. */
+  creator(handle: string): Promise<CreatorProfile | null>;
+  /** Copies a published trip into MY account (A11.1). Requires sign-in. */
+  cloneFromPublic(tokenOrSlug: string): Promise<Trip>;
 }
 
 export interface PoiRepo {

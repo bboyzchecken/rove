@@ -138,6 +138,7 @@ func loadConfig() core.Config {
 			"rentalcars": viper.GetString("AFFILIATE_RENTALCARS_ID"),
 			"airalo":     viper.GetString("AFFILIATE_AIRALO_ID"),
 		},
+		AffiliateWebhookSecret: viper.GetString("AFFILIATE_WEBHOOK_SECRET"),
 	}
 }
 

@@ -97,6 +97,48 @@ export interface MemberDto {
   has_wishlist: boolean;
 }
 
+/* ---------------------------------------------------- public model (M11) - */
+
+export interface PublicCreatorDto {
+  name: string;
+  handle: string | null;
+  character_id: string;
+}
+
+export interface PublicTripDto {
+  trip: TripDto;
+  days: PlanDayDto[];
+  members: MemberDto[];
+  creator: PublicCreatorDto;
+  view_count: number;
+  clone_count: number;
+}
+
+export interface ExploreTripDto {
+  slug: string;
+  title: string;
+  cover_image_url: string;
+  cities: string[];
+  country: string;
+  days: number;
+  budget_per_person_thb: number;
+  view_count: number;
+  clone_count: number;
+  creator: PublicCreatorDto;
+  updated_at: string;
+}
+
+export interface CreatorProfileDto {
+  name: string;
+  handle: string;
+  character_id: string;
+  public_trips: number;
+  total_views: number;
+  total_clones: number;
+  points_earned: number;
+  trips: ExploreTripDto[];
+}
+
 /* -------------------------------------------------------- variants (M6) -- */
 
 export interface VariantMetricsDto {

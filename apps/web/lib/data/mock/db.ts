@@ -108,12 +108,22 @@ export interface TripRecord {
   activity: ActivityEvent[];
   ai: { used: number; included: number; extra: number };
   share: ShareState;
+  /**
+   * Who published it — set only on the seeded explore records, which belong to
+   * nobody in this browser. A record without one is the demo user's own.
+   */
+  creator?: { name: string; handle: string; characterId: string };
 }
 
 export interface MockDb {
   version: number;
   user: CurrentUser;
   trips: TripRecord[];
+  /**
+   * Published trips by other (fictional) travellers, so the explore feed has
+   * something to show before the demo user publishes anything (M11).
+   */
+  publicTrips: TripRecord[];
   dreams: DreamItem[];
   /** Everything this user has bought, newest last (M20). */
   orders: Order[];
@@ -353,6 +363,96 @@ function seedDateTrip(): TripRecord {
   };
 }
 
+/**
+ * A published trip by a fictional traveller, derived from the demo itinerary
+ * so cloning it produces a fully working room.
+ */
+function seedPublicTrip(input: {
+  id: string;
+  slug: string;
+  title: string;
+  cover: string;
+  cities: string[];
+  viewCount: number;
+  cloneCount: number;
+  creator: { name: string; handle: string; characterId: string };
+}): TripRecord {
+  const record = seedDemoTrip();
+  record.trip = {
+    ...record.trip,
+    id: input.id,
+    title: input.title,
+    cover: input.cover,
+    cities: input.cities,
+    status: 'done',
+  };
+  record.role = 'viewer';
+  record.members = [
+    {
+      id: `${input.id}-owner`,
+      name: input.creator.name,
+      role: 'owner',
+      characterId: input.creator.characterId,
+      hasWishlist: true,
+    },
+  ];
+  // Someone else's room: their money and their chatter never ship with a seed.
+  record.expenses = [];
+  record.settled = [];
+  record.comments = [];
+  record.activity = [];
+  record.profiles = {};
+  record.days = record.days.map((day) => ({
+    ...day,
+    items: day.items.map((item) => ({ ...item, id: `${input.id}-${item.id}` })),
+  }));
+  record.share = {
+    visibility: 'public',
+    shareToken: `tok-${input.id}`,
+    shareUrl: null,
+    publicSlug: input.slug,
+    viewCount: input.viewCount,
+    cloneCount: input.cloneCount,
+  };
+  record.creator = input.creator;
+  return record;
+}
+
+function seedPublicTrips(): TripRecord[] {
+  return [
+    seedPublicTrip({
+      id: 'pub-tokyo',
+      slug: 'tokyo-week-mint',
+      title: 'โตเกียว 7 วันฉบับไปครั้งแรก',
+      cover: '/brand/covers/cover-japan.webp',
+      cities: ['Tokyo', 'Yokohama'],
+      viewCount: 1284,
+      cloneCount: 96,
+      creator: { name: 'มิ้นท์', handle: 'mint.travels', characterId: 'cat' },
+    }),
+    seedPublicTrip({
+      id: 'pub-osaka',
+      slug: 'kansai-food-run',
+      title: 'สายกินบุกคันไซ 5 วัน',
+      cover: '/brand/covers/cover-food.webp',
+      cities: ['Osaka', 'Kyoto', 'Nara'],
+      viewCount: 872,
+      cloneCount: 41,
+      creator: { name: 'ภูมิ', handle: 'phum.eats', characterId: 'bear' },
+    }),
+    seedPublicTrip({
+      id: 'pub-korea',
+      slug: 'seoul-cafe-hop',
+      title: 'โซลคาเฟ่ฮอป 4 วัน 3 คืน',
+      cover: '/brand/covers/cover-korea.webp',
+      cities: ['Seoul'],
+      viewCount: 655,
+      cloneCount: 28,
+      creator: { name: 'พลอย', handle: 'ploy.wander', characterId: 'rabbit' },
+    }),
+  ];
+}
+
 export function seedDb(): MockDb {
   return {
     version: 6,
@@ -367,6 +467,7 @@ export function seedDb(): MockDb {
       points: CURRENT_USER.points,
     },
     trips: [seedDemoTrip(), seedDateTrip()],
+    publicTrips: seedPublicTrips(),
     dreams: structuredClone(DREAMS),
     orders: seedOrders(),
     subscription: structuredClone(FREE_SUBSCRIPTION),

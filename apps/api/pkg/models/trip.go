@@ -75,6 +75,17 @@ func (t Trip) Nights() int {
 
 func (Trip) TableName() string { return "trips" }
 
+// ExploreFilter is what the public explore feed accepts (M11 — A11.2).
+type ExploreFilter struct {
+	// Free text against title and cities.
+	Query   string
+	Country string
+	// "popular" (views + clones) or "new" (latest published first).
+	Sort   string
+	Limit  int
+	Offset int
+}
+
 type TripStore interface {
 	Create(ctx context.Context, t *Trip) error
 	// GetByID is scoped to a user via trip_members — see DEV_SPEC §4.3.
@@ -89,4 +100,9 @@ type TripStore interface {
 	BumpViewCount(ctx context.Context, tripID string) error
 	BumpCloneCount(ctx context.Context, tripID string) error
 	Count(ctx context.Context) (int64, error)
+
+	// ListPublic feeds /public/explore (A11.2): public trips only, no auth.
+	ListPublic(ctx context.Context, f ExploreFilter) ([]Trip, int64, error)
+	// ListPublicByOwner feeds the creator page (A11.2 / W11.2).
+	ListPublicByOwner(ctx context.Context, ownerID string) ([]Trip, error)
 }

@@ -25,8 +25,11 @@ import type {
   LockedDatesDto,
   MeDto,
   MemberDto,
+  CreatorProfileDto,
+  ExploreTripDto,
   MemberProfileDto,
   OrderDto,
+  PublicTripDto,
   VariantDto,
   VariantListDto,
   VariantVotesDto,
@@ -73,8 +76,11 @@ import {
   toInvite,
   toLocked,
   toMember,
+  toCreatorProfile,
+  toExploreTrip,
   toMemberProfile,
   toOrder,
+  toPublicCreator,
   toVariant,
   toVariantList,
   toParsedTicket,
@@ -738,17 +744,45 @@ export const liveRepo: RoveRepo = {
     },
     async publicTrip(tokenOrSlug) {
       try {
-        const dto = await api.get<{ trip: TripDto; days: PlanDayDto[]; members: MemberDto[] }>(
-          `/public/trips/${tokenOrSlug}`,
-        );
+        const dto = await api.get<PublicTripDto>(`/public/trips/${tokenOrSlug}`);
         return {
           trip: toTrip(dto.trip),
           days: (dto.days ?? []).map(toPlanDay),
           members: (dto.members ?? []).map(toMember),
+          creator: toPublicCreator(dto.creator),
+          viewCount: dto.view_count,
+          cloneCount: dto.clone_count,
         };
       } catch {
         return null;
       }
+    },
+
+    /* --------------------------------------------- public model (M11) -- */
+
+    async explore(filters) {
+      const dto = await api.get<{ items: ExploreTripDto[]; total: number }>('/public/explore', {
+        searchParams: {
+          q: filters.q,
+          country: filters.country,
+          sort: filters.sort,
+          limit: filters.limit != null ? String(filters.limit) : undefined,
+          offset: filters.offset != null ? String(filters.offset) : undefined,
+        },
+      });
+      return { items: (dto.items ?? []).map(toExploreTrip), total: dto.total };
+    },
+
+    async creator(handle) {
+      try {
+        return toCreatorProfile(await api.get<CreatorProfileDto>(`/public/creators/${handle}`));
+      } catch {
+        return null;
+      }
+    },
+
+    async cloneFromPublic(tokenOrSlug) {
+      return toTrip(await api.post<TripDto>(`/public/trips/${tokenOrSlug}/clone`));
     },
   },
 

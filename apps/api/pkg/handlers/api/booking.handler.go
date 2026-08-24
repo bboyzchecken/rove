@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"net/http"
 	"time"
 
@@ -256,6 +257,67 @@ func (s *Server) handleAffiliateRedirect(c echo.Context) error {
 	}
 
 	return c.Redirect(http.StatusFound, url)
+}
+
+/* --------------------------------------------------- partner postback ---- */
+
+type affiliateWebhookRequest struct {
+	TrackingID string `json:"tracking_id" validate:"required"`
+	Status     string `json:"status"`
+}
+
+// handleAffiliateWebhook is the confirmation side of A12.6: a partner tells us
+// a tracked click converted, the click is marked confirmed once, and the
+// source creator earns their points. Guarded by a shared secret; without one
+// configured the route answers 404 — an unconfigured webhook must not exist.
+//
+// Note: the manual "จองแล้ว" path (handleUpdateBooking) also awards points as a
+// stand-in while no partner posts back. When real postbacks go live per
+// partner (A12.9), that stand-in should be reviewed so a booking is not paid
+// twice.
+func (s *Server) handleAffiliateWebhook(c echo.Context) error {
+	secret := s.cfg.AffiliateWebhookSecret
+	if secret == "" {
+		return request.NotFound(c, "ยังไม่เปิดใช้งาน")
+	}
+	if subtle.ConstantTimeCompare([]byte(c.Request().Header.Get("X-Rove-Signature")), []byte(secret)) != 1 {
+		return request.Error(c, http.StatusUnauthorized, "ลายเซ็นไม่ถูกต้อง")
+	}
+
+	var req affiliateWebhookRequest
+	if err := request.BindAndValidate(c, &req); err != nil {
+		return err
+	}
+	if req.Status != "" && req.Status != "confirmed" {
+		// Cancellations and pendings are acknowledged but change nothing yet.
+		return c.NoContent(http.StatusAccepted)
+	}
+
+	ctx := c.Request().Context()
+	click, err := s.bookings.GetClick(ctx, req.TrackingID)
+	if err != nil {
+		return request.NotFound(c, "ไม่พบ tracking id นี้")
+	}
+	if click.ConfirmedAt != nil {
+		// Partners retry webhooks; a second confirm must not pay twice.
+		return c.NoContent(http.StatusOK)
+	}
+
+	if err := s.bookings.ConfirmClick(ctx, click.ID, time.Now().UTC()); err != nil {
+		return request.Internal(c, "บันทึกไม่สำเร็จ")
+	}
+
+	if click.SourceCreatorID != nil && *click.SourceCreatorID != "" {
+		_ = s.points.Add(ctx, &models.UserPoints{
+			UserID: *click.SourceCreatorID,
+			Delta:  domain.PointsPerBooking,
+			Reason: models.PointsReasonBooking,
+			Note:   "มีคนจองสำเร็จจากทริปที่คุณเปิดสาธารณะ (" + click.Partner + ")",
+			TripID: &click.TripID,
+		})
+	}
+
+	return c.NoContent(http.StatusOK)
 }
 
 // awardBookingPoints credits the creator of the trip this one was copied from.

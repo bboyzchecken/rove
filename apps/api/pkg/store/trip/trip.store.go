@@ -87,3 +87,52 @@ func (s *store) Count(ctx context.Context) (int64, error) {
 	err := s.db.WithContext(ctx).Model(&models.Trip{}).Count(&n).Error
 	return n, err
 }
+
+/* ------------------------------------------------- public explore (M11) -- */
+
+// ListPublic returns only trips their owners chose to publish. Sorting is a
+// column sort, not a ranked feed — the points-weighted feed is a later story.
+func (s *store) ListPublic(ctx context.Context, f models.ExploreFilter) ([]models.Trip, int64, error) {
+	limit := f.Limit
+	if limit <= 0 || limit > 50 {
+		limit = 12
+	}
+
+	q := s.db.WithContext(ctx).Model(&models.Trip{}).
+		Where("visibility = ?", models.VisibilityPublic)
+
+	if f.Country != "" {
+		q = q.Where("destination_country = ?", f.Country)
+	}
+	if f.Query != "" {
+		like := "%" + f.Query + "%"
+		// destination_cities is a JSON array; LIKE over its text form is crude
+		// but works identically on MySQL and the SQLite the tests run on.
+		q = q.Where("title LIKE ? OR destination_cities LIKE ?", like, like)
+	}
+
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	switch f.Sort {
+	case "new":
+		q = q.Order("updated_at DESC")
+	default: // popular
+		q = q.Order("(view_count + clone_count * 5) DESC").Order("updated_at DESC")
+	}
+
+	var out []models.Trip
+	err := q.Limit(limit).Offset(f.Offset).Find(&out).Error
+	return out, total, err
+}
+
+func (s *store) ListPublicByOwner(ctx context.Context, ownerID string) ([]models.Trip, error) {
+	var out []models.Trip
+	err := s.db.WithContext(ctx).
+		Where("owner_id = ? AND visibility = ?", ownerID, models.VisibilityPublic).
+		Order("updated_at DESC").
+		Find(&out).Error
+	return out, err
+}

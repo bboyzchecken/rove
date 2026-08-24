@@ -272,6 +272,16 @@ func (s *Server) handleCloneTrip(c echo.Context) error {
 		return request.NotFound(c, "ไม่พบทริปต้นทาง")
 	}
 
+	copyTrip, err := s.cloneTripForUser(ctx, source, userID)
+	if err != nil {
+		return request.Internal(c, "คัดลอกทริปไม่สำเร็จ")
+	}
+	return c.JSON(http.StatusCreated, toTripDTO(*copyTrip))
+}
+
+// cloneTripForUser is the shared clone core (A11.1): the member route above and
+// the public clone route (public.handler.go) both come through here.
+func (s *Server) cloneTripForUser(ctx contextT, source *models.Trip, userID string) (*models.Trip, error) {
 	copyTrip := *source
 	copyTrip.ID = ""
 	copyTrip.OwnerID = userID
@@ -287,21 +297,21 @@ func (s *Server) handleCloneTrip(c echo.Context) error {
 	copyTrip.UpdatedAt = time.Time{}
 
 	if err := s.trips.Create(ctx, &copyTrip); err != nil {
-		return request.Internal(c, "คัดลอกทริปไม่สำเร็จ")
+		return nil, err
 	}
 	if err := s.members.Add(ctx, &models.TripMember{
 		TripID: copyTrip.ID,
 		UserID: userID,
 		Role:   models.TripRoleOwner,
 	}); err != nil {
-		return request.Internal(c, "คัดลอกทริปไม่สำเร็จ")
+		return nil, err
 	}
 
 	// Copy the itinerary itself. New ids are minted here rather than left to
 	// the create hook, because the item map has to be keyed by the *new* day id
 	// before anything is written.
-	if days, err := s.plans.ListDays(ctx, sourceID); err == nil && len(days) > 0 {
-		items, _ := s.plans.ListItems(ctx, sourceID)
+	if days, err := s.plans.ListDays(ctx, source.ID); err == nil && len(days) > 0 {
+		items, _ := s.plans.ListItems(ctx, source.ID)
 		byDay := map[string][]models.PlanItem{}
 		for _, item := range items {
 			byDay[item.DayID] = append(byDay[item.DayID], item)
@@ -336,7 +346,7 @@ func (s *Server) handleCloneTrip(c echo.Context) error {
 		}
 	}
 
-	_ = s.trips.BumpCloneCount(ctx, sourceID)
+	_ = s.trips.BumpCloneCount(ctx, source.ID)
 
 	// Points for the creator whose trip was worth copying (§6.5).
 	if source.OwnerID != userID {
@@ -349,7 +359,7 @@ func (s *Server) handleCloneTrip(c echo.Context) error {
 		})
 	}
 
-	return c.JSON(http.StatusCreated, toTripDTO(copyTrip))
+	return &copyTrip, nil
 }
 
 /* -------------------------------------------------------------- overview -- */
