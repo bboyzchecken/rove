@@ -79,7 +79,7 @@ func TestEveryPrivateRouteRequiresAToken(t *testing.T) {
 		for _, param := range []string{
 			":tripId", ":userId", ":itemId", ":wishId", ":expenseId", ":taskId",
 			":bookingId", ":commentId", ":jobId", ":dreamId", ":poiId", ":token",
-			":clickId", ":provider", ":tokenOrSlug", ":flightId",
+			":clickId", ":provider", ":tokenOrSlug", ":flightId", ":variantId",
 		} {
 			path = strings.ReplaceAll(path, param, "x")
 		}

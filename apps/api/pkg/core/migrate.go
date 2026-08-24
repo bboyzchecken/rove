@@ -144,6 +144,17 @@ func Migrate(db *gorm.DB) error {
 				return tx.Migrator().DropTable("member_profiles")
 			},
 		},
+		{
+			// M6 — A6.1: candidate itineraries stored whole as snapshots, kept out
+			// of plan_days so every existing trip-scoped query stays as it is.
+			ID: "202608240001_plan_variants",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.AutoMigrate(&models.PlanVariant{})
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return tx.Migrator().DropTable("plan_variants")
+			},
+		},
 	})
 
 	return m.Migrate()

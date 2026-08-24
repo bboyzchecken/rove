@@ -28,6 +28,9 @@ import (
 type Runner interface {
 	// Enqueue starts a job and returns immediately.
 	Enqueue(job models.AIJob, in GenerateInput)
+	// EnqueueVariants runs the pipeline 2–3 times with a different key decision
+	// each and stores every result as a PlanVariant (M6 — A6.2).
+	EnqueueVariants(job models.AIJob, in GenerateInput, count int)
 }
 
 const (
@@ -39,6 +42,7 @@ type runner struct {
 	cfg      core.Config
 	pipeline Pipeline
 	jobs     models.AIJobStore
+	plans    models.PlanStore
 	hub      events.Hub
 
 	// slots caps concurrency: three drafts at once is plenty for one instance,
@@ -47,11 +51,12 @@ type runner struct {
 	wg    sync.WaitGroup
 }
 
-func NewRunner(cfg core.Config, p Pipeline, jobs models.AIJobStore, hub events.Hub) Runner {
+func NewRunner(cfg core.Config, p Pipeline, jobs models.AIJobStore, plans models.PlanStore, hub events.Hub) Runner {
 	return &runner{
 		cfg:      cfg,
 		pipeline: p,
 		jobs:     jobs,
+		plans:    plans,
 		hub:      hub,
 		slots:    make(chan struct{}, maxConcurrent),
 	}
@@ -168,6 +173,221 @@ func (r *runner) run(ctx context.Context, job models.AIJob, in GenerateInput) {
 		ActorID:    job.UserID,
 		TS:         time.Now().UTC(),
 	})
+}
+
+/* ------------------------------------------------- multi-variant (M6) ---- */
+
+// variantFlavours are the key decisions the multi-variant run explores. Each
+// one really changes the draft — pace drives items-per-day in the pipeline —
+// rather than being three names for the same itinerary.
+var variantFlavours = []struct {
+	pace, label, key, brief string
+}{
+	{
+		pace:  "balanced",
+		label: "สมดุล",
+		key:   "เก็บที่สำคัญให้ครบ โดยไม่ต้องรีบ",
+		brief: "จัดจังหวะกลางๆ เก็บ must-do ให้ครบ และเว้นช่วงพักบ้าง",
+	},
+	{
+		pace:  "relaxed",
+		label: "สายชิล",
+		key:   "วันละไม่กี่ที่ มีเวลานั่งคาเฟ่และเดินเล่น",
+		brief: "ลดจำนวนที่ต่อวันลง เน้นคุณภาพเวลามากกว่าจำนวนที่",
+	},
+	{
+		pace:  "packed",
+		label: "จัดเต็ม",
+		key:   "อัดให้ครบทุกอย่างที่กลุ่มอยากไป",
+		brief: "อัดที่เที่ยวให้มากที่สุดเท่าที่วันจะรับไหว เริ่มเช้า กลับดึก",
+	},
+}
+
+func (r *runner) EnqueueVariants(job models.AIJob, in GenerateInput, count int) {
+	if count < 2 {
+		count = 2
+	}
+	if count > len(variantFlavours) {
+		count = len(variantFlavours)
+	}
+
+	r.wg.Add(1)
+	go func() {
+		defer r.wg.Done()
+
+		r.slots <- struct{}{}
+		defer func() { <-r.slots }()
+
+		// One timeout per draft — a three-variant job is legitimately three
+		// drafts long.
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(count)*jobTimeout)
+		defer cancel()
+
+		r.runVariants(ctx, job, in, count)
+	}()
+}
+
+func (r *runner) runVariants(ctx context.Context, job models.AIJob, in GenerateInput, count int) {
+	publish := func(j *models.AIJob) {
+		payload, err := json.Marshal(map[string]any{
+			"job_id":   j.ID,
+			"status":   j.Status,
+			"progress": j.Progress,
+			"step":     j.Step,
+		})
+		if err != nil {
+			return
+		}
+		_ = r.hub.Publish(ctx, j.TripID, events.Event{
+			Type:       events.TypeAIProgress,
+			TargetType: "ai_job",
+			TargetID:   j.ID,
+			ActorID:    j.UserID,
+			TS:         time.Now().UTC(),
+			Payload:    payload,
+		})
+	}
+
+	job.Status = models.AIRunning
+	job.Step = "เริ่มร่างหลายแบบ"
+	job.Progress = 0.05
+	if err := r.jobs.Update(ctx, &job); err != nil {
+		logger.L().WithError(err).Error("ai: cannot mark the variants job running")
+		return
+	}
+	publish(&job)
+
+	variantIDs := make([]string, 0, count)
+	var usage Usage
+	simulated := false
+
+	for i := 0; i < count; i++ {
+		flavour := variantFlavours[i]
+
+		base := float64(i) / float64(count)
+		span := 1.0 / float64(count)
+		onStep := func(step string, progress float64) {
+			job.Step = fmt.Sprintf("แบบที่ %d/%d (%s) — %s", i+1, count, flavour.label, step)
+			job.Progress = base + progress*span*0.95
+			if err := r.jobs.Update(ctx, &job); err != nil {
+				logger.L().WithError(err).Debug("ai: variants progress write failed")
+			}
+			publish(&job)
+		}
+
+		variantIn := in
+		variantIn.Pace = flavour.pace
+		if in.Brief != "" {
+			variantIn.Brief = in.Brief + "\n" + flavour.brief
+		} else {
+			variantIn.Brief = flavour.brief
+		}
+
+		result, err := r.pipeline.Generate(ctx, variantIn, onStep)
+		if err != nil {
+			// One failed flavour does not waste the ones that finished: keep what
+			// exists and report the failure honestly.
+			logger.L().WithError(err).Errorf("ai: variant %d/%d failed", i+1, count)
+			continue
+		}
+		usage.InputTokens += result.Usage.InputTokens
+		usage.OutputTokens += result.Usage.OutputTokens
+		usage.CostUSD += result.Usage.CostUSD
+		simulated = simulated || result.Simulated
+
+		daysJSON, err := json.Marshal(result.Days)
+		if err != nil {
+			continue
+		}
+		variant := models.PlanVariant{
+			TripID:      job.TripID,
+			Label:       flavour.label,
+			KeyDecision: flavour.key,
+			Summary:     firstLine(result.Rationales),
+			Source:      models.VariantSourceAI,
+			CreatedBy:   job.UserID,
+			Days:        daysJSON,
+			Pros:        mustJSON(prosOf(flavour.pace)),
+			Cons:        mustJSON(consOf(flavour.pace)),
+		}
+		if err := r.plans.CreateVariant(ctx, &variant); err != nil {
+			logger.L().WithError(err).Error("ai: cannot store a variant")
+			continue
+		}
+		variantIDs = append(variantIDs, variant.ID)
+	}
+
+	finished := time.Now().UTC()
+	job.FinishedAt = &finished
+	job.Simulated = simulated
+	job.InputTokens = usage.InputTokens
+	job.OutputTokens = usage.OutputTokens
+	job.CostUSD = usage.CostUSD
+	job.Progress = 1
+
+	if len(variantIDs) == 0 {
+		job.Status = models.AIFailed
+		job.Error = "ร่างไม่สำเร็จสักแบบ"
+		job.Step = "ร่างไม่สำเร็จ"
+	} else {
+		job.Status = models.AIDone
+		job.Step = fmt.Sprintf("ได้ %d แบบ", len(variantIDs))
+		raw, err := json.Marshal(map[string]any{"variant_ids": variantIDs})
+		if err == nil {
+			job.Result = raw
+		}
+	}
+
+	if err := r.jobs.Update(ctx, &job); err != nil {
+		logger.L().WithError(err).Error("ai: cannot store the finished variants job")
+		return
+	}
+	publish(&job)
+
+	_ = r.hub.Publish(ctx, job.TripID, events.Event{
+		Type:       events.TypePlanUpdated,
+		TargetType: "variant",
+		TargetID:   job.ID,
+		ActorID:    job.UserID,
+		TS:         time.Now().UTC(),
+	})
+}
+
+func firstLine(lines []string) string {
+	if len(lines) == 0 {
+		return ""
+	}
+	return lines[0]
+}
+
+func prosOf(pace string) []string {
+	switch pace {
+	case "relaxed":
+		return []string{"ไม่เหนื่อย มีเวลาซึมซับแต่ละที่", "เผื่อเวลาหลงทาง/ต่อคิวได้สบาย"}
+	case "packed":
+		return []string{"เก็บครบทุกอย่างที่กลุ่มอยากไป", "คุ้มค่าตั๋วเครื่องบินที่สุด"}
+	default:
+		return []string{"สมดุลระหว่างเก็บที่เที่ยวกับเวลาพัก", "เหมาะกับกลุ่มที่จังหวะต่างกัน"}
+	}
+}
+
+func consOf(pace string) []string {
+	switch pace {
+	case "relaxed":
+		return []string{"อาจเก็บ must-do ได้ไม่ครบ"}
+	case "packed":
+		return []string{"เหนื่อย — วันเริ่มเช้าและจบดึก", "เวลาแต่ละที่จำกัด"}
+	default:
+		return []string{"ไม่สุดสักทาง ถ้ากลุ่มอยากได้แนวชัดๆ"}
+	}
+}
+
+func mustJSON(v any) []byte {
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return []byte("[]")
+	}
+	return raw
 }
 
 // CheckDailyCap reports whether another run is allowed today (A4.11). A model

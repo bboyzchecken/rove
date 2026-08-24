@@ -2,7 +2,7 @@ import { api, type Paginated } from '@/lib/api-client';
 import { env } from '@/lib/env';
 
 import type { RoveRepo } from '../repo';
-import type { AiJob, Airport, CurrentUser, Member } from '../types';
+import type { AiJob, Airport, CurrentUser, Member, TripConflict } from '../types';
 import type {
   ActivityDto,
   AdminStatsDto,
@@ -27,6 +27,9 @@ import type {
   MemberDto,
   MemberProfileDto,
   OrderDto,
+  VariantDto,
+  VariantListDto,
+  VariantVotesDto,
   ParsedTicketDto,
   PastTripDto,
   PlanDayDto,
@@ -72,6 +75,8 @@ import {
   toMember,
   toMemberProfile,
   toOrder,
+  toVariant,
+  toVariantList,
   toParsedTicket,
   toPastTrip,
   toPlanDay,
@@ -417,6 +422,50 @@ export const liveRepo: RoveRepo = {
     async versions(tripId) {
       const dto = await api.get<PlanVersionDto[]>(`/trips/${tripId}/plan/versions`);
       return dto.map(toPlanVersion);
+    },
+
+    /* ------------------------------------------- variants & compare (M6) */
+
+    async variants(tripId) {
+      return toVariantList(await api.get<VariantListDto>(`/trips/${tripId}/variants`));
+    },
+    async forkVariant(tripId, input) {
+      return toVariant(
+        await api.post<VariantDto>(`/trips/${tripId}/variants`, {
+          label: input.label,
+          key_decision: input.keyDecision,
+        }),
+      );
+    },
+    async generateVariants(tripId, input) {
+      return toAiJob(
+        await api.post<AiJobDto>(`/trips/${tripId}/variants/generate`, {
+          count: input.count,
+          brief: input.brief,
+        }),
+      );
+    },
+    async voteVariant(tripId, variantId, value) {
+      const dto = await api.post<VariantVotesDto>(`/trips/${tripId}/variants/${variantId}/vote`, {
+        value,
+      });
+      return { up: dto.up, down: dto.down, mine: dto.mine > 0 ? 1 : dto.mine < 0 ? -1 : 0 };
+    },
+    async adoptVariant(tripId, variantId) {
+      const dto = await api.post<PlanDayDto[]>(`/trips/${tripId}/variants/${variantId}/adopt`);
+      return dto.map(toPlanDay);
+    },
+    async removeVariant(tripId, variantId) {
+      await api.delete<void>(`/trips/${tripId}/variants/${variantId}`);
+    },
+    async freeze(tripId) {
+      return toTrip(await api.post<TripDto>(`/trips/${tripId}/plan/freeze`));
+    },
+    async unfreeze(tripId) {
+      return toTrip(await api.delete<TripDto>(`/trips/${tripId}/plan/freeze`));
+    },
+    async conflicts(tripId) {
+      return api.get<TripConflict[]>(`/trips/${tripId}/conflicts`);
     },
   },
 

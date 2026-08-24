@@ -263,7 +263,7 @@ export interface Comment {
   resolved: boolean;
 }
 
-export type VoteTarget = 'item' | 'wish' | 'window' | 'destination';
+export type VoteTarget = 'item' | 'wish' | 'window' | 'destination' | 'variant';
 
 export interface Vote {
   targetType: VoteTarget;
@@ -284,7 +284,7 @@ export interface ActivityEvent {
 
 /* -------------------------------------------------------------------- ai -- */
 
-export type AiJobKind = 'draft' | 'refine' | 'rebalance' | 'suggest_destination';
+export type AiJobKind = 'draft' | 'variants' | 'refine' | 'rebalance' | 'suggest_destination';
 export type AiJobStatus = 'queued' | 'running' | 'done' | 'failed';
 
 export interface AiJob {
@@ -334,6 +334,63 @@ export interface AiGenerateInput {
   brief?: string;
   pace?: 'relaxed' | 'balanced' | 'packed';
   focus?: string[];
+}
+
+/* ------------------------------------------------------- variants (M6) -- */
+
+/** The row of numbers the compare table renders per candidate. */
+export interface VariantMetrics {
+  dayCount: number;
+  itemCount: number;
+  totalCostJpy: number;
+  perPersonThb: number;
+  travelMinutes: number;
+  coveragePercent: number;
+  mustCovered: number;
+  mustTotal: number;
+  warningCount: number;
+}
+
+export interface VariantVotes {
+  up: number;
+  down: number;
+  /** This member's standing vote; 0 = none. */
+  mine: -1 | 0 | 1;
+}
+
+/**
+ * One candidate itinerary (M6). Read-only by design: compared, voted on and
+ * adopted — never edited in place. Adopting replaces the live plan.
+ */
+export interface PlanVariant {
+  id: string;
+  label: string;
+  keyDecision: string;
+  summary: string;
+  source: 'ai' | 'fork';
+  createdBy: string;
+  createdAt: string;
+  fromDayIndex: number;
+  pros: string[];
+  cons: string[];
+  metrics: VariantMetrics;
+  votes: VariantVotes;
+  days: PlanDay[];
+}
+
+export interface VariantList {
+  /** The live plan's numbers — the baseline column. */
+  current: VariantMetrics;
+  /** True once the owner froze the plan (A6.4). */
+  frozen: boolean;
+  variants: PlanVariant[];
+}
+
+/** What the pre-generate conflict check found (A6.5). */
+export interface TripConflict {
+  kind: 'pace' | 'budget' | 'wish';
+  severity: 'error' | 'warning';
+  message: string;
 }
 
 /* ----------------------------------------------------------------- recap -- */

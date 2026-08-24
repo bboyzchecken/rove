@@ -46,6 +46,8 @@ export const queryKeys = {
 
   planDays: (tripId: string) => ['trip', tripId, 'plan'] as const,
   planVersions: (tripId: string) => ['trip', tripId, 'plan', 'versions'] as const,
+  variants: (tripId: string) => ['trip', tripId, 'variants'] as const,
+  conflicts: (tripId: string) => ['trip', tripId, 'conflicts'] as const,
   prepNote: (tripId: string) => ['trip', tripId, 'prep', 'note'] as const,
   budget: (tripId: string) => ['trip', tripId, 'budget'] as const,
   expenses: (tripId: string) => ['trip', tripId, 'expenses'] as const,

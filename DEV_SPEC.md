@@ -983,13 +983,13 @@ Cloudflare DNS (rovetravel.site)
 ## 11. Phase 2 — V1 (Variants, Public + Points, Photos, Documents, Community)
 
 ### Plan Variants & Compare
-- [ ] A6.1 create variant (fork จาก day index) + key_decision
-- [ ] A6.2 AI multi-variant (2–3 ตาม key decision candidates)
-- [ ] A6.3 `GET /plans/:id/compare?with=` metrics (cost, per person, travel รวม, coverage%, POI count, warnings)
-- [ ] A6.4 votes + freeze plan
-- [ ] A6.5 conflict detector (pace/budget/must-do ชนกัน) ก่อน generate
-- [ ] W6.1 Compare page (metrics table + parallel timeline + pros/cons)
-- [ ] W6.2 Vote UI + freeze
+- [x] A6.1 create variant (fork จาก day index) + key_decision  ·  **หมายเหตุ:** variant = snapshot ทั้งก้อนในตาราง `plan_variants` (JSON shape เดียวกับ AI draft) — อ่านอย่างเดียว เทียบ/โหวต/adopt ไม่แก้ในตัว · `POST /trips/:id/variants` fork แพลนปัจจุบัน + `from_day_index` บันทึกจุดแตก (Decision Log 24 ส.ค.)
+- [x] A6.2 AI multi-variant (2–3 ตาม key decision candidates)  ·  **หมายเหตุ:** `POST /trips/:id/variants/generate` — job เดียวรัน pipeline 2–3 รอบ (สมดุล/สายชิล/จัดเต็ม — pace เปลี่ยน itemsPerDay จริง) ใช้เครดิตตามจำนวนแบบ ตรวจโควตาก่อนเริ่ม
+- [x] A6.3 compare metrics (cost, per person, travel รวม, coverage%, POI count, warnings)  ·  **หมายเหตุ:** อยู่ใน `GET /trips/:id/variants` — ทุก variant + แพลนปัจจุบันถูกให้คะแนนด้วย `domain.ComputeVariantMetrics` ชุดเดียวกัน (มี unit test)
+- [x] A6.4 votes + freeze plan  ·  **หมายเหตุ:** โหวตใช้ตาราง votes เดิม (`target_type='variant'`, กดซ้ำ = ถอน) · freeze = `POST|DELETE /trips/:id/plan/freeze` [owner] → trip.status='final' + middleware `PlanUnfrozen` กัน item/undo/apply/adopt ตอบ 409
+- [x] A6.5 conflict detector (pace/budget/must-do ชนกัน) ก่อน generate  ·  **หมายเหตุ:** `GET /trips/:id/conflicts` — `domain.DetectConflicts` อ่าน member_profiles (A3.1) + wishlist: pace ชิลชนจัดเต็ม, งบไม่ทับกัน, must ชน avoid (มี unit test)
+- [x] W6.1 Compare page (metrics table + parallel timeline + pros/cons)  ·  **หมายเหตุ:** `/t/[tripId]/plan/compare` — ตารางเทียบ + การ์ดต่อ variant (pros/cons, ไทม์ไลน์กางได้) + ปุ่มร่าง 2/3 แบบ + เก็บแพลนปัจจุบันก่อนสลับ + แบนเนอร์ conflicts
+- [x] W6.2 Vote UI + freeze  ·  **หมายเหตุ:** thumbs up/down ต่อ variant (patch cache ไม่รีโหลดตาราง), ปุ่ม "ตกลงตามนี้ — สรุปแพลน" [owner] + แบนเนอร์ล็อกบนแท็บแพลน · mock/live ทำงานครบทั้งคู่
 
 ### Public Model + Points
 - [ ] A10.4 publish flow: slug + privacy opts + `GET /public/plans/:slug` (expense hidden ทุกกรณี)
@@ -1283,6 +1283,7 @@ AUTH_COOKIE_DOMAIN=rove.app
 | 21 ส.ค. 2569 | จ่ายด้วยแต้มบนใบเสร็จ | คงราคาป้ายไว้ที่ `subtotal` แล้วลด `discount` เต็มจำนวน → `total = ฿0` + `points_spent` แยกช่อง | "฿0" เดี่ยว ๆ อ่านเหมือนบั๊ก · แต้มไม่ใช่บาท จึงไม่บวกรวมในยอดเงินสด แต่ต้องเห็นว่าจ่ายอะไรไป |
 | 21 ส.ค. 2569 | ช่องทางชำระเงิน | `pay_channels` เปลี่ยนจาก `string[]` เป็น `{id,label}` และ purchase รับ `method` | เดิมฝั่ง Go แยกแต้ม/เงินสดด้วยการค้นคำว่า "แต้ม" ในข้อความ · ใบเสร็จที่เขียนว่า "บัตรเครดิต" ทั้งที่จ่ายพร้อมเพย์คือเรื่องร้องเรียน |
 | 21 ส.ค. 2569 | แพ็กเกจรายเดือน | ใส่ catalogue (ฟรี / Plus รายเดือน ฿129 / รายปี ฿1,290) ตั้งแต่ตอนนี้ โดย `available:false` | หน้าจอที่จะขายคือหน้าจอที่เรนเดอร์อยู่แล้ว — วันเปิดขายเป็น deploy ไม่ใช่การรื้อหน้า · ผู้ใช้ฟรีไม่มีแถวใน `subscriptions` ให้ API สังเคราะห์เอา |
+| 24 ส.ค. 2569 | โครงสร้าง plan variant (M6) | variant = **snapshot ทั้งก้อน** ในตาราง `plan_variants` (JSON รูปเดียวกับ AI draft) ไม่ใช่หลายแถวใน `plans`/`plan_days` · adopt ใช้โค้ดเส้นเดียวกับ apply draft | ทุก query ที่ scope ด้วย tripID ทำงานเหมือนเดิมโดยไม่ต้องรื้อ · variant มีไว้เทียบ/โหวต/สลับ ไม่ใช่แก้คู่ขนาน — แก้ได้เมื่อ adopt แล้วเท่านั้น ซึ่งตรงกับพฤติกรรมที่กลุ่มใช้จริง |
 | 24 ส.ค. 2569 | ทางเข้าระบบ | `/login` เหลือ **OAuth อย่างเดียว** (LINE, Google) · ประตู dev-login ย้ายไป `/admin/login` และบัญชีที่ได้ถูกตั้งเป็น `admin` เสมอ | ทางเข้าที่ไม่มีเจ้าของบัญชีมายืนยันตัวตนคือสิ่งที่สคริปต์ปั่นบัญชีม้าต้องการ (แต้ม referral 150/คน + เครดิต AI ฟรี — plan §11) · เงื่อนไข 3 ชั้นเดิม (NEXT_PUBLIC_DEV_LOGIN + non-production + MOCK_MODE) ยังอยู่ครบ ประตูนี้แค่ไม่อยู่บนหน้าที่ผู้ใช้จริงเห็น |
 
 ---

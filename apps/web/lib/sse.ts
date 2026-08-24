@@ -93,6 +93,9 @@ function keysFor(tripId: string, type: TripEventType): readonly (readonly unknow
         queryKeys.budget(tripId),
         queryKeys.coverage(tripId),
         queryKeys.tripOverview(tripId),
+        // Variants ride the plan events: a new candidate, a vote, an adopt and
+        // a freeze all publish one of these (M6).
+        queryKeys.variants(tripId),
       ];
 
     case 'expense.changed':
@@ -109,6 +112,15 @@ function keysFor(tripId: string, type: TripEventType): readonly (readonly unknow
 
     case 'member.joined':
       return [queryKeys.tripMembers(tripId), queryKeys.tripOverview(tripId)];
+
+    // Frame edits and the freeze/unfreeze toggle (M6 — A6.4) both land here;
+    // the frozen state lives on the trip itself.
+    case 'trip.updated':
+      return [
+        queryKeys.trip(tripId),
+        queryKeys.tripOverview(tripId),
+        queryKeys.variants(tripId),
+      ];
 
     // The AI job carries its own stream; the plan is refreshed when it lands.
     case 'ai.progress':

@@ -39,6 +39,7 @@ import type {
   PastTrip,
   PlanDay,
   PlanItem,
+  PlanVariant,
   PlanVersion,
   Poi,
   PrepTask,
@@ -46,12 +47,15 @@ import type {
   Subscription,
   SubscriptionPlan,
   Trip,
+  TripConflict,
   TripOverview,
   TripRecap,
   TripRoute,
   TripSummary,
   TripVisibility,
   UpdateTripInput,
+  VariantList,
+  VariantVotes,
   Vote,
   VoteTarget,
   WishlistItem,
@@ -193,6 +197,23 @@ export interface PlanRepo {
   undo(tripId: string): Promise<PlanDay[]>;
   /** What changed recently, newest first (W5.7). */
   versions(tripId: string): Promise<PlanVersion[]>;
+
+  /* ---- variants & compare (M6) ---- */
+
+  variants(tripId: string): Promise<VariantList>;
+  /** Snapshots the live plan as a named candidate (A6.1). */
+  forkVariant(tripId: string, input: { label: string; keyDecision?: string }): Promise<PlanVariant>;
+  /** Asks the AI for 2–3 candidates in one job (A6.2). Costs one credit each. */
+  generateVariants(tripId: string, input: { count: 2 | 3; brief?: string }): Promise<AiJob>;
+  voteVariant(tripId: string, variantId: string, value: -1 | 0 | 1): Promise<VariantVotes>;
+  /** Owner only — writes the candidate over the live plan. */
+  adoptVariant(tripId: string, variantId: string): Promise<PlanDay[]>;
+  removeVariant(tripId: string, variantId: string): Promise<void>;
+  /** Owner only — "ตกลงตามนี้": edits refuse until unfrozen (A6.4). */
+  freeze(tripId: string): Promise<Trip>;
+  unfreeze(tripId: string): Promise<Trip>;
+  /** The pre-generate disagreement check (A6.5). */
+  conflicts(tripId: string): Promise<TripConflict[]>;
 }
 
 export interface BudgetRepo {

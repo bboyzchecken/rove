@@ -14,6 +14,7 @@ import {
   computeExpenses,
   computeWindows,
   daysBetween,
+  detectConflicts,
   membersFreeInRange,
   parseIsoDate,
   recomputeCoverage,
@@ -21,6 +22,7 @@ import {
   toIsoDate,
   toThb,
   validateDays,
+  variantMetricsOf,
 } from '../domain';
 import type { RoveRepo } from '../repo';
 import type {
@@ -39,6 +41,7 @@ import type {
   PastTrip,
   PlanDay,
   PlanItem,
+  PlanVariant,
   PrepTask,
   RecapDecision,
   ShareState,
@@ -60,6 +63,7 @@ import {
   tripRecord,
   type MockDb,
   type TripRecord,
+  type VariantRecord,
 } from './db';
 
 /**
@@ -132,6 +136,129 @@ function draftFor(record: TripRecord): PlanDay[] {
 function emit(job: AiJob) {
   runningJobs.set(job.id, job);
   for (const listener of jobListeners.get(job.id) ?? []) listener(clone(job));
+}
+
+/* -------------------------------------------------------- variants (M6) -- */
+
+/** Mirrors the API's variantFlavours — pace really changes the itinerary. */
+const VARIANT_FLAVOURS = [
+  {
+    pace: 'balanced' as const,
+    itemsPerDay: 4,
+    label: 'สมดุล',
+    key: 'เก็บที่สำคัญให้ครบ โดยไม่ต้องรีบ',
+    pros: ['สมดุลระหว่างเก็บที่เที่ยวกับเวลาพัก', 'เหมาะกับกลุ่มที่จังหวะต่างกัน'],
+    cons: ['ไม่สุดสักทาง ถ้ากลุ่มอยากได้แนวชัดๆ'],
+  },
+  {
+    pace: 'relaxed' as const,
+    itemsPerDay: 3,
+    label: 'สายชิล',
+    key: 'วันละไม่กี่ที่ มีเวลานั่งคาเฟ่และเดินเล่น',
+    pros: ['ไม่เหนื่อย มีเวลาซึมซับแต่ละที่', 'เผื่อเวลาหลงทาง/ต่อคิวได้สบาย'],
+    cons: ['อาจเก็บ must-do ได้ไม่ครบ'],
+  },
+  {
+    pace: 'packed' as const,
+    itemsPerDay: 6,
+    label: 'จัดเต็ม',
+    key: 'อัดให้ครบทุกอย่างที่กลุ่มอยากไป',
+    pros: ['เก็บครบทุกอย่างที่กลุ่มอยากไป', 'คุ้มค่าตั๋วเครื่องบินที่สุด'],
+    cons: ['เหนื่อย — วันเริ่มเช้าและจบดึก', 'เวลาแต่ละที่จำกัด'],
+  },
+];
+
+function variantVotesOf(record: TripRecord, variantId: string, meId: string) {
+  const votes = record.votes.filter(
+    (v) => v.targetType === 'variant' && v.targetId === variantId,
+  );
+  return {
+    up: votes.filter((v) => v.value > 0).length,
+    down: votes.filter((v) => v.value < 0).length,
+    mine: (votes.find((v) => v.memberId === meId)?.value ?? 0) as -1 | 0 | 1,
+  };
+}
+
+function variantOut(record: TripRecord, v: VariantRecord, meId: string): PlanVariant {
+  return {
+    id: v.id,
+    label: v.label,
+    keyDecision: v.keyDecision,
+    summary: v.summary,
+    source: v.source,
+    createdBy: v.createdBy,
+    createdAt: v.createdAt,
+    fromDayIndex: v.fromDayIndex,
+    pros: [...v.pros],
+    cons: [...v.cons],
+    metrics: variantMetricsOf(v.days, record.wishlist, record.trip.fxRate),
+    votes: variantVotesOf(record, v.id, meId),
+    days: clone(v.days),
+  };
+}
+
+/** A frozen plan does not move — the same rule the API enforces (A6.4). */
+function assertUnfrozen(record: TripRecord) {
+  if (record.trip.status === 'ready') {
+    throw new Error('แพลนถูกสรุปแล้ว — เจ้าของทริปต้องปลดล็อกก่อนถึงจะแก้ได้');
+  }
+}
+
+/** Drafts one candidate per flavour by pacing the canned itinerary. */
+function startVariantsJob(record: TripRecord, job: AiJob, count: number) {
+  let tick = 0;
+  const timer = setInterval(() => {
+    tick += 1;
+    const current = runningJobs.get(job.id);
+    if (!current) return;
+
+    if (tick >= AI_STEPS.length + 1) {
+      clearInterval(timer);
+      jobTimers.delete(job.id);
+
+      mutate((db) => {
+        const fresh = tripRecord(db, record.trip.id);
+        for (const flavour of VARIANT_FLAVOURS.slice(0, count)) {
+          const days = draftFor(fresh).map((day) => ({
+            ...day,
+            items: day.items.slice(0, flavour.itemsPerDay),
+          }));
+          fresh.variants.push({
+            id: mockId('var'),
+            label: flavour.label,
+            keyDecision: flavour.key,
+            summary: '',
+            source: 'ai',
+            createdBy: db.user.id,
+            createdAt: nowIso(),
+            fromDayIndex: 0,
+            pros: [...flavour.pros],
+            cons: [...flavour.cons],
+            days,
+          });
+        }
+        log(fresh, db.user.id, `AI ร่างแพลน ${count} แบบมาเทียบกันแล้ว`);
+      });
+
+      emit({
+        ...current,
+        status: 'done',
+        progress: 1,
+        step: `ได้ ${count} แบบ`,
+        finishedAt: nowIso(),
+      });
+      return;
+    }
+
+    emit({
+      ...current,
+      status: 'running',
+      progress: tick / (AI_STEPS.length + 1),
+      step: `กำลังร่างหลายแบบ — ${AI_STEPS[Math.min(tick - 1, AI_STEPS.length - 1)]!}`,
+    });
+  }, 700);
+
+  jobTimers.set(job.id, timer);
 }
 
 function startJob(record: TripRecord, job: AiJob) {
@@ -403,6 +530,7 @@ export const mockRepo: RoveRepo = {
           wishlist: [],
           profiles: {},
           days: [],
+          variants: [],
           budgetLines: [],
           itemsWithoutCost: 0,
           expenses: [],
@@ -862,6 +990,7 @@ export const mockRepo: RoveRepo = {
       return delay(
         mutate((db) => {
           const record = tripRecord(db, tripId);
+          assertUnfrozen(record);
           const { dayId, index, ...rest } = input;
           const day = record.days.find((d) => d.id === dayId) ?? record.days[0];
           if (!day) throw new Error('ยังไม่มีวันในแพลนนี้');
@@ -879,6 +1008,7 @@ export const mockRepo: RoveRepo = {
       return delay(
         mutate((db) => {
           const record = tripRecord(db, tripId);
+          assertUnfrozen(record);
           snapshot(record, db.user.id, itemId, 'update');
           let updated: PlanItem | null = null;
           for (const day of record.days) {
@@ -899,6 +1029,7 @@ export const mockRepo: RoveRepo = {
       return delay(
         mutate((db) => {
           const record = tripRecord(db, tripId);
+          assertUnfrozen(record);
           snapshot(record, db.user.id, input.itemId, 'move');
           let moved: PlanItem | null = null;
           for (const day of record.days) {
@@ -921,6 +1052,7 @@ export const mockRepo: RoveRepo = {
     async removeItem(tripId, itemId) {
       mutate((db) => {
         const record = tripRecord(db, tripId);
+        assertUnfrozen(record);
         snapshot(record, db.user.id, itemId, 'delete');
         for (const day of record.days) {
           day.items = day.items.filter((i) => i.id !== itemId);
@@ -935,6 +1067,7 @@ export const mockRepo: RoveRepo = {
       return delay(
         mutate((db) => {
           const record = tripRecord(db, tripId);
+          assertUnfrozen(record);
           const version = record.versions.pop();
           if (!version) throw new Error('ไม่มีอะไรให้ย้อนกลับ');
 
@@ -982,6 +1115,161 @@ export const mockRepo: RoveRepo = {
           return clone(record.days);
         }),
         280,
+      );
+    },
+
+    /* ------------------------------------------- variants & compare (M6) */
+
+    async variants(tripId) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          return {
+            current: variantMetricsOf(record.days, record.wishlist, record.trip.fxRate),
+            frozen: record.trip.status === 'ready',
+            variants: record.variants.map((v) => variantOut(record, v, db.user.id)),
+          };
+        }),
+      );
+    },
+
+    async forkVariant(tripId, input) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          if (record.days.length === 0) {
+            throw new Error('ยังไม่มีแพลนให้แตกตัวเลือก — ร่างแพลนก่อน');
+          }
+          const variant: VariantRecord = {
+            id: mockId('var'),
+            label: input.label || 'ตัวเลือกใหม่',
+            keyDecision: input.keyDecision ?? '',
+            summary: '',
+            source: 'fork',
+            createdBy: db.user.id,
+            createdAt: nowIso(),
+            fromDayIndex: 0,
+            pros: [],
+            cons: [],
+            days: clone(record.days),
+          };
+          record.variants.push(variant);
+          log(record, db.user.id, `เก็บแพลนปัจจุบันเป็นตัวเลือก "${variant.label}"`);
+          return variantOut(record, variant, db.user.id);
+        }),
+      );
+    },
+
+    async generateVariants(tripId, input) {
+      const job = mutate((db) => {
+        const record = tripRecord(db, tripId);
+        assertUnfrozen(record);
+        const quota = record.ai.included + record.ai.extra;
+        if (record.ai.used + input.count > quota) {
+          throw new Error(
+            `ร่าง ${input.count} แบบใช้ ${input.count} สิทธิ์ แต่โควตาเหลือไม่พอ — ซื้อเพิ่มก่อน`,
+          );
+        }
+        record.ai.used += input.count;
+        log(record, db.user.id, `ให้ AI ร่างแพลน ${input.count} แบบมาเทียบกัน`);
+
+        const created: AiJob = {
+          id: mockId('job'),
+          tripId,
+          kind: 'variants',
+          status: 'queued',
+          progress: 0,
+          step: 'เข้าคิว',
+          createdAt: nowIso(),
+        };
+        runningJobs.set(created.id, created);
+        queueMicrotask(() => startVariantsJob(record, created, input.count));
+        return clone(created);
+      });
+      return delay(job, 200);
+    },
+
+    async voteVariant(tripId, variantId, value) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          record.votes = record.votes.filter(
+            (v) =>
+              !(v.targetType === 'variant' && v.targetId === variantId && v.memberId === db.user.id),
+          );
+          if (value !== 0) {
+            record.votes.push({
+              targetType: 'variant',
+              targetId: variantId,
+              memberId: db.user.id,
+              value,
+            });
+          }
+          return variantVotesOf(record, variantId, db.user.id);
+        }),
+      );
+    },
+
+    async adoptVariant(tripId, variantId) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          assertUnfrozen(record);
+          const variant = record.variants.find((v) => v.id === variantId);
+          if (!variant) throw new Error('ไม่พบตัวเลือกนี้');
+
+          record.days = validateDays(clone(variant.days));
+          record.wishlist = recomputeCoverage(record.wishlist, record.days);
+          record.budgetLines = budgetFromPlan(record.days, record.trip.partySize, record.budgetLines);
+          record.itemsWithoutCost = record.days
+            .flatMap((d) => d.items)
+            .filter((i) => !i.costJpy).length;
+          log(record, db.user.id, `สลับมาใช้แพลน "${variant.label}"`);
+          return clone(record.days);
+        }),
+        260,
+      );
+    },
+
+    async removeVariant(tripId, variantId) {
+      mutate((db) => {
+        const record = tripRecord(db, tripId);
+        record.variants = record.variants.filter((v) => v.id !== variantId);
+      });
+      return delay(undefined);
+    },
+
+    async freeze(tripId) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          record.trip.status = 'ready';
+          log(record, db.user.id, 'สรุปแพลนแล้ว — ตกลงตามนี้ 🎉');
+          return clone(record.trip);
+        }),
+      );
+    },
+
+    async unfreeze(tripId) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          record.trip.status = 'planning';
+          log(record, db.user.id, 'ปลดล็อกแพลนกลับมาแก้ต่อ');
+          return clone(record.trip);
+        }),
+      );
+    },
+
+    async conflicts(tripId) {
+      const db = loadDb();
+      const record = tripRecord(db, tripId);
+      const nameOf = (id: string) => record.members.find((m) => m.id === id)?.name ?? 'สมาชิก';
+      return delay(
+        detectConflicts(
+          Object.values(record.profiles).map((p) => ({ ...p, name: nameOf(p.userId) })),
+          record.wishlist.map((w) => ({ ...w, ownerName: nameOf(w.memberId) })),
+        ),
       );
     },
   },
@@ -1349,6 +1637,7 @@ export const mockRepo: RoveRepo = {
       return delay(
         mutate((db) => {
           const record = tripRecord(db, tripId);
+          assertUnfrozen(record);
           record.days = validateDays(job.result!.days);
           record.wishlist = recomputeCoverage(record.wishlist, record.days);
           record.budgetLines = budgetFromPlan(record.days, record.trip.partySize, record.budgetLines);

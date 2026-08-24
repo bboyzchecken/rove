@@ -90,6 +90,38 @@ type ItemVersion struct {
 
 func (ItemVersion) TableName() string { return "item_versions" }
 
+// Variant sources (M6).
+const (
+	VariantSourceAI   = "ai"
+	VariantSourceFork = "fork"
+)
+
+// PlanVariant is one candidate itinerary, stored whole as a snapshot (M6).
+//
+// A variant is read-only by design: it exists to be compared, voted on and
+// adopted — not edited in parallel with the live plan. Adopting one replaces
+// the live days via the same path an AI draft takes, after which it is editable
+// like anything else. Keeping candidates out of plan_days means every existing
+// trip-scoped query stays exactly as it is (Decision Log 24 ส.ค.).
+type PlanVariant struct {
+	Base
+	TripID      string `gorm:"type:char(36);not null;index" json:"trip_id"`
+	Label       string `gorm:"type:varchar(120);not null" json:"label"`
+	KeyDecision string `gorm:"type:varchar(255)" json:"key_decision"`
+	Summary     string `gorm:"type:text" json:"summary"`
+	Source      string `gorm:"type:varchar(10);not null;default:'ai'" json:"source"`
+	CreatedBy   string `gorm:"type:char(36)" json:"created_by"`
+	// Which day the fork's key decision splits from (0 = whole plan differs).
+	FromDayIndex int `gorm:"not null;default:0" json:"from_day_index"`
+	// []ai.DraftDay — the same shape an AI draft carries, so adopting a variant
+	// and applying a draft are one code path.
+	Days datatypes.JSON `gorm:"type:json" json:"days"`
+	Pros datatypes.JSON `gorm:"type:json" json:"pros"`
+	Cons datatypes.JSON `gorm:"type:json" json:"cons"`
+}
+
+func (PlanVariant) TableName() string { return "plan_variants" }
+
 // PlanStore covers the whole itinerary aggregate. Everything is trip-scoped.
 type PlanStore interface {
 	EnsurePlan(ctx context.Context, tripID, userID string) (*Plan, error)
@@ -114,4 +146,10 @@ type PlanStore interface {
 	LatestVersion(ctx context.Context, tripID, itemID string) (*ItemVersion, error)
 	ListVersions(ctx context.Context, tripID string, limit int) ([]ItemVersion, error)
 	DeleteVersion(ctx context.Context, tripID, versionID string) error
+
+	// Plan variants (M6).
+	CreateVariant(ctx context.Context, v *PlanVariant) error
+	GetVariant(ctx context.Context, tripID, variantID string) (*PlanVariant, error)
+	ListVariants(ctx context.Context, tripID string) ([]PlanVariant, error)
+	DeleteVariant(ctx context.Context, tripID, variantID string) error
 }

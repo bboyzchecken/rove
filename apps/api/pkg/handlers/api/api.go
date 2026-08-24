@@ -191,6 +191,7 @@ func (s *Server) registerRoutes() {
 	s.registerDateRoutes(trips)          // A2.6 — date coordination
 	s.registerWishlistRoutes(trips)      // A3.2
 	s.registerPlanRoutes(trips)          // A4.x / A5.x
+	s.registerVariantRoutes(trips)       // A6.x — variants, compare, freeze
 	s.registerItemRoutes(trips)          // A5.x
 	s.registerBudgetRoutes(trips)        // A7.x
 	s.registerExpenseRoutes(trips)       // A16.x

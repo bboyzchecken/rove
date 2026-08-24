@@ -51,6 +51,21 @@ import type {
 
 const STORAGE_KEY = 'rove.mock.v6';
 
+/** One candidate itinerary (M6) — metrics and votes are computed at read. */
+export interface VariantRecord {
+  id: string;
+  label: string;
+  keyDecision: string;
+  summary: string;
+  source: 'ai' | 'fork';
+  createdBy: string;
+  createdAt: string;
+  fromDayIndex: number;
+  pros: string[];
+  cons: string[];
+  days: PlanDay[];
+}
+
 export interface TripRecord {
   trip: Trip;
   role: 'owner' | 'editor' | 'viewer';
@@ -68,6 +83,8 @@ export interface TripRecord {
   /** Trip-scoped member profiles (A3.1), keyed by member id. */
   profiles: Record<string, MemberProfile>;
   days: PlanDay[];
+  /** Candidate itineraries being compared (M6). */
+  variants: VariantRecord[];
   budgetLines: BudgetLine[];
   itemsWithoutCost: number;
   expenses: ExpenseEntry[];
@@ -232,6 +249,7 @@ function seedDemoTrip(): TripRecord {
       },
     },
     days: structuredClone(DAYS),
+    variants: [],
     budgetLines: structuredClone(BUDGET),
     itemsWithoutCost: ITEMS_WITHOUT_COST,
     expenses: structuredClone(EXPENSES),
@@ -308,6 +326,7 @@ function seedDateTrip(): TripRecord {
     wishlist: [],
     profiles: {},
     days: [],
+    variants: [],
     budgetLines: [],
     itemsWithoutCost: 0,
     expenses: [],

@@ -29,7 +29,7 @@ func (s *Server) registerAIRoutes(g *echo.Group) {
 	g.POST("/:tripId/ai/generate", s.handleAIGenerate, edit)
 	g.GET("/:tripId/ai/jobs/:jobId", s.handleAIJob, view)
 	g.GET("/:tripId/ai/jobs/:jobId/stream", s.handleAIJobStream, view)
-	g.POST("/:tripId/ai/jobs/:jobId/apply", s.handleApplyDraft, edit)
+	g.POST("/:tripId/ai/jobs/:jobId/apply", s.handleApplyDraft, edit, s.PlanUnfrozen)
 	g.POST("/:tripId/ai/credits/purchase", s.handleBuyCredits, edit)
 }
 
@@ -225,13 +225,36 @@ func (s *Server) handleApplyDraft(c echo.Context) error {
 		return request.Internal(c, "เตรียมแพลนไม่สำเร็จ")
 	}
 
-	days := make([]models.PlanDay, 0, len(result.Days))
+	days, items := draftDaysToModels(tripID, plan.ID, result.Days)
+	if err := s.plans.ReplaceDays(ctx, tripID, days, items); err != nil {
+		return request.Internal(c, "บันทึกแพลนไม่สำเร็จ")
+	}
+
+	plan.Rationales = toDatatypesJSON(result.Rationales)
+	plan.OpenQs = toDatatypesJSON(result.OpenQuestions)
+	_ = s.plans.UpdatePlan(ctx, plan)
+
+	_ = s.revalidate(ctx, tripID)
+	_, _ = s.recomputeCoverage(ctx, tripID)
+
+	s.track(c, tripID,
+		fmt.Sprintf("ใช้ร่างของ AI (%d วัน)", len(days)),
+		events.TypePlanReady, "plan", plan.ID)
+
+	return s.handlePlanDays(c)
+}
+
+// draftDaysToModels turns draft days into persistable rows. Applying an AI
+// draft and adopting a plan variant (M6) both come through here — the two
+// features must never disagree about how an itinerary is written down.
+func draftDaysToModels(tripID, planID string, draftDays []ai.DraftDay) ([]models.PlanDay, map[string][]models.PlanItem) {
+	days := make([]models.PlanDay, 0, len(draftDays))
 	items := map[string][]models.PlanItem{}
 
-	for i, draftDay := range result.Days {
+	for i, draftDay := range draftDays {
 		day := models.PlanDay{
 			Base:        models.Base{ID: uuid.NewString()},
-			PlanID:      plan.ID,
+			PlanID:      planID,
 			TripID:      tripID,
 			DayIndex:    i + 1,
 			Date:        draftDay.Date,
@@ -280,22 +303,7 @@ func (s *Server) handleApplyDraft(c echo.Context) error {
 		items[day.ID] = dayItems
 	}
 
-	if err := s.plans.ReplaceDays(ctx, tripID, days, items); err != nil {
-		return request.Internal(c, "บันทึกแพลนไม่สำเร็จ")
-	}
-
-	plan.Rationales = toDatatypesJSON(result.Rationales)
-	plan.OpenQs = toDatatypesJSON(result.OpenQuestions)
-	_ = s.plans.UpdatePlan(ctx, plan)
-
-	_ = s.revalidate(ctx, tripID)
-	_, _ = s.recomputeCoverage(ctx, tripID)
-
-	s.track(c, tripID,
-		fmt.Sprintf("ใช้ร่างของ AI (%d วัน)", len(days)),
-		events.TypePlanReady, "plan", plan.ID)
-
-	return s.handlePlanDays(c)
+	return days, items
 }
 
 type buyCreditsRequest struct {
@@ -492,14 +500,23 @@ func draftResultDTO(raw []byte) json.RawMessage {
 		return json.RawMessage(raw)
 	}
 
-	days := make([]planDayDTO, 0, len(result.Days))
-	for i, day := range result.Days {
+	return toJSON(map[string]any{
+		"days":           draftDayDTOs(result.Days, "draft"),
+		"rationales":     result.Rationales,
+		"open_questions": result.OpenQuestions,
+	})
+}
+
+// draftDayDTOs renders draft-shaped days in the plan endpoint's wire format.
+// Draft previews and plan variants (M6) both use it — the ids are synthetic
+// but stable within one payload, which is all the list needs to render.
+func draftDayDTOs(draftDays []ai.DraftDay, idPrefix string) []planDayDTO {
+	days := make([]planDayDTO, 0, len(draftDays))
+	for i, day := range draftDays {
 		items := make([]planItemDTO, 0, len(day.Items))
 		for j, item := range day.Items {
 			dto := planItemDTO{
-				// A draft has no ids yet; these are stable within the preview,
-				// which is all the list needs to render.
-				ID:         fmt.Sprintf("draft-%d-%d", i, j),
+				ID:         fmt.Sprintf("%s-%d-%d", idPrefix, i, j),
 				Type:       orDefault(item.Type, models.ItemPOI),
 				StartTime:  item.StartTime,
 				EndTime:    strPtr(item.EndTime),
@@ -526,7 +543,7 @@ func draftResultDTO(raw []byte) json.RawMessage {
 		}
 
 		dayDTO := planDayDTO{
-			ID:          fmt.Sprintf("draft-%d", i),
+			ID:          fmt.Sprintf("%s-%d", idPrefix, i),
 			DayIndex:    i + 1,
 			Date:        day.Date.Format("2006-01-02"),
 			Label:       orDefault(day.Label, fmt.Sprintf("วันที่ %d", i+1)),
@@ -541,10 +558,5 @@ func draftResultDTO(raw []byte) json.RawMessage {
 		}
 		days = append(days, dayDTO)
 	}
-
-	return toJSON(map[string]any{
-		"days":           days,
-		"rationales":     result.Rationales,
-		"open_questions": result.OpenQuestions,
-	})
+	return days
 }

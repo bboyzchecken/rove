@@ -97,6 +97,48 @@ export interface MemberDto {
   has_wishlist: boolean;
 }
 
+/* -------------------------------------------------------- variants (M6) -- */
+
+export interface VariantMetricsDto {
+  day_count: number;
+  item_count: number;
+  total_cost_jpy: number;
+  per_person_thb: number;
+  travel_minutes: number;
+  coverage_percent: number;
+  must_covered: number;
+  must_total: number;
+  warning_count: number;
+}
+
+export interface VariantVotesDto {
+  up: number;
+  down: number;
+  mine: number;
+}
+
+export interface VariantDto {
+  id: string;
+  label: string;
+  key_decision: string;
+  summary: string;
+  source: 'ai' | 'fork';
+  created_by: string;
+  created_at: string;
+  from_day_index: number;
+  pros: string[];
+  cons: string[];
+  metrics: VariantMetricsDto;
+  votes: VariantVotesDto;
+  days: PlanDayDto[];
+}
+
+export interface VariantListDto {
+  current: VariantMetricsDto;
+  frozen: boolean;
+  variants: VariantDto[];
+}
+
 /** Trip-scoped member profile (A3.1). */
 export interface MemberProfileDto {
   user_id: string;

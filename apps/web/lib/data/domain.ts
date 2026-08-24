@@ -7,8 +7,11 @@ import type {
   ExpenseEntry,
   ExpenseSummary,
   Member,
+  MemberProfile,
   PlanDay,
   Settlement,
+  TripConflict,
+  VariantMetrics,
   WishlistItem,
 } from './types';
 
@@ -553,4 +556,106 @@ export function addMinutes(hhmm: string, minutes: number) {
   const hh = Math.floor((total % 1440) / 60);
   const mm = total % 60;
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
+
+/* ------------------------------------------------------- variants (M6) --- */
+
+/**
+ * Scores one candidate itinerary with the same maths the live plan is scored
+ * by (`pkg/domain/variants.go`). Costs are per person, so THB per person is
+ * the cost sum converted and rounded to whole baht.
+ */
+export function variantMetricsOf(
+  days: PlanDay[],
+  wishlist: WishlistItem[],
+  fxRate: number,
+): VariantMetrics {
+  const items = days.flatMap((d) => d.items);
+  const totalCostJpy = items.reduce((sum, i) => sum + (i.costJpy ?? 0), 0);
+  const travelMinutes = items.reduce((sum, i) => sum + (i.travel?.minutes ?? 0), 0);
+
+  const covered = recomputeCoverage(
+    wishlist.map((w) => ({ ...w })),
+    days,
+  );
+  const coverage = computeCoverage(covered);
+  const warnings = validateDays(days.map((d) => ({ ...d, items: d.items.map((i) => ({ ...i })) })))
+    .flatMap((d) => d.items)
+    .filter((i) => i.warning).length;
+
+  return {
+    dayCount: days.length,
+    itemCount: items.length,
+    totalCostJpy,
+    perPersonThb: fxRate > 0 ? Math.round(totalCostJpy * fxRate) : 0,
+    travelMinutes,
+    coveragePercent: coverage.percent,
+    mustCovered: coverage.mustCovered,
+    mustTotal: coverage.mustTotal,
+    warningCount: warnings,
+  };
+}
+
+/**
+ * The pre-generate disagreement check (A6.5), mirroring
+ * `pkg/domain.DetectConflicts`: the model cannot satisfy a group that
+ * disagrees with itself, so the disagreement is surfaced to the humans first.
+ */
+export function detectConflicts(
+  profiles: (MemberProfile & { name: string })[],
+  wishlist: (WishlistItem & { ownerName: string })[],
+): TripConflict[] {
+  const conflicts: TripConflict[] = [];
+
+  const relaxed = profiles.filter((p) => p.pace === 'relaxed').map((p) => p.name);
+  const packed = profiles.filter((p) => p.pace === 'packed').map((p) => p.name);
+  if (relaxed.length > 0 && packed.length > 0) {
+    conflicts.push({
+      kind: 'pace',
+      severity: 'warning',
+      message: `${relaxed.join(', ')} อยากเที่ยวชิลๆ แต่ ${packed.join(', ')} อยากจัดเต็ม — แพลนกลางๆ อาจไม่ถูกใจทั้งคู่ ลองคุยกันก่อน หรือร่างสองแบบมาเทียบ`,
+    });
+  }
+
+  let maxOfMins = 0;
+  let minOfMaxes = 0;
+  let minName = '';
+  let maxName = '';
+  for (const p of profiles) {
+    if (p.budgetMaxThb <= 0) continue;
+    if (p.budgetMinThb > maxOfMins) {
+      maxOfMins = p.budgetMinThb;
+      minName = p.name;
+    }
+    if (minOfMaxes === 0 || p.budgetMaxThb < minOfMaxes) {
+      minOfMaxes = p.budgetMaxThb;
+      maxName = p.name;
+    }
+  }
+  if (minOfMaxes > 0 && maxOfMins > minOfMaxes) {
+    conflicts.push({
+      kind: 'budget',
+      severity: 'error',
+      message: `งบไม่ทับกันเลย — ${minName} ตั้งต้นที่ ${maxOfMins.toLocaleString('th-TH')} บาท แต่ ${maxName} ไปได้สุดแค่ ${minOfMaxes.toLocaleString('th-TH')} บาท ต้องตกลงงบกลางก่อนร่าง`,
+    });
+  }
+
+  const normalise = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+  const avoids = wishlist.filter((w) => w.kind === 'avoid');
+  for (const must of wishlist.filter((w) => w.kind === 'must')) {
+    const m = normalise(must.title);
+    const clash = avoids.find((a) => {
+      const n = normalise(a.title);
+      return n === m || n.includes(m) || m.includes(n);
+    });
+    if (clash) {
+      conflicts.push({
+        kind: 'wish',
+        severity: 'error',
+        message: `"${must.title}" เป็นสิ่งที่${must.ownerName}ต้องไป แต่${clash.ownerName}ไม่อยากไป — ต้องเคลียร์กันเองก่อน AI ตัดสินให้ไม่ได้`,
+      });
+    }
+  }
+
+  return conflicts;
 }

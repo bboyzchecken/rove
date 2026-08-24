@@ -13,6 +13,7 @@ const (
 	TargetWish        = "wish"
 	TargetWindow      = "window"
 	TargetDestination = "destination"
+	TargetVariant     = "variant" // M6 — a candidate plan being voted on
 )
 
 // Comment is a single-level thread — replies are flat, by design: a nested

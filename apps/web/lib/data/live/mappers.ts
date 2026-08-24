@@ -26,6 +26,9 @@ import type {
   LockedDates,
   Member,
   MemberProfile,
+  PlanVariant,
+  VariantList,
+  VariantMetrics,
   Order,
   ParsedTicket,
   PastTrip,
@@ -71,6 +74,9 @@ import type {
   LockedDatesDto,
   MemberDto,
   MemberProfileDto,
+  VariantDto,
+  VariantListDto,
+  VariantMetricsDto,
   OrderDto,
   ParsedTicketDto,
   PastTripDto,
@@ -446,6 +452,49 @@ export function toPlanVersion(dto: PlanVersionDto): PlanVersion {
     actorId: dto.actor_id,
     createdAt: dto.created_at,
     title: dto.snapshot?.title ?? 'รายการหนึ่ง',
+  };
+}
+
+/* -------------------------------------------------------- variants (M6) -- */
+
+export function toVariantMetrics(dto: VariantMetricsDto): VariantMetrics {
+  return {
+    dayCount: dto.day_count,
+    itemCount: dto.item_count,
+    totalCostJpy: dto.total_cost_jpy,
+    perPersonThb: dto.per_person_thb,
+    travelMinutes: dto.travel_minutes,
+    coveragePercent: dto.coverage_percent,
+    mustCovered: dto.must_covered,
+    mustTotal: dto.must_total,
+    warningCount: dto.warning_count,
+  };
+}
+
+export function toVariant(dto: VariantDto): PlanVariant {
+  const mine = dto.votes.mine > 0 ? 1 : dto.votes.mine < 0 ? -1 : 0;
+  return {
+    id: dto.id,
+    label: dto.label,
+    keyDecision: dto.key_decision,
+    summary: dto.summary,
+    source: dto.source,
+    createdBy: dto.created_by,
+    createdAt: dto.created_at,
+    fromDayIndex: dto.from_day_index,
+    pros: dto.pros ?? [],
+    cons: dto.cons ?? [],
+    metrics: toVariantMetrics(dto.metrics),
+    votes: { up: dto.votes.up, down: dto.votes.down, mine },
+    days: (dto.days ?? []).map(toPlanDay),
+  };
+}
+
+export function toVariantList(dto: VariantListDto): VariantList {
+  return {
+    current: toVariantMetrics(dto.current),
+    frozen: dto.frozen,
+    variants: (dto.variants ?? []).map(toVariant),
   };
 }
 

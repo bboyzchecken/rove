@@ -271,4 +271,36 @@ func (s *store) DeleteVersion(ctx context.Context, tripID, versionID string) err
 		Delete(&models.ItemVersion{}).Error
 }
 
+/* ------------------------------------------------------ variants (M6) ---- */
+
+func (s *store) CreateVariant(ctx context.Context, v *models.PlanVariant) error {
+	return s.db.WithContext(ctx).Create(v).Error
+}
+
+func (s *store) GetVariant(ctx context.Context, tripID, variantID string) (*models.PlanVariant, error) {
+	var v models.PlanVariant
+	err := s.db.WithContext(ctx).
+		Where("trip_id = ? AND id = ?", tripID, variantID).
+		First(&v).Error
+	if err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
+func (s *store) ListVariants(ctx context.Context, tripID string) ([]models.PlanVariant, error) {
+	var out []models.PlanVariant
+	err := s.db.WithContext(ctx).
+		Where("trip_id = ?", tripID).
+		Order("created_at ASC").
+		Find(&out).Error
+	return out, err
+}
+
+func (s *store) DeleteVariant(ctx context.Context, tripID, variantID string) error {
+	return s.db.WithContext(ctx).
+		Where("trip_id = ? AND id = ?", tripID, variantID).
+		Delete(&models.PlanVariant{}).Error
+}
+
 var _ = time.Now

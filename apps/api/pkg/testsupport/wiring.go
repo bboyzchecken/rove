@@ -59,11 +59,12 @@ var allModels = []any{
 	&models.Comment{}, &models.Vote{}, &models.Activity{},
 	&models.AIJob{}, &models.AICredit{}, &models.TripFlight{},
 	&models.Order{}, &models.Subscription{}, &models.MemberProfile{},
+	&models.PlanVariant{},
 }
 
 // allTables is the drop order — children before parents.
 var allTables = []string{
-	"member_profiles",
+	"plan_variants", "member_profiles",
 	"orders", "subscriptions",
 	"ai_credits", "ai_jobs", "activity_logs", "votes", "comments",
 	"booking_clicks", "bookings", "trip_flights", "prep_notes", "prep_tasks",
@@ -171,3 +172,4 @@ func (stubPipeline) ParseTicket(context.Context, string) (*ai.ParsedTicket, erro
 type stubRunner struct{}
 
 func (stubRunner) Enqueue(models.AIJob, ai.GenerateInput) {}
+func (stubRunner) EnqueueVariants(models.AIJob, ai.GenerateInput, int) {}

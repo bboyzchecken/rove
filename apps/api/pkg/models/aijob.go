@@ -10,6 +10,7 @@ import (
 // AI job kinds and statuses (DEV_SPEC M4 — A4.9).
 const (
 	AIKindDraft       = "draft"
+	AIKindVariants    = "variants" // M6 — 2–3 drafts in one job, one per key decision
 	AIKindRefine      = "refine"
 	AIKindRebalance   = "rebalance"
 	AIKindDestination = "suggest_destination"
