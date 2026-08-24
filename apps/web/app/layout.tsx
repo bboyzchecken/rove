@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, Noto_Sans_Thai } from 'next/font/google';
+import { NextIntlClientProvider } from 'next-intl';
+import { getLocale } from 'next-intl/server';
 
 import { env } from '@/lib/env';
 import '@/styles/globals.css';
@@ -40,11 +42,17 @@ export const viewport: Viewport = {
   themeColor: '#FFFFFF',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // W0.6 — next-intl. The provider inherits locale + messages from
+  // i18n/request.ts; client components reach them via useTranslations.
+  const locale = await getLocale();
+
   return (
-    <html lang="th" className={`${inter.variable} ${notoSansThai.variable}`}>
+    <html lang={locale} className={`${inter.variable} ${notoSansThai.variable}`}>
       <body className="min-h-dvh antialiased">
-        <Providers>{children}</Providers>
+        <NextIntlClientProvider>
+          <Providers>{children}</Providers>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

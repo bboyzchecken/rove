@@ -759,7 +759,7 @@ Cloudflare DNS (rovetravel.site)
 - [x] W0.3 TanStack Query provider + devtools + default options §7.1
 - [x] W0.4 `lib/api-client.ts` (fetch wrapper: base url, auth, error → typed) + `features/` skeleton  ·  **หมายเหตุ:** `features/*/queries.ts` 9 โมดูล + `lib/data/` แยก mock/live repo
 - [x] W0.5 Auth flow: LINE/Google button → callback route → set httpOnly cookie → `useMe()`
-- [ ] W0.6 Zustand store สำหรับ UI state + next-intl + PostHog + flags  ·  **หมายเหตุ:** Zustand + PostHog + `lib/flags.ts` ครบ — next-intl ยังไม่ได้ wire (มีแค่ `messages/th.json` ยังไม่มี provider)
+- [x] W0.6 Zustand store สำหรับ UI state + next-intl + PostHog + flags  ·  **หมายเหตุ:** next-intl wire แล้ว — `i18n/request.ts` + plugin ใน next.config + `NextIntlClientProvider` ใน root layout · แท็บห้องทริปอ่าน label จาก `messages/th.json` เป็นตัวพิสูจน์ท่อ (ภาษาที่สองเริ่มจากตรงนั้น)
 - [ ] W0.7 Vercel (หรือ container) deploy preview ต่อ PR  ·  **หมายเหตุ:** CI build ผ่านทุก PR แต่ยังไม่มี preview deploy ต่อ PR
 
 ### Data / Ops
