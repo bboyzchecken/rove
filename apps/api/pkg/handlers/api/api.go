@@ -21,6 +21,7 @@ import (
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/airports"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
 	fxsvc "github.com/bboyzchecken/rove/apps/api/pkg/services/fx"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/notify"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/places"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/storage"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/weather"
@@ -36,26 +37,28 @@ type ServerParams struct {
 	DB     *gorm.DB
 	Redis  *redis.Client
 
-	Users      models.UserStore
-	Trips      models.TripStore
-	Members    models.TripMemberStore
-	POIs       models.POIStore
-	Characters models.CharacterStore
-	Points     models.PointsStore
-	Invites    models.InviteStore
-	Dreams     models.DreamStore
-	Dates      models.DateStore
-	Wishlist   models.WishlistStore
-	Plans      models.PlanStore
-	Expenses   models.ExpenseStore
-	Prep       models.PrepStore
-	Bookings   models.BookingStore
-	Flights    models.FlightStore
-	Collab     models.CollabStore
-	AIJobs     models.AIJobStore
-	Billing    models.BillingStore
-	Photos     models.PhotoStore
-	Documents  models.DocumentStore
+	Users         models.UserStore
+	Trips         models.TripStore
+	Members       models.TripMemberStore
+	POIs          models.POIStore
+	Characters    models.CharacterStore
+	Points        models.PointsStore
+	Invites       models.InviteStore
+	Dreams        models.DreamStore
+	Dates         models.DateStore
+	Wishlist      models.WishlistStore
+	Plans         models.PlanStore
+	Expenses      models.ExpenseStore
+	Prep          models.PrepStore
+	Bookings      models.BookingStore
+	Flights       models.FlightStore
+	Collab        models.CollabStore
+	AIJobs        models.AIJobStore
+	Billing       models.BillingStore
+	Photos        models.PhotoStore
+	Documents     models.DocumentStore
+	Notifications models.NotificationStore
+	Polls         models.PollStore
 
 	Hub       events.Hub
 	FX        fxsvc.Service
@@ -66,6 +69,7 @@ type ServerParams struct {
 	Pipeline  ai.Pipeline
 	AIRunner  ai.Runner
 	Storage   storage.Service
+	Notify    notify.Service
 }
 
 type Server struct {
@@ -74,26 +78,28 @@ type Server struct {
 	db    *gorm.DB
 	redis *redis.Client
 
-	users      models.UserStore
-	trips      models.TripStore
-	members    models.TripMemberStore
-	pois       models.POIStore
-	characters models.CharacterStore
-	points     models.PointsStore
-	invites    models.InviteStore
-	dreams     models.DreamStore
-	dates      models.DateStore
-	wishlist   models.WishlistStore
-	plans      models.PlanStore
-	expenses   models.ExpenseStore
-	prep       models.PrepStore
-	bookings   models.BookingStore
-	flights    models.FlightStore
-	collab     models.CollabStore
-	aiJobs     models.AIJobStore
-	billing    models.BillingStore
-	photos     models.PhotoStore
-	documents  models.DocumentStore
+	users         models.UserStore
+	trips         models.TripStore
+	members       models.TripMemberStore
+	pois          models.POIStore
+	characters    models.CharacterStore
+	points        models.PointsStore
+	invites       models.InviteStore
+	dreams        models.DreamStore
+	dates         models.DateStore
+	wishlist      models.WishlistStore
+	plans         models.PlanStore
+	expenses      models.ExpenseStore
+	prep          models.PrepStore
+	bookings      models.BookingStore
+	flights       models.FlightStore
+	collab        models.CollabStore
+	aiJobs        models.AIJobStore
+	billing       models.BillingStore
+	photos        models.PhotoStore
+	documents     models.DocumentStore
+	notifications models.NotificationStore
+	polls         models.PollStore
 
 	hub       events.Hub
 	fx        fxsvc.Service
@@ -104,6 +110,7 @@ type Server struct {
 	pipeline  ai.Pipeline
 	aiRunner  ai.Runner
 	storage   storage.Service
+	notify    notify.Service
 
 	cookieName string
 }
@@ -115,40 +122,43 @@ func NewServer(p ServerParams) *Server {
 	e.Validator = customvalidator.New()
 
 	s := &Server{
-		e:          e,
-		cfg:        p.Config,
-		db:         p.DB,
-		redis:      p.Redis,
-		users:      p.Users,
-		trips:      p.Trips,
-		members:    p.Members,
-		pois:       p.POIs,
-		characters: p.Characters,
-		points:     p.Points,
-		invites:    p.Invites,
-		dreams:     p.Dreams,
-		dates:      p.Dates,
-		wishlist:   p.Wishlist,
-		plans:      p.Plans,
-		expenses:   p.Expenses,
-		prep:       p.Prep,
-		bookings:   p.Bookings,
-		flights:    p.Flights,
-		collab:     p.Collab,
-		aiJobs:     p.AIJobs,
-		billing:    p.Billing,
-		photos:     p.Photos,
-		documents:  p.Documents,
-		hub:        p.Hub,
-		fx:         p.FX,
-		airports:   p.Airports,
-		weather:    p.Weather,
-		affiliate:  p.Affiliate,
-		places:     p.Places,
-		pipeline:   p.Pipeline,
-		aiRunner:   p.AIRunner,
-		storage:    p.Storage,
-		cookieName: p.Config.AuthCookieName,
+		e:             e,
+		cfg:           p.Config,
+		db:            p.DB,
+		redis:         p.Redis,
+		users:         p.Users,
+		trips:         p.Trips,
+		members:       p.Members,
+		pois:          p.POIs,
+		characters:    p.Characters,
+		points:        p.Points,
+		invites:       p.Invites,
+		dreams:        p.Dreams,
+		dates:         p.Dates,
+		wishlist:      p.Wishlist,
+		plans:         p.Plans,
+		expenses:      p.Expenses,
+		prep:          p.Prep,
+		bookings:      p.Bookings,
+		flights:       p.Flights,
+		collab:        p.Collab,
+		aiJobs:        p.AIJobs,
+		billing:       p.Billing,
+		photos:        p.Photos,
+		documents:     p.Documents,
+		notifications: p.Notifications,
+		polls:         p.Polls,
+		hub:           p.Hub,
+		fx:            p.FX,
+		airports:      p.Airports,
+		weather:       p.Weather,
+		affiliate:     p.Affiliate,
+		places:        p.Places,
+		pipeline:      p.Pipeline,
+		aiRunner:      p.AIRunner,
+		storage:       p.Storage,
+		notify:        p.Notify,
+		cookieName:    p.Config.AuthCookieName,
 	}
 
 	s.setupMiddleware()
@@ -220,6 +230,7 @@ func (s *Server) registerRoutes() {
 	s.registerExportRoutes(trips)        // A10.x
 	s.registerPhotoRoutes(trips)         // A18.x — trip photos
 	s.registerDocumentRoutes(trips)      // A19.x — document folder
+	s.registerCommunityRoutes(trips)     // A9.2/A9.3 — polls + presence
 	s.registerEventRoutes(trips)         // A2.5 — SSE
 
 	// --- admin ---------------------------------------------------------------

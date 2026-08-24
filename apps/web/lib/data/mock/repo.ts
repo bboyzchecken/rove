@@ -42,6 +42,7 @@ import type {
   PlanDay,
   PlanItem,
   PlanVariant,
+  Poll,
   PrepTask,
   RecapDecision,
   ShareState,
@@ -138,6 +139,39 @@ function draftFor(record: TripRecord): PlanDay[] {
 function emit(job: AiJob) {
   runningJobs.set(job.id, job);
   for (const listener of jobListeners.get(job.id) ?? []) listener(clone(job));
+}
+
+/* ------------------------------------------------------ community (M9) --- */
+
+/**
+ * Rebuilds a poll's tally from the votes list, the way the API derives it —
+ * the stored poll carries the question and its options, never the counts, so
+ * the two can never drift apart.
+ */
+function pollWithTally(db: MockDb, poll: Poll): Poll {
+  const record = db.trips.find((t) => t.polls.some((p) => p.id === poll.id));
+  const votes = (record?.votes ?? []).filter(
+    (v) => v.targetType === 'poll' && v.targetId === poll.id,
+  );
+
+  const options = poll.options.map((option) => ({
+    ...option,
+    votes: 0,
+    who: [] as string[],
+  }));
+  let answered = 0;
+  let myAnswer = -1;
+
+  for (const vote of votes) {
+    const index = vote.value;
+    if (index < 0 || index >= options.length) continue;
+    options[index]!.votes += 1;
+    options[index]!.who.push(vote.memberId);
+    answered += 1;
+    if (vote.memberId === db.user.id) myAnswer = index;
+  }
+
+  return { ...clone(poll), options, answered, myAnswer };
 }
 
 /* ---------------------------------------------------- public model (M11) - */
@@ -579,6 +613,7 @@ export const mockRepo: RoveRepo = {
           bookings: [],
           photos: [],
           documents: [],
+          polls: [],
           comments: [],
           votes: [],
           activity: [],
@@ -636,6 +671,7 @@ export const mockRepo: RoveRepo = {
           // with a copied plan (M18/M19).
           copy.photos = [];
           copy.documents = [];
+          copy.polls = [];
           copy.share = { ...copy.share, shareToken: null, shareUrl: null, visibility: 'private' };
           source.share.cloneCount += 1;
           log(copy, db.user.id, `คัดลอกทริปจาก "${source.trip.title}"`);
@@ -1985,6 +2021,7 @@ export const mockRepo: RoveRepo = {
           copy.bookings = [];
           copy.photos = [];
           copy.documents = [];
+          copy.polls = [];
           copy.profiles = {};
           copy.ai = { used: 0, included: 2, extra: 0 };
           copy.share = {
@@ -2122,6 +2159,129 @@ export const mockRepo: RoveRepo = {
         record.documents = record.documents.filter((d) => d.id !== documentId);
       });
       return delay(undefined);
+    },
+  },
+
+  /* --------------------------------------------- community (M9) -- */
+  community: {
+    async inbox() {
+      const db = loadDb();
+      const items = [...db.notifications].reverse();
+      return delay({
+        unread: items.filter((n) => !n.read).length,
+        items: items.map((n) => clone(n)),
+      });
+    },
+
+    async markRead(notificationId) {
+      return delay(
+        mutate((db) => {
+          for (const n of db.notifications) {
+            if (!notificationId || n.id === notificationId) n.read = true;
+          }
+          const items = [...db.notifications].reverse();
+          return {
+            unread: items.filter((n) => !n.read).length,
+            items: items.map((n) => clone(n)),
+          };
+        }),
+      );
+    },
+
+    async polls(tripId) {
+      return delay(
+        mutate((db) => tripRecord(db, tripId).polls.map((p) => pollWithTally(db, p))),
+      );
+    },
+
+    async createPoll(tripId, input) {
+      const options = input.options.map((o) => o.trim()).filter(Boolean);
+      if (options.length < 2) throw new Error('ใส่ตัวเลือกอย่างน้อย 2 อย่าง');
+      if (options.length > 6) throw new Error('ตัวเลือกเยอะเกินไป — เอาไม่เกิน 6 อย่าง');
+
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          const poll: Poll = {
+            id: mockId('poll'),
+            question: input.question.trim(),
+            itemId: input.itemId ?? null,
+            options: options.map((label, index) => ({ index, label, votes: 0, who: [] })),
+            closed: false,
+            closesAt: null,
+            createdBy: db.user.id,
+            createdAt: nowIso(),
+            myAnswer: -1,
+            answered: 0,
+          };
+          record.polls.unshift(poll);
+          log(record, db.user.id, `เปิดโพล "${poll.question}"`);
+          return pollWithTally(db, poll);
+        }),
+      );
+    },
+
+    async answerPoll(tripId, pollId, option) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          const poll = record.polls.find((p) => p.id === pollId);
+          if (!poll) throw new Error('ไม่พบโพลนี้');
+          if (poll.closed) throw new Error('โพลนี้ปิดไปแล้ว');
+          if (option < -1 || option >= poll.options.length) throw new Error('ไม่มีตัวเลือกนี้');
+
+          // Answers live in the votes list, exactly as they do in the API.
+          record.votes = record.votes.filter(
+            (v) => !(v.targetType === 'poll' && v.targetId === pollId && v.memberId === db.user.id),
+          );
+          if (option >= 0) {
+            record.votes.push({
+              targetType: 'poll',
+              targetId: pollId,
+              memberId: db.user.id,
+              // The option index rides in `value`, same as the API.
+              value: option,
+            });
+          }
+          return pollWithTally(db, poll);
+        }),
+      );
+    },
+
+    async closePoll(tripId, pollId) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          const poll = record.polls.find((p) => p.id === pollId);
+          if (!poll) throw new Error('ไม่พบโพลนี้');
+          if (poll.createdBy !== db.user.id && record.role !== 'owner') {
+            throw new Error('ปิดโพลได้เฉพาะคนที่เปิดหรือเจ้าของทริป');
+          }
+          poll.closed = true;
+          log(record, db.user.id, `ปิดโพล "${poll.question}"`);
+          return pollWithTally(db, poll);
+        }),
+      );
+    },
+
+    async removePoll(tripId, pollId) {
+      mutate((db) => {
+        const record = tripRecord(db, tripId);
+        const poll = record.polls.find((p) => p.id === pollId);
+        if (poll && poll.createdBy !== db.user.id && record.role !== 'owner') {
+          throw new Error('ลบโพลได้เฉพาะคนที่เปิดหรือเจ้าของทริป');
+        }
+        record.polls = record.polls.filter((p) => p.id !== pollId);
+        record.votes = record.votes.filter(
+          (v) => !(v.targetType === 'poll' && v.targetId === pollId),
+        );
+      });
+      return delay(undefined);
+    },
+
+    async ping() {
+      // Nobody else is looking in mock mode, so there is nothing to announce.
+      return Promise.resolve();
     },
   },
 

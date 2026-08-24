@@ -14,6 +14,7 @@ const (
 	TargetWindow      = "window"
 	TargetDestination = "destination"
 	TargetVariant     = "variant" // M6 — a candidate plan being voted on
+	TargetPoll        = "poll"    // M9 — the answer index lives in Vote.Value
 )
 
 // Comment is a single-level thread — replies are flat, by design: a nested

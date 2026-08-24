@@ -27,9 +27,11 @@ import type {
   LockedDates,
   Member,
   MemberProfile,
+  Notification,
   Order,
   PlanDay,
   PlanItem,
+  Poll,
   PrepTask,
   ShareState,
   Subscription,
@@ -108,6 +110,8 @@ export interface TripRecord {
   /** Pictures taken on the trip (M18) and the paper it runs on (M19). */
   photos: TripPhoto[];
   documents: TripDocument[];
+  /** Open questions with fixed options (M9 — A9.3). */
+  polls: Poll[];
   comments: Comment[];
   votes: Vote[];
   activity: ActivityEvent[];
@@ -134,6 +138,8 @@ export interface MockDb {
   orders: Order[];
   /** The standing plan. Free until a gateway exists. */
   subscription: Subscription;
+  /** Everything addressed to this user, newest last (M9 — A9.2). */
+  notifications: Notification[];
   /** Trips the user finished — the profile timeline reads these as-is. */
   past: typeof PAST_TRIPS;
   upcoming: typeof UPCOMING;
@@ -275,6 +281,7 @@ function seedDemoTrip(): TripRecord {
     bookings: [],
     photos: [],
     documents: [],
+    polls: [],
     comments: [
       {
         id: 'c1',
@@ -354,6 +361,7 @@ function seedDateTrip(): TripRecord {
     bookings: [],
     photos: [],
     documents: [],
+    polls: [],
     comments: [],
     votes: [],
     activity: [
@@ -412,6 +420,7 @@ function seedPublicTrip(input: {
   record.activity = [];
   record.photos = [];
   record.documents = [];
+  record.polls = [];
   record.profiles = {};
   record.days = record.days.map((day) => ({
     ...day,
@@ -482,6 +491,7 @@ export function seedDb(): MockDb {
     dreams: structuredClone(DREAMS),
     orders: seedOrders(),
     subscription: structuredClone(FREE_SUBSCRIPTION),
+    notifications: [],
     past: structuredClone(PAST_TRIPS),
     upcoming: structuredClone(UPCOMING),
     stats: structuredClone(YEAR_STATS),

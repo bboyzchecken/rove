@@ -97,6 +97,45 @@ export interface MemberDto {
   has_wishlist: boolean;
 }
 
+/* ------------------------------------------------------ community (M9) --- */
+
+export interface NotificationDto {
+  id: string;
+  kind: 'mention' | 'assigned' | 'poll_opened' | 'plan_ready' | 'points';
+  title: string;
+  body: string;
+  link: string;
+  trip_id: string | null;
+  actor_id: string;
+  read: boolean;
+  created_at: string;
+}
+
+export interface InboxDto {
+  unread: number;
+  items: NotificationDto[];
+}
+
+export interface PollOptionDto {
+  index: number;
+  label: string;
+  votes: number;
+  who: string[];
+}
+
+export interface PollDto {
+  id: string;
+  question: string;
+  item_id: string | null;
+  options: PollOptionDto[];
+  closed: boolean;
+  closes_at: string | null;
+  created_by: string;
+  created_at: string;
+  my_answer: number;
+  answered: number;
+}
+
 /* --------------------------------------------- photos & documents (M18/19) */
 
 export interface PhotoDto {

@@ -20,6 +20,7 @@ import type {
   CoverageSummary,
   CreateItemInput,
   CreateTripInput,
+  CreatePollInput,
   CreatorProfile,
   CurrentUser,
   DateWindow,
@@ -31,6 +32,7 @@ import type {
   ExploreResult,
   ExportFormat,
   ExportResult,
+  Inbox,
   FlightLegInput,
   InviteLink,
   LockedDates,
@@ -45,6 +47,7 @@ import type {
   PlanVariant,
   PlanVersion,
   Poi,
+  Poll,
   PrepTask,
   PublicTripPayload,
   ShareState,
@@ -97,6 +100,7 @@ export interface RoveRepo {
   poi: PoiRepo;
   photos: PhotoRepo;
   documents: DocumentRepo;
+  community: CommunityRepo;
   profile: ProfileRepo;
   admin: AdminRepo;
 }
@@ -346,6 +350,30 @@ export interface DocumentRepo {
   list(tripId: string): Promise<TripDocument[]>;
   upload(tripId: string, input: UploadDocumentInput): Promise<TripDocument>;
   remove(tripId: string, documentId: string): Promise<void>;
+}
+
+/**
+ * The parts of a room that are about the people in it (M9): the inbox, polls,
+ * and who is looking right now.
+ */
+export interface CommunityRepo {
+  /** Everything addressed to me, across every trip. */
+  inbox(): Promise<Inbox>;
+  /** Empty id marks the whole inbox read. */
+  markRead(notificationId?: string): Promise<Inbox>;
+
+  polls(tripId: string): Promise<Poll[]>;
+  createPoll(tripId: string, input: CreatePollInput): Promise<Poll>;
+  /** -1 withdraws the answer, same gesture as un-voting a variant. */
+  answerPoll(tripId: string, pollId: string, option: number): Promise<Poll>;
+  closePoll(tripId: string, pollId: string): Promise<Poll>;
+  removePoll(tripId: string, pollId: string): Promise<void>;
+
+  /**
+   * "I am here" — fire and forget (W9.3). Nothing is stored: presence is true
+   * for a few seconds and false after, which is an event, not a row.
+   */
+  ping(tripId: string, state: { typing: boolean; tab: string }): Promise<void>;
 }
 
 export interface PoiRepo {

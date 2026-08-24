@@ -1029,9 +1029,9 @@ Cloudflare DNS (rovetravel.site)
 
 ### More Phase 2
 - [ ] A8.4 rule blocks trigger จาก item (car → IDP/ETC/snow tires, themepark, onsen, rail pass)
-- [ ] A9.2 mentions + notification inbox + LINE Messaging notify
-- [ ] A9.3 tasks (assign/due/done), polls
-- [ ] W9.3 presence/typing indicator (SSE)
+- [x] A9.2 mentions + notification inbox + LINE Messaging notify  ·  **หมายเหตุ:** ตาราง `notifications` (แยกจาก `activity_logs` เพราะอันนี้ "ส่งถึงคนคนหนึ่ง" มีสถานะอ่าน/ยังไม่อ่าน) + `GET|POST /users/me/notifications` · `@handle` ในคอมเมนต์แจ้งเฉพาะ**สมาชิกในทริปนั้น** (มีเทสต์คุมว่าคนนอกไม่โดน และคนเขียนไม่แจ้งตัวเอง) · LINE push ผ่าน `services/notify` — ไม่มี token = เงียบ ไม่พัง
+- [x] A9.3 tasks (assign/due/done), polls  ·  **หมายเหตุ:** tasks มีอยู่แล้วตั้งแต่ M8 (`prep_tasks` มี assignee/due/done ครบ) · เพิ่ม `polls` — คำตอบใช้ตาราง `votes` เดิม (`target_type='poll'`, index ตัวเลือกอยู่ใน `value`) ไม่ต้องมีตารางที่สอง · ปิดโพลได้เฉพาะคนเปิดหรือ owner, โพลที่ปิดแล้วตอบไม่ได้ (มีเทสต์)
+- [x] W9.3 presence/typing indicator (SSE)  ·  **หมายเหตุ:** `POST /trips/:id/presence` publish อย่างเดียว ไม่เก็บลง DB — presence เป็นจริงแค่ไม่กี่วินาที ไม่ใช่แถว · ฝั่งเว็บ ping ทุก 20 วิ (เฉพาะตอนแท็บ visible) แล้วลืมคนที่เงียบเกิน 45 วิ · **ใช้ SSE เส้นเดียวกับ TripRealtime** ไม่เปิด connection ที่สอง
 - [ ] D2.1 seed 20–30 public plans จากทีม/อินฟลูฯ ก่อนเปิด
 - [ ] A12.8 เพิ่ม partner: car rental, eSIM, insurance, flight
 - [ ] A12.9 postback จริงตาม partner ที่ approve
@@ -1283,6 +1283,9 @@ AUTH_COOKIE_DOMAIN=rove.app
 | 21 ส.ค. 2569 | จ่ายด้วยแต้มบนใบเสร็จ | คงราคาป้ายไว้ที่ `subtotal` แล้วลด `discount` เต็มจำนวน → `total = ฿0` + `points_spent` แยกช่อง | "฿0" เดี่ยว ๆ อ่านเหมือนบั๊ก · แต้มไม่ใช่บาท จึงไม่บวกรวมในยอดเงินสด แต่ต้องเห็นว่าจ่ายอะไรไป |
 | 21 ส.ค. 2569 | ช่องทางชำระเงิน | `pay_channels` เปลี่ยนจาก `string[]` เป็น `{id,label}` และ purchase รับ `method` | เดิมฝั่ง Go แยกแต้ม/เงินสดด้วยการค้นคำว่า "แต้ม" ในข้อความ · ใบเสร็จที่เขียนว่า "บัตรเครดิต" ทั้งที่จ่ายพร้อมเพย์คือเรื่องร้องเรียน |
 | 21 ส.ค. 2569 | แพ็กเกจรายเดือน | ใส่ catalogue (ฟรี / Plus รายเดือน ฿129 / รายปี ฿1,290) ตั้งแต่ตอนนี้ โดย `available:false` | หน้าจอที่จะขายคือหน้าจอที่เรนเดอร์อยู่แล้ว — วันเปิดขายเป็น deploy ไม่ใช่การรื้อหน้า · ผู้ใช้ฟรีไม่มีแถวใน `subscriptions` ให้ API สังเคราะห์เอา |
+| 24 ส.ค. 2569 | คำตอบโพล (A9.3) | ไม่มีตาราง `poll_votes` — ใช้ `votes` เดิม `target_type='poll'` แล้วเก็บ**ดัชนีตัวเลือกใน `value`** | โพลคือ "หนึ่งคน หนึ่งคำตอบ ต่อหนึ่งเรื่อง" ซึ่งเป็นรูปเดียวกับ thumb บน item/variant เป๊ะ · composite key เดิมทำให้ตอบใหม่ทับของเก่าได้ฟรี ไม่ต้องเขียน dedupe เอง |
+| 24 ส.ค. 2569 | inbox แยกจาก activity feed | ตาราง `notifications` ใหม่ ไม่ยัดลง `activity_logs` | feed คือ "เกิดอะไรขึ้นในห้อง" ใครเปิดก็อ่านอันเดียวกัน · inbox คือ**จดหมายจ่าหน้าถึงคน** มีผู้รับ มีสถานะยังไม่อ่าน และเป็นสิ่งที่ badge นับได้ · สองอย่างนี้ต่างกันที่ "ของใคร" ไม่ใช่แค่รูปแบบการแสดงผล |
+| 24 ส.ค. 2569 | presence (W9.3) | เป็น **event ไม่ใช่แถว** — publish ผ่าน SSE เส้นเดิมของห้อง ไม่เก็บ DB ไม่มี endpoint disconnect | "ใครอยู่ในห้อง" เป็นจริงแค่ไม่กี่วินาที · เก็บลง DB แปลว่าต้องมี logic ลบคนที่ปิดโน้ตบุ๊กโดยไม่บอกลา ซึ่งเป็นบั๊กที่ไม่มีวันจบ · ping หายไปเอง = หายจากห้องเอง |
 | 24 ส.ค. 2569 | ที่เก็บไฟล์ (M18/M19) | `services/storage` มีสองหลังจริง: **R2** (aws-sdk-go-v2, presigned GET) เมื่อ config ครบ · **ดิสก์ `./uploads`** เมื่อไม่ครบ โดย API เสิร์ฟเอง — ไม่มี stub ที่คืน error แล้ว · แถวเก็บ **storage key ไม่ใช่ URL** | เดิม storage เป็น stub ทั้งก้อน ทำให้ฟีเจอร์รูป/เอกสารต้องรอบัญชี R2 ถึงจะ dev ได้ · เก็บ URL ลงแถวแปลว่าวันที่ย้าย bucket หรือ presign หมดอายุ ต้องไล่ migrate ข้อมูล — เก็บ key แล้วออก URL ตอนอ่านไม่มีปัญหานั้น |
 | 24 ส.ค. 2569 | โครงสร้าง plan variant (M6) | variant = **snapshot ทั้งก้อน** ในตาราง `plan_variants` (JSON รูปเดียวกับ AI draft) ไม่ใช่หลายแถวใน `plans`/`plan_days` · adopt ใช้โค้ดเส้นเดียวกับ apply draft | ทุก query ที่ scope ด้วย tripID ทำงานเหมือนเดิมโดยไม่ต้องรื้อ · variant มีไว้เทียบ/โหวต/สลับ ไม่ใช่แก้คู่ขนาน — แก้ได้เมื่อ adopt แล้วเท่านั้น ซึ่งตรงกับพฤติกรรมที่กลุ่มใช้จริง |
 | 24 ส.ค. 2569 | ทางเข้าระบบ | `/login` เหลือ **OAuth อย่างเดียว** (LINE, Google) · ประตู dev-login ย้ายไป `/admin/login` และบัญชีที่ได้ถูกตั้งเป็น `admin` เสมอ | ทางเข้าที่ไม่มีเจ้าของบัญชีมายืนยันตัวตนคือสิ่งที่สคริปต์ปั่นบัญชีม้าต้องการ (แต้ม referral 150/คน + เครดิต AI ฟรี — plan §11) · เงื่อนไข 3 ชั้นเดิม (NEXT_PUBLIC_DEV_LOGIN + non-production + MOCK_MODE) ยังอยู่ครบ ประตูนี้แค่ไม่อยู่บนหน้าที่ผู้ใช้จริงเห็น |

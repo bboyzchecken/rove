@@ -6,6 +6,7 @@ import { LayoutDashboard, Luggage, Plus, Sparkles, UserRound } from 'lucide-reac
 
 import { ModeBanner } from '@/components/common/mode-banner';
 import { RoveLogo } from '@/components/brand/rove-logo';
+import { InboxBell } from '@/components/collab/inbox-bell';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
 import { useMe } from '@/features/auth/queries';
 import { cn } from '@/lib/utils';
@@ -74,9 +75,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             ))}
           </nav>
 
-          <Link href="/profile" aria-label="โปรไฟล์">
-            <CharacterAvatar characterId={me?.characterId ?? 'shiba'} size="sm" />
-          </Link>
+          <div className="flex items-center gap-1">
+            <InboxBell />
+            <Link href="/profile" aria-label="โปรไฟล์">
+              <CharacterAvatar characterId={me?.characterId ?? 'shiba'} size="sm" />
+            </Link>
+          </div>
         </div>
       </header>
 

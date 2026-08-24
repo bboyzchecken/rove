@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { isMockMode } from './data';
@@ -30,7 +30,9 @@ export type TripEventType =
   | 'prep.changed'
   | 'booking.changed'
   | 'photo.changed'
-  | 'document.changed';
+  | 'document.changed'
+  | 'poll.changed'
+  | 'presence.ping';
 
 export interface TripEvent {
   type: TripEventType;
@@ -38,10 +40,26 @@ export interface TripEvent {
   target_id: string;
   actor_id: string;
   ts: string;
+  /** Carried only where a refetch would be wasteful — AI progress, presence. */
+  payload?: { typing?: boolean; tab?: string; step?: string; progress?: number };
 }
 
-export function useTripEvents(tripId: string | undefined) {
+export function useTripEvents(
+  tripId: string | undefined,
+  /**
+   * Called for every frame, before the cache work. Presence needs the raw
+   * event — it is the one thing in the room that is deliberately not cached
+   * (W9.3) — and this keeps the stream to one connection per room.
+   */
+  onEvent?: (event: TripEvent) => void,
+) {
   const queryClient = useQueryClient();
+  // Held in a ref so a new callback identity does not reconnect the stream.
+  // Written in an effect rather than during render: a ref is not render state.
+  const handler = useRef(onEvent);
+  useEffect(() => {
+    handler.current = onEvent;
+  }, [onEvent]);
 
   useEffect(() => {
     if (!tripId || isMockMode) return;
@@ -53,6 +71,7 @@ export function useTripEvents(tripId: string | undefined) {
     source.onmessage = (message) => {
       try {
         const event = JSON.parse(message.data) as TripEvent;
+        handler.current?.(event);
         for (const key of keysFor(tripId, event.type)) {
           void queryClient.invalidateQueries({ queryKey: key });
         }
@@ -116,6 +135,14 @@ function keysFor(tripId: string, type: TripEventType): readonly (readonly unknow
 
     case 'document.changed':
       return [queryKeys.documents(tripId)];
+
+    case 'poll.changed':
+      return [queryKeys.polls(tripId)];
+
+    // Presence is not cached anywhere — usePresence keeps it in memory and
+    // forgets whoever stops pinging (W9.3).
+    case 'presence.ping':
+      return [];
 
     case 'comment.created':
       return [['trip', tripId, 'comments'], queryKeys.tripActivity(tripId)];

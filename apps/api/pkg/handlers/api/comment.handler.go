@@ -81,6 +81,10 @@ func (s *Server) handleCreateComment(c echo.Context) error {
 		return request.Internal(c, "ส่งคอมเมนต์ไม่สำเร็จ")
 	}
 
+	// "@handle" reaches the person it names (A9.2). Failing to deliver a
+	// mention must never fail the comment, so this returns nothing.
+	s.notifyMentions(ctx, tripID, comment.UserID, comment.Body, "/t/"+tripID+"/discussion")
+
 	s.track(c, tripID, "คอมเมนต์ในแพลน", events.TypeCommentCreated, req.TargetType, req.TargetID)
 	return c.JSON(http.StatusCreated, toCommentDTO(*comment))
 }

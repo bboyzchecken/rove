@@ -19,19 +19,21 @@ import (
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/airports"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
 	fxsvc "github.com/bboyzchecken/rove/apps/api/pkg/services/fx"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/notify"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/places"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/storage"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/weather"
 	aijobstore "github.com/bboyzchecken/rove/apps/api/pkg/store/aijob"
 	billingstore "github.com/bboyzchecken/rove/apps/api/pkg/store/billing"
-	mediastore "github.com/bboyzchecken/rove/apps/api/pkg/store/media"
 	bookingstore "github.com/bboyzchecken/rove/apps/api/pkg/store/booking"
 	characterstore "github.com/bboyzchecken/rove/apps/api/pkg/store/character"
 	collabstore "github.com/bboyzchecken/rove/apps/api/pkg/store/collab"
+	communitystore "github.com/bboyzchecken/rove/apps/api/pkg/store/community"
 	datestore "github.com/bboyzchecken/rove/apps/api/pkg/store/dates"
 	expensestore "github.com/bboyzchecken/rove/apps/api/pkg/store/expense"
 	flightstore "github.com/bboyzchecken/rove/apps/api/pkg/store/flight"
 	invitestore "github.com/bboyzchecken/rove/apps/api/pkg/store/invite"
+	mediastore "github.com/bboyzchecken/rove/apps/api/pkg/store/media"
 	memberstore "github.com/bboyzchecken/rove/apps/api/pkg/store/member"
 	planstore "github.com/bboyzchecken/rove/apps/api/pkg/store/plan"
 	poistore "github.com/bboyzchecken/rove/apps/api/pkg/store/poi"
@@ -103,12 +105,12 @@ func loadConfig() core.Config {
 			Password: viper.GetString("REDIS_PASSWORD"),
 		},
 		R2: core.R2Config{
-			Endpoint:     viper.GetString("R2_ENDPOINT"),
-			Region:       viper.GetString("R2_REGION"),
-			AccessKey:    viper.GetString("R2_ACCESS_KEY"),
-			SecretKey:    viper.GetString("R2_SECRET_KEY"),
-			ExportBucket: viper.GetString("R2_EXPORT_BUCKET"),
-			ImageBucket:  viper.GetString("R2_IMAGE_BUCKET"),
+			Endpoint:       viper.GetString("R2_ENDPOINT"),
+			Region:         viper.GetString("R2_REGION"),
+			AccessKey:      viper.GetString("R2_ACCESS_KEY"),
+			SecretKey:      viper.GetString("R2_SECRET_KEY"),
+			ExportBucket:   viper.GetString("R2_EXPORT_BUCKET"),
+			ImageBucket:    viper.GetString("R2_IMAGE_BUCKET"),
 			DocumentBucket: viper.GetString("R2_DOCUMENT_BUCKET"),
 			PhotoBucket:    viper.GetString("R2_PHOTO_BUCKET"),
 		},
@@ -181,6 +183,7 @@ func storeModules() fx.Option {
 		aijobstore.Module,
 		billingstore.Module,
 		mediastore.Module,
+		communitystore.Module,
 	)
 }
 
@@ -197,6 +200,7 @@ func serviceModules() fx.Option {
 		places.Module,
 		affiliate.Module,
 		storage.Module,
+		notify.Module,
 		ai.Module,
 		ai.RunnerModule,
 	)

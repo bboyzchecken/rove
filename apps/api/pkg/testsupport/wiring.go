@@ -25,6 +25,7 @@ import (
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/ai"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/airports"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/notify"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/places"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/storage"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/weather"
@@ -33,6 +34,7 @@ import (
 	bookingstore "github.com/bboyzchecken/rove/apps/api/pkg/store/booking"
 	characterstore "github.com/bboyzchecken/rove/apps/api/pkg/store/character"
 	collabstore "github.com/bboyzchecken/rove/apps/api/pkg/store/collab"
+	communitystore "github.com/bboyzchecken/rove/apps/api/pkg/store/community"
 	datestore "github.com/bboyzchecken/rove/apps/api/pkg/store/dates"
 	expensestore "github.com/bboyzchecken/rove/apps/api/pkg/store/expense"
 	flightstore "github.com/bboyzchecken/rove/apps/api/pkg/store/flight"
@@ -62,11 +64,13 @@ var allModels = []any{
 	&models.AIJob{}, &models.AICredit{}, &models.TripFlight{},
 	&models.Order{}, &models.Subscription{}, &models.MemberProfile{},
 	&models.PlanVariant{}, &models.TripPhoto{}, &models.TripDocument{},
+	&models.Notification{}, &models.Poll{},
 }
 
 // allTables is the drop order — children before parents.
 var allTables = []string{
-	"trip_documents", "trip_photos", "plan_variants", "member_profiles",
+	"polls", "notifications", "trip_documents", "trip_photos",
+	"plan_variants", "member_profiles",
 	"orders", "subscriptions",
 	"ai_credits", "ai_jobs", "activity_logs", "votes", "comments",
 	"booking_clicks", "bookings", "trip_flights", "prep_notes", "prep_tasks",
@@ -87,26 +91,28 @@ func newParams(cfg core.Config, db *gorm.DB) handlers.ServerParams {
 		// Redis, so these tests take exactly the path a dev machine takes.
 		Redis: nil,
 
-		Users:      userstore.New(db),
-		Trips:      tripstore.New(db),
-		Members:    memberstore.New(db),
-		POIs:       poistore.New(db),
-		Characters: characterstore.New(db),
-		Points:     pointsstore.New(db),
-		Invites:    invitestore.New(db),
-		Dreams:     invitestore.NewDreamStore(db),
-		Dates:      datestore.New(db),
-		Wishlist:   wishliststore.New(db),
-		Plans:      planstore.New(db),
-		Expenses:   expensestore.New(db),
-		Prep:       prepstore.New(db),
-		Bookings:   bookingstore.New(db),
-		Flights:    flightstore.New(db),
-		Collab:     collabstore.New(db),
-		AIJobs:     aijobstore.New(db),
-		Billing:    billingstore.New(db),
-		Photos:     mediastore.NewPhotoStore(db),
-		Documents:  mediastore.NewDocumentStore(db),
+		Users:         userstore.New(db),
+		Trips:         tripstore.New(db),
+		Members:       memberstore.New(db),
+		POIs:          poistore.New(db),
+		Characters:    characterstore.New(db),
+		Points:        pointsstore.New(db),
+		Invites:       invitestore.New(db),
+		Dreams:        invitestore.NewDreamStore(db),
+		Dates:         datestore.New(db),
+		Wishlist:      wishliststore.New(db),
+		Plans:         planstore.New(db),
+		Expenses:      expensestore.New(db),
+		Prep:          prepstore.New(db),
+		Bookings:      bookingstore.New(db),
+		Flights:       flightstore.New(db),
+		Collab:        collabstore.New(db),
+		AIJobs:        aijobstore.New(db),
+		Billing:       billingstore.New(db),
+		Photos:        mediastore.NewPhotoStore(db),
+		Documents:     mediastore.NewDocumentStore(db),
+		Notifications: communitystore.NewNotificationStore(db),
+		Polls:         communitystore.NewPollStore(db),
 
 		Hub: stubHub{},
 		// The airport index is embedded data with no I/O — the real one is the
@@ -119,6 +125,8 @@ func newParams(cfg core.Config, db *gorm.DB) handlers.ServerParams {
 		Pipeline:  stubPipeline{},
 		AIRunner:  stubRunner{},
 		Storage:   storage.New(cfg),
+		// No token in tests: pushes are skipped, the inbox row is still written.
+		Notify: notify.New(cfg),
 	}
 }
 
@@ -176,5 +184,5 @@ func (stubPipeline) ParseTicket(context.Context, string) (*ai.ParsedTicket, erro
 
 type stubRunner struct{}
 
-func (stubRunner) Enqueue(models.AIJob, ai.GenerateInput) {}
+func (stubRunner) Enqueue(models.AIJob, ai.GenerateInput)              {}
 func (stubRunner) EnqueueVariants(models.AIJob, ai.GenerateInput, int) {}

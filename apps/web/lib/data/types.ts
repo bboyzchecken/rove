@@ -263,13 +263,18 @@ export interface Comment {
   resolved: boolean;
 }
 
-export type VoteTarget = 'item' | 'wish' | 'window' | 'destination' | 'variant';
+export type VoteTarget = 'item' | 'wish' | 'window' | 'destination' | 'variant' | 'poll';
 
 export interface Vote {
   targetType: VoteTarget;
   targetId: string;
   memberId: string;
-  value: 1 | -1;
+  /**
+   * ±1 for a thumb on an item or a variant; for a poll it is the chosen
+   * option's index. One member's one answer about one thing is the same shape
+   * either way, which is why polls do not get a second table (M9 — A9.3).
+   */
+  value: number;
 }
 
 export interface ActivityEvent {
@@ -424,6 +429,71 @@ export interface TripRecap {
   pointsPerPublish: number;
   /** Owner, and not public yet. */
   canPublish: boolean;
+}
+
+/* ------------------------------------------------- community (M9) ------- */
+
+export type NotificationKind = 'mention' | 'assigned' | 'poll_opened' | 'plan_ready' | 'points';
+
+/**
+ * One thing that happened *to you*. Distinct from an ActivityEvent, which is
+ * what happened in a room: this one has a recipient, can be unread, and is
+ * what a badge counts.
+ */
+export interface Notification {
+  id: string;
+  kind: NotificationKind;
+  title: string;
+  body: string;
+  /** Where tapping it lands, as an app path. */
+  link: string;
+  tripId: string | null;
+  actorId: string;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface Inbox {
+  unread: number;
+  items: Notification[];
+}
+
+export interface PollOption {
+  index: number;
+  label: string;
+  votes: number;
+  /** Member ids, so the card can show faces rather than a bare count. */
+  who: string[];
+}
+
+/** A question with fixed options — the decisions that are not a whole plan. */
+export interface Poll {
+  id: string;
+  question: string;
+  itemId: string | null;
+  options: PollOption[];
+  closed: boolean;
+  closesAt: string | null;
+  createdBy: string;
+  createdAt: string;
+  /** -1 when this member has not answered. */
+  myAnswer: number;
+  answered: number;
+}
+
+export interface CreatePollInput {
+  question: string;
+  options: string[];
+  itemId?: string;
+}
+
+/** Who is in the room right now (W9.3) — held in memory, never persisted. */
+export interface PresenceMember {
+  memberId: string;
+  typing: boolean;
+  tab: string;
+  /** Epoch ms of the last ping; stale entries are dropped by the hook. */
+  at: number;
 }
 
 /* --------------------------------------------- photos & documents (M18/19) */

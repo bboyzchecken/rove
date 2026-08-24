@@ -20,9 +20,10 @@ export default async function TripLayout({
 
   return (
     <div>
-      <TripRealtime tripId={tripId} />
       <TripHeader tripId={tripId} />
       <TripTabs tripId={tripId} />
+      {/* Owns the room's single SSE connection and renders "who is here". */}
+      <TripRealtime tripId={tripId} />
       <div className="px-4 pb-5">{children}</div>
     </div>
   );

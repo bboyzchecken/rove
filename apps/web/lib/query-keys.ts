@@ -9,6 +9,7 @@ export const queryKeys = {
   me: () => ['me'] as const,
   characters: () => ['characters'] as const,
   dreams: () => ['dreams'] as const,
+  inbox: () => ['inbox'] as const,
 
   /**
    * Bill & Payment (M20). Not trip-scoped: a receipt outlives the trip it was
@@ -54,6 +55,7 @@ export const queryKeys = {
   prep: (tripId: string) => ['trip', tripId, 'prep'] as const,
   photos: (tripId: string, filter = '') => ['trip', tripId, 'photos', filter] as const,
   documents: (tripId: string) => ['trip', tripId, 'documents'] as const,
+  polls: (tripId: string) => ['trip', tripId, 'polls'] as const,
   bookings: (tripId: string) => ['trip', tripId, 'bookings'] as const,
   bookingOffers: (tripId: string, kind: string) => ['trip', tripId, 'bookings', 'offers', kind] as const,
 

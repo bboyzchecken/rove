@@ -87,6 +87,27 @@ func TestOutsiderCannotReachAnyTripRoute(t *testing.T) {
 
 		{"ai credits", http.MethodGet, base + "/ai/credits", nil},
 		{"ai generate", http.MethodPost, base + "/ai/generate", map[string]any{}},
+
+		// Phase 2 groups.
+		{"member profile read", http.MethodGet, base + "/profile/me", nil},
+		{"member profile write", http.MethodPut, base + "/profile/me", map[string]any{"pace": "packed"}},
+		{"trip profiles", http.MethodGet, base + "/profiles", nil},
+
+		{"variants read", http.MethodGet, base + "/variants", nil},
+		{"variants fork", http.MethodPost, base + "/variants", map[string]any{"label": "แทรก"}},
+		{"variants generate", http.MethodPost, base + "/variants/generate", map[string]any{"count": 2}},
+		{"plan freeze", http.MethodPost, base + "/plan/freeze", nil},
+		{"conflicts", http.MethodGet, base + "/conflicts", nil},
+
+		{"photos read", http.MethodGet, base + "/photos", nil},
+		{"photobook", http.MethodGet, base + "/photobook", nil},
+		{"documents read", http.MethodGet, base + "/documents", nil},
+
+		{"polls read", http.MethodGet, base + "/polls", nil},
+		{"polls write", http.MethodPost, base + "/polls", map[string]any{
+			"question": "แทรกเข้ามา", "options": []string{"a", "b"},
+		}},
+		{"presence", http.MethodPost, base + "/presence", map[string]any{}},
 	}
 
 	for _, tc := range cases {

@@ -28,6 +28,8 @@ import type {
   CreatorProfileDto,
   DocumentDto,
   ExploreTripDto,
+  InboxDto,
+  PollDto,
   PhotoDto,
   MemberProfileDto,
   OrderDto,
@@ -81,6 +83,8 @@ import {
   toCreatorProfile,
   toDocument,
   toExploreTrip,
+  toInbox,
+  toPoll,
   toPhoto,
   toMemberProfile,
   toOrder,
@@ -839,6 +843,55 @@ export const liveRepo: RoveRepo = {
 
     async remove(tripId, documentId) {
       await api.delete<void>(`/trips/${tripId}/documents/${documentId}`);
+    },
+  },
+
+  /* --------------------------------------------- community (M9) -- */
+  community: {
+    async inbox() {
+      return toInbox(await api.get<InboxDto>('/users/me/notifications'));
+    },
+    async markRead(notificationId) {
+      return toInbox(
+        await api.post<InboxDto>('/users/me/notifications/read', {
+          notification_id: notificationId ?? '',
+        }),
+      );
+    },
+
+    async polls(tripId) {
+      return (await api.get<PollDto[]>(`/trips/${tripId}/polls`)).map(toPoll);
+    },
+    async createPoll(tripId, input) {
+      return toPoll(
+        await api.post<PollDto>(`/trips/${tripId}/polls`, {
+          question: input.question,
+          options: input.options,
+          item_id: input.itemId,
+        }),
+      );
+    },
+    async answerPoll(tripId, pollId, option) {
+      return toPoll(await api.post<PollDto>(`/trips/${tripId}/polls/${pollId}/answer`, { option }));
+    },
+    async closePoll(tripId, pollId) {
+      return toPoll(await api.post<PollDto>(`/trips/${tripId}/polls/${pollId}/close`));
+    },
+    async removePoll(tripId, pollId) {
+      await api.delete<void>(`/trips/${tripId}/polls/${pollId}`);
+    },
+
+    async ping(tripId, state) {
+      // Fire and forget: a dropped heartbeat costs nothing, and a failed one
+      // must never surface as an error over the thing the user was doing.
+      try {
+        await api.post<void>(`/trips/${tripId}/presence`, {
+          typing: state.typing,
+          tab: state.tab,
+        });
+      } catch {
+        // Ignored on purpose.
+      }
     },
   },
 

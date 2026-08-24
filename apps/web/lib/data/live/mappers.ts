@@ -26,9 +26,12 @@ import type {
   LockedDates,
   CreatorProfile,
   ExploreTrip,
+  Inbox,
   Member,
   MemberProfile,
+  Notification,
   PlanVariant,
+  Poll,
   PublicCreator,
   VariantList,
   VariantMetrics,
@@ -80,7 +83,10 @@ import type {
   CreatorProfileDto,
   DocumentDto,
   ExploreTripDto,
+  InboxDto,
+  NotificationDto,
   PhotoDto,
+  PollDto,
   MemberDto,
   MemberProfileDto,
   PublicCreatorDto,
@@ -462,6 +468,46 @@ export function toPlanVersion(dto: PlanVersionDto): PlanVersion {
     actorId: dto.actor_id,
     createdAt: dto.created_at,
     title: dto.snapshot?.title ?? 'รายการหนึ่ง',
+  };
+}
+
+/* ------------------------------------------------------ community (M9) --- */
+
+export function toNotification(dto: NotificationDto): Notification {
+  return {
+    id: dto.id,
+    kind: dto.kind,
+    title: dto.title,
+    body: dto.body ?? '',
+    link: dto.link ?? '',
+    tripId: dto.trip_id,
+    actorId: dto.actor_id,
+    read: dto.read,
+    createdAt: dto.created_at,
+  };
+}
+
+export function toInbox(dto: InboxDto): Inbox {
+  return { unread: dto.unread, items: (dto.items ?? []).map(toNotification) };
+}
+
+export function toPoll(dto: PollDto): Poll {
+  return {
+    id: dto.id,
+    question: dto.question,
+    itemId: dto.item_id,
+    options: (dto.options ?? []).map((option) => ({
+      index: option.index,
+      label: option.label,
+      votes: option.votes,
+      who: option.who ?? [],
+    })),
+    closed: dto.closed,
+    closesAt: dto.closes_at,
+    createdBy: dto.created_by,
+    createdAt: dto.created_at,
+    myAnswer: dto.my_answer,
+    answered: dto.answered,
   };
 }
 

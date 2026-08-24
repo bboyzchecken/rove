@@ -31,6 +31,10 @@ const (
 	TypeBookingChanged  = "booking.changed"
 	TypePhotoChanged    = "photo.changed"
 	TypeDocumentChanged = "document.changed"
+	TypePollChanged     = "poll.changed"
+	TypeNotification    = "notification.created"
+	// Presence is a heartbeat, not a change: nothing is stored (W9.3).
+	TypePresence = "presence.ping"
 )
 
 type Event struct {

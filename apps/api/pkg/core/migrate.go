@@ -166,6 +166,17 @@ func Migrate(db *gorm.DB) error {
 				return tx.Migrator().DropTable("trip_documents", "trip_photos")
 			},
 		},
+		{
+			// M9 — A9.2/A9.3: the inbox and polls. Poll answers reuse `votes`
+			// with target_type='poll' and the option index in `value`.
+			ID: "202608240003_community",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.AutoMigrate(&models.Notification{}, &models.Poll{})
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return tx.Migrator().DropTable("polls", "notifications")
+			},
+		},
 	})
 
 	return m.Migrate()

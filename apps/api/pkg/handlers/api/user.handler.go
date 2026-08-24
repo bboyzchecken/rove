@@ -21,6 +21,7 @@ func (s *Server) registerUserRoutes(g *echo.Group) {
 	me.PATCH("", s.handleUpdateMe)
 	me.GET("/stats", s.handleMyStats)
 	me.GET("/points", s.handleMyPoints)
+	s.registerInboxRoutes(me) // A9.2 — the inbox belongs to a person, not a trip
 	me.GET("/trips/upcoming", s.handleUpcomingTrips)
 	me.GET("/trips/past", s.handlePastTrips)
 	// Bill & payment (A20.x) — receipts belong to the user, not to a trip.

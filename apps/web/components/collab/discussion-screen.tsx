@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Check, Send } from 'lucide-react';
 
+import { PollBoard } from '@/components/collab/poll-board';
 import { SectionHeader } from '@/components/common/section';
 import { EmptyState } from '@/components/common/empty-state';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +39,8 @@ export function DiscussionScreen({ tripId }: { tripId: string }) {
 
   return (
     <div className="space-y-6">
+      <PollBoard tripId={tripId} />
+
       <section>
         <SectionHeader label="คุยกันเรื่องทริปนี้" />
 
