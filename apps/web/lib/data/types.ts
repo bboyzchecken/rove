@@ -142,6 +142,31 @@ export interface DestinationSuggestion {
   weather: { high: number; low: number; text: string };
 }
 
+/* ------------------------------------------------- member profile (A3.1) -- */
+
+export type TripPace = 'relaxed' | 'balanced' | 'packed';
+
+/**
+ * What one member wants out of THIS trip — distinct from their account
+ * profile, because the same person is a temple-hopper on one trip and a beach
+ * potato on the next. The AI frame and the conflict check (A6.5) read these.
+ */
+export interface MemberProfile {
+  userId: string;
+  visitedBefore: boolean;
+  pace: TripPace;
+  /** 1 = as little as possible, 2 = normal, 3 = happy to hike. */
+  walkLevel: 1 | 2 | 3;
+  canDrive: boolean;
+  hasIdp: boolean;
+  budgetMinThb: number;
+  budgetMaxThb: number;
+  dietary: string[];
+  notes: string;
+  /** False when this is the default the API synthesised — the tab nudges. */
+  filled: boolean;
+}
+
 /* -------------------------------------------------------------- coverage -- */
 
 export interface CoverageSummary {

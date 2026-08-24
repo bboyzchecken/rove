@@ -32,6 +32,7 @@ import type {
   InviteLink,
   LockedDates,
   Member,
+  MemberProfile,
   MoveItemInput,
   Order,
   ParsedTicket,
@@ -141,6 +142,15 @@ export interface MemberRepo {
   join(token: string): Promise<{ tripId: string }>;
   updateRole(tripId: string, memberId: string, role: 'owner' | 'editor' | 'viewer'): Promise<Member>;
   remove(tripId: string, memberId: string): Promise<void>;
+
+  /** My trip-scoped profile (A3.1); a default with `filled:false` if unset. */
+  myProfile(tripId: string): Promise<MemberProfile>;
+  saveProfile(
+    tripId: string,
+    input: Omit<MemberProfile, 'userId' | 'filled'>,
+  ): Promise<MemberProfile>;
+  /** Every member's saved profile — the AI dialog and conflict check read these. */
+  profiles(tripId: string): Promise<MemberProfile[]>;
 }
 
 /** Date coordination — the step that happens before a trip has dates at all. */

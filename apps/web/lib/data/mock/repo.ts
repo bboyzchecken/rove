@@ -401,6 +401,7 @@ export const mockRepo: RoveRepo = {
           destinationId: null,
           flights: legs,
           wishlist: [],
+          profiles: {},
           days: [],
           budgetLines: [],
           itemsWithoutCost: 0,
@@ -640,9 +641,47 @@ export const mockRepo: RoveRepo = {
       mutate((db) => {
         const record = tripRecord(db, tripId);
         record.members = record.members.filter((m) => m.id !== memberId);
+        delete record.profiles[memberId];
         record.trip.partySize = record.members.length;
       });
       return delay(undefined);
+    },
+
+    /* -------------------------------------------- member profiles (A3.1) */
+
+    async myProfile(tripId) {
+      const db = loadDb();
+      const record = tripRecord(db, tripId);
+      const saved = record.profiles[db.user.id];
+      if (saved) return delay(clone(saved));
+      return delay({
+        userId: db.user.id,
+        visitedBefore: false,
+        pace: 'balanced' as const,
+        walkLevel: 2 as const,
+        canDrive: false,
+        hasIdp: false,
+        budgetMinThb: 0,
+        budgetMaxThb: 0,
+        dietary: [],
+        notes: '',
+        filled: false,
+      });
+    },
+
+    async saveProfile(tripId, input) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          const profile = { ...input, userId: db.user.id, filled: true };
+          record.profiles[db.user.id] = profile;
+          return clone(profile);
+        }),
+      );
+    },
+
+    async profiles(tripId) {
+      return delay(mutate((db) => clone(Object.values(tripRecord(db, tripId).profiles))));
     },
   },
 

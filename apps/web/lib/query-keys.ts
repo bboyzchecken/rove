@@ -32,6 +32,8 @@ export const queryKeys = {
   tripRoute: (tripId: string) => ['trip', tripId, 'route'] as const,
   tripOverview: (tripId: string) => ['trip', tripId, 'overview'] as const,
   tripMembers: (tripId: string) => ['trip', tripId, 'members'] as const,
+  tripProfileMe: (tripId: string) => ['trip', tripId, 'profile', 'me'] as const,
+  tripProfiles: (tripId: string) => ['trip', tripId, 'profiles'] as const,
   tripActivity: (tripId: string) => ['trip', tripId, 'activity'] as const,
   tripRecap: (tripId: string) => ['trip', tripId, 'recap'] as const,
 

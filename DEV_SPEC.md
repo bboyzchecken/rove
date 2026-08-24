@@ -831,7 +831,7 @@ Cloudflare DNS (rovetravel.site)
 - [x] X2.5 e2e `e2e/date-coordination.spec.ts`
 
 ### M3 Wishlist & Coverage
-- [ ] A3.1 member_profiles GET/PUT  ·  **หมายเหตุ:** **ยังไม่มีตาราง `member_profiles`** — โปรไฟล์ตอนนี้เป็นระดับ user (`PATCH /users/me`) ไม่ใช่ระดับทริป
+- [x] A3.1 member_profiles GET/PUT  ·  **หมายเหตุ:** ตาราง `member_profiles` (PK รวม trip_id+user_id) + `GET|PUT /trips/:id/profile/me` + `GET /trips/:id/profiles` — ฟอร์ม "สไตล์เที่ยวของคุณ" อยู่บนแท็บที่อยากไป (pace/เดิน/งบ/อาหาร/ขับรถ) · โปรไฟล์ระดับ user (`PATCH /users/me`) ยังอยู่แยกกัน
 - [x] A3.2 wishlist CRUD (เขียนได้เฉพาะของตัวเอง ยกเว้น owner)
 - [ ] A3.3 AI normalize wishlist (job) → tags + poi_id  ·  **หมายเหตุ:** มีแค่ค่าคงที่ `AIKindNormalize` — ยังไม่มี job ที่รันจริง (ตอนนี้ match ด้วย `domain.NormalizeName` ตอน generate แทน)
 - [x] A3.4 `pkg/domain/coverage.go` + unit tests + `GET /coverage`
@@ -846,7 +846,7 @@ Cloudflare DNS (rovetravel.site)
 - [x] A4.2 tools: lookup_poi, get_poi, distance (Google + redis cache), weather, fx
 - [x] A4.3 buildFrame (anchors: flights, prepaid stay, dated must-do, zones)
 - [x] A4.4 generatePlan → PlanDraft (1 variant)  ·  **หมายเหตุ:** ไม่มีคีย์ = โหมด simulate ให้ผลแบบ deterministic (ใช้ใน UAT/e2e)
-- [ ] A4.5 `pkg/domain/validate.go` (closed day, นอกเวลาเปิด, วันยาวเกิน, travel ไม่สมจริง, must-do หาย, POI ซ้ำ) + tests  ·  **หมายเหตุ:** `pkg/domain/validate.go` ครบทุกกฎ แต่**ยังไม่มี unit test**
+- [x] A4.5 `pkg/domain/validate.go` (closed day, นอกเวลาเปิด, วันยาวเกิน, travel ไม่สมจริง, must-do หาย, POI ซ้ำ) + tests  ·  **หมายเหตุ:** `validate_test.go` ครอบทุกกฎ + เวลาข้ามเที่ยงคืน + เวลาเปิดที่ parse ไม่ได้ต้องไม่เตือนมั่ว
 - [ ] A4.6 repairPlan (≤2 loops)  ·  **หมายเหตุ:** ยังไม่ได้ทำ — pipeline validate แล้วเขียน warning ลง note ไม่ได้ป้อนกลับให้โมเดลแก้
 - [x] A4.7 explainPlan → rationales + open_questions
 - [x] A4.8 persistPlan ใน transaction + item_versions  ·  **หมายเหตุ:** persist ผ่าน transaction ใน `store/plan` + `AddVersion` ทุกครั้ง
@@ -875,7 +875,7 @@ Cloudflare DNS (rovetravel.site)
 - [ ] X5.1 ทดสอบ dnd บนมือถือจริง (iOS Safari + Android Chrome)  ·  **หมายเหตุ:** ยังไม่ได้ทดสอบบนเครื่องจริง — Playwright ครอบ webkit ไว้แล้วแต่ไม่ใช่ touch จริง
 
 ### M7 Budget (ประมาณการจาก plan items)
-- [ ] A7.1 `pkg/domain/budget.go` (category rollup, per_person/group/night, prepaid แยก, FX) + tests  ·  **หมายเหตุ:** `pkg/domain/budget.go` ครบทุกกฎ (rollup, per_person/group/night, prepaid, FX) แต่**ยังไม่มี unit test**
+- [x] A7.1 `pkg/domain/budget.go` (category rollup, per_person/group/night, prepaid แยก, FX) + tests  ·  **หมายเหตุ:** `budget_test.go` ครอบทุก basis + prepaid/remaining + ปัดเศษ + party size 0 + FX rate 0
 - [x] A7.2 `GET /plans/:id/budget` + FX service (cache รายวันจาก API) + override manual
 - [x] W7.1 Budget tab: ตาราง category × (JPY, THB, ต่อคน) + total + prepaid + เทียบงบที่ตั้งไว้ + label "ประมาณการ"
 - [x] W7.2 Highlight item ที่ยังไม่มี cost

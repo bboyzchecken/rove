@@ -25,6 +25,7 @@ import type {
   InviteLink,
   LockedDates,
   Member,
+  MemberProfile,
   Order,
   ParsedTicket,
   PastTrip,
@@ -69,6 +70,7 @@ import type {
   InviteDto,
   LockedDatesDto,
   MemberDto,
+  MemberProfileDto,
   OrderDto,
   ParsedTicketDto,
   PastTripDto,
@@ -211,6 +213,23 @@ export function toMember(dto: MemberDto): Member {
     role: dto.role,
     characterId: dto.character_id,
     hasWishlist: dto.has_wishlist,
+  };
+}
+
+export function toMemberProfile(dto: MemberProfileDto): MemberProfile {
+  const walk = dto.walk_level === 1 || dto.walk_level === 3 ? dto.walk_level : 2;
+  return {
+    userId: dto.user_id,
+    visitedBefore: dto.visited_before,
+    pace: dto.pace,
+    walkLevel: walk,
+    canDrive: dto.can_drive,
+    hasIdp: dto.has_idp,
+    budgetMinThb: dto.budget_min_thb,
+    budgetMaxThb: dto.budget_max_thb,
+    dietary: dto.dietary ?? [],
+    notes: dto.notes,
+    filled: dto.filled,
   };
 }
 

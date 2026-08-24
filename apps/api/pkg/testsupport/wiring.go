@@ -58,11 +58,12 @@ var allModels = []any{
 	&models.PrepTask{}, &models.PrepNote{}, &models.Booking{}, &models.BookingClick{},
 	&models.Comment{}, &models.Vote{}, &models.Activity{},
 	&models.AIJob{}, &models.AICredit{}, &models.TripFlight{},
-	&models.Order{}, &models.Subscription{},
+	&models.Order{}, &models.Subscription{}, &models.MemberProfile{},
 }
 
 // allTables is the drop order — children before parents.
 var allTables = []string{
+	"member_profiles",
 	"orders", "subscriptions",
 	"ai_credits", "ai_jobs", "activity_logs", "votes", "comments",
 	"booking_clicks", "bookings", "trip_flights", "prep_notes", "prep_tasks",

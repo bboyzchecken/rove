@@ -132,6 +132,18 @@ func Migrate(db *gorm.DB) error {
 				return tx.Migrator().DropTable("orders", "subscriptions")
 			},
 		},
+		{
+			// M3 — A3.1: what each member wants out of THIS trip. Account-level
+			// profiles already exist; this table is the per-trip layer the AI frame
+			// and the conflict detector (A6.5) read.
+			ID: "202608240000_member_profiles",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.AutoMigrate(&models.MemberProfile{})
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return tx.Migrator().DropTable("member_profiles")
+			},
+		},
 	})
 
 	return m.Migrate()

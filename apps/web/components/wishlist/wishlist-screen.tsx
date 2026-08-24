@@ -4,6 +4,7 @@ import { SectionHeader, Stat } from '@/components/common/section';
 import { Card } from '@/components/ui/card';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
 import { Progress } from '@/components/ui/progress';
+import { TripProfileCard } from '@/components/wishlist/trip-profile-card';
 import { WishlistBoard } from '@/components/wishlist/wishlist-board';
 import { useTripMembers } from '@/features/trip/queries';
 import { useCoverage, useWishlist } from '@/features/wishlist/queries';
@@ -19,6 +20,8 @@ export function WishlistScreen({ tripId }: { tripId: string }) {
 
   return (
     <div className="space-y-7">
+      <TripProfileCard tripId={tripId} />
+
       <section>
         <SectionHeader label="สรุปว่าของใครเข้าแพลนแล้วบ้าง" />
         <Card accent="matcha" className="p-4">

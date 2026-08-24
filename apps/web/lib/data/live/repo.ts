@@ -25,6 +25,7 @@ import type {
   LockedDatesDto,
   MeDto,
   MemberDto,
+  MemberProfileDto,
   OrderDto,
   ParsedTicketDto,
   PastTripDto,
@@ -69,6 +70,7 @@ import {
   toInvite,
   toLocked,
   toMember,
+  toMemberProfile,
   toOrder,
   toParsedTicket,
   toPastTrip,
@@ -275,6 +277,29 @@ export const liveRepo: RoveRepo = {
     },
     async remove(tripId, memberId) {
       await api.delete<void>(`/trips/${tripId}/members/${memberId}`);
+    },
+
+    async myProfile(tripId) {
+      return toMemberProfile(await api.get<MemberProfileDto>(`/trips/${tripId}/profile/me`));
+    },
+    async saveProfile(tripId, input) {
+      return toMemberProfile(
+        await api.put<MemberProfileDto>(`/trips/${tripId}/profile/me`, {
+          visited_before: input.visitedBefore,
+          pace: input.pace,
+          walk_level: input.walkLevel,
+          can_drive: input.canDrive,
+          has_idp: input.hasIdp,
+          budget_min_thb: input.budgetMinThb,
+          budget_max_thb: input.budgetMaxThb,
+          dietary: input.dietary,
+          notes: input.notes,
+        }),
+      );
+    },
+    async profiles(tripId) {
+      const dto = await api.get<MemberProfileDto[]>(`/trips/${tripId}/profiles`);
+      return dto.map(toMemberProfile);
     },
   },
 

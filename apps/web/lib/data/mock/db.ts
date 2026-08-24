@@ -26,6 +26,7 @@ import type {
   FlightLeg,
   LockedDates,
   Member,
+  MemberProfile,
   Order,
   PlanDay,
   PlanItem,
@@ -48,7 +49,7 @@ import type {
  * Never imported outside lib/data/mock.
  */
 
-const STORAGE_KEY = 'rove.mock.v5';
+const STORAGE_KEY = 'rove.mock.v6';
 
 export interface TripRecord {
   trip: Trip;
@@ -64,6 +65,8 @@ export interface TripRecord {
   /** The booked route (M1 — A1.3). The frame above is derived from it. */
   flights: FlightLeg[];
   wishlist: WishlistItem[];
+  /** Trip-scoped member profiles (A3.1), keyed by member id. */
+  profiles: Record<string, MemberProfile>;
   days: PlanDay[];
   budgetLines: BudgetLine[];
   itemsWithoutCost: number;
@@ -198,6 +201,36 @@ function seedDemoTrip(): TripRecord {
       },
     ],
     wishlist: structuredClone(WISHLIST),
+    // Two of four filled in, so the nudge and the conflict check both have
+    // something to show out of the box.
+    profiles: {
+      m1: {
+        userId: 'm1',
+        visitedBefore: true,
+        pace: 'balanced',
+        walkLevel: 2,
+        canDrive: true,
+        hasIdp: false,
+        budgetMinThb: 35_000,
+        budgetMaxThb: 50_000,
+        dietary: [],
+        notes: 'อยากได้วันว่างสักครึ่งวันไว้ช้อปปิ้ง',
+        filled: true,
+      },
+      m2: {
+        userId: 'm2',
+        visitedBefore: false,
+        pace: 'relaxed',
+        walkLevel: 1,
+        canDrive: false,
+        hasIdp: false,
+        budgetMinThb: 25_000,
+        budgetMaxThb: 38_000,
+        dietary: ['ไม่กินหมู'],
+        notes: '',
+        filled: true,
+      },
+    },
     days: structuredClone(DAYS),
     budgetLines: structuredClone(BUDGET),
     itemsWithoutCost: ITEMS_WITHOUT_COST,
@@ -273,6 +306,7 @@ function seedDateTrip(): TripRecord {
     // No dates yet means no tickets yet — this is the date-board trip.
     flights: [],
     wishlist: [],
+    profiles: {},
     days: [],
     budgetLines: [],
     itemsWithoutCost: 0,
@@ -302,7 +336,7 @@ function seedDateTrip(): TripRecord {
 
 export function seedDb(): MockDb {
   return {
-    version: 5,
+    version: 6,
     user: {
       id: CURRENT_USER.id,
       name: CURRENT_USER.name,
@@ -351,7 +385,7 @@ export function loadDb(): MockDb {
         const parsed = JSON.parse(raw) as MockDb;
         // A seed change bumps the version; an old blob is thrown away rather
         // than migrated — this is demo data, not anyone's real trip.
-        if (parsed.version === 5) {
+        if (parsed.version === 6) {
           memory = parsed;
           return memory;
         }

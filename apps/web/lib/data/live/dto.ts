@@ -97,6 +97,21 @@ export interface MemberDto {
   has_wishlist: boolean;
 }
 
+/** Trip-scoped member profile (A3.1). */
+export interface MemberProfileDto {
+  user_id: string;
+  visited_before: boolean;
+  pace: 'relaxed' | 'balanced' | 'packed';
+  walk_level: number;
+  can_drive: boolean;
+  has_idp: boolean;
+  budget_min_thb: number;
+  budget_max_thb: number;
+  dietary: string[];
+  notes: string;
+  filled: boolean;
+}
+
 export interface MeDto {
   id: string;
   display_name: string;

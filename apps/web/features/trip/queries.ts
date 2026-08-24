@@ -7,6 +7,7 @@ import { repo } from '@/lib/data';
 import type {
   CreateTripInput,
   FlightLegInput,
+  MemberProfile,
   ShareState,
   TripOverview,
   TripVisibility,
@@ -53,6 +54,37 @@ export function useTripMembers(tripId: string) {
     queryKey: queryKeys.tripMembers(tripId),
     queryFn: () => repo.members.list(tripId),
     enabled: Boolean(tripId),
+  });
+}
+
+/* --------------------------------------------- member profiles (A3.1) -- */
+
+export function useMyTripProfile(tripId: string) {
+  return useQuery({
+    queryKey: queryKeys.tripProfileMe(tripId),
+    queryFn: () => repo.members.myProfile(tripId),
+    enabled: Boolean(tripId),
+  });
+}
+
+export function useTripProfiles(tripId: string) {
+  return useQuery({
+    queryKey: queryKeys.tripProfiles(tripId),
+    queryFn: () => repo.members.profiles(tripId),
+    enabled: Boolean(tripId),
+  });
+}
+
+export function useSaveTripProfile(tripId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Omit<MemberProfile, 'userId' | 'filled'>) =>
+      repo.members.saveProfile(tripId, input),
+    onSuccess: (profile) => {
+      track('profile_completed', {});
+      queryClient.setQueryData(queryKeys.tripProfileMe(tripId), profile);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tripProfiles(tripId) });
+    },
   });
 }
 
