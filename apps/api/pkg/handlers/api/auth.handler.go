@@ -136,7 +136,11 @@ func (s *Server) handleOAuthExchange(c echo.Context) error {
 }
 
 // handleDemoLogin signs in a fixed demo account. Mock mode only — the route is
-// not registered otherwise.
+// not registered otherwise, and the web app only ever links to it from
+// /admin/login, never the public /login screen (§16). The account it grants
+// is always promoted to admin: this door is a break-glass entry for staff,
+// not a way to test as an ordinary user, so it must never be mistaken for the
+// kind of unverified sign-in a mule-account script could farm.
 func (s *Server) handleDemoLogin(c echo.Context) error {
 	ctx, cancel := contextWithTimeout(c, 10*time.Second)
 	defer cancel()
@@ -148,6 +152,12 @@ func (s *Server) handleDemoLogin(c echo.Context) error {
 	}, "")
 	if err != nil {
 		return request.Internal(c, "สร้างบัญชีทดลองไม่สำเร็จ")
+	}
+	if user.Role != models.RoleAdmin {
+		user.Role = models.RoleAdmin
+		if err := s.users.Update(ctx, user); err != nil {
+			return request.Internal(c, "ตั้งสิทธิ์บัญชีทดลองไม่สำเร็จ")
+		}
 	}
 
 	token, err := s.IssueToken(user)

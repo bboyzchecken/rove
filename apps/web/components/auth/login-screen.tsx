@@ -2,14 +2,13 @@
 
 import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { MessageCircle, Wrench } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 
 import { RoveLogo } from '@/components/brand/rove-logo';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useLogin, useMe } from '@/features/auth/queries';
 import { safeNext } from '@/lib/auth-redirect';
-import { env } from '@/lib/env';
 
 /**
  * Sign-in (W0.5).
@@ -19,12 +18,15 @@ import { env } from '@/lib/env';
  * separate sign-up: the API creates the account on the first successful login,
  * so one button covers both and nobody has to guess which one they are.
  *
+ * This is the only door in — no password field, no dev bypass. The dev-only
+ * demo login lives at `/admin/login` instead, out of reach of anyone who only
+ * ever sees this screen (§16, anti-abuse hardening for the free-AI-plan promo).
+ *
  * Everything that can go wrong upstream comes back as `?error=` and is said out
  * loud here. A silent bounce back to this page teaches the user nothing.
  */
 const REASONS: Record<string, string> = {
   provider: 'ยังไม่รองรับผู้ให้บริการนี้',
-  demo: 'ประตูสำหรับนักพัฒนายังไม่เปิด — API ต้องรันด้วย MOCK_MODE=true',
   unconfigured: 'ช่องทางนี้ยังไม่เปิดใช้งาน ลองอีกช่องทางหรือติดต่อทีมงาน',
   unreachable: 'ต่อกับเซิร์ฟเวอร์ไม่ได้ ลองใหม่อีกครั้ง',
   state: 'ลิงก์เข้าสู่ระบบหมดอายุหรือถูกแก้ไข กดเข้าสู่ระบบใหม่อีกครั้ง',
@@ -41,11 +43,7 @@ export function LoginScreen() {
 
   const next = safeNext(params.get('next'));
   const errorCode = params.get('error');
-  // "ยังไม่ได้ตั้งค่า" reads differently for the dev door than for a provider:
-  // the fix is an environment variable, not another sign-in button.
-  const reasonKey =
-    errorCode === 'unconfigured' && params.get('provider') === 'demo' ? 'demo' : errorCode;
-  const reason = reasonKey ? (REASONS[reasonKey] ?? REASONS.exchange) : null;
+  const reason = errorCode ? (REASONS[errorCode] ?? REASONS.exchange) : null;
 
   // Already signed in — nothing to do on this screen.
   useEffect(() => {
@@ -118,8 +116,6 @@ export function LoginScreen() {
         </p>
       ) : null}
 
-      {env.devLogin ? <DevSignIn next={next} /> : null}
-
       <p className="text-muted text-center text-xs leading-relaxed">
         การเข้าสู่ระบบถือว่าคุณยอมรับ{' '}
         <a href="/terms" className="text-espresso font-semibold underline underline-offset-2">
@@ -129,31 +125,6 @@ export function LoginScreen() {
         <a href="/privacy" className="text-espresso font-semibold underline underline-offset-2">
           นโยบายความเป็นส่วนตัว
         </a>
-      </p>
-    </div>
-  );
-}
-
-/**
- * The developer's way in, shown only while NEXT_PUBLIC_DEV_LOGIN is on.
- *
- * A plain link rather than a mutation: the route it points at sets an httpOnly
- * cookie and redirects, and neither of those survives a fetch from here. It is
- * deliberately styled as a utility strip, not a third provider — nobody should
- * mistake it for a way real users sign in.
- */
-function DevSignIn({ next }: { next: string }) {
-  return (
-    <div className="border-border border-t pt-5">
-      <a
-        href={`/api/auth/demo?next=${encodeURIComponent(next)}`}
-        className="border-border text-muted hover:bg-surface flex w-full items-center justify-center gap-2 rounded-full border border-dashed px-4 py-2.5 text-sm font-semibold transition"
-      >
-        <Wrench className="size-4" strokeWidth={2.5} />
-        เข้าสู่ระบบสำหรับนักพัฒนา
-      </a>
-      <p className="text-muted mt-2 text-center text-xs">
-        ข้ามขั้นตอน OAuth ด้วยบัญชีทดลอง ใช้ได้เฉพาะตอนพัฒนาเท่านั้น
       </p>
     </div>
   );

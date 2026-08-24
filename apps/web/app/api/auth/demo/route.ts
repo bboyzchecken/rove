@@ -4,7 +4,11 @@ import { DEFAULT_AFTER_LOGIN, safeNext } from '@/lib/auth-redirect';
 import { serverEnv } from '@/lib/env';
 
 /**
- * The dev sign-in door.
+ * The dev sign-in door — reachable only via `/admin/login`, never `/login`
+ * (§16: a plain sign-in with no OAuth provider to vouch for the person is
+ * exactly the surface a script farming free-AI-plan credit would want, so it
+ * was moved off the screen every real user sees and the account it grants is
+ * always promoted to admin).
  *
  * Live mode has no other way in while GOOGLE_OAUTH_CLIENT_ID and
  * LINE_LOGIN_CHANNEL_ID are still blank: the API answers 400 for both consent
@@ -24,7 +28,7 @@ import { serverEnv } from '@/lib/env';
  * callback does it: the JWT must never reach client JavaScript (DEV_SPEC §17).
  */
 function loginUrl(params: Record<string, string>) {
-  const url = new URL('/login', serverEnv.webBaseUrl);
+  const url = new URL('/admin/login', serverEnv.webBaseUrl);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
   return url;
 }
@@ -47,7 +51,7 @@ export async function GET(request: NextRequest) {
     // never registered — the same "not configured" story the login screen
     // already tells for an unset provider.
     if (!res.ok) {
-      return NextResponse.redirect(loginUrl({ error: 'unconfigured', provider: 'demo' }));
+      return NextResponse.redirect(loginUrl({ error: 'unconfigured' }));
     }
     ({ token } = (await res.json()) as { token: string });
   } catch {

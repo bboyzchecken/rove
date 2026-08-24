@@ -29,6 +29,18 @@ type Harness struct {
 // New builds a server with every store wired to an in-memory database.
 func New(t *testing.T) *Harness {
 	t.Helper()
+	return newHarness(t, false)
+}
+
+// NewMock is New with MOCK_MODE on — for exercising routes that only
+// register while mocking, such as the /auth/demo dev-login door.
+func NewMock(t *testing.T) *Harness {
+	t.Helper()
+	return newHarness(t, true)
+}
+
+func newHarness(t *testing.T, mock bool) *Harness {
+	t.Helper()
 
 	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared&_pragma=foreign_keys(1)"), &gorm.Config{
 		Logger:  gormlogger.Default.LogMode(gormlogger.Silent),
@@ -51,6 +63,7 @@ func New(t *testing.T) *Harness {
 
 	cfg := core.Config{
 		Environment:    "test",
+		MockMode:       mock,
 		Port:           "0",
 		JwtSecret:      "test-secret-not-used-anywhere-real",
 		AuthCookieName: "rove_token",
