@@ -23,6 +23,8 @@ const TABS = [
   { segment: 'expense', key: 'expense' },
   { segment: 'prep', key: 'prep' },
   { segment: 'bookings', key: 'bookings' },
+  { segment: 'photos', key: 'photos' },
+  { segment: 'documents', key: 'documents' },
   { segment: 'discussion', key: 'discussion' },
 ] as const;
 

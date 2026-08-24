@@ -22,6 +22,7 @@ import (
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
 	fxsvc "github.com/bboyzchecken/rove/apps/api/pkg/services/fx"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/places"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/storage"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/weather"
 	customvalidator "github.com/bboyzchecken/rove/apps/api/pkg/utils/validator"
 )
@@ -53,6 +54,8 @@ type ServerParams struct {
 	Collab     models.CollabStore
 	AIJobs     models.AIJobStore
 	Billing    models.BillingStore
+	Photos     models.PhotoStore
+	Documents  models.DocumentStore
 
 	Hub       events.Hub
 	FX        fxsvc.Service
@@ -62,6 +65,7 @@ type ServerParams struct {
 	Places    places.Service
 	Pipeline  ai.Pipeline
 	AIRunner  ai.Runner
+	Storage   storage.Service
 }
 
 type Server struct {
@@ -88,6 +92,8 @@ type Server struct {
 	collab     models.CollabStore
 	aiJobs     models.AIJobStore
 	billing    models.BillingStore
+	photos     models.PhotoStore
+	documents  models.DocumentStore
 
 	hub       events.Hub
 	fx        fxsvc.Service
@@ -97,6 +103,7 @@ type Server struct {
 	places    places.Service
 	pipeline  ai.Pipeline
 	aiRunner  ai.Runner
+	storage   storage.Service
 
 	cookieName string
 }
@@ -130,6 +137,8 @@ func NewServer(p ServerParams) *Server {
 		collab:     p.Collab,
 		aiJobs:     p.AIJobs,
 		billing:    p.Billing,
+		photos:     p.Photos,
+		documents:  p.Documents,
 		hub:        p.Hub,
 		fx:         p.FX,
 		airports:   p.Airports,
@@ -138,6 +147,7 @@ func NewServer(p ServerParams) *Server {
 		places:     p.Places,
 		pipeline:   p.Pipeline,
 		aiRunner:   p.AIRunner,
+		storage:    p.Storage,
 		cookieName: p.Config.AuthCookieName,
 	}
 
@@ -159,7 +169,9 @@ func (s *Server) setupMiddleware() {
 		AllowCredentials: true,
 		MaxAge:           600,
 	}))
-	s.e.Use(middleware.BodyLimit("2M"))
+	// 8M: a ticket PDF is a few megabytes; photos arrive browser-resized and
+	// far smaller. Anything bigger than this is a mistake, not a document.
+	s.e.Use(middleware.BodyLimit("8M"))
 	s.e.Use(s.RateLimit())
 }
 
@@ -174,6 +186,10 @@ func (s *Server) registerRoutes() {
 	s.e.GET("/go/:clickId", s.handleAffiliateRedirect)
 	// Partner postback (A12.6) — shared-secret guarded; 404 until configured.
 	s.e.POST("/webhooks/affiliate/:partner", s.handleAffiliateWebhook)
+	// Local-disk storage serves its own files in dev; R2 serves them itself.
+	if s.storage != nil && !s.storage.Configured() {
+		s.e.Static("/uploads", "uploads")
+	}
 
 	v1 := s.e.Group("/api/v1")
 
@@ -202,6 +218,8 @@ func (s *Server) registerRoutes() {
 	s.registerAIRoutes(trips)            // A4.x
 	s.registerBookingRoutes(trips)       // A12.x
 	s.registerExportRoutes(trips)        // A10.x
+	s.registerPhotoRoutes(trips)         // A18.x — trip photos
+	s.registerDocumentRoutes(trips)      // A19.x — document folder
 	s.registerEventRoutes(trips)         // A2.5 — SSE
 
 	// --- admin ---------------------------------------------------------------

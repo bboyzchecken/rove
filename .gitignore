@@ -6,6 +6,9 @@
 # go
 apps/api/bin/
 apps/api/tmp/
+# local-disk storage backend (dev only — production uses R2)
+apps/api/uploads/
+uploads/
 *.test
 *.out
 

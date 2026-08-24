@@ -52,6 +52,8 @@ export const queryKeys = {
   budget: (tripId: string) => ['trip', tripId, 'budget'] as const,
   expenses: (tripId: string) => ['trip', tripId, 'expenses'] as const,
   prep: (tripId: string) => ['trip', tripId, 'prep'] as const,
+  photos: (tripId: string, filter = '') => ['trip', tripId, 'photos', filter] as const,
+  documents: (tripId: string) => ['trip', tripId, 'documents'] as const,
   bookings: (tripId: string) => ['trip', tripId, 'bookings'] as const,
   bookingOffers: (tripId: string, kind: string) => ['trip', tripId, 'bookings', 'offers', kind] as const,
 

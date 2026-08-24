@@ -46,6 +46,8 @@ import type {
   RecapDecision,
   ShareState,
   Trip,
+  TripDocument,
+  TripPhoto,
   TripRecap,
   TripRoute,
   TripSummary,
@@ -575,6 +577,8 @@ export const mockRepo: RoveRepo = {
           prepNote: '',
           versions: [],
           bookings: [],
+          photos: [],
+          documents: [],
           comments: [],
           votes: [],
           activity: [],
@@ -628,6 +632,10 @@ export const mockRepo: RoveRepo = {
           copy.expenses = [];
           copy.comments = [];
           copy.activity = [];
+          // Someone else's memories and someone else's tickets do not travel
+          // with a copied plan (M18/M19).
+          copy.photos = [];
+          copy.documents = [];
           copy.share = { ...copy.share, shareToken: null, shareUrl: null, visibility: 'private' };
           source.share.cloneCount += 1;
           log(copy, db.user.id, `คัดลอกทริปจาก "${source.trip.title}"`);
@@ -1975,6 +1983,8 @@ export const mockRepo: RoveRepo = {
           copy.variants = [];
           copy.versions = [];
           copy.bookings = [];
+          copy.photos = [];
+          copy.documents = [];
           copy.profiles = {};
           copy.ai = { used: 0, included: 2, extra: 0 };
           copy.share = {
@@ -1992,6 +2002,126 @@ export const mockRepo: RoveRepo = {
         }),
         320,
       );
+    },
+  },
+
+  /* ------------------------------------------------ photos (M18) -- */
+  photos: {
+    async list(tripId, filter) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          return record.photos
+            .filter(
+              (p) =>
+                (!filter?.dayId || p.dayId === filter.dayId) &&
+                (!filter?.itemId || p.itemId === filter.itemId) &&
+                (!filter?.userId || p.userId === filter.userId),
+            )
+            .map((p) => clone(p));
+        }),
+      );
+    },
+
+    async upload(tripId, input) {
+      // No bucket in mock mode: the resized file becomes an object URL that
+      // lives as long as the tab does. Reloading loses the picture but keeps
+      // the row, which is exactly what the empty state is for.
+      const url = typeof URL === 'undefined' ? '' : URL.createObjectURL(input.file);
+
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          const photo: TripPhoto = {
+            id: mockId('ph'),
+            tripId,
+            dayId: input.dayId ?? null,
+            itemId: input.itemId ?? null,
+            userId: db.user.id,
+            url,
+            caption: input.caption ?? '',
+            takenAt: null,
+            createdAt: nowIso(),
+          };
+          // An item pins the photo to its day too, same as the API does.
+          if (input.itemId) {
+            const day = record.days.find((d) => d.items.some((i) => i.id === input.itemId));
+            if (day) photo.dayId = day.id;
+          }
+          record.photos.push(photo);
+          log(record, db.user.id, 'อัปโหลดรูปใหม่');
+          return clone(photo);
+        }),
+        400,
+      );
+    },
+
+    async remove(tripId, photoId) {
+      mutate((db) => {
+        const record = tripRecord(db, tripId);
+        const photo = record.photos.find((p) => p.id === photoId);
+        if (photo && photo.userId !== db.user.id && record.role !== 'owner') {
+          throw new Error('ลบได้เฉพาะรูปของตัวเอง');
+        }
+        if (photo?.url.startsWith('blob:') && typeof URL !== 'undefined') {
+          URL.revokeObjectURL(photo.url);
+        }
+        record.photos = record.photos.filter((p) => p.id !== photoId);
+      });
+      return delay(undefined);
+    },
+
+    photoBookUrl(tripId) {
+      // Mock mode has no server to render it; the screen turns this into the
+      // browser's own print dialog instead.
+      return `/t/${tripId}/photos?print=1`;
+    },
+  },
+
+  /* --------------------------------------------- documents (M19) -- */
+  documents: {
+    async list(tripId) {
+      return delay(mutate((db) => tripRecord(db, tripId).documents.map((d) => clone(d))));
+    },
+
+    async upload(tripId, input) {
+      const url = typeof URL === 'undefined' ? '' : URL.createObjectURL(input.file);
+
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          const doc: TripDocument = {
+            id: mockId('doc'),
+            tripId,
+            userId: db.user.id,
+            name: input.name || input.file.name,
+            category: input.category,
+            url,
+            contentType: input.file.type,
+            sizeBytes: input.file.size,
+            createdAt: nowIso(),
+          };
+          record.documents.unshift(doc);
+          log(record, db.user.id, `เพิ่มเอกสาร "${doc.name}"`);
+          return clone(doc);
+        }),
+        400,
+      );
+    },
+
+    async remove(tripId, documentId) {
+      mutate((db) => {
+        const record = tripRecord(db, tripId);
+        const doc = record.documents.find((d) => d.id === documentId);
+        if (doc && doc.userId !== db.user.id && record.role !== 'owner') {
+          throw new Error('ลบได้เฉพาะเอกสารที่ตัวเองอัปโหลด');
+        }
+        if (doc?.url.startsWith('blob:') && typeof URL !== 'undefined') {
+          URL.revokeObjectURL(doc.url);
+        }
+        record.documents = record.documents.filter((d) => d.id !== documentId);
+      });
+      return delay(undefined);
     },
   },
 

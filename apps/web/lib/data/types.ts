@@ -426,6 +426,54 @@ export interface TripRecap {
   canPublish: boolean;
 }
 
+/* --------------------------------------------- photos & documents (M18/19) */
+
+/**
+ * One picture taken on the trip. `url` is minted per read by the API — the
+ * row itself stores a storage key — so it is never persisted client-side.
+ */
+export interface TripPhoto {
+  id: string;
+  tripId: string;
+  dayId: string | null;
+  itemId: string | null;
+  /** Who took it; only they (or the owner) may delete it. */
+  userId: string;
+  url: string;
+  caption: string;
+  takenAt: string | null;
+  createdAt: string;
+}
+
+export interface UploadPhotoInput {
+  /** Already resized in the browser (lib/image.ts `photoFromFile`). */
+  file: File;
+  dayId?: string;
+  itemId?: string;
+  caption?: string;
+}
+
+export type DocumentCategory = 'ticket' | 'hotel' | 'transport' | 'insurance' | 'other';
+
+/** One file the group needs on the road — a ticket, voucher, insurance paper. */
+export interface TripDocument {
+  id: string;
+  tripId: string;
+  userId: string;
+  name: string;
+  category: DocumentCategory;
+  url: string;
+  contentType: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+export interface UploadDocumentInput {
+  file: File;
+  name: string;
+  category: DocumentCategory;
+}
+
 /* ----------------------------------------------------------------- share -- */
 
 export type TripVisibility = 'private' | 'link' | 'public';

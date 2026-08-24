@@ -26,6 +26,7 @@ import (
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/airports"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/places"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/storage"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/weather"
 	aijobstore "github.com/bboyzchecken/rove/apps/api/pkg/store/aijob"
 	billingstore "github.com/bboyzchecken/rove/apps/api/pkg/store/billing"
@@ -36,6 +37,7 @@ import (
 	expensestore "github.com/bboyzchecken/rove/apps/api/pkg/store/expense"
 	flightstore "github.com/bboyzchecken/rove/apps/api/pkg/store/flight"
 	invitestore "github.com/bboyzchecken/rove/apps/api/pkg/store/invite"
+	mediastore "github.com/bboyzchecken/rove/apps/api/pkg/store/media"
 	memberstore "github.com/bboyzchecken/rove/apps/api/pkg/store/member"
 	planstore "github.com/bboyzchecken/rove/apps/api/pkg/store/plan"
 	poistore "github.com/bboyzchecken/rove/apps/api/pkg/store/poi"
@@ -59,12 +61,12 @@ var allModels = []any{
 	&models.Comment{}, &models.Vote{}, &models.Activity{},
 	&models.AIJob{}, &models.AICredit{}, &models.TripFlight{},
 	&models.Order{}, &models.Subscription{}, &models.MemberProfile{},
-	&models.PlanVariant{},
+	&models.PlanVariant{}, &models.TripPhoto{}, &models.TripDocument{},
 }
 
 // allTables is the drop order — children before parents.
 var allTables = []string{
-	"plan_variants", "member_profiles",
+	"trip_documents", "trip_photos", "plan_variants", "member_profiles",
 	"orders", "subscriptions",
 	"ai_credits", "ai_jobs", "activity_logs", "votes", "comments",
 	"booking_clicks", "bookings", "trip_flights", "prep_notes", "prep_tasks",
@@ -103,6 +105,8 @@ func newParams(cfg core.Config, db *gorm.DB) handlers.ServerParams {
 		Collab:     collabstore.New(db),
 		AIJobs:     aijobstore.New(db),
 		Billing:    billingstore.New(db),
+		Photos:     mediastore.NewPhotoStore(db),
+		Documents:  mediastore.NewDocumentStore(db),
 
 		Hub: stubHub{},
 		// The airport index is embedded data with no I/O — the real one is the
@@ -114,6 +118,7 @@ func newParams(cfg core.Config, db *gorm.DB) handlers.ServerParams {
 		Places:    stubPlaces{},
 		Pipeline:  stubPipeline{},
 		AIRunner:  stubRunner{},
+		Storage:   storage.New(cfg),
 	}
 }
 

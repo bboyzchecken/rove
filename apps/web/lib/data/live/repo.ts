@@ -26,7 +26,9 @@ import type {
   MeDto,
   MemberDto,
   CreatorProfileDto,
+  DocumentDto,
   ExploreTripDto,
+  PhotoDto,
   MemberProfileDto,
   OrderDto,
   PublicTripDto,
@@ -77,7 +79,9 @@ import {
   toLocked,
   toMember,
   toCreatorProfile,
+  toDocument,
   toExploreTrip,
+  toPhoto,
   toMemberProfile,
   toOrder,
   toPublicCreator,
@@ -783,6 +787,58 @@ export const liveRepo: RoveRepo = {
 
     async cloneFromPublic(tokenOrSlug) {
       return toTrip(await api.post<TripDto>(`/public/trips/${tokenOrSlug}/clone`));
+    },
+  },
+
+  /* ------------------------------------------------ photos (M18) -- */
+  photos: {
+    async list(tripId, filter) {
+      const dto = await api.get<PhotoDto[]>(`/trips/${tripId}/photos`, {
+        searchParams: {
+          day_id: filter?.dayId,
+          item_id: filter?.itemId,
+          user_id: filter?.userId,
+        },
+      });
+      return dto.map(toPhoto);
+    },
+
+    async upload(tripId, input) {
+      const form = new FormData();
+      form.append('image', input.file);
+      if (input.dayId) form.append('day_id', input.dayId);
+      if (input.itemId) form.append('item_id', input.itemId);
+      if (input.caption) form.append('caption', input.caption);
+      return toPhoto(await api.upload<PhotoDto>(`/trips/${tripId}/photos`, form));
+    },
+
+    async remove(tripId, photoId) {
+      await api.delete<void>(`/trips/${tripId}/photos/${photoId}`);
+    },
+
+    photoBookUrl(tripId) {
+      // Rendered server-side as a self-contained page the user prints —
+      // opened in a tab, not fetched, so it is a URL and not a request.
+      return `${env.apiUrl}/api/v1/trips/${tripId}/photobook`;
+    },
+  },
+
+  /* --------------------------------------------- documents (M19) -- */
+  documents: {
+    async list(tripId) {
+      return (await api.get<DocumentDto[]>(`/trips/${tripId}/documents`)).map(toDocument);
+    },
+
+    async upload(tripId, input) {
+      const form = new FormData();
+      form.append('file', input.file);
+      form.append('name', input.name);
+      form.append('category', input.category);
+      return toDocument(await api.upload<DocumentDto>(`/trips/${tripId}/documents`, form));
+    },
+
+    async remove(tripId, documentId) {
+      await api.delete<void>(`/trips/${tripId}/documents/${documentId}`);
     },
   },
 

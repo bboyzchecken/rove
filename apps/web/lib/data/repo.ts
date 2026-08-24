@@ -52,12 +52,16 @@ import type {
   SubscriptionPlan,
   Trip,
   TripConflict,
+  TripDocument,
+  TripPhoto,
   TripOverview,
   TripRecap,
   TripRoute,
   TripSummary,
   TripVisibility,
   UpdateTripInput,
+  UploadDocumentInput,
+  UploadPhotoInput,
   VariantList,
   VariantVotes,
   Vote,
@@ -91,6 +95,8 @@ export interface RoveRepo {
   billing: BillingRepo;
   share: ShareRepo;
   poi: PoiRepo;
+  photos: PhotoRepo;
+  documents: DocumentRepo;
   profile: ProfileRepo;
   admin: AdminRepo;
 }
@@ -320,6 +326,26 @@ export interface ShareRepo {
   creator(handle: string): Promise<CreatorProfile | null>;
   /** Copies a published trip into MY account (A11.1). Requires sign-in. */
   cloneFromPublic(tokenOrSlug: string): Promise<Trip>;
+}
+
+/**
+ * Trip photos (M18). Uploads are `File`s already resized in the browser —
+ * see lib/image.ts `photoFromFile`; the repo never resizes for you, because
+ * a 12MB original crossing hotel wifi is the thing that has to not happen.
+ */
+export interface PhotoRepo {
+  list(tripId: string, filter?: { dayId?: string; itemId?: string; userId?: string }): Promise<TripPhoto[]>;
+  upload(tripId: string, input: UploadPhotoInput): Promise<TripPhoto>;
+  remove(tripId: string, photoId: string): Promise<void>;
+  /** The printable photo book (A18.4) — a URL the caller opens in a tab. */
+  photoBookUrl(tripId: string): string;
+}
+
+/** The document folder (M19): tickets, vouchers, insurance papers. */
+export interface DocumentRepo {
+  list(tripId: string): Promise<TripDocument[]>;
+  upload(tripId: string, input: UploadDocumentInput): Promise<TripDocument>;
+  remove(tripId: string, documentId: string): Promise<void>;
 }
 
 export interface PoiRepo {

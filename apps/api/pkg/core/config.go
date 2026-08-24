@@ -58,12 +58,14 @@ type RedisConfig struct {
 }
 
 type R2Config struct {
-	Endpoint     string
-	Region       string
-	AccessKey    string
-	SecretKey    string
-	ExportBucket string
-	ImageBucket  string
+	Endpoint       string
+	Region         string
+	AccessKey      string
+	SecretKey      string
+	ExportBucket   string
+	ImageBucket    string
+	DocumentBucket string
+	PhotoBucket    string
 }
 
 type AnthropicConfig struct {

@@ -34,6 +34,8 @@ import type {
   ShareState,
   Subscription,
   Trip,
+  TripDocument,
+  TripPhoto,
   Vote,
   WishlistItem,
 } from '../types';
@@ -103,6 +105,9 @@ export interface TripRecord {
     item: PlanItem;
   }[];
   bookings: BookingEntry[];
+  /** Pictures taken on the trip (M18) and the paper it runs on (M19). */
+  photos: TripPhoto[];
+  documents: TripDocument[];
   comments: Comment[];
   votes: Vote[];
   activity: ActivityEvent[];
@@ -268,6 +273,8 @@ function seedDemoTrip(): TripRecord {
     prepNote: '',
     versions: [],
     bookings: [],
+    photos: [],
+    documents: [],
     comments: [
       {
         id: 'c1',
@@ -345,6 +352,8 @@ function seedDateTrip(): TripRecord {
     prepNote: '',
     versions: [],
     bookings: [],
+    photos: [],
+    documents: [],
     comments: [],
     votes: [],
     activity: [
@@ -401,6 +410,8 @@ function seedPublicTrip(input: {
   record.settled = [];
   record.comments = [];
   record.activity = [];
+  record.photos = [];
+  record.documents = [];
   record.profiles = {};
   record.days = record.days.map((day) => ({
     ...day,

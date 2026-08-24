@@ -1,68 +1,181 @@
-// Package storage wraps object storage for exports, OG images and uploads.
+// Package storage puts files somewhere and hands back URLs — the one part of
+// the system that owns bytes rather than rows.
 //
-// Phase 1 decision: exports are streamed straight from the API with a
-// Content-Disposition header instead of being uploaded and signed. A trip
-// export is a few kilobytes of HTML or ICS that the user asked for and
-// downloads immediately — putting it in a bucket first adds a dependency, a
-// signing key and a lifecycle policy to solve a problem nobody has yet.
+// Two backends, one interface:
 //
-// The interface stays because Phase 2 (photos, PDF rendering, OG images) does
-// need a bucket; `NewService` returns a stub until R2 credentials are set, and
-// every caller has to handle `ErrNotConfigured` anyway.
+//   - R2 (S3-compatible, via aws-sdk-go-v2) when R2_* credentials are set —
+//     production. Reads go out as presigned GET URLs, so a bucket never has to
+//     be public.
+//   - Local disk (./uploads) otherwise — dev and UAT. Files are served by the
+//     API itself under /uploads, so the whole photo/document flow works on a
+//     laptop with nothing configured.
+//
+// Callers store the KEY on their rows, never the URL: a URL is minted at read
+// time by URL(), which is what lets the backend change without a data
+// migration (M18 — A18.1).
 package storage
 
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	uberfx "go.uber.org/fx"
 
 	"github.com/bboyzchecken/rove/apps/api/pkg/core"
 )
 
 type Service interface {
+	// Put stores the object and returns the key it was stored under.
 	Put(ctx context.Context, bucket, key string, body io.Reader, contentType string) error
-	SignedURL(ctx context.Context, bucket, key string, ttl time.Duration) (string, error)
+	// URL returns something a browser can GET for a while: a presigned R2 URL,
+	// or a plain /uploads path in local mode.
+	URL(ctx context.Context, bucket, key string) (string, error)
 	Delete(ctx context.Context, bucket, key string) error
-	// Configured reports whether a real bucket is behind this service, so a
-	// caller can pick the streaming path instead.
+	// Configured reports whether a real bucket is behind this service.
 	Configured() bool
 }
 
-// ErrNotConfigured is returned by every method when R2 has no credentials.
+// ErrNotConfigured survives for callers that still branch on it.
 var ErrNotConfigured = errors.New("storage: R2 is not configured")
 
-type service struct{ cfg core.Config }
+// presignTTL is how long a minted read URL stays valid. Seven days is the
+// SigV4 maximum; the app re-mints on every payload anyway.
+const presignTTL = 7 * 24 * time.Hour
 
-func New(cfg core.Config) Service { return &service{cfg: cfg} }
+func New(cfg core.Config) Service {
+	r2 := cfg.R2
+	if r2.Endpoint != "" && r2.AccessKey != "" && r2.SecretKey != "" {
+		client, presigner, err := newR2Client(r2)
+		if err == nil {
+			return &r2Service{client: client, presigner: presigner}
+		}
+	}
+	return &localService{cfg: cfg, root: "uploads"}
+}
 
 var Module = uberfx.Module("services.storage", uberfx.Provide(New))
 
-func (s *service) Configured() bool {
-	return s.cfg.R2.Endpoint != "" && s.cfg.R2.AccessKey != "" && s.cfg.R2.SecretKey != ""
+/* ---------------------------------------------------------------- R2 ------ */
+
+type r2Service struct {
+	client    *s3.Client
+	presigner *s3.PresignClient
 }
 
-func (s *service) Put(context.Context, string, string, io.Reader, string) error {
-	if !s.Configured() {
-		return ErrNotConfigured
+func newR2Client(cfg core.R2Config) (*s3.Client, *s3.PresignClient, error) {
+	region := cfg.Region
+	if region == "" {
+		region = "auto"
 	}
-	// TODO(Phase 2 — photos): implement with an S3-compatible client once
-	// something needs to persist a file rather than stream it.
-	return ErrNotConfigured
+	awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(),
+		awsconfig.WithRegion(region),
+		awsconfig.WithCredentialsProvider(
+			credentials.NewStaticCredentialsProvider(cfg.AccessKey, cfg.SecretKey, ""),
+		),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+		o.BaseEndpoint = aws.String(cfg.Endpoint)
+		// R2 wants path-style addressing.
+		o.UsePathStyle = true
+	})
+	return client, s3.NewPresignClient(client), nil
 }
 
-func (s *service) SignedURL(context.Context, string, string, time.Duration) (string, error) {
-	if !s.Configured() {
-		return "", ErrNotConfigured
-	}
-	return "", ErrNotConfigured
+func (s *r2Service) Configured() bool { return true }
+
+func (s *r2Service) Put(ctx context.Context, bucket, key string, body io.Reader, contentType string) error {
+	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(bucket),
+		Key:         aws.String(key),
+		Body:        body,
+		ContentType: aws.String(contentType),
+	})
+	return err
 }
 
-func (s *service) Delete(context.Context, string, string) error {
-	if !s.Configured() {
-		return ErrNotConfigured
+func (s *r2Service) URL(ctx context.Context, bucket, key string) (string, error) {
+	out, err := s.presigner.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	}, s3.WithPresignExpires(presignTTL))
+	if err != nil {
+		return "", err
 	}
-	return ErrNotConfigured
+	return out.URL, nil
+}
+
+func (s *r2Service) Delete(ctx context.Context, bucket, key string) error {
+	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	return err
+}
+
+/* -------------------------------------------------------------- local ----- */
+
+// localService keeps files under ./uploads/<bucket>/<key> and serves them via
+// the API's own /uploads static route. Dev and UAT only — production has R2.
+type localService struct {
+	cfg  core.Config
+	root string
+}
+
+func (s *localService) Configured() bool { return false }
+
+// cleanPath refuses anything that could walk out of the root. Keys are
+// generated by handlers, but a path check this cheap is not worth skipping.
+func (s *localService) cleanPath(bucket, key string) (string, error) {
+	p := filepath.Join(s.root, bucket, filepath.FromSlash(key))
+	if !strings.HasPrefix(filepath.Clean(p), filepath.Clean(s.root)+string(os.PathSeparator)) {
+		return "", fmt.Errorf("storage: refusing path %q", p)
+	}
+	return p, nil
+}
+
+func (s *localService) Put(_ context.Context, bucket, key string, body io.Reader, _ string) error {
+	path, err := s.cleanPath(bucket, key)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = io.Copy(f, body)
+	return err
+}
+
+func (s *localService) URL(_ context.Context, bucket, key string) (string, error) {
+	return s.cfg.AppBaseURL + "/uploads/" + bucket + "/" + key, nil
+}
+
+func (s *localService) Delete(_ context.Context, bucket, key string) error {
+	path, err := s.cleanPath(bucket, key)
+	if err != nil {
+		return err
+	}
+	err = os.Remove(path)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	return err
 }

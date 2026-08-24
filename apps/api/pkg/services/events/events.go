@@ -29,6 +29,8 @@ const (
 	TypeExpenseChanged  = "expense.changed"
 	TypePrepChanged     = "prep.changed"
 	TypeBookingChanged  = "booking.changed"
+	TypePhotoChanged    = "photo.changed"
+	TypeDocumentChanged = "document.changed"
 )
 
 type Event struct {

@@ -24,6 +24,7 @@ import (
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/weather"
 	aijobstore "github.com/bboyzchecken/rove/apps/api/pkg/store/aijob"
 	billingstore "github.com/bboyzchecken/rove/apps/api/pkg/store/billing"
+	mediastore "github.com/bboyzchecken/rove/apps/api/pkg/store/media"
 	bookingstore "github.com/bboyzchecken/rove/apps/api/pkg/store/booking"
 	characterstore "github.com/bboyzchecken/rove/apps/api/pkg/store/character"
 	collabstore "github.com/bboyzchecken/rove/apps/api/pkg/store/collab"
@@ -108,6 +109,8 @@ func loadConfig() core.Config {
 			SecretKey:    viper.GetString("R2_SECRET_KEY"),
 			ExportBucket: viper.GetString("R2_EXPORT_BUCKET"),
 			ImageBucket:  viper.GetString("R2_IMAGE_BUCKET"),
+			DocumentBucket: viper.GetString("R2_DOCUMENT_BUCKET"),
+			PhotoBucket:    viper.GetString("R2_PHOTO_BUCKET"),
 		},
 		Anthropic: core.AnthropicConfig{
 			ApiKey:          viper.GetString("ANTHROPIC_API_KEY"),
@@ -177,6 +180,7 @@ func storeModules() fx.Option {
 		collabstore.Module,
 		aijobstore.Module,
 		billingstore.Module,
+		mediastore.Module,
 	)
 }
 

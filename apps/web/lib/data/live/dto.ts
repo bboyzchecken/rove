@@ -97,6 +97,32 @@ export interface MemberDto {
   has_wishlist: boolean;
 }
 
+/* --------------------------------------------- photos & documents (M18/19) */
+
+export interface PhotoDto {
+  id: string;
+  trip_id: string;
+  day_id: string | null;
+  item_id: string | null;
+  user_id: string;
+  url: string;
+  caption: string;
+  taken_at: string | null;
+  created_at: string;
+}
+
+export interface DocumentDto {
+  id: string;
+  trip_id: string;
+  user_id: string;
+  name: string;
+  category: 'ticket' | 'hotel' | 'transport' | 'insurance' | 'other';
+  url: string;
+  content_type: string;
+  size_bytes: number;
+  created_at: string;
+}
+
 /* ---------------------------------------------------- public model (M11) - */
 
 export interface PublicCreatorDto {

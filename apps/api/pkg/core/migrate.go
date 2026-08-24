@@ -155,6 +155,17 @@ func Migrate(db *gorm.DB) error {
 				return tx.Migrator().DropTable("plan_variants")
 			},
 		},
+		{
+			// M18/M19 — photos and the document folder. Rows carry storage KEYS;
+			// URLs are minted at read time by the storage service.
+			ID: "202608240002_trip_photos_documents",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.AutoMigrate(&models.TripPhoto{}, &models.TripDocument{})
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return tx.Migrator().DropTable("trip_documents", "trip_photos")
+			},
+		},
 	})
 
 	return m.Migrate()

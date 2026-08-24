@@ -28,7 +28,9 @@ export type TripEventType =
   | 'dates.locked'
   | 'expense.changed'
   | 'prep.changed'
-  | 'booking.changed';
+  | 'booking.changed'
+  | 'photo.changed'
+  | 'document.changed';
 
 export interface TripEvent {
   type: TripEventType;
@@ -106,6 +108,14 @@ function keysFor(tripId: string, type: TripEventType): readonly (readonly unknow
 
     case 'booking.changed':
       return [queryKeys.bookings(tripId), queryKeys.tripOverview(tripId)];
+
+    // Every filtered view of the grid is stale at once, so the prefix goes in
+    // rather than one key per filter (M18/M19).
+    case 'photo.changed':
+      return [['trip', tripId, 'photos']];
+
+    case 'document.changed':
+      return [queryKeys.documents(tripId)];
 
     case 'comment.created':
       return [['trip', tripId, 'comments'], queryKeys.tripActivity(tripId)];

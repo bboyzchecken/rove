@@ -1003,23 +1003,23 @@ Cloudflare DNS (rovetravel.site)
 - [x] W11.2 Creator profile `/u/[handle]` + แต้มที่เคยได้  ·  **หมายเหตุ:** การ์ดโปรไฟล์ + สถิติ (ทริป/ยอดดู/คนตามรอย/แต้มที่เคยได้) + กริดทริป + CTA ชวนเปิด public
 
 ### Travel Photo Feature
-- [ ] A18.1 migration: ตาราง `trip_photos`, S3 upload config (R2 photo bucket)
-- [ ] A18.2 photo upload endpoint (resize/compress ก่อน store) + delete
-- [ ] A18.3 `GET /trips/:tripId/photos?poi_id=` — photos ที่ POI นั้นในทริปนี้
-- [ ] A18.4 photobook export job: เรียง photos ตาม day/poi → render HTML template → PDF/Ebook via gotenberg → R2
-- [ ] W18.1 **Photos tab** ใน trip room — grid รวมทุกรูปในทริป (กรองตาม day, สมาชิก)
-- [ ] W18.2 **Photo ที่ item card** — เมื่อ item มี photos → แสดง thumbnail strip + ปุ่ม upload
-- [ ] W18.3 **POI Photo Grid** (IG-style) — เมื่อเปิด item/POI detail เห็นรูปทั้งหมดที่ถ่ายที่นั้นใน trip นี้ (แบบ Map pin + grid ใน ref image)
-- [ ] W18.4 ปุ่ม "สร้าง Travel Photo Book" → เลือก format (PDF/Ebook) → download link
+- [x] A18.1 migration: ตาราง `trip_photos`, S3 upload config (R2 photo bucket)  ·  **หมายเหตุ:** `services/storage` เขียนใหม่ให้มีของจริงสองหลัง — R2 ผ่าน aws-sdk-go-v2 (presigned GET, TTL 7 วัน) เมื่อมี `R2_*` ครบ, ไม่งั้นลงดิสก์ที่ `./uploads` แล้ว API เสิร์ฟเองที่ `/uploads` (dev/UAT ใช้ได้โดยไม่ต้องมีบัญชี R2) · **แถวเก็บ key ไม่ใช่ URL** — URL ออกตอนอ่าน จึงย้ายหลังบ้านได้โดยไม่ต้อง migrate ข้อมูล
+- [x] A18.2 photo upload endpoint (resize/compress ก่อน store) + delete  ·  **หมายเหตุ:** ย่อที่เบราว์เซอร์ก่อนส่ง (`lib/image.ts` `photoFromFile` — ด้านยาวสุด 1600px, WebP, ≤900KB) แบบเดียวกับรูปปกทริป · API รับ multipart, allowlist jpg/png/webp, ลบได้เฉพาะคนอัปหรือเจ้าของทริป และลบไฟล์ใน bucket ตามด้วย
+- [x] A18.3 `GET /trips/:tripId/photos?poi_id=` — photos ที่ POI นั้นในทริปนี้  ·  **หมายเหตุ:** กรองด้วย `day_id` / `item_id` / `user_id` — รูปที่ผูกกับ item จะสืบ day และ poi ของ item ให้อัตโนมัติ จึงกรองด้วย item ได้ตรง ๆ
+- [x] A18.4 photobook export: เรียง photos ตาม day → render HTML → พิมพ์/บันทึก PDF  ·  **หมายเหตุ:** `GET /trips/:id/photobook` คืนหน้า HTML self-contained ให้สั่งพิมพ์เอง — ตามการตัดสินใจเดิมเรื่อง PDF (§16, 20 ส.ค.) ไม่แบก headless Chrome · ไม่ได้ทำเป็น job → R2 → signed url
+- [x] W18.1 **Photos tab** ใน trip room — grid รวมทุกรูปในทริป (กรองตาม day, สมาชิก)
+- [x] W18.2 **Photo ที่ item card** — เมื่อ item มี photos → แสดง thumbnail strip + ปุ่ม upload
+- [x] W18.3 **POI Photo Grid** (IG-style) — รูปทั้งหมดที่ถ่ายที่ item นั้น อยู่บนการ์ดเลย  ·  **หมายเหตุ:** รวมกับ W18.2 เป็นชิ้นเดียว — strip บนการ์ดคือกริดของ POI นั้นอยู่แล้ว ไม่ต้องเปิด detail แยก
+- [x] W18.4 ปุ่ม "สร้าง Travel Photo Book" → เปิดหน้าพร้อมพิมพ์  ·  **หมายเหตุ:** เลือก format PDF/Ebook ยังไม่มี — พิมพ์จากเบราว์เซอร์ได้ทั้ง PDF และกระดาษ
 - [ ] W18.5 Photo Book แนบกับ profile creator (แสดงใน `/u/[handle]`)
-- [ ] X18.1 ทดสอบ upload image บนมือถือ + preview ลื่น
+- [ ] X18.1 ทดสอบ upload image บนมือถือ + preview ลื่น  ·  **หมายเหตุ:** ยังไม่ได้ทดสอบบนเครื่องจริง
 
 ### Document Folder
-- [ ] A19.1 migration: ตาราง `trip_documents`, R2 document bucket
-- [ ] A19.2 document upload (accept: PDF, image, common docs) + delete
-- [ ] W19.1 **Documents tab** ใน trip room — list ไฟล์แยก category (ตั๋ว/โรงแรม/transport/อื่นๆ)
-- [ ] W19.2 Upload dialog: เลือกไฟล์ + ตั้งชื่อ + เลือก category
-- [ ] W19.3 Preview inline สำหรับ image + ปุ่ม download
+- [x] A19.1 migration: ตาราง `trip_documents`, R2 document bucket  ·  **หมายเหตุ:** ใช้ storage ตัวเดียวกับรูป (`R2_DOCUMENT_BUCKET`, fallback ดิสก์)
+- [x] A19.2 document upload (accept: PDF, image, common docs) + delete  ·  **หมายเหตุ:** allowlist PDF/jpg/png/webp/heic/doc/docx — ไฟล์รันได้ไม่มีสิทธิ์อยู่ในนี้ · body limit ขยับเป็น 8M
+- [x] W19.1 **Documents tab** ใน trip room — list ไฟล์แยก category (ตั๋ว/โรงแรม/transport/ประกัน/อื่นๆ)
+- [x] W19.2 Upload dialog: เลือกไฟล์ + ตั้งชื่อ + เลือก category  ·  **หมายเหตุ:** ไดอะล็อกเปิด**หลัง**เลือกไฟล์ เพราะชื่อไฟล์คือค่าตั้งต้นเดียวที่สมเหตุสมผลของช่องชื่อ
+- [x] W19.3 Preview inline สำหรับ image + ปุ่ม download
 
 ### AI & Itinerary Enhancements
 - [ ] A4.13 auto-fix suggestion จาก issues ("ให้ AI แก้")
@@ -1283,6 +1283,7 @@ AUTH_COOKIE_DOMAIN=rove.app
 | 21 ส.ค. 2569 | จ่ายด้วยแต้มบนใบเสร็จ | คงราคาป้ายไว้ที่ `subtotal` แล้วลด `discount` เต็มจำนวน → `total = ฿0` + `points_spent` แยกช่อง | "฿0" เดี่ยว ๆ อ่านเหมือนบั๊ก · แต้มไม่ใช่บาท จึงไม่บวกรวมในยอดเงินสด แต่ต้องเห็นว่าจ่ายอะไรไป |
 | 21 ส.ค. 2569 | ช่องทางชำระเงิน | `pay_channels` เปลี่ยนจาก `string[]` เป็น `{id,label}` และ purchase รับ `method` | เดิมฝั่ง Go แยกแต้ม/เงินสดด้วยการค้นคำว่า "แต้ม" ในข้อความ · ใบเสร็จที่เขียนว่า "บัตรเครดิต" ทั้งที่จ่ายพร้อมเพย์คือเรื่องร้องเรียน |
 | 21 ส.ค. 2569 | แพ็กเกจรายเดือน | ใส่ catalogue (ฟรี / Plus รายเดือน ฿129 / รายปี ฿1,290) ตั้งแต่ตอนนี้ โดย `available:false` | หน้าจอที่จะขายคือหน้าจอที่เรนเดอร์อยู่แล้ว — วันเปิดขายเป็น deploy ไม่ใช่การรื้อหน้า · ผู้ใช้ฟรีไม่มีแถวใน `subscriptions` ให้ API สังเคราะห์เอา |
+| 24 ส.ค. 2569 | ที่เก็บไฟล์ (M18/M19) | `services/storage` มีสองหลังจริง: **R2** (aws-sdk-go-v2, presigned GET) เมื่อ config ครบ · **ดิสก์ `./uploads`** เมื่อไม่ครบ โดย API เสิร์ฟเอง — ไม่มี stub ที่คืน error แล้ว · แถวเก็บ **storage key ไม่ใช่ URL** | เดิม storage เป็น stub ทั้งก้อน ทำให้ฟีเจอร์รูป/เอกสารต้องรอบัญชี R2 ถึงจะ dev ได้ · เก็บ URL ลงแถวแปลว่าวันที่ย้าย bucket หรือ presign หมดอายุ ต้องไล่ migrate ข้อมูล — เก็บ key แล้วออก URL ตอนอ่านไม่มีปัญหานั้น |
 | 24 ส.ค. 2569 | โครงสร้าง plan variant (M6) | variant = **snapshot ทั้งก้อน** ในตาราง `plan_variants` (JSON รูปเดียวกับ AI draft) ไม่ใช่หลายแถวใน `plans`/`plan_days` · adopt ใช้โค้ดเส้นเดียวกับ apply draft | ทุก query ที่ scope ด้วย tripID ทำงานเหมือนเดิมโดยไม่ต้องรื้อ · variant มีไว้เทียบ/โหวต/สลับ ไม่ใช่แก้คู่ขนาน — แก้ได้เมื่อ adopt แล้วเท่านั้น ซึ่งตรงกับพฤติกรรมที่กลุ่มใช้จริง |
 | 24 ส.ค. 2569 | ทางเข้าระบบ | `/login` เหลือ **OAuth อย่างเดียว** (LINE, Google) · ประตู dev-login ย้ายไป `/admin/login` และบัญชีที่ได้ถูกตั้งเป็น `admin` เสมอ | ทางเข้าที่ไม่มีเจ้าของบัญชีมายืนยันตัวตนคือสิ่งที่สคริปต์ปั่นบัญชีม้าต้องการ (แต้ม referral 150/คน + เครดิต AI ฟรี — plan §11) · เงื่อนไข 3 ชั้นเดิม (NEXT_PUBLIC_DEV_LOGIN + non-production + MOCK_MODE) ยังอยู่ครบ ประตูนี้แค่ไม่อยู่บนหน้าที่ผู้ใช้จริงเห็น |
 

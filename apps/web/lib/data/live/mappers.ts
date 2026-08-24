@@ -44,7 +44,9 @@ import type {
   Subscription,
   SubscriptionPlan,
   Trip,
+  TripDocument,
   TripOverview,
+  TripPhoto,
   TripRecap,
   TripRoute,
   TripSummary,
@@ -76,7 +78,9 @@ import type {
   InviteDto,
   LockedDatesDto,
   CreatorProfileDto,
+  DocumentDto,
   ExploreTripDto,
+  PhotoDto,
   MemberDto,
   MemberProfileDto,
   PublicCreatorDto,
@@ -458,6 +462,36 @@ export function toPlanVersion(dto: PlanVersionDto): PlanVersion {
     actorId: dto.actor_id,
     createdAt: dto.created_at,
     title: dto.snapshot?.title ?? 'รายการหนึ่ง',
+  };
+}
+
+/* --------------------------------------------- photos & documents (M18/19) */
+
+export function toPhoto(dto: PhotoDto): TripPhoto {
+  return {
+    id: dto.id,
+    tripId: dto.trip_id,
+    dayId: dto.day_id,
+    itemId: dto.item_id,
+    userId: dto.user_id,
+    url: dto.url,
+    caption: dto.caption ?? '',
+    takenAt: dto.taken_at,
+    createdAt: dto.created_at,
+  };
+}
+
+export function toDocument(dto: DocumentDto): TripDocument {
+  return {
+    id: dto.id,
+    tripId: dto.trip_id,
+    userId: dto.user_id,
+    name: dto.name,
+    category: dto.category,
+    url: dto.url,
+    contentType: dto.content_type,
+    sizeBytes: dto.size_bytes,
+    createdAt: dto.created_at,
   };
 }
 
