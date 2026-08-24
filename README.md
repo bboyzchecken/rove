@@ -8,6 +8,7 @@ result can be shared or exported. Every item has a bookable affiliate link.
 - **Product rationale** → [trip-planning-platform-plan.md](trip-planning-platform-plan.md)
 - **Dev source of truth** → [DEV_SPEC.md](DEV_SPEC.md)
 - **Backend patterns** → [PROJECT_TEMPLATE.md](PROJECT_TEMPLATE.md)
+- **Deploying to AWS** → [deploy/AWS_DEPLOY.md](deploy/AWS_DEPLOY.md)
 - **Decisions** → [docs/adr/](docs/adr/)
 
 Current phase: **Phase 0 — Setup & Validate** (DEV_SPEC §9).
@@ -56,7 +57,7 @@ rove/
 │   ├── api/              Go · Echo · GORM · Uber FX · MySQL 8 · Redis
 │   └── web/              Next.js App Router · TanStack Query · Tailwind
 ├── packages/             shared code, once there is any
-├── deploy/               Lightsail production compose + Caddy + deploy script
+├── deploy/               AWS infra — Terraform + the step-by-step deploy guide
 └── docs/adr/             architecture decision records
 ```
 

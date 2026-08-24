@@ -1,0 +1,8 @@
+# cp backend.hcl.example backend.hcl (gitignored), fill in the bucket name
+# backend-bootstrap.sh printed, then:  terraform init -backend-config=backend.hcl
+
+bucket         = "rove-terraform-state-CHANGE_ME"
+key            = "rove/production/terraform.tfstate"
+region         = "ap-southeast-1"
+dynamodb_table = "rove-terraform-locks"
+encrypt        = true

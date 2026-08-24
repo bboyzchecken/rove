@@ -88,20 +88,30 @@ Go API (Echo) ── Uber FX ── Handlers → Store interfaces → GORM → M
 | Test | `go test` + testify + sqlmock/testcontainers | |
 
 ### 2.3 Infra
-| ส่วน | Phase 1 (low cost) | โตขึ้นแล้วย้ายไป |
-|---|---|---|
-| Compute | **AWS Lightsail instance** 2 vCPU / 2 GB (~$12/mo) รัน Docker Compose | Lightsail 4GB → ECS Fargate / EC2 + RDS |
-| DB | MySQL container บน instance เดียวกัน + snapshot รายวัน | Lightsail Managed Database → RDS |
-| Redis | container เดียวกัน | ElastiCache |
-| Reverse proxy/TLS | **Caddy** container (auto Let's Encrypt) | ALB + ACM |
-| Object storage | Cloudflare R2 (egress ฟรี) — bucket แยก: export, images, documents, photos | คงเดิม |
-| Frontend hosting | Vercel (Hobby) หรือ container บน Lightsail เดียวกัน | Vercel Pro / Amplify |
-| DNS/CDN | Cloudflare (free) | คงเดิม |
-| Backup | Lightsail auto snapshot + `mysqldump` → R2 รายวัน | RDS automated backup |
-| CI/CD | GitHub Actions → build image → GHCR → ssh deploy script | ECR + ECS deploy |
-| Monitoring | Uptime Kuma container + Lightsail metrics + Logrus → file → Loki (ทีหลัง) | CloudWatch/Grafana |
+> **แก้ 23 ส.ค. 2569 — ADR 0004:** ตัด Lightsail ออก ขึ้น ECS Fargate ตั้งแต่วันแรก
+> เพราะซื้อโดเมนแล้วและช่องทางเปิดตัวคืออินฟลูฯ (traffic มาเป็นขั้นบันได ไม่ใช่ทางลาด)
+> การย้าย Lightsail → ECS ทีหลังคือการเปลี่ยน network + secret store + CI target +
+> ย้าย DB พร้อมกัน ซึ่งจะต้องทำตอนที่เว็บกำลังไฟไหม้พอดี
 
-> เป้าหมายค่าใช้จ่าย Phase 1: **≤ $25/เดือน** ไม่รวม AI API และ Google Maps API
+| ส่วน | ใช้จริง (ADR 0004) | ตอนโตแล้วปรับ |
+|---|---|---|
+| Compute | **ECS Fargate** — api + web คนละ service, autoscale 1–10 task | เพิ่ม max, ขยาย cpu/memory |
+| Load balance | **ALB** + host-based routing + ACM | คงเดิม |
+| Autoscale | Target tracking: ALBRequestCountPerTarget + CPU | ปรับ target value |
+| DB | **RDS MySQL 8** `db.t4g.micro` single-AZ | `db_multi_az = true` / class ใหญ่ขึ้น |
+| Redis | **ElastiCache** 1 node `cache.t4g.micro` | replication group |
+| Outbound | NAT **instance** `t4g.nano` (~$3/mo) | NAT Gateway (~$32/mo) |
+| Object storage | Cloudflare R2 (egress ฟรี) — bucket แยก: export, images, documents, photos | คงเดิม |
+| DNS/CDN | Cloudflare (free) | คงเดิม |
+| Secret | AWS Secrets Manager (DB password ให้ RDS หมุนเอง) | คงเดิม |
+| Backup | RDS automated backup 7 วัน + PITR + final snapshot | เพิ่ม retention |
+| IaC | **Terraform** — `deploy/terraform/` | คงเดิม |
+| CI/CD | GitHub Actions (OIDC ไม่มี access key) → ECR → ECS UpdateService | คงเดิม |
+| Monitoring | CloudWatch Logs + alarms → SNS อีเมล + AWS Budgets | Container Insights / Grafana |
+
+> ค่าใช้จ่ายตั้งต้น **~$50–70/เดือน** ตอนยังไม่มีคนใช้ ไม่รวม AI API และ Google Maps API
+> — สูงกว่าเป้าเดิม $25 เพราะ ALB/RDS คิดขั้นต่ำแม้ traffic เป็นศูนย์ แลกกับการรับ
+> traffic spike ได้โดยไม่ต้อง migrate
 
 ---
 
@@ -655,37 +665,62 @@ export const userKeys = {
 
 ---
 
-## 8. Deployment (AWS Lightsail — low cost)
+## 8. Deployment (AWS ECS Fargate + ALB + autoscale)
 
-### 8.1 Phase 1 topology (instance เดียว)
+> **เขียนใหม่ทั้งหัวข้อ 23 ส.ค. 2569 — [ADR 0004](docs/adr/0004-aws-ecs-instead-of-lightsail.md)**
+> ของเดิม (Lightsail กล่องเดียว + Caddy + docker compose, ≤$25/mo) ถูกแทนที่
+> **ขั้นตอนลงมือจริงอยู่ที่ [deploy/AWS_DEPLOY.md](deploy/AWS_DEPLOY.md)** หัวข้อนี้เก็บแค่โครง
+
+### 8.1 Topology
 ```
-Lightsail Ubuntu 2 vCPU / 2 GB / 60 GB SSD  ($12/mo)  + static IP (ฟรีเมื่อ attach)
-└── docker compose -f deploy/docker-compose.prod.yml
-    ├── caddy      :80/:443  → TLS อัตโนมัติ, reverse proxy
-    │     api.rove.app  → api:5000
-    │     rove.app      → web:3000 (ถ้าไม่ใช้ Vercel)
-    ├── api        (Go binary, alpine)
-    ├── web        (Next.js standalone output)  [optional]
-    ├── mysql:8.0  volume ./data/mysql, my.cnf ปรับ innodb_buffer_pool_size=512M
-    └── redis:7    volume ./data/redis, maxmemory 128mb allkeys-lru
+Cloudflare DNS (rovetravel.site)
+└── ALB :443 (ACM cert, idle_timeout 120s รองรับ SSE)
+    ├── rovetravel.site / www → web target group → ECS service "rove-web"  (Fargate, 1–10 task)
+    └── api.rovetravel.site   → api target group → ECS service "rove-api"  (Fargate, 1–10 task)
+                                                    │  (private subnet, ไม่มี public IP)
+                                                    ├── RDS MySQL 8  db.t4g.micro, single-AZ, backup 7 วัน
+                                                    ├── ElastiCache Redis 7  cache.t4g.micro 1 node
+                                                    └── NAT instance t4g.nano → Anthropic / Google / LINE
 ```
-- ถ้า RAM ตึง: ย้าย web ไป Vercel Hobby (ฟรี)
-- เปิดเฉพาะพอร์ต 22/80/443 ใน Lightsail firewall
-- swap file 2GB กัน OOM ตอน build/AI burst
+- 2 AZ, public subnet มีแค่ ALB กับ NAT — ที่เหลืออยู่ private ทั้งหมด
+- Fargate ผสม on-demand 1 task เป็นฐาน + Spot ส่วนที่ scale ขึ้น (weight 1:4)
+- Secret อยู่ใน Secrets Manager, MySQL password ให้ RDS สร้าง/หมุนเอง
+- IaC ทั้งหมด: `deploy/terraform/` (state บน S3 + DynamoDB lock)
 
-### 8.2 CI/CD
-1. GitHub Actions: `go test` + `go build` → build image → push **GHCR**
-2. ssh เข้า Lightsail → `deploy/deploy.sh` → `docker compose pull && up -d` → healthcheck `/healthz`
-3. Web (ถ้าอยู่บน Vercel) deploy อัตโนมัติจาก branch
+### 8.2 Autoscale
+- Target tracking 2 ตัวต่อ service, อันไหนถึงก่อนชนะ:
+  - `ALBRequestCountPerTarget` — api 500, web 400 req/target/นาที (**ตัวหลัก**)
+  - `ECSServiceAverageCPUUtilization` 65%
+- scale-out cooldown 60s / scale-in 300s — ผิดทางขึ้นถูกกว่าผิดทางลงตอน spike
+- CPU อย่างเดียวตอบสนอง spike ช้าไป 1–2 cooldown จึงต้องมี request count คู่กัน
 
-### 8.3 Backup / Ops
-- Lightsail automatic snapshot รายวัน (เก็บ 7 วัน)
-- cron: `mysqldump` gzip → อัป R2 ทุกวัน เก็บ 30 วัน + ทดสอบ restore เดือนละครั้ง
-- Logrus → stdout → docker json-file; Uptime Kuma ping `/healthz` + แจ้ง LINE
-- `/healthz` เช็ค DB + Redis; `/readyz` สำหรับ deploy gate
+### 8.3 CI/CD
+1. GitHub Actions (`release.yml`) trigger จาก tag `v*`
+2. build → push **ECR** (ไม่ใช่ GHCR แล้ว) ผ่าน **OIDC role** — ไม่มี AWS access key ใน GitHub
+3. ดึง task definition ที่ live อยู่มาเปลี่ยนเฉพาะ image → `UpdateService` → รอ stable
+4. api ก่อน web เสมอ (`max-parallel: 1`)
+5. `aws_ecs_service` ตั้ง `ignore_changes = [task_definition, desired_count]` ไม่ให้ Terraform ทับ CI/autoscaler
+   → ผลข้างเคียง: แก้ env var ใน `ecs.tf` ต้อง `--force-new-deployment` เอง (AWS_DEPLOY.md ขั้น 8)
 
-### 8.4 เส้นทาง scale
-2GB → 4GB instance → แยก MySQL ไป Lightsail Managed DB → ECS Fargate + RDS + ElastiCache เมื่อ trips/วัน > ~2k
+### 8.4 Backup / Ops
+- RDS automated backup 7 วัน + PITR + final snapshot ตอนลบ + `deletion_protection`
+- CloudWatch Logs `/ecs/rove-api`, `/ecs/rove-web` เก็บ 14 วัน
+- Alarm → SNS อีเมล: ALB 5xx, unhealthy host, RDS CPU/storage, Redis CPU, NAT instance down
+- AWS Budgets เตือนที่ 80% actual และ 100% forecast (**เตือนได้อย่างเดียว หยุด spend ไม่ได้**)
+- `/healthz` = ALB health check, `/readyz` เช็ค DB + Redis สำหรับตรวจหลัง deploy
+
+### 8.5 ข้อจำกัดที่รู้ตัว (ADR 0004)
+| จุด | ความเสี่ยง | แก้เมื่อ |
+|---|---|---|
+| NAT instance ตัวเดียว | outbound (AI/Maps/LINE) ตาย เว็บยังขึ้น | เปลี่ยนเป็น NAT Gateway |
+| RDS single-AZ | ไม่มี failover อัตโนมัติ | `db_multi_az = true` |
+| Fargate Spot | ถูกดึงคืนได้ (เตือนล่วงหน้า 2 นาที) | ลบ block Spot |
+| **migration รันทุก task ตอน boot** | หลาย task boot พร้อมกัน = แย่งกันรัน | ใส่ MySQL advisory lock ครอบ `core.Migrate` |
+| SSR ของ web เรียก api ผ่าน ALB สาธารณะ | เพิ่ม 1 hop | ECS Service Connect |
+
+### 8.6 เส้นทาง scale ต่อจากนี้
+ทุกข้อคือแก้ตัวแปรใน `terraform.tfvars` แล้ว apply — ไม่ต้อง migrate:
+ยก `api_max_count` → `db_instance_class` ใหญ่ขึ้น → `db_multi_az` → Redis replication group → RDS read replica
 
 ---
 
@@ -715,8 +750,8 @@ Lightsail Ubuntu 2 vCPU / 2 GB / 60 GB SSD  ($12/mo)  + static IP (ฟรีเ�
 - [x] A0.6 `pkg/store/store.go` pagination + `pkg/utils/*` ตาม template
 - [x] A0.7 Redis client + rate limit middleware + cache helper (รวม FX cache helper)  ·  **หมายเหตุ:** gen 240/นาที, ai 12/ชม.; ไม่มี Redis = ข้ามการนับ (dev ไม่ต้องรัน container)
 - [x] A0.8 `/healthz`, `/readyz`, request logger, CORS (allow WebBaseURL), Recover, Secure
-- [x] A0.9 Dockerfile multi-stage + GitHub Actions (test/build/push GHCR)  ·  **หมายเหตุ:** ci.yml: go build/vet/test -race, web typecheck/lint/test/build, playwright, docker compose boot
-- [ ] A0.10 `deploy/` (compose.prod, Caddyfile, deploy.sh) + สร้าง Lightsail instance + domain + TLS ผ่านจริง  ·  **หมายเหตุ:** `deploy/` ครบ (compose.prod, Caddyfile, deploy.sh, backup.sh) แต่ยังไม่ได้สร้าง Lightsail instance / domain / TLS จริง
+- [x] A0.9 Dockerfile multi-stage + GitHub Actions (test/build/push **ECR**)  ·  **หมายเหตุ:** ci.yml: go build/vet/test -race, web typecheck/lint/test/build, playwright, docker compose boot, terraform fmt/validate · release.yml: OIDC → ECR → ECS UpdateService (เปลี่ยนจาก GHCR ตาม ADR 0004)
+- [ ] A0.10 ~~Lightsail~~ **AWS ECS Fargate + ALB + autoscale ผ่าน Terraform** + domain + TLS ผ่านจริง  ·  **หมายเหตุ:** โค้ดครบแล้วและ `terraform validate` ผ่าน — `deploy/terraform/` (16 ไฟล์), `deploy/AWS_DEPLOY.md` (ขั้นตอน 16 ขั้น), ADR 0004 · **ยังไม่ได้ provision จริงบน AWS** ยังไม่มี account/DNS/secret ของจริง · ของเดิม (compose.prod, Caddyfile, deploy.sh, backup.sh) เลิกใช้แล้ว เก็บไว้อ้างอิงเฉย ๆ
 
 ### Web (`rove-web`)
 - [x] W0.1 `pnpm create next-app@latest` (App Router, TS strict) + บันทึกเวอร์ชันใน Decision Log  ·  **หมายเหตุ:** Next 16.3.1 App Router + Turbopack, React 19.2.8, TS 5.9.3 strict — บันทึกใน §16
@@ -1204,7 +1239,8 @@ AUTH_COOKIE_DOMAIN=rove.app
 | — | ID strategy | UUID v4 `CHAR(36)` แทน auto-increment | ป้องกันเดา id, รองรับ clone/share |
 | — | Realtime | SSE + Redis pubsub (ไม่ใช้ WebSocket) | อ่านอย่างเดียวพอ, ผ่าน proxy ง่าย, ต้นทุนต่ำ |
 | — | Server state | TanStack Query เท่านั้น, Zustand เฉพาะ UI | กัน state ซ้ำซ้อน |
-| — | Deploy | Lightsail instance เดียว + Docker Compose | ต้นทุน ≤ $25/mo ใน Phase 1 |
+| — | Deploy | ~~Lightsail instance เดียว + Docker Compose~~ | ~~ต้นทุน ≤ $25/mo ใน Phase 1~~ — แทนที่แล้ว ดูบรรทัด 23 ส.ค. |
+| 23 ส.ค. 2569 | Deploy (แทนที่ของเดิม) | **ECS Fargate + ALB + autoscale 1–10 + RDS + ElastiCache ตั้งแต่วันแรก** ผ่าน Terraform — ตัด Lightsail ทิ้ง · [ADR 0004](docs/adr/0004-aws-ecs-instead-of-lightsail.md) | ซื้อโดเมน rovetravel.site แล้ว + เปิดตัวผ่านอินฟลูฯ = traffic มาเป็นขั้นบันได การ migrate Lightsail→ECS ทีหลังต้องทำตอนเว็บกำลังจะล่มพอดี · ตั้งทุกค่าที่โหมดถูกสุดไว้ก่อน (~$50–70/mo) แล้วยกทีละตัวแปรเมื่อจำเป็น |
 | 19 ส.ค. 2569 | Next.js version | **16.3.1** (App Router + Turbopack), React 19.2.8, TS 5.9.3 strict, Tailwind v4 | บันทึกจริงตาม W0.1 — Tailwind v4 ใช้ `@theme inline` ไม่มี `tailwind.config.js` |
 | 20 ส.ค. 2569 | PDF renderer | **ไม่ใช้ทั้งคู่ใน Phase 1** — export เป็น HTML self-contained แล้วให้ผู้ใช้สั่งพิมพ์เอง | ไม่ต้องแบก headless browser บน instance เดียว (§8.1) และได้ผลลัพธ์ที่ผู้ใช้เลือกขนาดกระดาษเองได้ · ทบทวนใหม่ตอน photo book Phase 2 |
 | — | Affiliate approve status | (บันทึกเมื่อสมัครแต่ละเจ้า) | |
