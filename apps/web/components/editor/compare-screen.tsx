@@ -131,7 +131,9 @@ export function CompareScreen({ tripId }: { tripId: string }) {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => fork.mutate({ label: 'แพลนปัจจุบัน' })}
+            // "แพลนเดิม", not "แพลนปัจจุบัน": the moment it is forked it is the
+            // OLD plan, and the baseline column already owns the other name.
+            onClick={() => fork.mutate({ label: 'แพลนเดิม (เก็บไว้)' })}
             disabled={fork.isPending}
           >
             <CopyPlus className="size-3.5" />

@@ -53,7 +53,7 @@ import type {
  * Never imported outside lib/data/mock.
  */
 
-const STORAGE_KEY = 'rove.mock.v6';
+const STORAGE_KEY = 'rove.mock.v7';
 
 /** One candidate itinerary (M6) — metrics and votes are computed at read. */
 export interface VariantRecord {
@@ -390,6 +390,9 @@ function seedPublicTrip(input: {
   title: string;
   cover: string;
   cities: string[];
+  /** Nights, so the card's "N วัน" agrees with the title it sits under. */
+  nights: number;
+  budgetPerPersonThb: number;
   viewCount: number;
   cloneCount: number;
   creator: { name: string; handle: string; characterId: string };
@@ -401,8 +404,17 @@ function seedPublicTrip(input: {
     title: input.title,
     cover: input.cover,
     cities: input.cities,
+    nights: input.nights,
+    budgetPerPersonThb: input.budgetPerPersonThb,
     status: 'done',
   };
+  // The itinerary is trimmed to the length the frame claims — a 4-day trip
+  // whose plan runs 8 days is the kind of detail a UAT tester spots first.
+  record.days = record.days.slice(0, input.nights + 1);
+  // No legs: these are other people's finished trips shown as plans, and a
+  // borrowed set of flight numbers would only contradict the frame above.
+  record.flights = [];
+  record.locked = null;
   record.role = 'viewer';
   record.members = [
     {
@@ -446,6 +458,8 @@ function seedPublicTrips(): TripRecord[] {
       title: 'โตเกียว 7 วันฉบับไปครั้งแรก',
       cover: '/brand/covers/cover-japan.webp',
       cities: ['Tokyo', 'Yokohama'],
+      nights: 6,
+      budgetPerPersonThb: 42_000,
       viewCount: 1284,
       cloneCount: 96,
       creator: { name: 'มิ้นท์', handle: 'mint.travels', characterId: 'cat' },
@@ -456,6 +470,8 @@ function seedPublicTrips(): TripRecord[] {
       title: 'สายกินบุกคันไซ 5 วัน',
       cover: '/brand/covers/cover-food.webp',
       cities: ['Osaka', 'Kyoto', 'Nara'],
+      nights: 4,
+      budgetPerPersonThb: 33_000,
       viewCount: 872,
       cloneCount: 41,
       creator: { name: 'ภูมิ', handle: 'phum.eats', characterId: 'bear' },
@@ -466,6 +482,8 @@ function seedPublicTrips(): TripRecord[] {
       title: 'โซลคาเฟ่ฮอป 4 วัน 3 คืน',
       cover: '/brand/covers/cover-korea.webp',
       cities: ['Seoul'],
+      nights: 3,
+      budgetPerPersonThb: 24_000,
       viewCount: 655,
       cloneCount: 28,
       creator: { name: 'พลอย', handle: 'ploy.wander', characterId: 'rabbit' },
@@ -475,7 +493,7 @@ function seedPublicTrips(): TripRecord[] {
 
 export function seedDb(): MockDb {
   return {
-    version: 6,
+    version: 7,
     user: {
       id: CURRENT_USER.id,
       name: CURRENT_USER.name,
@@ -526,7 +544,7 @@ export function loadDb(): MockDb {
         const parsed = JSON.parse(raw) as MockDb;
         // A seed change bumps the version; an old blob is thrown away rather
         // than migrated — this is demo data, not anyone's real trip.
-        if (parsed.version === 6) {
+        if (parsed.version === 7) {
           memory = parsed;
           return memory;
         }

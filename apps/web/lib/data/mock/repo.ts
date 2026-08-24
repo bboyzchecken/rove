@@ -664,6 +664,7 @@ export const mockRepo: RoveRepo = {
           const source = tripRecord(db, tripId);
           const copy = clone(source);
           copy.trip = { ...copy.trip, id: mockId('trip'), title: `${copy.trip.title} (คัดลอก)` };
+          copy.flights = [];
           copy.expenses = [];
           copy.comments = [];
           copy.activity = [];
@@ -2011,6 +2012,10 @@ export const mockRepo: RoveRepo = {
             },
           ];
           copy.creator = undefined;
+          // The API copies days and items, never the legs: you have copied
+          // someone's itinerary, you have not booked their flights. The frame
+          // keeps its dates; the route starts empty for this group to fill in.
+          copy.flights = [];
           copy.expenses = [];
           copy.settled = [];
           copy.comments = [];
