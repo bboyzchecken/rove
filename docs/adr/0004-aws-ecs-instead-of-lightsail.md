@@ -76,6 +76,18 @@ hit — Phase 1 migrations are additive `AutoMigrate` calls — but it is a real
 edge and the mitigation is recorded in AWS_DEPLOY.md step 9 rather than
 pretended away.
 
+**The autoscaling ceiling and the DB connection pool disagree.**
+`database.go` opens up to 25 MySQL connections per api task
+(`SetMaxOpenConns(25)`); `api_max_count = 10` means the fleet can ask for 250.
+`db.t4g.micro`'s default `max_connections` (~85, formula-derived from its 1
+GiB) runs out around the 4th task — the 5th–10th tasks ECS is proud of having
+started would be failing every query. `rds.tf` raises the parameter to 150,
+which buys roughly 6 tasks instead of 3–4 and is a plain `terraform apply`,
+not a fix: the actual fix is sizing the per-task pool to `150 /
+api_max_count` (or lower) in `database.go`, which this ADR deliberately does
+not touch — it is application code, not infrastructure. Recorded here so it
+does not read as solved.
+
 **Two more things left as-is on purpose.** Object storage stays on Cloudflare
 R2 (egress is free, S3 is not) — the ECS task role is deliberately empty.
 And SSR fetches from the web task go back out through the public ALB rather

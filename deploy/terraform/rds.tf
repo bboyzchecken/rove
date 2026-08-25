@@ -20,6 +20,17 @@ resource "aws_db_parameter_group" "mysql8" {
     value = "utf8mb4_0900_ai_ci"
   }
 
+  # db.t4g.micro's default (DBInstanceClassMemory/12582880 ≈ 85) is lower than
+  # api_max_count × the api's own pool (10 × 25 = 250, database.go
+  # SetMaxOpenConns) — past ~3 tasks the 4th+ gets "too many connections"
+  # while ECS still happily scales toward 10. This does not fix that ceiling,
+  # it raises it; see ADR 0004 "known gaps" for the matching fix on the app
+  # side (shrink the per-task pool so N tasks × pool always stays under this).
+  parameter {
+    name  = "max_connections"
+    value = "150"
+  }
+
   parameter {
     name  = "time_zone"
     value = "UTC"
