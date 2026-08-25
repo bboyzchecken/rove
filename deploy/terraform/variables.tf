@@ -80,6 +80,26 @@ variable "api_max_count" {
   default     = 10
 }
 
+# --------------------------------------------------------------- ecs — worker
+# The AI worker (Phase 3). Bigger memory than the API task and no vCPU bump:
+# a draft is mostly waiting on the model, and the JSON it comes back with is
+# what actually needs the headroom.
+variable "worker_cpu" {
+  type    = number
+  default = 256
+}
+
+variable "worker_memory" {
+  type    = number
+  default = 1024
+}
+
+variable "worker_count" {
+  description = "Set to 0 to fold the AI work back into the API tasks (ROVE_ROLE=all)."
+  type        = number
+  default     = 1
+}
+
 # ------------------------------------------------------------------ ecs — web
 variable "web_container_port" {
   type    = number

@@ -168,6 +168,12 @@ export interface TripRoute {
 export interface Trip {
   id: string;
   title: string;
+  /**
+   * ISO country of the destination (M23). It decides which prep checklist and
+   * which planning zones a trip gets, so a trip that does not know where it is
+   * going gets the Japan defaults rather than nothing.
+   */
+  country: string;
   cities: string[];
   startDate: string;
   endDate: string;

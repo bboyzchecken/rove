@@ -142,6 +142,11 @@ type PlanStore interface {
 	DeleteItem(ctx context.Context, tripID, itemID string) error
 	SetWarnings(ctx context.Context, tripID string, warnings map[string]string) error
 
+	// TagSignals returns, per trip id, the words a match score compares (A11.3):
+	// the area of every stop plus the category and tags of the POI behind it.
+	// One query for a whole page of explore results, not one per trip.
+	TagSignals(ctx context.Context, tripIDs []string) (map[string][]string, error)
+
 	AddVersion(ctx context.Context, v *ItemVersion) error
 	LatestVersion(ctx context.Context, tripID, itemID string) (*ItemVersion, error)
 	ListVersions(ctx context.Context, tripID string, limit int) ([]ItemVersion, error)

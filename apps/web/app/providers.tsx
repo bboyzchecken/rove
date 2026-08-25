@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 
+import { ServiceWorker } from '@/components/common/service-worker';
 import { initAnalytics } from '@/lib/analytics';
 import { ApiError } from '@/lib/api-client';
 
@@ -42,6 +43,8 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
+      {/* The offline shell behind Trip Mode (W10.6). */}
+      <ServiceWorker />
       {process.env.NODE_ENV === 'development' ? <ReactQueryDevtools initialIsOpen={false} /> : null}
     </QueryClientProvider>
   );

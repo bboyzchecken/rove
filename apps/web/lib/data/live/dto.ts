@@ -177,6 +177,99 @@ export interface PublicTripDto {
   creator: PublicCreatorDto;
   view_count: number;
   clone_count: number;
+  reviews: ReviewSummaryDto;
+  review_entries: ReviewDto[];
+}
+
+/* ------------------------------- points out, money owed (M22) ------------ */
+
+export interface DiscountCodeDto {
+  code: string;
+  scope: 'ai_credits' | 'booking';
+  amount_thb: number;
+  points_spent: number;
+  expires_at: string;
+  used_at: string | null;
+  usable: boolean;
+}
+
+export interface RedemptionListDto {
+  balance: number;
+  tiers: { amount_thb: number; points: number; afford: boolean }[];
+  codes: DiscountCodeDto[];
+}
+
+export interface EarningDto {
+  trip_id: string;
+  partner: string;
+  booking_value_thb: number;
+  commission_thb: number;
+  share_percent: number;
+  amount_thb: number;
+  estimated: boolean;
+  status: 'pending' | 'payable' | 'paid';
+  occurred_at: string;
+}
+
+export interface PayoutDto {
+  period_start: string;
+  period_end: string;
+  amount_thb: number;
+  earning_count: number;
+  status: 'draft' | 'paid';
+  paid_at: string | null;
+}
+
+export interface EarningsDto {
+  totals: { pending_thb: number; payable_thb: number; paid_thb: number; count: number };
+  share_percent: number;
+  minimum_payout_thb: number;
+  entries: EarningDto[];
+  payouts: PayoutDto[];
+}
+
+export interface LeadDto {
+  id: string;
+  partner: string;
+  contact_name: string;
+  contact_phone: string;
+  contact_line: string;
+  note: string;
+  status: 'new' | 'sent' | 'contacted' | 'won' | 'lost';
+  sent_at: string | null;
+  created_at: string;
+  simulated: boolean;
+}
+
+/* ------------------------------------------------- reviews (M21 — A11.5) - */
+
+export interface ReviewDto {
+  user_id: string;
+  name: string;
+  character_id: string;
+  rating: number;
+  actual_budget_per_person: number;
+  body: string;
+  created_at: string;
+}
+
+export interface ReviewSummaryDto {
+  count: number;
+  average_rating: number;
+  actual_budget_per_person: number;
+  budget_said: number;
+}
+
+export interface ReviewListDto {
+  summary: ReviewSummaryDto;
+  entries: ReviewDto[];
+  mine: ReviewDto | null;
+  can_review: boolean;
+}
+
+export interface MatchResultDto {
+  score: number;
+  reasons: string[];
 }
 
 export interface ExploreTripDto {
@@ -191,6 +284,37 @@ export interface ExploreTripDto {
   clone_count: number;
   creator: PublicCreatorDto;
   updated_at: string;
+  match?: MatchResultDto | null;
+  reviews: ReviewSummaryDto;
+}
+
+/* ---------------------------------------------- adapting a copy (A11.4) -- */
+
+export interface AdaptChangeDto {
+  kind: 'day_added' | 'day_removed' | 'item_removed' | 'item_moved';
+  day_label: string;
+  item_title: string;
+  reason: string;
+  cost_delta_dest: number;
+}
+
+export interface AdaptTotalsDto {
+  days: number;
+  items: number;
+  cost_per_person_dest: number;
+}
+
+export interface AdaptDiffDto {
+  changes: AdaptChangeDto[];
+  before: AdaptTotalsDto;
+  after: AdaptTotalsDto;
+  warnings: string[];
+  currency: string;
+}
+
+export interface AdaptCloneDto {
+  trip: TripDto;
+  diff: AdaptDiffDto;
 }
 
 export interface CreatorProfileDto {

@@ -14,6 +14,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
+import { LocaleSwitch } from '@/components/common/locale-switch';
 import { Card } from '@/components/ui/card';
 import { useDreams, useLogout, useMe } from '@/features/auth/queries';
 import { useBillingSummary } from '@/features/billing/queries';
@@ -72,6 +73,11 @@ export function ProfileMenu({ onEditProfile }: { onEditProfile: () => void }) {
       {me?.isAdmin ? (
         <MenuRow icon={ShieldCheck} label="แอดมิน" hint="เฉพาะทีมงาน" href="/admin" />
       ) : null}
+      {/* A preference about the person, not about a page (Phase 3). */}
+      <div className="border-border border-t px-4 py-3.5">
+        <LocaleSwitch />
+      </div>
+
       <MenuRow icon={FileText} label="เงื่อนไขการใช้งาน" href="/terms" />
       <MenuRow icon={FileText} label="นโยบายความเป็นส่วนตัว" href="/privacy" />
       <SignOutRow />

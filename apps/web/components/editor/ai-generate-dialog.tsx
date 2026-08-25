@@ -8,7 +8,7 @@ import { RoveMark } from '@/components/brand/rove-mark';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { FieldLabel, Textarea, fieldClass } from '@/components/ui/field';
+import { FieldLabel, Input, Textarea, fieldClass } from '@/components/ui/field';
 import { useMe } from '@/features/auth/queries';
 import { useAiCredits, useAiDraft, useBuyAiCredits } from '@/features/ai/queries';
 import { useWishlist } from '@/features/wishlist/queries';
@@ -66,6 +66,9 @@ export function AiGenerateDialog({
   // Preselect whichever option the user can actually complete right now, but
   // let an explicit tap win — derived, so it never fights a re-render.
   const [chosen, setChosen] = useState<'points' | 'purchase' | null>(null);
+  // A code redeemed from points (A12.10). Only a cash purchase can take one —
+  // paying with points already zeroes the bill.
+  const [discountCode, setDiscountCode] = useState('');
   const choice = chosen ?? (canUsePoints ? 'points' : 'purchase');
   const setChoice = setChosen;
 
@@ -106,6 +109,7 @@ export function AiGenerateDialog({
       quantity: 1,
       method: usingPoints ? 'points' : (channel?.id ?? 'card'),
       channel: label,
+      discountCode: usingPoints ? undefined : discountCode.trim().toUpperCase(),
     });
 
     setReceipt(result.order);
@@ -296,6 +300,31 @@ export function AiGenerateDialog({
                   ))}
                 </div>
               </div>
+            ) : null}
+
+            {choice === 'purchase' ? (
+              <label className="mt-2.5 block">
+                <FieldLabel>โค้ดส่วนลด (ถ้ามี)</FieldLabel>
+                <Input
+                  value={discountCode}
+                  onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
+                  placeholder="ROVE-XXXXXX"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  className="nums tracking-wide"
+                />
+                <span className="text-muted mt-1 block text-[11px]">
+                  แลกจากแต้มได้ที่หน้าโปรไฟล์ · ใช้ได้ครั้งเดียวต่อโค้ด
+                </span>
+              </label>
+            ) : null}
+
+            {buyCredits.isError ? (
+              <p className="text-danger mt-2 text-xs">
+                {buyCredits.error instanceof Error
+                  ? buyCredits.error.message
+                  : 'จ่ายไม่สำเร็จ — ลองใหม่อีกครั้ง'}
+              </p>
             ) : null}
 
             <Button

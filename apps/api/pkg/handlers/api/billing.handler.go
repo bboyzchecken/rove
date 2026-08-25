@@ -150,6 +150,8 @@ type recordOrderInput struct {
 	Method      string
 	MethodLabel string
 	PointsSpent int
+	// A code redeemed from points (A12.10). Nil for a full-price order.
+	Discount *models.DiscountCode
 	TripID      *string
 	TripTitle   string
 	PeriodStart *time.Time
@@ -187,18 +189,45 @@ func (s *Server) recordOrder(ctx context.Context, in recordOrderInput) (*models.
 		PaidAt:      &now,
 	}
 
+	// The code is claimed before the receipt is written, not after: the order
+	// has to state the price that was actually charged, and only the winner of
+	// the claim is entitled to the discount.
+	claimed := false
+	if in.Discount != nil && !paidWithPoints {
+		won, err := s.discounts.Claim(ctx, in.Discount.ID, now)
+		if err != nil {
+			return nil, err
+		}
+		claimed = won
+	}
+
 	// Points do not reduce a price, they replace it: the line keeps its list
 	// price and the whole of it is discounted away, so the receipt still says
 	// what the thing was worth.
-	if paidWithPoints {
+	switch {
+	case paidWithPoints:
 		order.DiscountTHB = amount
 		order.TotalTHB = 0
-	} else {
+	case claimed:
+		total, applied := domain.ApplyDiscount(amount, in.Discount.AmountTHB)
+		order.DiscountTHB = applied
+		order.TotalTHB = total
+		order.MethodLabel = in.MethodLabel + " · โค้ด " + in.Discount.Code
+	default:
 		order.TotalTHB = amount
 	}
 
 	if err := s.billing.CreateOrder(ctx, order); err != nil {
+		if claimed {
+			// Nothing was sold, so nothing was spent.
+			_ = s.discounts.Release(ctx, in.Discount.ID)
+		}
 		return nil, err
 	}
+
+	if claimed {
+		_ = s.discounts.Attach(ctx, in.Discount.ID, order.ID)
+	}
+
 	return order, nil
 }

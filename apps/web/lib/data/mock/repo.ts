@@ -7,6 +7,7 @@ import { getAirport, getAirports, searchAirports } from '../airports';
 import { buildRoute, routeCities } from '../route';
 
 import {
+  adaptPlan,
   addDays,
   budgetFromPlan,
   computeBudget,
@@ -18,15 +19,21 @@ import {
   membersFreeInRange,
   parseIsoDate,
   recomputeCoverage,
+  scoreMatch,
   thaiRangeLabel,
   toIsoDate,
   toThb,
   validateDays,
   variantMetricsOf,
 } from '../domain';
+import type { AdaptOutcome, AdaptRequest, MatchProfile } from '../domain';
 import type { RoveRepo } from '../repo';
 import type {
   ActivityEvent,
+  AdaptDiff,
+  AdaptInput,
+  AgentLead,
+  DiscountCode,
   AiJob,
   AvailabilityBoard,
   BookingEntry,
@@ -45,18 +52,21 @@ import type {
   Poll,
   PrepTask,
   RecapDecision,
+  ReviewBoard,
+  ReviewSummary,
   ShareState,
   Trip,
   TripDocument,
   TripPhoto,
   TripRecap,
+  TripReview,
   TripRoute,
   TripSummary,
   Vote,
   WishlistItem,
 } from '../types';
 import { buildOrder, PLANS } from './billing';
-import { BOOKING_OFFERS, POIS, PREP_TEMPLATE, rankDestinations } from './catalog';
+import { BOOKING_OFFERS, POIS, prepTemplateFor, rankDestinations } from './catalog';
 import {
   AI_META,
   loadDb,
@@ -207,6 +217,124 @@ function exploreOf(db: MockDb, record: TripRecord) {
     cloneCount: record.share.cloneCount,
     creator: creatorOf(db, record),
     updatedAt: nowIso(),
+    reviews: summariseReviews(record.reviews),
+  };
+}
+
+/**
+ * The roll-up the API computes in `summariseReviews` / `SummaryByTrips`.
+ *
+ * The budget average counts only the people who gave a number — averaging over
+ * everybody would quietly report a cheaper trip than anyone had.
+ */
+function summariseReviews(reviews: TripReview[]): ReviewSummary {
+  if (reviews.length === 0) {
+    return { count: 0, averageRating: 0, actualBudgetPerPerson: 0, budgetSaid: 0 };
+  }
+
+  const said = reviews.filter((r) => r.actualBudgetPerPerson > 0);
+  return {
+    count: reviews.length,
+    averageRating:
+      Math.round((reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length) * 10) / 10,
+    actualBudgetPerPerson:
+      said.length === 0
+        ? 0
+        : Math.round(said.reduce((sum, r) => sum + r.actualBudgetPerPerson, 0) / said.length),
+    budgetSaid: said.length,
+  };
+}
+
+/** Nobody reviews a holiday they are still packing for. */
+function tripIsOver(record: TripRecord) {
+  return record.trip.status === 'done' || record.trip.endDate < toIsoDate(new Date());
+}
+
+function reviewBoardOf(db: MockDb, record: TripRecord): ReviewBoard {
+  return {
+    summary: summariseReviews(record.reviews),
+    entries: clone(record.reviews),
+    mine: clone(record.reviews.find((r) => r.userId === db.user.id) ?? null),
+    canReview: tripIsOver(record),
+  };
+}
+
+/**
+ * The redemption rate and tiers, mirroring `pkg/domain/revenue.go`.
+ *
+ * Eight points to the baht comes from the one price the product already has:
+ * a draft is 300 points or ฿39.
+ */
+const POINTS_PER_BAHT = 8;
+const REDEMPTION_TIERS = [50, 100, 300];
+
+/** Same shape as the API's — readable off a screen, typable on a phone. */
+function mockDiscountCode() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let out = 'ROVE-';
+  for (let i = 0; i < 6; i += 1) {
+    out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return out;
+}
+
+/** The frame a copied plan is reshaped to (A11.4). */
+function adaptRequestOf(source: TripRecord, input: AdaptInput): AdaptRequest {
+  return {
+    days: input.days,
+    partySize: input.partySize,
+    fromPartySize: source.trip.partySize,
+    // The traveller thinks in baht, the plan is priced in yen.
+    budgetPerPersonDest: input.budgetPerPersonThb
+      ? input.budgetPerPersonThb / (source.trip.fxRate || 0.235)
+      : 0,
+  };
+}
+
+function diffOf(outcome: AdaptOutcome, currency: string): AdaptDiff {
+  return {
+    changes: outcome.changes,
+    before: outcome.before,
+    after: outcome.after,
+    warnings: outcome.warnings,
+    currency,
+  };
+}
+
+function adaptDiffOf(source: TripRecord, input: AdaptInput): AdaptDiff {
+  return diffOf(adaptPlan(source.days, adaptRequestOf(source, input)), source.trip.destCurrency);
+}
+
+/**
+ * What a trip is *about*, for the match score (A11.3).
+ *
+ * The API reads areas and POI tags out of the plan; the mock records carry the
+ * same information as cities and item areas, so the two agree on any trip a
+ * UAT session can produce.
+ */
+function matchTagsOf(record: TripRecord, includeWishlist: boolean) {
+  const tags = [...record.trip.cities];
+  for (const day of record.days) {
+    for (const item of day.items) if (item.area) tags.push(item.area);
+  }
+  if (includeWishlist) {
+    for (const wish of record.wishlist) {
+      if (wish.kind === 'avoid') continue;
+      tags.push(...(wish.tags ?? []));
+    }
+  }
+  return tags;
+}
+
+function matchProfileOf(record: TripRecord, includeWishlist = false): MatchProfile {
+  return {
+    // Mock records carry no ISO country code, so country is left unset — every
+    // seeded plan is in the same place and the filter would only ever tie.
+    startDate: record.trip.startDate,
+    days: record.trip.nights + 1,
+    budgetPerPersonThb: record.trip.budgetPerPersonThb,
+    partySize: record.trip.partySize,
+    tags: matchTagsOf(record, includeWishlist),
   };
 }
 
@@ -560,6 +688,7 @@ export const mockRepo: RoveRepo = {
           trip: {
             id,
             title: input.title,
+            country: input.country ?? 'JP',
             cities: cities.length > 0 ? cities : (input.cities ?? []),
             startDate: start,
             endDate: end,
@@ -614,6 +743,8 @@ export const mockRepo: RoveRepo = {
           photos: [],
           documents: [],
           polls: [],
+          reviews: [],
+          leads: [],
           comments: [],
           votes: [],
           activity: [],
@@ -1506,11 +1637,12 @@ export const mockRepo: RoveRepo = {
         mutate((db) => {
           const record = tripRecord(db, tripId);
           const existing = new Set(record.prep.map((p) => p.title));
-          for (const template of PREP_TEMPLATE) {
+          // The checklist follows the destination, like the API's (M23).
+          for (const template of prepTemplateFor(record.trip.country)) {
             if (existing.has(template.title)) continue;
             record.prep.push({ ...template, id: mockId('p'), done: false });
           }
-          log(record, db.user.id, 'ดึงเช็กลิสต์เตรียมตัวสำหรับญี่ปุ่นมาใช้');
+          log(record, db.user.id, 'ดึงเช็กลิสต์เตรียมตัวมาใช้');
           return clone(record.prep);
         }),
         260,
@@ -1920,6 +2052,8 @@ export const mockRepo: RoveRepo = {
             creator: creatorOf(db, record),
             viewCount: record.share.viewCount,
             cloneCount: record.share.cloneCount,
+            reviews: summariseReviews(record.reviews),
+            reviewEntries: clone(record.reviews),
           };
         }),
       );
@@ -1949,6 +2083,36 @@ export const mockRepo: RoveRepo = {
         );
       }
 
+      const offset = filters.offset ?? 0;
+      const limit = filters.limit ?? 12;
+
+      // Ranked against one of my own trips (A11.3). The API scores a window of
+      // the catalogue in Go for the same reason: the score is not a column.
+      if (filters.match) {
+        const mine = db.trips.find((t) => t.trip.id === filters.match);
+        if (!mine) throw new Error('ไม่พบทริปที่ใช้เทียบ');
+
+        const want = matchProfileOf(mine, true);
+        const scored = records
+          .filter((r) => r.trip.id !== mine.trip.id)
+          .map((r) => ({ record: r, match: scoreMatch(want, matchProfileOf(r)) }))
+          .filter((row) => row.match.score > 0)
+          .sort(
+            (a, b) =>
+              b.match.score - a.match.score ||
+              b.record.share.viewCount +
+                b.record.share.cloneCount * 5 -
+                (a.record.share.viewCount + a.record.share.cloneCount * 5),
+          );
+
+        return delay({
+          items: scored
+            .slice(offset, offset + limit)
+            .map((row) => ({ ...exploreOf(db, row.record), match: row.match })),
+          total: scored.length,
+        });
+      }
+
       records.sort((a, b) =>
         filters.sort === 'new'
           ? b.trip.startDate.localeCompare(a.trip.startDate)
@@ -1957,8 +2121,6 @@ export const mockRepo: RoveRepo = {
             (a.share.viewCount + a.share.cloneCount * 5),
       );
 
-      const offset = filters.offset ?? 0;
-      const limit = filters.limit ?? 12;
       return delay({
         items: records.slice(offset, offset + limit).map((r) => exploreOf(db, r)),
         total: records.length,
@@ -2045,6 +2207,174 @@ export const mockRepo: RoveRepo = {
         320,
       );
     },
+
+    async adaptPreview(tokenOrSlug, input) {
+      const db = loadDb();
+      const source = findPublished(db, tokenOrSlug);
+      if (!source) throw new Error('ไม่พบแพลนนี้');
+
+      return delay(adaptDiffOf(source, input));
+    },
+
+    async cloneAdapted(tokenOrSlug, input) {
+      const trip = await this.cloneFromPublic(tokenOrSlug);
+
+      return delay(
+        mutate((db) => {
+          const source = findPublished(db, tokenOrSlug);
+          const copy = db.trips.find((t) => t.trip.id === trip.id);
+          if (!source || !copy) throw new Error('ไม่พบแพลนนี้');
+
+          const outcome = adaptPlan(copy.days, adaptRequestOf(source, input));
+          const start = input.startDate || copy.trip.startDate;
+
+          copy.days = outcome.days.map((day, i) => ({
+            ...day,
+            id: day.id.startsWith('adapt-blank') ? mockId('day') : day.id,
+            date: addDays(start, i),
+          }));
+          copy.trip = {
+            ...copy.trip,
+            startDate: start,
+            endDate: addDays(start, Math.max(0, copy.days.length - 1)),
+            nights: Math.max(0, copy.days.length - 1),
+            partySize: input.partySize || copy.trip.partySize,
+            budgetPerPersonThb: input.budgetPerPersonThb || copy.trip.budgetPerPersonThb,
+          };
+
+          return {
+            trip: clone(copy.trip),
+            diff: diffOf(outcome, source.trip.destCurrency),
+          };
+        }),
+        320,
+      );
+    },
+  },
+
+  /* ----------------------------- points out, money owed (M22) -- */
+  rewards: {
+    async redemptions() {
+      const db = loadDb();
+      return delay({
+        balance: db.user.points,
+        tiers: REDEMPTION_TIERS.map((amountThb) => ({
+          amountThb,
+          points: amountThb * POINTS_PER_BAHT,
+          afford: db.user.points >= amountThb * POINTS_PER_BAHT,
+        })),
+        codes: clone(db.discountCodes),
+      });
+    },
+
+    async redeem(amountThb) {
+      return delay(
+        mutate((db) => {
+          if (!REDEMPTION_TIERS.includes(amountThb)) throw new Error('เลือกได้เฉพาะมูลค่าที่กำหนดไว้');
+          const cost = amountThb * POINTS_PER_BAHT;
+          if (db.user.points < cost) throw new Error('แต้มไม่พอ');
+
+          // Points are burned on issue, exactly like the API: a code that
+          // exists has already been paid for.
+          db.user.points -= cost;
+          const code: DiscountCode = {
+            code: mockDiscountCode(),
+            scope: 'ai_credits',
+            amountThb,
+            pointsSpent: cost,
+            expiresAt: addDays(toIsoDate(new Date()), 180),
+            usedAt: null,
+            usable: true,
+          };
+          db.discountCodes.unshift(code);
+          return clone(code);
+        }),
+        220,
+      );
+    },
+
+    async earnings() {
+      const db = loadDb();
+      return delay(clone(db.earnings));
+    },
+  },
+
+  leads: {
+    async list(tripId) {
+      return delay(mutate((db) => clone(tripRecord(db, tripId).leads)));
+    },
+
+    async create(tripId, input) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          if (!input.contactPhone && !input.contactLine) {
+            throw new Error('ใส่เบอร์โทรหรือ LINE ID อย่างน้อยหนึ่งอย่าง');
+          }
+
+          const lead: AgentLead = {
+            id: mockId('lead'),
+            partner: 'ROVE Agent',
+            contactName: input.contactName,
+            contactPhone: input.contactPhone ?? '',
+            contactLine: input.contactLine ?? '',
+            note: input.note ?? '',
+            status: 'new',
+            sentAt: null,
+            createdAt: nowIso(),
+            // Mock mode has no agent inbox to send to, and says so rather than
+            // pretending somebody was messaged.
+            simulated: true,
+          };
+          record.leads.unshift(lead);
+          log(record, db.user.id, 'ขอให้เอเจนต์ช่วยจัดทริปนี้');
+          return clone(lead);
+        }),
+        260,
+      );
+    },
+  },
+
+  /* ----------------------------------------------- reviews (M21) -- */
+  reviews: {
+    async list(tripId) {
+      return delay(mutate((db) => reviewBoardOf(db, tripRecord(db, tripId))));
+    },
+
+    async save(tripId, input) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          if (!tripIsOver(record)) throw new Error('รีวิวได้หลังทริปจบแล้วเท่านั้น');
+          if (input.rating < 1 || input.rating > 5) throw new Error('ให้ดาว 1–5 ดวง');
+
+          const mine: TripReview = {
+            userId: db.user.id,
+            name: db.user.name,
+            characterId: db.user.characterId,
+            rating: input.rating,
+            actualBudgetPerPerson: input.actualBudgetPerPerson ?? 0,
+            body: input.body ?? '',
+            createdAt: nowIso(),
+          };
+          // Upsert, like the unique index on the API side: saving again
+          // replaces my review rather than adding a second opinion.
+          record.reviews = [mine, ...record.reviews.filter((r) => r.userId !== db.user.id)];
+
+          return reviewBoardOf(db, record);
+        }),
+        200,
+      );
+    },
+
+    async remove(tripId) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          record.reviews = record.reviews.filter((r) => r.userId !== db.user.id);
+        }),
+      );
+    },
   },
 
   /* ------------------------------------------------ photos (M18) -- */
@@ -2113,10 +2443,24 @@ export const mockRepo: RoveRepo = {
       return delay(undefined);
     },
 
-    photoBookUrl(tripId) {
+    async photoBookThemes() {
+      // The same three the API ships, so the picker looks identical in both
+      // modes. Mirrors pkg/domain/photobook.go.
+      return delay([
+        { id: 'paper', name: 'กระดาษ', paper: '#FFFFFF', ink: '#3D2B24', muted: '#6B5B4E', accent: '#D9714E' },
+        { id: 'ink', name: 'หมึกเข้ม', paper: '#1C1714', ink: '#F5EFE9', muted: '#A2938A', accent: '#E49A81' },
+        { id: 'film', name: 'ฟิล์ม', paper: '#F3EEE5', ink: '#2E2A24', muted: '#7A7266', accent: '#8BA07A' },
+      ]);
+    },
+
+    photoBookUrl(tripId, options) {
       // Mock mode has no server to render it; the screen turns this into the
-      // browser's own print dialog instead.
-      return `/t/${tripId}/photos?print=1`;
+      // browser's own print dialog instead. The options ride along so the
+      // print view can honour them.
+      const params = new URLSearchParams({ print: '1' });
+      if (options?.theme) params.set('theme', options.theme);
+      if (options?.coverPhotoId) params.set('cover', options.coverPhotoId);
+      return `/t/${tripId}/photos?${params.toString()}`;
     },
   },
 

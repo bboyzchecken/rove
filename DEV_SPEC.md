@@ -1040,18 +1040,18 @@ Cloudflare DNS (rovetravel.site)
 
 ## 12. Phase 3 — V2
 
-- [ ] A11.3 `pkg/domain/match.go` match score (dates, budget, tags, party) + `GET /explore?match=`
-- [ ] A11.4 clone + AI auto-adapt (วัน/คน/งบต่าง) + diff preview
-- [ ] A11.5 reviews + actual budget post-trip
-- [ ] W10.6 Trip Mode `/t/[id]/now` (วันนี้/ถัดไป, กด navigate → Google Maps, PWA offline cache)
-- [ ] W10.7 export .ics + IG story image (1:1 สรุปทริป)
-- [ ] A16.5 Expense settle-up จริง (คำนวณใครโอนใคร ขั้นต่ำสุด)
-- [ ] A12.10 Points redemption: ออก discount code ใช้ลด booking ใน ROVE
-- [ ] A12.11 creator revenue share ledger + payout report (Points → THB ถ้า scale)
-- [ ] A12.12 agent lead handoff (form → email/LINE partner + tracking)
-- [ ] Photo Book V2: auto-layout, cover design, custom theme
-- [ ] I18N: EN + ประเทศที่ 2 (KR/TW): zones, POI, prep rules
-- [ ] INFRA: ย้าย MySQL ไป managed DB / แยก AI worker เป็น service แยก
+- [x] A11.3 `pkg/domain/match.go` match score (dates, budget, tags, party) + `GET /explore?match=`  ·  **หมายเหตุ:** `ScoreMatch` ถ่วงน้ำหนัก 30/25/25/20 — ช่วงเวลา (เดือนแบบวงกลม + ความยาวทริป), งบ (ถูกกว่างบยังเข้าเกณฑ์ แพงกว่าสองเท่า = 0), แท็ก (`TagCoverage` = "สิ่งที่อยากได้มีกี่ส่วน" ไม่ใช่ Jaccard), ขนาดกลุ่ม · คนละประเทศ = 0 ไม่ใช่คะแนนน้อย · `GET /public/explore?match=<tripId>` [OptionalJwt, ต้องเป็นสมาชิกทริปนั้น] จัดอันดับใน Go บน pool 200 ใบ (คะแนนไม่ใช่คอลัมน์) แล้วคืน `scored` มาบอกด้วยว่าจัดอันดับจากกี่ใบ · แท็กของแพลนสาธารณะมาจาก `PlanStore.TagSignals` (area + category/tags ของ POI) ไม่แตะ wishlist ของคนอื่น
+- [x] A11.4 clone + AI auto-adapt (วัน/คน/งบต่าง) + diff preview  ·  **หมายเหตุ:** `POST /public/trips/:tokenOrSlug/adapt/preview` (ไม่เขียนอะไรเลย) และ `POST .../adapt` (clone แล้วปรับ) — `/clone` เดิมยังเป็น clone ธรรมดา · `domain.AdaptPlan` ทำตามลำดับ ยาว→จังหวะ→งบ: ตัดวันที่เงียบที่สุดตรงกลาง (วันแรก/วันสุดท้ายคือโครง) แล้วย้ายไฮไลต์ไปวันที่ยังมีที่ว่าง, กลุ่มใหญ่ขึ้นลดที่ต่อวัน, เกินงบตัดของที่ตัดได้เรียงจากแพงสุด — ที่พัก/เดินทาง/มื้ออาหารไม่เคยถูกตัด และถ้ายังเกินงบก็บอกตรง ๆ · **เป็น deterministic ไม่ใช่ model call** (Decision Log 25 ส.ค.)
+- [x] A11.5 reviews + actual budget post-trip  ·  **หมายเหตุ:** ตาราง `trip_reviews` (unique (trip_id,user_id) — แก้รีวิว = แทนที่ ไม่ใช่ความเห็นที่สอง) · `GET /trips/:id/reviews` + `PUT|DELETE /trips/:id/reviews/me` [สมาชิก, เขียนได้เฉพาะหลังทริปจบ ไม่งั้น 409] · ยอด "ใช้จริงต่อคน" เฉลี่ยเฉพาะคนที่บอก (`budget_said`) ไม่เฉลี่ยรวมคนที่ไม่บอก · roll-up ไปโผล่บนหน้าแพลนสาธารณะ/explore/creator ผ่าน `ReviewStore.SummaryByTrips` (คิวรีเดียวต่อหน้า) · **ไม่ใช่ ledger ค่าใช้จ่าย** — `expense_entries` ยังไม่หลุด public payload (มีเทสต์คุม)
+- [x] W10.6 Trip Mode `/t/[id]/now` (วันนี้/ถัดไป, กด navigate → Google Maps, PWA offline cache)  ·  **หมายเหตุ:** ตอบสามคำถามเท่านั้น — ตอนนี้ / ต่อไป / ไปยังไง · "ตอนนี้" คือที่เริ่มไปแล้วและยังไม่เลย end time · ปุ่มนำทางส่งชื่อที่+ย่าน+เมืองไป Google Maps (`dir/?api=1&destination=`) ไม่วาดแผนที่เอง · ห้องทริปซ่อน header/tabs/bottom bar ทั้งหมดในโหมดนี้ (`TripRoomShell` อ่าน segment) · **offline:** `public/sw.js` แคช shell (navigation = network-first, static = cache-first, ไม่แตะ cross-origin/ไม่แคช redirect ไป /login) + `lib/offline.ts` เก็บ snapshot ของแพลนใน localStorage (อายุ 14 วัน) ไม่ persist query cache ทั้งก้อนเพราะจะพารายจ่าย/รายชื่อคนลงเครื่องไปด้วย · `app/manifest.ts` + ไอคอนเรนเดอร์จาก mark เดียวที่ `app/pwa-icon/[size]`
+- [x] W10.7 export .ics + IG story image (1:1 สรุปทริป)  ·  **หมายเหตุ:** .ics มีตั้งแต่ Phase 1 (`buildICS` — all-day event ต่อวัน ไม่ยิง 20 อีเวนต์ต่อวันเข้าปฏิทินคน) และอยู่ในไดอะล็อกแชร์อยู่แล้ว · story image 1080×1080 วาดด้วย canvas ในเบราว์เซอร์ (`lib/story-image.ts`) — สีอ่านจาก `styles/brand.css` ตอนวาด ไม่ hardcode hex, ตัดคำภาษาไทยแบบทีละตัวอักษรเพราะไม่มีช่องว่าง · มือถือส่งเข้า share sheet ผ่าน `navigator.share({files})` ที่เหลือดาวน์โหลด PNG
+- [x] A16.5 Expense settle-up จริง (คำนวณใครโอนใคร ขั้นต่ำสุด)  ·  **หมายเหตุ:** `domain.Settle` เลิกใช้ greedy ล้วน — หา**กลุ่มย่อยที่หักลบกันเองลงตัว**ให้ได้มากที่สุด (กลุ่ม k คนต้องโอน k-1 ครั้งเสมอ) ด้วย DP บน subset แล้วค่อย greedy ในแต่ละกลุ่ม · เศษจากการปัดเศษต่อคนถูกกลืนเข้ากับยอดที่ใหญ่ที่สุด ไม่ปล่อยให้กลายเป็นหนี้ผี · เกิน 12 คนถอยไปใช้ greedy (3^n) · twin ใน `lib/data/domain.ts` + เทสต์คู่ทั้งสองฝั่ง
+- [x] A12.10 Points redemption: ออก discount code ใช้ลด booking ใน ROVE  ·  **หมายเหตุ:** อัตรา 8 แต้ม = ฿1 (มาจากราคาที่มีอยู่แล้ว: ร่าง 1 ครั้ง = 300 แต้ม = ฿39 — แลกจึงไม่ได้เปรียบกว่าใช้ตรง ๆ) · ระดับที่ออกได้: ฿50/฿100/฿300, อายุ 180 วัน, ใช้ครั้งเดียว, โค้ดรูป `ROVE-XXXXXX` ตัดตัว I O 0 1 ทิ้ง · **หักแต้มตอนออกโค้ด** ไม่ใช่ตอนใช้ — โค้ดที่มีอยู่คือโค้ดที่จ่ายแล้ว · `scope` รองรับ `booking` ไว้แล้วแต่วันนี้ใช้ได้กับ `ai_credits` ซึ่งเป็นสิ่งเดียวที่ ROVE เก็บเงิน · กันใช้ซ้ำด้วย claim → order → attach (แพ้ race = ไม่ได้ส่วนลด ไม่ใช่ได้ฟรี)
+- [x] A12.11 creator revenue share ledger + payout report (Points → THB ถ้า scale)  ·  **หมายเหตุ:** ตาราง `creator_earnings` + `payouts` **แยกจาก `user_points`** — แต้มคือคะแนน, อันนี้คือเงินที่พาร์ตเนอร์ติดค้าง · ส่วนแบ่ง 30% ของค่าคอม · ค่าคอมที่พาร์ตเนอร์ส่งมาชนะเสมอ (รวมกรณีส่งมาเป็น 0), ไม่ส่งมาถึงประเมินจากเรตต่อพาร์ตเนอร์แล้วติดธง `estimated` ให้รายงานเห็น · `GET /users/me/earnings` (ครีเอเตอร์) · `GET|POST /admin/payouts` (รายงานต่อเดือน + ปิดยอดทีละคน, ขั้นต่ำ ฿300 ไม่ถึงทบไปเดือนหน้า) · click id unique กัน webhook ยิงซ้ำ
+- [x] A12.12 agent lead handoff (form → email/LINE partner + tracking)  ·  **หมายเหตุ:** ตาราง `agent_leads` — เก็บ**สแนปช็อต**ของทริป (วัน/จำนวนคน/งบ/ปลายทาง) ตอนส่ง เพราะเอเจนต์เสนอราคาจากสิ่งที่ได้รับ ส่วนห้องยังแก้ต่อ · `POST|GET /trips/:id/leads` [editor/viewer] · ส่งออกทางอีเมล + LINE ตาม `AGENT_LEAD_EMAIL` / `AGENT_LEAD_LINE_USER_ID` — ไม่ตั้งค่า = **เก็บ row ไว้แล้วบอกตรง ๆ ว่ายังไม่ได้ส่ง** (`simulated`) · คิวฝั่ง ops ที่ `GET /admin/leads` + `PATCH /admin/leads/:id`
+- [x] Photo Book V2: auto-layout, cover design, custom theme  ·  **หมายเหตุ:** `domain.PhotoBookLayout` จัดหน้าตามจำนวนรูปของวันนั้นบนกริด 6 คอลัมน์ — 1 รูปเต็มหน้า, 3 รูปมีตัวนำสูง, 7 รูปแถวสุดท้ายกินเต็มแถวแทนที่จะเหลือรูปโดดกับช่องว่าง (มีเทสต์ว่าไม่มีแถวไหนเหลือรู) · ปกใช้รูปในทริปเอง + scrim (เลือกด้วย `?cover=`) และไม่ถูกใส่ซ้ำในเล่ม · ธีม 3 แบบ (กระดาษ/หมึกเข้ม/ฟิล์ม) ผ่าน `?theme=` — พิมพ์ผิดได้เล่ม default ไม่ใช่ error · แคตตาล็อกธีมมาจาก API (`GET /trips/:id/photobook/themes`) ให้ตัวเลือกกับตัวเรนเดอร์ตรงกันเสมอ
+- [~] I18N: EN + ประเทศที่ 2 (KR/TW): zones, POI, prep rules  ·  **ประเทศที่ 2 = เสร็จ:** zones เกาหลี 10 โซน (โซล 5 + วันเดย์ทริป + ปูซาน) มี `Country` และ `ZonesForCountry`, เพื่อนบ้านเป็นสองทางแล้ว (เทสต์จับเจอว่าเดิม `CanShareDay` ตอบไม่เหมือนกันเมื่อสลับลำดับ) · `data/poi/kr.csv` 31 แห่ง, seeder อ่านทุก `data/poi/*.csv` และเอาชื่อไฟล์เป็นรหัสประเทศ · prep rules ย้ายเข้า `domain.PrepTemplateFor(country)` มี TH/EN ทั้งคู่ — JP นำด้วย Visit Japan Web, KR นำด้วย K-ETA/Q-CODE, ประเทศที่ไม่รู้จักยังได้ลิสต์กลาง 6 ข้อ · หน้าเว็บ `Trip.country` ส่งต่อจนถึง mock  ·  **EN = ยังไม่ครบ:** ท่อ next-intl พร้อมแล้ว (`messages/en.json`, locale จากคุกกี้ผ่าน server action, ตัวสลับภาษาในโปรไฟล์) แต่ข้อความบนจอ ~5,800 ชิ้นยังฮาร์ดโค้ดภาษาไทยอยู่ในคอมโพเนนต์ — ต้องดึงออกเป็นคีย์ก่อนถึงจะเรียกว่าแปลแล้ว ตัวสลับภาษาจึงบอกตรง ๆ ว่าตอนนี้แปลเฉพาะเมนู · แผนงานเต็มและข้อเสนอให้ใช้ `[locale]` segment แทนคุกกี้อยู่ที่ [docs/i18n-plan.md](docs/i18n-plan.md) (D1 ยังไม่เคาะ) — ที่ทำไปคือตัวเลือก A ซึ่งถอดทิ้งได้โดยไม่เสีย messages/ตัวสลับ
+- [x] INFRA: ย้าย MySQL ไป managed DB / แยก AI worker เป็น service แยก  ·  **หมายเหตุ:** managed DB ทำไปแล้วตอนย้ายไป ECS (RDS `deploy/terraform/rds.tf`, ADR 0004) · worker แยกด้วย `ROVE_ROLE=api|worker|all` — คิวเป็น Redis list ไม่ใช่ broker เพราะงานอยู่ในตาราง `ai_jobs` อยู่แล้ว คิวถือแค่ซองจดหมาย · `api` push แล้วจบ, **ต่อ Redis ไม่ได้ = ร่างในโปรเซสตัวเองแทน** (เครดิตถูกหักไปแล้ว การทำหายแย่กว่าการช้า) · `worker` รัน pool ตัวเดียวกับโหมด `all` จึงได้ร่างเหมือนกันเป๊ะ · terraform: `worker.tf` (service ไม่มี ingress, FARGATE_SPOT ล้วน — งานที่หลุดกลับไปเป็น `queued` ได้), compose: `--profile worker`
 
 ---
 
@@ -1132,8 +1132,15 @@ AFFILIATE_KLOOK_AID=
 AFFILIATE_KKDAY_ID=
 AFFILIATE_RENTALCARS_ID=
 AFFILIATE_AIRALO_ID=
+AFFILIATE_WEBHOOK_SECRET=
 ADMIN_EMAILS=
 
+# Agent lead handoff (A12.12) — both empty = stored but not sent
+AGENT_LEAD_EMAIL=
+AGENT_LEAD_LINE_USER_ID=
+AGENT_LEAD_PARTNER=
+
+# ยังไม่ได้ใช้: อัตราแลกแต้มอยู่ใน pkg/domain/revenue.go (8 แต้ม = ฿1, ขั้นต่ำ ฿50)
 POINTS_EARN_RATE_PCT=25
 POINTS_MIN_REDEEM=100
 ```
@@ -1242,6 +1249,11 @@ AUTH_COOKIE_DOMAIN=rove.app
 | — | Deploy | ~~Lightsail instance เดียว + Docker Compose~~ | ~~ต้นทุน ≤ $25/mo ใน Phase 1~~ — แทนที่แล้ว ดูบรรทัด 23 ส.ค. |
 | 23 ส.ค. 2569 | Deploy (แทนที่ของเดิม) | **ECS Fargate + ALB + autoscale 1–10 + RDS + ElastiCache ตั้งแต่วันแรก** ผ่าน Terraform — ตัด Lightsail ทิ้ง · [ADR 0004](docs/adr/0004-aws-ecs-instead-of-lightsail.md) | ซื้อโดเมน rovetravel.site แล้ว + เปิดตัวผ่านอินฟลูฯ = traffic มาเป็นขั้นบันได การ migrate Lightsail→ECS ทีหลังต้องทำตอนเว็บกำลังจะล่มพอดี · ตั้งทุกค่าที่โหมดถูกสุดไว้ก่อน (~$50–70/mo) แล้วยกทีละตัวแปรเมื่อจำเป็น |
 | 19 ส.ค. 2569 | Next.js version | **16.3.1** (App Router + Turbopack), React 19.2.8, TS 5.9.3 strict, Tailwind v4 | บันทึกจริงตาม W0.1 — Tailwind v4 ใช้ `@theme inline` ไม่มี `tailwind.config.js` |
+| 25 ส.ค. 2569 | บันทึกการตัดสินใจ Phase 3 ทั้งชุด | [ADR 0005](docs/adr/0005-phase-3-build-decisions.md) |  |
+| 25 ส.ค. 2569 | แยก AI worker | `ROVE_ROLE` + Redis list (`rove:ai:jobs`) ไม่ใช้ broker · ต่อคิวไม่ได้ = ร่างเองในโปรเซส API | ที่เปลี่ยนไม่ใช่โหลด แต่เป็นรูปทรง — ร่างหนึ่งครั้งใช้ถึงสามนาที ส่วน deploy ใช้ไม่กี่วินาที ทุก release จึงต้องเลือกระหว่างรอหรือฆ่างานทิ้ง · แยกแล้วเว็บรีสตาร์ต/สเกลตามจังหวะตัวเอง และ worker ใช้ Spot ล้วนได้เพราะงานที่หลุดกลับไปเป็น `queued` |
+| 25 ส.ค. 2569 | ภาษาที่สอง | locale เก็บใน**คุกกี้** ไม่ใช่ `/en` prefix | ผู้ใช้กลุ่มเดียว สินค้าตัวเดียว · prefix จะทำให้ลิงก์แชร์และ OG แตกเป็นสองชุดเพื่อความชอบส่วนตัวของคน ๆ เดียว · ตัวสลับภาษาบอกตรง ๆ ว่ายังแปลไม่ครบ ดีกว่าส่งแอปครึ่งอังกฤษเงียบ ๆ |
+| 25 ส.ค. 2569 | "AI auto-adapt" (A11.4) | ปรับแพลนที่ก๊อปมาด้วย **กฎ deterministic ใน `pkg/domain/adapt.go`** ไม่เรียกโมเดล | preview กับตัวจริงต้องตอบเหมือนกันทุกครั้ง ซึ่งโมเดลรับประกันให้ไม่ได้ · การตัดที่เที่ยวที่ห้าของวันหรือตั๋วที่แพงที่สุดเป็นเลขคณิต ไม่ใช่วิจารณญาณ · ได้ของแถมคือรันใน mock mode และเทสต์ได้ (twin: `lib/data/domain.ts`) |
+| 25 ส.ค. 2569 | จัดอันดับ explore ด้วย match score | ดึง pool 200 ใบเรียงตามยอดนิยม แล้วให้คะแนน+เรียงใน Go | คะแนนขึ้นกับทริปของผู้ถามจึงเขียนเป็น SQL ไม่ได้ · response คืน `scored` มาบอกว่าจัดอันดับจากกี่ใบ ไม่แกล้งทำเป็นว่าจัดทั้งแคตตาล็อก — ตัวเลขที่ต้องขยับเมื่อแพลนสาธารณะเกินสองร้อยใบ |
 | 20 ส.ค. 2569 | PDF renderer | **ไม่ใช้ทั้งคู่ใน Phase 1** — export เป็น HTML self-contained แล้วให้ผู้ใช้สั่งพิมพ์เอง | ไม่ต้องแบก headless browser บน instance เดียว (§8.1) และได้ผลลัพธ์ที่ผู้ใช้เลือกขนาดกระดาษเองได้ · ทบทวนใหม่ตอน photo book Phase 2 |
 | — | Affiliate approve status | (บันทึกเมื่อสมัครแต่ละเจ้า) | |
 | — | Brand name | ROVE | ตัด `xxx` placeholder — §15 filled |

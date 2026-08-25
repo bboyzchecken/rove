@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	uberfx "go.uber.org/fx"
 
 	"github.com/bboyzchecken/rove/apps/api/pkg/core"
@@ -51,7 +52,14 @@ type runner struct {
 	wg    sync.WaitGroup
 }
 
-func NewRunner(cfg core.Config, p Pipeline, jobs models.AIJobStore, plans models.PlanStore, hub events.Hub) Runner {
+// eventsHub is the hub this package needs, named locally so queue.go can take
+// it without repeating the import in every signature.
+type eventsHub = events.Hub
+
+// newLocalRunner is the in-process pool. Both modes use it: `all` runs it
+// directly, and the worker process runs it behind the queue consumer, which is
+// what keeps the two producing identical drafts.
+func newLocalRunner(cfg core.Config, p Pipeline, jobs models.AIJobStore, plans models.PlanStore, hub events.Hub) Runner {
 	return &runner{
 		cfg:      cfg,
 		pipeline: p,
@@ -60,6 +68,31 @@ func NewRunner(cfg core.Config, p Pipeline, jobs models.AIJobStore, plans models
 		hub:      hub,
 		slots:    make(chan struct{}, maxConcurrent),
 	}
+}
+
+// NewRunner picks how a draft gets run, from the role this process is playing.
+//
+//	all     — run it here, which is what a laptop and docker compose do
+//	api     — hand it to the queue for a worker to pick up
+//	worker  — the same in-process pool, driven by ai.Consumer
+//
+// The API role still falls back to running the draft locally when the queue
+// cannot be reached: a credit has already been spent by the time this is
+// called, and losing the draft is the one outcome worth avoiding.
+func NewRunner(
+	cfg core.Config,
+	p Pipeline,
+	jobs models.AIJobStore,
+	plans models.PlanStore,
+	hub events.Hub,
+	rdb *redis.Client,
+) Runner {
+	local := newLocalRunner(cfg, p, jobs, plans, hub)
+
+	if cfg.Role != RoleAPI || rdb == nil {
+		return local
+	}
+	return &publisher{redis: rdb, local: local}
 }
 
 var RunnerModule = uberfx.Module("services.ai.runner", uberfx.Provide(NewRunner))

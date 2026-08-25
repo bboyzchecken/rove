@@ -177,6 +177,36 @@ func Migrate(db *gorm.DB) error {
 				return tx.Migrator().DropTable("polls", "notifications")
 			},
 		},
+		{
+			// M21 — A11.5: what people say after the trip, and what it actually
+			// cost them. One row per member per trip; the unique index is what
+			// makes "edit my review" a replace rather than a second opinion.
+			ID: "202608250000_trip_reviews",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.AutoMigrate(&models.TripReview{})
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return tx.Migrator().DropTable("trip_reviews")
+			},
+		},
+		{
+			// M22 — A12.10/A12.11/A12.12: what points turn into, what a published
+			// plan earns its creator, and the groups who asked for a human.
+			ID: "202608250001_partner_economy",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.AutoMigrate(
+					&models.DiscountCode{},
+					&models.CreatorEarning{},
+					&models.Payout{},
+					&models.AgentLead{},
+				)
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return tx.Migrator().DropTable(
+					"agent_leads", "payouts", "creator_earnings", "discount_codes",
+				)
+			},
+		},
 	})
 
 	return m.Migrate()

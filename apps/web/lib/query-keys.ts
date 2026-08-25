@@ -69,8 +69,17 @@ export const queryKeys = {
 
   share: (tripId: string) => ['trip', tripId, 'share'] as const,
   publicTrip: (tokenOrSlug: string) => ['public', tokenOrSlug] as const,
+  reviews: (tripId: string) => ['trip', tripId, 'reviews'] as const,
+  /** Points out and money owed (M22). Both belong to a person, not a trip. */
+  redemptions: () => ['me', 'redemptions'] as const,
+  earnings: () => ['me', 'earnings'] as const,
+  leads: (tripId: string) => ['trip', tripId, 'leads'] as const,
+  photoBookThemes: (tripId: string) => ['trip', tripId, 'photobook', 'themes'] as const,
   explore: (filters: string) => ['explore', filters] as const,
   creator: (handle: string) => ['creator', handle] as const,
+  /** The diff a copy would apply — keyed by the frame it was asked for. */
+  adaptPreview: (tokenOrSlug: string, input: string) =>
+    ['adapt-preview', tokenOrSlug, input] as const,
 
   poiSearch: (q: string, city?: string) => ['poi', 'search', q, city ?? ''] as const,
 } as const;

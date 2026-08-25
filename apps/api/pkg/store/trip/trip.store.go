@@ -93,8 +93,10 @@ func (s *store) Count(ctx context.Context) (int64, error) {
 // ListPublic returns only trips their owners chose to publish. Sorting is a
 // column sort, not a ranked feed — the points-weighted feed is a later story.
 func (s *store) ListPublic(ctx context.Context, f models.ExploreFilter) ([]models.Trip, int64, error) {
+	// 200 is the match pool (A11.3), not a page size: ranking by match score
+	// happens in Go, so the handler asks for a window and slices it itself.
 	limit := f.Limit
-	if limit <= 0 || limit > 50 {
+	if limit <= 0 || limit > 200 {
 		limit = 12
 	}
 

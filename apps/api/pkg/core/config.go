@@ -41,7 +41,23 @@ type Config struct {
 	// Shared secret partner postbacks must present (A12.6). Empty = the
 	// webhook is not enabled and answers 404.
 	AffiliateWebhookSecret string
+
+	// Where an agent handoff goes (A12.12). Both empty means the lead is still
+	// stored and the screen says nobody was messaged — a saved request with an
+	// honest label beats a form that pretends.
+	AgentEmail      string
+	AgentLineUserID string
+	AgentPartner    string
+
+	// Which half of the product this process is (Phase 3 — INFRA):
+	// "all" (default) serves HTTP and runs AI drafts in the same binary,
+	// "api" serves HTTP and hands drafts to a queue, "worker" only drains it.
+	Role string
 }
+
+// IsWorker reports whether this process exists to drain the AI queue rather
+// than to answer requests.
+func (c Config) IsWorker() bool { return c.Role == "worker" }
 
 type MySQLConfig struct {
 	Host     string

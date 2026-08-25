@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -122,16 +123,50 @@ const (
 	colQuality  = "quality_score"
 )
 
+// seedPOIs imports every catalogue in data/poi.
+//
+// The file name is the country: `jp.csv` is Japan, `kr.csv` is Korea. That
+// looks like a shortcut and is deliberate — a country column would let one row
+// in the wrong file claim to be somewhere it is not, and the whole point of a
+// per-country file is that a reviewer can see what changed at a glance.
 func seedPOIs(ctx context.Context, db *gorm.DB) error {
-	path := filepath.Join("data", "poi", "jp.csv")
+	paths, err := filepath.Glob(filepath.Join("data", "poi", "*.csv"))
+	if err != nil {
+		return err
+	}
+	if len(paths) == 0 {
+		logger.L().Warn("data/poi/*.csv not found — nothing to seed (see DEV_SPEC D0.2)")
+		return nil
+	}
+
+	sort.Strings(paths)
+	store := poistore.New(db)
+	imported, skipped := 0, 0
+
+	for _, path := range paths {
+		gotIn, skippedIn, err := seedPOIFile(ctx, store, path)
+		if err != nil {
+			return err
+		}
+		imported += gotIn
+		skipped += skippedIn
+	}
+
+	total, _ := store.Count(ctx)
+	logger.L().Infof("pois seeded: %d imported, %d skipped, %d in db", imported, skipped, total)
+	return nil
+}
+
+func seedPOIFile(ctx context.Context, store models.POIStore, path string) (int, int, error) {
+	country := strings.ToUpper(strings.TrimSuffix(filepath.Base(path), ".csv"))
+	if len(country) != 2 {
+		logger.L().Warnf("%s: file name is not a two-letter country code — skipped", path)
+		return 0, 0, nil
+	}
 
 	f, err := os.Open(path)
 	if err != nil {
-		if os.IsNotExist(err) {
-			logger.L().Warnf("%s not found — nothing to seed (see DEV_SPEC D0.2)", path)
-			return nil
-		}
-		return err
+		return 0, 0, err
 	}
 	defer f.Close()
 
@@ -140,11 +175,11 @@ func seedPOIs(ctx context.Context, db *gorm.DB) error {
 
 	rows, err := reader.ReadAll()
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
 	if len(rows) < 2 {
-		logger.L().Warn("poi csv has no data rows")
-		return nil
+		logger.L().Warnf("%s has no data rows", path)
+		return 0, 0, nil
 	}
 
 	index := map[string]int{}
@@ -153,7 +188,7 @@ func seedPOIs(ctx context.Context, db *gorm.DB) error {
 	}
 	for _, required := range []string{colID, colNameTH, colCity} {
 		if _, ok := index[required]; !ok {
-			return fmt.Errorf("poi csv: missing required column %q", required)
+			return 0, 0, fmt.Errorf("%s: missing required column %q", path, required)
 		}
 	}
 
@@ -165,7 +200,6 @@ func seedPOIs(ctx context.Context, db *gorm.DB) error {
 		return strings.TrimSpace(row[i])
 	}
 
-	store := poistore.New(db)
 	imported, skipped := 0, 0
 
 	for _, row := range rows[1:] {
@@ -180,7 +214,7 @@ func seedPOIs(ctx context.Context, db *gorm.DB) error {
 			NameTH:       name,
 			NameEN:       get(row, colNameEN),
 			NameJA:       get(row, colNameJA),
-			Country:      "JP",
+			Country:      country,
 			City:         get(row, colCity),
 			Area:         get(row, colArea),
 			Category:     firstNonEmpty(get(row, colCategory), "อื่นๆ"),
@@ -200,14 +234,13 @@ func seedPOIs(ctx context.Context, db *gorm.DB) error {
 		poi.ID = id
 
 		if err := store.Upsert(ctx, &poi); err != nil {
-			return fmt.Errorf("poi %s: %w", id, err)
+			return 0, 0, fmt.Errorf("poi %s: %w", id, err)
 		}
 		imported++
 	}
 
-	total, _ := store.Count(ctx)
-	logger.L().Infof("pois seeded: %d imported, %d skipped, %d in db", imported, skipped, total)
-	return nil
+	logger.L().Infof("%s: %d imported, %d skipped", path, imported, skipped)
+	return imported, skipped, nil
 }
 
 /* ----------------------------------------------------------------- util -- */

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Check, ExternalLink, Plus, Trash2 } from 'lucide-react';
 
+import { AgentHandoffCard } from '@/components/booking/agent-handoff';
 import { SectionHeader } from '@/components/common/section';
 import { EmptyState } from '@/components/common/empty-state';
 import { Badge } from '@/components/ui/badge';
@@ -171,6 +172,9 @@ export function BookingScreen({ tripId }: { tripId: string }) {
           ราคาที่คุณจ่ายเท่าเดิม
         </p>
       </section>
+
+      {/* When links are not what the group wants (M22 — A12.12). */}
+      <AgentHandoffCard tripId={tripId} />
     </div>
   );
 }

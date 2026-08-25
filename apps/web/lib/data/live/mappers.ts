@@ -2,6 +2,15 @@ import { DEFAULT_COVER } from '@/lib/covers';
 
 import type {
   ActivityEvent,
+  AdaptDiff,
+  AgentLead,
+  DiscountCode,
+  EarningsStatement,
+  RedemptionBoard,
+  ReviewBoard,
+  ReviewSummary,
+  TripReview,
+  AdaptTotals,
   AiCredits,
   Airport,
   AiJob,
@@ -59,6 +68,15 @@ import type {
 } from '../types';
 import type {
   ActivityDto,
+  AdaptDiffDto,
+  DiscountCodeDto,
+  EarningsDto,
+  LeadDto,
+  RedemptionListDto,
+  ReviewDto,
+  ReviewListDto,
+  ReviewSummaryDto,
+  AdaptTotalsDto,
   AirportDto,
   AiCreditsDto,
   AiJobDto,
@@ -124,6 +142,7 @@ export function toTrip(dto: TripDto): Trip {
   return {
     id: dto.id,
     title: dto.title,
+    country: dto.destination_country || 'JP',
     cities: dto.destination_cities ?? [],
     startDate: dto.start_date ?? '',
     endDate: dto.end_date ?? '',
@@ -564,6 +583,138 @@ export function toExploreTrip(dto: ExploreTripDto): ExploreTrip {
     cloneCount: dto.clone_count,
     creator: toPublicCreator(dto.creator),
     updatedAt: dto.updated_at,
+    match: dto.match ? { score: dto.match.score, reasons: dto.match.reasons ?? [] } : null,
+    reviews: toReviewSummary(dto.reviews),
+  };
+}
+
+/* ------------------------------- points out, money owed (M22) ------------ */
+
+export function toDiscountCode(dto: DiscountCodeDto): DiscountCode {
+  return {
+    code: dto.code,
+    scope: dto.scope,
+    amountThb: dto.amount_thb,
+    pointsSpent: dto.points_spent,
+    expiresAt: dto.expires_at,
+    usedAt: dto.used_at,
+    usable: dto.usable,
+  };
+}
+
+export function toRedemptionBoard(dto: RedemptionListDto): RedemptionBoard {
+  return {
+    balance: dto.balance,
+    tiers: (dto.tiers ?? []).map((tier) => ({
+      amountThb: tier.amount_thb,
+      points: tier.points,
+      afford: tier.afford,
+    })),
+    codes: (dto.codes ?? []).map(toDiscountCode),
+  };
+}
+
+export function toEarningsStatement(dto: EarningsDto): EarningsStatement {
+  return {
+    totals: {
+      pendingThb: dto.totals?.pending_thb ?? 0,
+      payableThb: dto.totals?.payable_thb ?? 0,
+      paidThb: dto.totals?.paid_thb ?? 0,
+      count: dto.totals?.count ?? 0,
+    },
+    sharePercent: dto.share_percent,
+    minimumPayoutThb: dto.minimum_payout_thb,
+    entries: (dto.entries ?? []).map((entry) => ({
+      tripId: entry.trip_id,
+      partner: entry.partner,
+      bookingValueThb: entry.booking_value_thb,
+      commissionThb: entry.commission_thb,
+      sharePercent: entry.share_percent,
+      amountThb: entry.amount_thb,
+      estimated: entry.estimated,
+      status: entry.status,
+      occurredAt: entry.occurred_at,
+    })),
+    payouts: (dto.payouts ?? []).map((payout) => ({
+      periodStart: payout.period_start,
+      periodEnd: payout.period_end,
+      amountThb: payout.amount_thb,
+      earningCount: payout.earning_count,
+      status: payout.status,
+      paidAt: payout.paid_at,
+    })),
+  };
+}
+
+export function toLead(dto: LeadDto): AgentLead {
+  return {
+    id: dto.id,
+    partner: dto.partner,
+    contactName: dto.contact_name,
+    contactPhone: dto.contact_phone,
+    contactLine: dto.contact_line,
+    note: dto.note,
+    status: dto.status,
+    sentAt: dto.sent_at,
+    createdAt: dto.created_at,
+    simulated: dto.simulated,
+  };
+}
+
+/* ------------------------------------------------- reviews (M21 — A11.5) - */
+
+export function toReviewSummary(dto?: ReviewSummaryDto | null): ReviewSummary {
+  return {
+    count: dto?.count ?? 0,
+    averageRating: dto?.average_rating ?? 0,
+    actualBudgetPerPerson: dto?.actual_budget_per_person ?? 0,
+    budgetSaid: dto?.budget_said ?? 0,
+  };
+}
+
+export function toReview(dto: ReviewDto): TripReview {
+  return {
+    userId: dto.user_id,
+    name: dto.name,
+    characterId: dto.character_id || 'shiba',
+    rating: dto.rating,
+    actualBudgetPerPerson: dto.actual_budget_per_person,
+    body: dto.body,
+    createdAt: dto.created_at,
+  };
+}
+
+export function toReviewBoard(dto: ReviewListDto): ReviewBoard {
+  return {
+    summary: toReviewSummary(dto.summary),
+    entries: (dto.entries ?? []).map(toReview),
+    mine: dto.mine ? toReview(dto.mine) : null,
+    canReview: dto.can_review,
+  };
+}
+
+/** The diff a copy would apply, or did (A11.4). */
+export function toAdaptDiff(dto: AdaptDiffDto): AdaptDiff {
+  return {
+    changes: (dto.changes ?? []).map((change) => ({
+      kind: change.kind,
+      dayLabel: change.day_label,
+      itemTitle: change.item_title,
+      reason: change.reason,
+      costDeltaDest: change.cost_delta_dest,
+    })),
+    before: toAdaptTotals(dto.before),
+    after: toAdaptTotals(dto.after),
+    warnings: dto.warnings ?? [],
+    currency: dto.currency,
+  };
+}
+
+function toAdaptTotals(dto: AdaptTotalsDto): AdaptTotals {
+  return {
+    days: dto.days,
+    items: dto.items,
+    costPerPersonDest: dto.cost_per_person_dest,
   };
 }
 

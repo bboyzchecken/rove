@@ -1,0 +1,35 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "loading": "Loading…",
+    "error": "Something went wrong",
+    "retry": "Try again",
+    "empty": "Nothing here yet"
+  },
+  "trip": {
+    "overview": "Overview",
+    "dates": "Dates",
+    "wishlist": "Wishlist",
+    "plan": "Plan",
+    "budget": "Budget",
+    "expense": "Spending",
+    "prep": "Prep",
+    "bookings": "Bookings",
+    "discussion": "Discussion",
+    "photos": "Photos",
+    "documents": "Documents"
+  },
+  "wishlist": {
+    "must": "Must do",
+    "nice": "Would be nice",
+    "avoid": "Rather not"
+  },
+  "coverage": {
+    "covered": "In the plan",
+    "partial": "Partly in",
+    "uncovered": "Not in yet"
+  }
+}

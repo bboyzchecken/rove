@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Pencil, Sparkles } from 'lucide-react';
 
 import { ModeLine } from '@/components/common/mode-banner';
+import { CreatorEarningsCard } from '@/components/profile/creator-earnings';
+import { PointsRedeemCard } from '@/components/profile/points-redeem';
 import { SectionHeader, Stat } from '@/components/common/section';
 import { CharacterPicker } from '@/components/profile/character-picker';
 import { ProfileEditSheet } from '@/components/profile/profile-edit-sheet';
@@ -57,12 +59,16 @@ export function ProfileScreen() {
               {(me?.points ?? 0).toLocaleString('th-TH')}
             </p>
             <p className="text-muted mt-1 text-xs">
-              ใช้ร่างแพลนด้วย AI เพิ่ม ({POINTS_PER_RUN} แต้ม/ครั้ง) หรือเป็นส่วนลดตอนจองก็ได้
+              ใช้ร่างแพลนด้วย AI เพิ่ม ({POINTS_PER_RUN} แต้ม/ครั้ง) หรือแลกเป็นโค้ดส่วนลดก็ได้
             </p>
           </div>
           <Sparkles className="text-primary size-8" />
         </div>
       </Card>
+
+      {/* redeeming and earning (M22 — A12.10 / A12.11) ------------------ */}
+      <PointsRedeemCard />
+      <CreatorEarningsCard />
 
       {/* stats --------------------------------------------------------- */}
       <section>

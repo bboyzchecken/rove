@@ -13,3 +13,4 @@ here. Order matters: **decide and record before writing the code** (DEV_SPEC §0
 | [0002](0002-phase-0-stack-versions.md) | Pinned stack versions for Phase 0 |
 | [0003](0003-phase-1-build-decisions.md) | Phase 1 build decisions (mock/live split, duplicated domain rules, no queue) |
 | [0004](0004-aws-ecs-instead-of-lightsail.md) | ECS Fargate + ALB from day one, not a single Lightsail box |
+| [0005](0005-phase-3-build-decisions.md) | Phase 3 build decisions (rule-based adapt, scored explore window, two currencies, worker split) |

@@ -1,6 +1,9 @@
 import type {
   ActivityEvent,
+  AdaptDiff,
+  AdaptInput,
   AdminStats,
+  AgentLead,
   Airport,
   AiCredits,
   AiGenerateInput,
@@ -19,10 +22,13 @@ import type {
   CommentTarget,
   CoverageSummary,
   CreateItemInput,
+  CreateLeadInput,
   CreateTripInput,
   CreatePollInput,
   CreatorProfile,
   CurrentUser,
+  DiscountCode,
+  EarningsStatement,
   DateWindow,
   DestinationSuggestion,
   DreamItem,
@@ -42,6 +48,8 @@ import type {
   Order,
   ParsedTicket,
   PastTrip,
+  PhotoBookOptions,
+  PhotoBookTheme,
   PlanDay,
   PlanItem,
   PlanVariant,
@@ -50,6 +58,9 @@ import type {
   Poll,
   PrepTask,
   PublicTripPayload,
+  RedemptionBoard,
+  ReviewBoard,
+  SaveReviewInput,
   ShareState,
   Subscription,
   SubscriptionPlan,
@@ -101,6 +112,9 @@ export interface RoveRepo {
   photos: PhotoRepo;
   documents: DocumentRepo;
   community: CommunityRepo;
+  reviews: ReviewRepo;
+  rewards: RewardRepo;
+  leads: LeadRepo;
   profile: ProfileRepo;
   admin: AdminRepo;
 }
@@ -330,6 +344,14 @@ export interface ShareRepo {
   creator(handle: string): Promise<CreatorProfile | null>;
   /** Copies a published trip into MY account (A11.1). Requires sign-in. */
   cloneFromPublic(tokenOrSlug: string): Promise<Trip>;
+
+  /**
+   * What copying this plan into my own dates, group and budget would change
+   * (A11.4). Writes nothing — this is the preview the confirm dialog shows.
+   */
+  adaptPreview(tokenOrSlug: string, input: AdaptInput): Promise<AdaptDiff>;
+  /** The same copy with those changes applied. Requires sign-in. */
+  cloneAdapted(tokenOrSlug: string, input: AdaptInput): Promise<{ trip: Trip; diff: AdaptDiff }>;
 }
 
 /**
@@ -341,8 +363,10 @@ export interface PhotoRepo {
   list(tripId: string, filter?: { dayId?: string; itemId?: string; userId?: string }): Promise<TripPhoto[]>;
   upload(tripId: string, input: UploadPhotoInput): Promise<TripPhoto>;
   remove(tripId: string, photoId: string): Promise<void>;
+  /** The palettes the renderer can print (Photo Book V2). */
+  photoBookThemes(tripId: string): Promise<PhotoBookTheme[]>;
   /** The printable photo book (A18.4) — a URL the caller opens in a tab. */
-  photoBookUrl(tripId: string): string;
+  photoBookUrl(tripId: string, options?: PhotoBookOptions): string;
 }
 
 /** The document folder (M19): tickets, vouchers, insurance papers. */
@@ -374,6 +398,41 @@ export interface CommunityRepo {
    * for a few seconds and false after, which is an event, not a row.
    */
   ping(tripId: string, state: { typing: boolean; tab: string }): Promise<void>;
+}
+
+/**
+ * Trip reviews (M21 — A11.5): how it went, and what it really cost.
+ *
+ * Member-only and post-trip. The roll-up is public — it rides along with the
+ * published plan — but writing one is something only the people who went can
+ * do, and only once the trip is behind them.
+ */
+export interface ReviewRepo {
+  list(tripId: string): Promise<ReviewBoard>;
+  /** Upsert: saving again replaces my review rather than adding a second. */
+  save(tripId: string, input: SaveReviewInput): Promise<ReviewBoard>;
+  remove(tripId: string): Promise<void>;
+}
+
+/**
+ * What points turn into and what a published plan earns (M22).
+ *
+ * Two currencies, kept apart on purpose: points are a score this product
+ * mints, earnings are money a partner owes in baht.
+ */
+export interface RewardRepo {
+  /** My balance, the tiers I can afford, and the codes I already hold. */
+  redemptions(): Promise<RedemptionBoard>;
+  /** Burns the points and returns the code (A12.10). */
+  redeem(amountThb: number): Promise<DiscountCode>;
+  /** What my public plans have earned me, and what has been paid (A12.11). */
+  earnings(): Promise<EarningsStatement>;
+}
+
+/** Handing a trip to a partner agent (A12.12). */
+export interface LeadRepo {
+  list(tripId: string): Promise<AgentLead[]>;
+  create(tripId: string, input: CreateLeadInput): Promise<AgentLead>;
 }
 
 export interface PoiRepo {

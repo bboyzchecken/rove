@@ -1,15 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { ImageUp } from 'lucide-react';
+import { Compass, ImageUp } from 'lucide-react';
 
 import { TripCover } from '@/components/trip/trip-cover';
 import { TripCoverSheet } from '@/components/trip/trip-cover-sheet';
 import { Badge } from '@/components/ui/badge';
+import { ButtonLink } from '@/components/ui/button';
 import { CharacterStack } from '@/components/ui/character-avatar';
 import { useMe } from '@/features/auth/queries';
 import { useTripOverview } from '@/features/trip/queries';
-import { thaiRangeLabel } from '@/lib/data/domain';
+import { thaiRangeLabel, toIsoDate } from '@/lib/data/domain';
 
 /**
  * The trip room's masthead (M2 — W2.1).
@@ -27,6 +28,12 @@ const STATUS_LABEL: Record<string, string> = {
   done: 'จบทริปแล้ว',
 };
 
+function addDaysIso(iso: string, days: number) {
+  const d = new Date(iso);
+  d.setDate(d.getDate() + days);
+  return toIsoDate(d);
+}
+
 export function TripHeader({ tripId }: { tripId: string }) {
   const { data, isLoading } = useTripOverview(tripId);
   const { data: me } = useMe();
@@ -43,6 +50,11 @@ export function TripHeader({ tripId }: { tripId: string }) {
 
   const { trip, members, locked } = data;
   const hasDates = Boolean(trip.startDate && trip.endDate);
+  // Trip Mode is offered from the day before departure until the day after the
+  // trip ends (W10.6). Any earlier and it is a screen with nothing to say.
+  const today = toIsoDate(new Date());
+  const travelling =
+    hasDates && today >= addDaysIso(trip.startDate, -1) && today <= addDaysIso(trip.endDate, 1);
   // A viewer reads the room but does not dress it — the same rule the API keeps.
   const canEdit = members.find((member) => member.id === me?.id)?.role !== 'viewer';
 
@@ -90,6 +102,13 @@ export function TripHeader({ tripId }: { tripId: string }) {
         </div>
         <CharacterStack characterIds={members.map((m) => m.characterId)} />
       </div>
+
+      {travelling ? (
+        <ButtonLink href={`/t/${tripId}/now` as never} size="sm" className="mt-3">
+          <Compass className="size-3.5" />
+          โหมดวันเดินทาง
+        </ButtonLink>
+      ) : null}
 
       <TripCoverSheet
         tripId={tripId}
