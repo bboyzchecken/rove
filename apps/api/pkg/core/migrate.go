@@ -207,7 +207,98 @@ func Migrate(db *gorm.DB) error {
 				)
 			},
 		},
+		{
+			// Indexes for the read paths the trip room hits hardest. Every one of
+			// these matched a WHERE that was already indexed but an ORDER BY that
+			// was not, which MySQL answers with a filesort over the whole matched
+			// set — cheap on a seeded database, and the first thing to show up in
+			// slow query logs once a trip has a real amount of history in it.
+			//
+			// Raw SQL rather than tags on the models: the sort column is usually
+			// `created_at`, which lives on the embedded Base and cannot be tagged
+			// per-table without putting the same index on all of them.
+			ID: "202608250002_hot_path_indexes",
+			Migrate: func(tx *gorm.DB) error {
+				return createIndexes(tx, hotPathIndexes)
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return dropIndexes(tx, hotPathIndexes)
+			},
+		},
 	})
 
 	return m.Migrate()
+}
+
+// hotPathIndex is one index, named so the guard below can ask whether it is
+// already there — a fresh database and an existing one take the same path.
+type hotPathIndex struct {
+	name    string
+	table   string
+	columns string
+	why     string
+}
+
+var hotPathIndexes = []hotPathIndex{
+	{
+		name: "idx_activity_feed", table: "activity_logs", columns: "(trip_id, created_at)",
+		// ListActivity: WHERE trip_id ORDER BY created_at DESC, keyset-paginated.
+		// This table gains a row on every mutation anywhere in the product, so it
+		// is the fastest-growing one there is, and the trip overview reads it.
+		why: "trip feed, keyset-paginated",
+	},
+	{
+		name: "idx_ai_jobs_created", table: "ai_jobs", columns: "(created_at)",
+		// CostSince: SUM(cost_usd) WHERE created_at >= ?. It runs before every
+		// single draft to check the daily cap, and was scanning the whole table.
+		why: "daily AI cost cap",
+	},
+	{
+		name: "idx_trips_public", table: "trips", columns: "(visibility, updated_at)",
+		// ListPublic: WHERE visibility = 'public'. Nothing indexed that column, so
+		// the busiest unauthenticated endpoint in the product scanned trips. Note
+		// this only covers sort=new; sort=popular orders by an expression and
+		// needs a stored score column instead.
+		why: "explore feed",
+	},
+	{
+		name: "idx_plan_items_order", table: "plan_items", columns: "(trip_id, sort_order)",
+		// ListItems: WHERE trip_id ORDER BY sort_order. Read by the plan board,
+		// the overview, validation and coverage — several times per trip request.
+		why: "itinerary read",
+	},
+	{
+		name: "idx_plan_days_order", table: "plan_days", columns: "(trip_id, day_index)",
+		why: "itinerary read",
+	},
+	{
+		name: "idx_wishlist_order", table: "wishlist_items", columns: "(trip_id, sort_order)",
+		why: "wishlist and coverage read",
+	},
+}
+
+// createIndexes is idempotent: an index that is already there is left alone
+// rather than failing the boot of every task in the service.
+func createIndexes(tx *gorm.DB, indexes []hotPathIndex) error {
+	for _, ix := range indexes {
+		if tx.Migrator().HasIndex(ix.table, ix.name) {
+			continue
+		}
+		if err := tx.Exec("CREATE INDEX " + ix.name + " ON " + ix.table + " " + ix.columns).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func dropIndexes(tx *gorm.DB, indexes []hotPathIndex) error {
+	for _, ix := range indexes {
+		if !tx.Migrator().HasIndex(ix.table, ix.name) {
+			continue
+		}
+		if err := tx.Exec("DROP INDEX " + ix.name + " ON " + ix.table).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
