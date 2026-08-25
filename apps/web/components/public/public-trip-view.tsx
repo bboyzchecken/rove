@@ -1,10 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bus, Car, Copy, Eye, EyeOff, Footprints, TrainFront } from 'lucide-react';
+import { Bus, Car, Copy, Eye, EyeOff, Footprints, TrainFront, Wand2 } from 'lucide-react';
 
 import { RoveLogo } from '@/components/brand/rove-logo';
+import { AdaptDialog } from '@/components/public/adapt-dialog';
+import { ReviewLine, ReviewSummaryLine } from '@/components/trip/trip-review';
 import { SectionHeader } from '@/components/common/section';
 import { TripCover } from '@/components/trip/trip-cover';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +33,7 @@ export function PublicTripView({ tokenOrSlug }: { tokenOrSlug: string }) {
   const { data, isLoading } = usePublicTrip(tokenOrSlug);
   const { data: me } = useMe();
   const cloneTrip = useCloneFromPublic();
+  const [adapting, setAdapting] = useState(false);
   const router = useRouter();
 
   if (isLoading) {
@@ -54,7 +58,7 @@ export function PublicTripView({ tokenOrSlug }: { tokenOrSlug: string }) {
     );
   }
 
-  const { trip, days, members, creator, viewCount, cloneCount } = data;
+  const { trip, days, members, creator, viewCount, cloneCount, reviews, reviewEntries } = data;
   const perPersonJpy = days
     .flatMap((d) => d.items)
     .reduce((sum, item) => sum + (item.costJpy ?? 0), 0);
@@ -130,6 +134,25 @@ export function PublicTripView({ tokenOrSlug }: { tokenOrSlug: string }) {
         </Card>
       ) : null}
 
+      {reviews.count > 0 ? (
+        <Card className="mt-4 p-4">
+          <p className="text-muted text-xs">คนที่ไปมาแล้วบอกว่า</p>
+          <div className="mt-2">
+            <ReviewSummaryLine summary={reviews} />
+          </div>
+          {reviewEntries.some((entry) => entry.body) ? (
+            <div className="divide-border border-border mt-2 divide-y border-t">
+              {reviewEntries
+                .filter((entry) => entry.body)
+                .slice(0, 3)
+                .map((entry) => (
+                  <ReviewLine key={entry.userId} review={entry} />
+                ))}
+            </div>
+          ) : null}
+        </Card>
+      ) : null}
+
       <section className="mt-6 space-y-5">
         {days.map((day) => (
           <div key={day.id}>
@@ -179,10 +202,16 @@ export function PublicTripView({ tokenOrSlug }: { tokenOrSlug: string }) {
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {me ? (
-            <Button size="sm" onClick={follow} disabled={cloneTrip.isPending}>
-              <Copy className="size-3.5" />
-              {cloneTrip.isPending ? 'กำลังก๊อป…' : 'เที่ยวตามแพลนนี้'}
-            </Button>
+            <>
+              <Button size="sm" onClick={follow} disabled={cloneTrip.isPending}>
+                <Copy className="size-3.5" />
+                {cloneTrip.isPending ? 'กำลังก๊อป…' : 'เที่ยวตามแพลนนี้'}
+              </Button>
+              <Button size="sm" variant="soft" onClick={() => setAdapting(true)}>
+                <Wand2 className="size-3.5" />
+                ปรับให้เข้ากับทริปฉัน
+              </Button>
+            </>
           ) : (
             <ButtonLink href={`/login?next=/p/${tokenOrSlug}` as never} size="sm">
               <Copy className="size-3.5" />
@@ -197,6 +226,13 @@ export function PublicTripView({ tokenOrSlug }: { tokenOrSlug: string }) {
           <p className="text-warning mt-2 text-xs">ก๊อปไม่สำเร็จ — ลองใหม่อีกครั้ง</p>
         ) : null}
       </Card>
+
+      <AdaptDialog
+        open={adapting}
+        onClose={() => setAdapting(false)}
+        tokenOrSlug={tokenOrSlug}
+        source={trip}
+      />
     </main>
   );
 }

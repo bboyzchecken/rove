@@ -86,6 +86,9 @@ resource "aws_ecs_task_definition" "api" {
         { name = "ENV", value = "production" },
         { name = "PORT", value = tostring(var.api_container_port) },
         { name = "MOCK_MODE", value = "false" },
+        # Drafts go to the queue for the worker service (Phase 3 — worker.tf).
+        # Set to "all" and scale worker_count to 0 to fold them back in here.
+        { name = "ROVE_ROLE", value = var.worker_count > 0 ? "api" : "all" },
         { name = "APP_BASE_URL", value = "https://${var.api_subdomain}.${var.domain_name}" },
         { name = "WEB_BASE_URL", value = "https://${var.domain_name}" },
         { name = "AUTH_COOKIE_NAME", value = "rove_token" },

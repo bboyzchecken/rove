@@ -22,6 +22,8 @@ func (s *Server) registerAdminRoutes(g *echo.Group) {
 	g.PATCH("/poi/:poiId", s.handleAdminUpsertPOI)
 	g.GET("/characters", s.handleAdminCharacters)
 	g.POST("/characters", s.handleAdminUpsertCharacter)
+	// The partner economy's ops screens (A12.11 / A12.12).
+	s.registerPayoutRoutes(g)
 }
 
 type adminStatsDTO struct {

@@ -8,13 +8,12 @@ import { SectionHeader } from '@/components/common/section';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
+import { PhotoBookSheet } from '@/components/photo/photo-book-sheet';
 import { Sheet } from '@/components/ui/sheet';
 import { useMe } from '@/features/auth/queries';
 import { usePhotos, useRemovePhoto, useUploadPhoto } from '@/features/media/queries';
 import { usePlanDays } from '@/features/plan/queries';
 import { useTripMembers } from '@/features/trip/queries';
-import { track } from '@/lib/analytics';
-import { repo } from '@/lib/data';
 import type { TripPhoto } from '@/lib/data';
 import { PHOTO_ACCEPT, photoFromFile } from '@/lib/image';
 import { cn } from '@/lib/utils';
@@ -35,6 +34,7 @@ export function PhotosScreen({ tripId }: { tripId: string }) {
   const [memberFilter, setMemberFilter] = useState('');
   const [lightbox, setLightbox] = useState<TripPhoto | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [booking, setBooking] = useState(false);
 
   const shown = photos.filter(
     (p) => (!dayFilter || p.dayId === dayFilter) && (!memberFilter || p.userId === memberFilter),
@@ -65,10 +65,8 @@ export function PhotosScreen({ tripId }: { tripId: string }) {
     }
   };
 
-  const openBook = () => {
-    track('photobook_export_started', { format: 'print' });
-    window.open(repo.photos.photoBookUrl(tripId), '_blank', 'noopener');
-  };
+  // Photo Book V2 asks for a cover and a palette first; the layout is worked
+  // out by the renderer from how many pictures each day has.
 
   return (
     <div className="space-y-6">
@@ -76,7 +74,7 @@ export function PhotosScreen({ tripId }: { tripId: string }) {
         <UploadPhotoButton pending={upload.isPending} onPick={pickFile} />
 
         {photos.length > 0 ? (
-          <Button variant="soft" size="sm" onClick={openBook}>
+          <Button variant="soft" size="sm" onClick={() => setBooking(true)}>
             <BookOpen className="size-3.5" />
             ทำ Photo Book
           </Button>
@@ -184,6 +182,13 @@ export function PhotosScreen({ tripId }: { tripId: string }) {
           onClose={() => setLightbox(null)}
         />
       ) : null}
+
+      <PhotoBookSheet
+        tripId={tripId}
+        photos={photos}
+        open={booking}
+        onClose={() => setBooking(false)}
+      />
     </div>
   );
 }

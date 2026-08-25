@@ -16,6 +16,9 @@ import { AI_PAY_CHANNELS, FREE_SUBSCRIPTION, seedOrders } from './billing';
 
 import type {
   ActivityEvent,
+  AgentLead,
+  DiscountCode,
+  EarningsStatement,
   AvailabilityEntry,
   BookingEntry,
   BudgetLine,
@@ -38,6 +41,7 @@ import type {
   Trip,
   TripDocument,
   TripPhoto,
+  TripReview,
   Vote,
   WishlistItem,
 } from '../types';
@@ -53,7 +57,11 @@ import type {
  * Never imported outside lib/data/mock.
  */
 
-const STORAGE_KEY = 'rove.mock.v7';
+// v9 adds `reviews` and `leads` to every trip record (A11.5 / A12.12) and the
+// redemption and earnings ledgers to the root (A12.10 / A12.11). Bumped rather
+// than back-filled: a stored older blob has no such arrays, and a UAT session
+// that half-loads is worse than one that starts clean.
+const STORAGE_KEY = 'rove.mock.v9';
 
 /** One candidate itinerary (M6) — metrics and votes are computed at read. */
 export interface VariantRecord {
@@ -112,6 +120,10 @@ export interface TripRecord {
   documents: TripDocument[];
   /** Open questions with fixed options (M9 — A9.3). */
   polls: Poll[];
+  /** What people said afterwards (M21 — A11.5). One per member, at most. */
+  reviews: TripReview[];
+  /** Requests to hand this trip to a partner agent (M22 — A12.12). */
+  leads: AgentLead[];
   comments: Comment[];
   votes: Vote[];
   activity: ActivityEvent[];
@@ -140,6 +152,10 @@ export interface MockDb {
   subscription: Subscription;
   /** Everything addressed to this user, newest last (M9 — A9.2). */
   notifications: Notification[];
+  /** Points turned into money off (M22 — A12.10), newest first. */
+  discountCodes: DiscountCode[];
+  /** What this user's published plans have earned them (M22 — A12.11). */
+  earnings: EarningsStatement;
   /** Trips the user finished — the profile timeline reads these as-is. */
   past: typeof PAST_TRIPS;
   upcoming: typeof UPCOMING;
@@ -282,6 +298,8 @@ function seedDemoTrip(): TripRecord {
     photos: [],
     documents: [],
     polls: [],
+    reviews: [],
+    leads: [],
     comments: [
       {
         id: 'c1',
@@ -325,6 +343,9 @@ function seedDateTrip(): TripRecord {
     trip: {
       id: 'dec',
       title: 'ทริปสิ้นปีของแก๊ง',
+      // No destination yet — the date board picks it (M2.5), so the checklist
+      // and the zones fall back to the default until it does.
+      country: 'JP',
       cities: [],
       startDate: '',
       endDate: '',
@@ -362,6 +383,8 @@ function seedDateTrip(): TripRecord {
     photos: [],
     documents: [],
     polls: [],
+    reviews: [],
+    leads: [],
     comments: [],
     votes: [],
     activity: [
@@ -510,9 +533,83 @@ export function seedDb(): MockDb {
     orders: seedOrders(),
     subscription: structuredClone(FREE_SUBSCRIPTION),
     notifications: [],
+    discountCodes: [],
+    // Seeded with one settled month and one still owing, so the creator
+    // statement has something to be a statement of.
+    earnings: seedEarnings(),
     past: structuredClone(PAST_TRIPS),
     upcoming: structuredClone(UPCOMING),
     stats: structuredClone(YEAR_STATS),
+  };
+}
+
+/**
+ * A creator statement worth looking at (M22 — A12.11).
+ *
+ * The numbers follow the same arithmetic the API uses: a partner commission,
+ * 30% of it to the creator, and an `estimated` flag on anything accrued from a
+ * rate table rather than reported.
+ */
+function seedEarnings(): EarningsStatement {
+  const entries = [
+    {
+      tripId: 'demo',
+      partner: 'Agoda',
+      bookingValueThb: 48_000,
+      commissionThb: 2_400,
+      sharePercent: 30,
+      amountThb: 720,
+      estimated: true,
+      status: 'payable' as const,
+      occurredAt: '2026-08-12T09:20:00.000Z',
+    },
+    {
+      tripId: 'demo',
+      partner: 'Klook',
+      bookingValueThb: 9_600,
+      commissionThb: 480,
+      sharePercent: 30,
+      amountThb: 144,
+      estimated: false,
+      status: 'payable' as const,
+      occurredAt: '2026-08-03T14:05:00.000Z',
+    },
+    {
+      tripId: 'demo',
+      partner: 'Booking.com',
+      bookingValueThb: 62_000,
+      commissionThb: 2_480,
+      sharePercent: 30,
+      amountThb: 744,
+      estimated: false,
+      status: 'paid' as const,
+      occurredAt: '2026-07-18T11:40:00.000Z',
+    },
+  ];
+
+  const sum = (status: string) =>
+    entries.filter((e) => e.status === status).reduce((n, e) => n + e.amountThb, 0);
+
+  return {
+    totals: {
+      pendingThb: sum('pending'),
+      payableThb: sum('payable'),
+      paidThb: sum('paid'),
+      count: entries.length,
+    },
+    sharePercent: 30,
+    minimumPayoutThb: 300,
+    entries,
+    payouts: [
+      {
+        periodStart: '2026-07-01',
+        periodEnd: '2026-07-31',
+        amountThb: 744,
+        earningCount: 1,
+        status: 'paid',
+        paidAt: '2026-08-05T03:00:00.000Z',
+      },
+    ],
   };
 }
 

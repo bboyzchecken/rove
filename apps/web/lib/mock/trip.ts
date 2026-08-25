@@ -9,6 +9,7 @@ import type { BudgetLine, ExpenseEntry, Member, PlanDay, Trip, WishlistItem } fr
 export const TRIP: Trip = {
   id: 'demo',
   title: 'ญี่ปุ่นใบไม้เปลี่ยนสี 2569',
+  country: 'JP',
   cities: ['โตเกียว', 'เกียวโต', 'โอซาก้า'],
   startDate: '2026-11-15',
   endDate: '2026-11-22',

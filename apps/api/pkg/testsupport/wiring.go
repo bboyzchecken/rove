@@ -25,6 +25,7 @@ import (
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/ai"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/airports"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/email"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/notify"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/places"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/storage"
@@ -44,6 +45,9 @@ import (
 	planstore "github.com/bboyzchecken/rove/apps/api/pkg/store/plan"
 	poistore "github.com/bboyzchecken/rove/apps/api/pkg/store/poi"
 	pointsstore "github.com/bboyzchecken/rove/apps/api/pkg/store/points"
+	leadstore "github.com/bboyzchecken/rove/apps/api/pkg/store/lead"
+	reviewstore "github.com/bboyzchecken/rove/apps/api/pkg/store/review"
+	rewardstore "github.com/bboyzchecken/rove/apps/api/pkg/store/reward"
 	prepstore "github.com/bboyzchecken/rove/apps/api/pkg/store/prep"
 	tripstore "github.com/bboyzchecken/rove/apps/api/pkg/store/trip"
 	userstore "github.com/bboyzchecken/rove/apps/api/pkg/store/user"
@@ -64,12 +68,14 @@ var allModels = []any{
 	&models.AIJob{}, &models.AICredit{}, &models.TripFlight{},
 	&models.Order{}, &models.Subscription{}, &models.MemberProfile{},
 	&models.PlanVariant{}, &models.TripPhoto{}, &models.TripDocument{},
-	&models.Notification{}, &models.Poll{},
+	&models.Notification{}, &models.Poll{}, &models.TripReview{},
+	&models.DiscountCode{}, &models.CreatorEarning{}, &models.Payout{}, &models.AgentLead{},
 }
 
 // allTables is the drop order — children before parents.
 var allTables = []string{
-	"polls", "notifications", "trip_documents", "trip_photos",
+	"agent_leads", "payouts", "creator_earnings", "discount_codes",
+	"trip_reviews", "polls", "notifications", "trip_documents", "trip_photos",
 	"plan_variants", "member_profiles",
 	"orders", "subscriptions",
 	"ai_credits", "ai_jobs", "activity_logs", "votes", "comments",
@@ -113,6 +119,11 @@ func newParams(cfg core.Config, db *gorm.DB) handlers.ServerParams {
 		Documents:     mediastore.NewDocumentStore(db),
 		Notifications: communitystore.NewNotificationStore(db),
 		Polls:         communitystore.NewPollStore(db),
+		Reviews:       reviewstore.New(db),
+		Discounts:     rewardstore.NewDiscountStore(db),
+		Earnings:      rewardstore.NewEarningStore(db),
+		Payouts:       rewardstore.NewPayoutStore(db),
+		Leads:         leadstore.New(db),
 
 		Hub: stubHub{},
 		// The airport index is embedded data with no I/O — the real one is the
@@ -127,6 +138,9 @@ func newParams(cfg core.Config, db *gorm.DB) handlers.ServerParams {
 		Storage:   storage.New(cfg),
 		// No token in tests: pushes are skipped, the inbox row is still written.
 		Notify: notify.New(cfg),
+		// The stub logs what it would have sent, which is the production
+		// behaviour until a transport is configured.
+		Email: email.New(cfg),
 	}
 }
 

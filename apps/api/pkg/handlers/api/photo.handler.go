@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 
+	"github.com/bboyzchecken/rove/apps/api/pkg/domain"
 	"github.com/bboyzchecken/rove/apps/api/pkg/handlers/api/request"
 	"github.com/bboyzchecken/rove/apps/api/pkg/models"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
@@ -28,6 +29,9 @@ func (s *Server) registerPhotoRoutes(g *echo.Group) {
 	g.POST("/:tripId/photos", s.handleUploadPhoto, edit)
 	g.DELETE("/:tripId/photos/:photoId", s.handleDeletePhoto, edit)
 	g.GET("/:tripId/photobook", s.handlePhotoBook, view)
+	// The palette catalogue, so the picker offers exactly what the renderer
+	// knows how to print (Photo Book V2).
+	g.GET("/:tripId/photobook/themes", s.handlePhotoBookThemes, view)
 }
 
 /* ------------------------------------------------------------------ DTOs -- */
@@ -183,49 +187,109 @@ func (s *Server) handleDeletePhoto(c echo.Context) error {
 
 /* -------------------------------------------------------- photo book ----- */
 
+func (s *Server) handlePhotoBookThemes(c echo.Context) error {
+	return c.JSON(http.StatusOK, domain.PhotoBookThemes)
+}
+
 // photoBookTemplate is a self-contained page the browser prints to PDF — the
 // same choice the plan export made (Decision Log 20 ส.ค.): no headless Chrome
 // on the instance, and the user picks their own paper size.
+//
+// V2 (Phase 3) adds the three things that separate a book from a contact
+// sheet: a cover built from one of the trip's own photos, a palette, and a
+// per-day layout that reacts to how many pictures the day has
+// (pkg/domain/photobook.go).
 var photoBookTemplate = template.Must(template.New("photobook").Parse(`<!doctype html>
 <html lang="th"><head><meta charset="utf-8">
 <title>{{.Title}} — Photo Book</title>
 <style>
-  body { font-family: 'Inter', 'Noto Sans Thai', sans-serif; color: #3D2B24; margin: 0; }
-  .cover { min-height: 90vh; display: flex; flex-direction: column; justify-content: center; text-align: center; padding: 2rem; }
-  .cover h1 { font-size: 2.4rem; margin: 0.5rem 0 0.2rem; }
-  .cover p { color: #6B5B4E; }
-  .day { page-break-before: always; padding: 1.5rem 2rem; }
-  .day h2 { font-size: 1.3rem; border-bottom: 2px solid #D9714E; padding-bottom: 0.4rem; }
-  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.8rem; margin-top: 1rem; }
-  figure { margin: 0; break-inside: avoid; }
-  img { width: 100%; border-radius: 12px; display: block; }
-  figcaption { font-size: 0.75rem; color: #6B5B4E; margin-top: 0.3rem; }
-  .footer { text-align: center; color: #6B5B4E; font-size: 0.7rem; padding: 2rem; }
-  @media print { .day { padding: 0.5rem 0; } }
+  :root {
+    --paper: {{.Theme.Paper}};
+    --ink: {{.Theme.Ink}};
+    --muted: {{.Theme.Muted}};
+    --accent: {{.Theme.Accent}};
+    --cover-ink: {{.Theme.CoverInk}};
+  }
+  body { font-family: 'Inter', 'Noto Sans Thai', sans-serif; color: var(--ink); background: var(--paper); margin: 0; }
+
+  /* The cover is the trip's own photograph with the title on it. A scrim
+     rather than a tint: the type has to stay readable over a picture nobody
+     chose for its contrast. */
+  .cover { position: relative; min-height: 96vh; display: flex; flex-direction: column;
+           justify-content: flex-end; padding: 3rem 2.5rem; overflow: hidden; }
+  .cover-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .cover-scrim { position: absolute; inset: 0;
+                 background: linear-gradient(180deg, rgba(0,0,0,.15) 0%, rgba(0,0,0,.72) 78%); }
+  .cover-text { position: relative; color: var(--cover-ink); }
+  .cover.plain { justify-content: center; text-align: center; background: var(--paper); }
+  .cover.plain .cover-text { color: var(--ink); }
+  .kicker { font-size: .75rem; letter-spacing: .18em; text-transform: uppercase; opacity: .85; margin: 0; }
+  .cover h1 { font-size: 2.8rem; line-height: 1.1; margin: .6rem 0 .4rem; }
+  .cover .sub { opacity: .85; margin: 0; font-size: .95rem; }
+  .rule { width: 56px; height: 3px; background: var(--accent); border-radius: 2px; margin: 1.1rem 0 0; }
+
+  .day { page-break-before: always; padding: 2rem 2.5rem; }
+  .day h2 { font-size: 1.15rem; margin: 0 0 .2rem; }
+  .day .count { color: var(--muted); font-size: .75rem; margin: 0 0 1rem; }
+  .grid { display: grid; grid-template-columns: repeat(6, 1fr); grid-auto-rows: 8.5rem; gap: .7rem; }
+  figure { margin: 0; break-inside: avoid; position: relative; grid-row: span 1; }
+  figure.tall { grid-row: span 2; }
+  img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; display: block; }
+  figcaption { font-size: .7rem; color: var(--muted); margin-top: .3rem; }
+
+  .footer { text-align: center; color: var(--muted); font-size: .7rem; padding: 2rem; }
+  @media print {
+    body { background: var(--paper); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .day { padding: .6rem 0; }
+  }
 </style></head><body>
-<div class="cover">
-  <p>ROVE Travel Photo Book</p>
-  <h1>{{.Title}}</h1>
-  <p>{{.Subtitle}}</p>
+
+<div class="cover{{if not .CoverURL}} plain{{end}}">
+  {{if .CoverURL}}<img class="cover-photo" src="{{.CoverURL}}" alt=""><div class="cover-scrim"></div>{{end}}
+  <div class="cover-text">
+    <p class="kicker">{{.Kicker}}</p>
+    <h1>{{.Title}}</h1>
+    <p class="sub">{{.Subtitle}}</p>
+    <div class="rule"></div>
+  </div>
 </div>
+
 {{range .Days}}
 <section class="day">
   <h2>{{.Label}}</h2>
+  <p class="count">{{len .Photos}} รูป</p>
   <div class="grid">
-    {{range .Photos}}<figure><img src="{{.URL}}" alt="">{{if .Caption}}<figcaption>{{.Caption}}</figcaption>{{end}}</figure>{{end}}
+    {{range .Photos}}
+    <figure class="{{if .Slot.Tall}}tall{{end}}" style="grid-column: span {{.Slot.Span}}">
+      <img src="{{.URL}}" alt="">
+      {{if .Caption}}<figcaption>{{.Caption}}</figcaption>{{end}}
+    </figure>
+    {{end}}
   </div>
 </section>
 {{end}}
+
 <p class="footer">ทำด้วย ROVE — rovetravel.site</p>
 </body></html>`))
 
+// photoBookPhoto is a picture plus the place the layout gave it.
+type photoBookPhoto struct {
+	URL     string
+	Caption string
+	Slot    domain.PhotoSlot
+}
+
 type photoBookDay struct {
 	Label  string
-	Photos []photoDTO
+	Photos []photoBookPhoto
 }
 
 // handlePhotoBook renders every photo of the trip, grouped by day, as one
-// printable page (A18.4 — W18.4).
+// printable book (A18.4 — W18.4; V2 layout/cover/theme in Phase 3).
+//
+// Query: `theme` picks a palette, `cover` picks which photo leads. Both fall
+// back rather than failing — a mistyped parameter should print the default
+// book, not an error page.
 func (s *Server) handlePhotoBook(c echo.Context) error {
 	ctx := c.Request().Context()
 	tripID := request.TripID(c)
@@ -251,13 +315,31 @@ func (s *Server) handlePhotoBook(c echo.Context) error {
 		dayOrder[day.ID] = day.DayIndex
 	}
 
-	grouped := map[string][]photoDTO{}
+	// The cover photo leads the book and is not repeated inside it.
+	coverID := c.QueryParam("cover")
+	coverURL := ""
 	for _, p := range photos {
+		if p.ID == coverID {
+			coverURL, _ = s.storage.URL(ctx, s.photoBucket(), p.StorageKey)
+			break
+		}
+	}
+	if coverURL == "" && coverID == "" {
+		coverURL, _ = s.storage.URL(ctx, s.photoBucket(), photos[0].StorageKey)
+		coverID = photos[0].ID
+	}
+
+	grouped := map[string][]photoBookPhoto{}
+	for _, p := range photos {
+		if p.ID == coverID {
+			continue
+		}
 		key := ""
 		if p.DayID != nil {
 			key = *p.DayID
 		}
-		grouped[key] = append(grouped[key], s.toPhotoDTO(ctx, p))
+		url, _ := s.storage.URL(ctx, s.photoBucket(), p.StorageKey)
+		grouped[key] = append(grouped[key], photoBookPhoto{URL: url, Caption: p.Caption})
 	}
 
 	keys := make([]string, 0, len(grouped))
@@ -280,7 +362,13 @@ func (s *Server) handlePhotoBook(c echo.Context) error {
 		if label == "" {
 			label = "ความทรงจำอื่นๆ"
 		}
-		bookDays = append(bookDays, photoBookDay{Label: label, Photos: grouped[key]})
+
+		dayPhotos := grouped[key]
+		slots := domain.PhotoBookLayout(len(dayPhotos))
+		for i := range dayPhotos {
+			dayPhotos[i].Slot = slots[i]
+		}
+		bookDays = append(bookDays, photoBookDay{Label: label, Photos: dayPhotos})
 	}
 
 	subtitle := strings.Join(jsonStrings(toJSONRaw(trip.DestinationCities)), " · ")
@@ -293,6 +381,9 @@ func (s *Server) handlePhotoBook(c echo.Context) error {
 	if err := photoBookTemplate.Execute(&b, map[string]any{
 		"Title":    trip.Title,
 		"Subtitle": subtitle,
+		"Kicker":   "ROVE Travel Photo Book",
+		"CoverURL": coverURL,
+		"Theme":    domain.PhotoBookThemeByID(c.QueryParam("theme")),
 		"Days":     bookDays,
 	}); err != nil {
 		return request.Internal(c, "สร้างโฟโต้บุ๊กไม่สำเร็จ")

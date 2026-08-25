@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -312,6 +313,8 @@ type buyCreditsRequest struct {
 	// user actually tapped and is quoted verbatim on the receipt.
 	Method  string `json:"method"`
 	Channel string `json:"channel"`
+	// A discount code redeemed from points (A12.10).
+	DiscountCode string `json:"discount_code"`
 }
 
 // handleBuyCredits adds paid drafts. There is no payment gateway in Phase 1:
@@ -367,6 +370,17 @@ func (s *Server) handleBuyCredits(c echo.Context) error {
 		}
 	}
 
+	// A code redeemed from points (A12.10). Only cash orders can take one:
+	// paying with points already zeroes the bill.
+	var discount *models.DiscountCode
+	if !usingPoints {
+		found, problem := s.resolveDiscount(ctx, userID, strings.ToUpper(strings.TrimSpace(req.DiscountCode)), models.DiscountScopeAICredits)
+		if problem != "" {
+			return request.BadRequest(c, problem)
+		}
+		discount = found
+	}
+
 	credits.Extra += req.Quantity
 	if err := s.aiJobs.SaveCredits(ctx, credits); err != nil {
 		return request.Internal(c, "บันทึกโควตาไม่สำเร็จ")
@@ -391,6 +405,7 @@ func (s *Server) handleBuyCredits(c echo.Context) error {
 		Method:      method,
 		MethodLabel: orDefault(req.Channel, domain.PayMethodLabel(method)),
 		PointsSpent: pointsSpent,
+		Discount:    discount,
 		TripID:      &tripID,
 		TripTitle:   tripTitle,
 	})

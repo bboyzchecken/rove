@@ -6,6 +6,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -19,6 +20,7 @@ import (
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/affiliate"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/ai"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/airports"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/email"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
 	fxsvc "github.com/bboyzchecken/rove/apps/api/pkg/services/fx"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/notify"
@@ -59,6 +61,11 @@ type ServerParams struct {
 	Documents     models.DocumentStore
 	Notifications models.NotificationStore
 	Polls         models.PollStore
+	Reviews       models.ReviewStore
+	Discounts     models.DiscountStore
+	Earnings      models.EarningStore
+	Payouts       models.PayoutStore
+	Leads         models.LeadStore
 
 	Hub       events.Hub
 	FX        fxsvc.Service
@@ -70,6 +77,7 @@ type ServerParams struct {
 	AIRunner  ai.Runner
 	Storage   storage.Service
 	Notify    notify.Service
+	Email     email.Service
 }
 
 type Server struct {
@@ -100,6 +108,11 @@ type Server struct {
 	documents     models.DocumentStore
 	notifications models.NotificationStore
 	polls         models.PollStore
+	reviews       models.ReviewStore
+	discounts     models.DiscountStore
+	earnings      models.EarningStore
+	payouts       models.PayoutStore
+	leads         models.LeadStore
 
 	hub       events.Hub
 	fx        fxsvc.Service
@@ -111,6 +124,7 @@ type Server struct {
 	aiRunner  ai.Runner
 	storage   storage.Service
 	notify    notify.Service
+	email     email.Service
 
 	cookieName string
 }
@@ -148,6 +162,11 @@ func NewServer(p ServerParams) *Server {
 		documents:     p.Documents,
 		notifications: p.Notifications,
 		polls:         p.Polls,
+		reviews:       p.Reviews,
+		discounts:     p.Discounts,
+		earnings:      p.Earnings,
+		payouts:       p.Payouts,
+		leads:         p.Leads,
 		hub:           p.Hub,
 		fx:            p.FX,
 		airports:      p.Airports,
@@ -158,6 +177,7 @@ func NewServer(p ServerParams) *Server {
 		aiRunner:      p.AIRunner,
 		storage:       p.Storage,
 		notify:        p.Notify,
+		email:         p.Email,
 		cookieName:    p.Config.AuthCookieName,
 	}
 
@@ -179,10 +199,36 @@ func (s *Server) setupMiddleware() {
 		AllowCredentials: true,
 		MaxAge:           600,
 	}))
+	// Nothing in front of this compresses: an ALB forwards the body untouched,
+	// unlike a CDN. A trip room's plan payload is a few hundred kilobytes of
+	// JSON that gzips to a fraction of that, and the audience is on a phone.
+	s.e.Use(middleware.GzipWithConfig(middleware.GzipConfig{
+		Level: 5,
+		// Below this the header overhead costs more than the saving.
+		MinLength: 1024,
+		Skipper:   skipCompression,
+	}))
 	// 8M: a ticket PDF is a few megabytes; photos arrive browser-resized and
 	// far smaller. Anything bigger than this is a mistake, not a document.
 	s.e.Use(middleware.BodyLimit("8M"))
 	s.e.Use(s.RateLimit())
+}
+
+// skipCompression leaves alone the responses where gzip either cannot help or
+// would actively hurt: the SSE stream (frames must leave the moment they are
+// written, and buffering them is the one thing that breaks realtime), the
+// health probes an ALB hits every 15s, and bytes that arrive compressed
+// already.
+func skipCompression(c echo.Context) bool {
+	path := c.Path()
+	switch path {
+	case "/healthz", "/readyz":
+		return true
+	}
+	if strings.HasSuffix(path, "/events") {
+		return true
+	}
+	return strings.HasPrefix(path, "/uploads")
 }
 
 // registerRoutes is the map of the whole API. Each register* method lives in
@@ -231,6 +277,8 @@ func (s *Server) registerRoutes() {
 	s.registerPhotoRoutes(trips)         // A18.x — trip photos
 	s.registerDocumentRoutes(trips)      // A19.x — document folder
 	s.registerCommunityRoutes(trips)     // A9.2/A9.3 — polls + presence
+	s.registerReviewRoutes(trips)        // A11.5 — how it actually went
+	s.registerLeadRoutes(trips)          // A12.12 — hand the trip to an agent
 	s.registerEventRoutes(trips)         // A2.5 — SSE
 
 	// --- admin ---------------------------------------------------------------

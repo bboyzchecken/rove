@@ -13,6 +13,9 @@ const (
 	PointsReasonPublish     = "trip_published"
 	PointsReasonAIDraft     = "ai_draft"
 	PointsReasonAdjustment  = "adjustment"
+	// Points turned into a discount code (A12.10) — a spend, never a balance
+	// reset: the ledger still has to answer "where did 2,400 points go?".
+	PointsReasonRedeem = "redeem"
 )
 
 // UserPoints is an append-only ledger, never a balance column.

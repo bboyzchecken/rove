@@ -176,6 +176,77 @@ describe('expenses', () => {
     const total = settle(rows).reduce((sum, s) => sum + s.amountThb, 0);
     expect(total).toBe(300);
   });
+
+  /* ------------------------------------------- minimal settle-up (A16.5) -- */
+
+  it('finds the subgroups that already clear among themselves', () => {
+    // Two people owe 500 and two are owed 500. Greedy pairing needs three
+    // transfers here; splitting the group into two pairs needs two.
+    const got = settle([
+      { member: { id: 'a' }, balanceThb: -500 },
+      { member: { id: 'b' }, balanceThb: 500 },
+      { member: { id: 'c' }, balanceThb: -500 },
+      { member: { id: 'd' }, balanceThb: 500 },
+    ]);
+
+    expect(got).toHaveLength(2);
+    expect(got.every((t) => t.amountThb === 500)).toBe(true);
+  });
+
+  it('still needs k-1 transfers when nothing splits', () => {
+    const got = settle([
+      { member: { id: 'a' }, balanceThb: 900 },
+      { member: { id: 'b' }, balanceThb: -300 },
+      { member: { id: 'c' }, balanceThb: -300 },
+      { member: { id: 'd' }, balanceThb: -300 },
+    ]);
+
+    expect(got).toHaveLength(3);
+    expect(got.every((t) => t.toMemberId === 'a')).toBe(true);
+  });
+
+  it('leaves every balance exactly cleared', () => {
+    const rows = [
+      { member: { id: 'a' }, balanceThb: -1200 },
+      { member: { id: 'b' }, balanceThb: 700 },
+      { member: { id: 'c' }, balanceThb: -800 },
+      { member: { id: 'd' }, balanceThb: 1300 },
+      { member: { id: 'e' }, balanceThb: 0 },
+    ];
+
+    const net: Record<string, number> = {};
+    for (const t of settle(rows)) {
+      net[t.fromMemberId] = (net[t.fromMemberId] ?? 0) - t.amountThb;
+      net[t.toMemberId] = (net[t.toMemberId] ?? 0) + t.amountThb;
+    }
+    for (const row of rows) {
+      expect(net[row.member.id] ?? 0).toBe(row.balanceThb);
+    }
+  });
+
+  it('absorbs per-member rounding into the largest balance', () => {
+    const got = settle([
+      { member: { id: 'a' }, balanceThb: -333 },
+      { member: { id: 'b' }, balanceThb: -333 },
+      { member: { id: 'c' }, balanceThb: 667 },
+    ]);
+
+    expect(got.reduce((sum, t) => sum + t.amountThb, 0)).toBe(666);
+  });
+
+  it('falls back to greedy above the exact limit and still clears', () => {
+    const rows = [
+      ...Array.from({ length: 12 }, (_, i) => ({
+        member: { id: `m${i}` },
+        balanceThb: -100,
+      })),
+      { member: { id: 'z' }, balanceThb: 1200 },
+    ];
+
+    const got = settle(rows);
+    expect(got).toHaveLength(12);
+    expect(got.reduce((sum, t) => sum + t.amountThb, 0)).toBe(1200);
+  });
 });
 
 describe('plan', () => {

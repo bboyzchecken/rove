@@ -18,6 +18,7 @@ import {
 
 import { SectionHeader, Stat } from '@/components/common/section';
 import { TripCover } from '@/components/trip/trip-cover';
+import { TripReviewCard } from '@/components/trip/trip-review';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -291,6 +292,9 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
           </Card>
         </section>
       ) : null}
+
+      {/* ------------------------------------------------------- review */}
+      <TripReviewCard tripId={tripId} />
 
       {/* ----------------------------------------------------- activity */}
       {recap.activity.length > 0 ? (

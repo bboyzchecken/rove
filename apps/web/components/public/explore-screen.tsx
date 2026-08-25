@@ -2,15 +2,19 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Copy, Eye, Search } from 'lucide-react';
+import { Copy, Eye, Search, Sparkles } from 'lucide-react';
 
 import { RoveLogo } from '@/components/brand/rove-logo';
+import { MatchBadge } from '@/components/public/match-badge';
+import { Stars } from '@/components/trip/trip-review';
 import { TripCover } from '@/components/trip/trip-cover';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
 import { bareInputClass, fieldShellClass } from '@/components/ui/field';
+import { useMe } from '@/features/auth/queries';
 import { useExplore } from '@/features/public/queries';
+import { useTrips } from '@/features/trip/queries';
 import type { ExploreTrip } from '@/lib/data';
 import { cn } from '@/lib/utils';
 
@@ -34,16 +38,24 @@ export function ExploreScreen() {
   const [quick, setQuick] = useState('');
   const [sort, setSort] = useState<'popular' | 'new'>('popular');
   const [pages, setPages] = useState(1);
+  /** The trip to rank against, empty for the plain feed (A11.3). */
+  const [matchTripId, setMatchTripId] = useState('');
 
-  const { data, isLoading } = useExplore({
+  const { data: me } = useMe();
+  const { data: myTrips } = useTrips();
+  const matchable = myTrips ?? [];
+
+  const { data, isLoading, isError } = useExplore({
     q: query || quick,
     sort,
+    match: matchTripId || undefined,
     limit: PAGE_SIZE * pages,
     offset: 0,
   });
 
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
+  const matching = Boolean(matchTripId);
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-6">
@@ -102,11 +114,14 @@ export function ExploreScreen() {
               key={mode}
               onClick={() => {
                 setSort(mode);
+                setMatchTripId('');
                 setPages(1);
               }}
               className={cn(
                 'rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition',
-                sort === mode ? 'bg-primary/12 text-primary' : 'text-muted hover:bg-surface',
+                sort === mode && !matching
+                  ? 'bg-primary/12 text-primary'
+                  : 'text-muted hover:bg-surface',
               )}
             >
               {mode === 'popular' ? 'ยอดนิยม' : 'มาใหม่'}
@@ -114,6 +129,45 @@ export function ExploreScreen() {
           ))}
         </div>
       </div>
+
+      {me && matchable.length > 0 ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-muted flex items-center gap-1.5 text-xs">
+            <Sparkles className="size-3.5" />
+            เรียงตามที่เข้ากับทริปของฉัน
+          </span>
+          <select
+            className="bg-surface text-espresso rounded-full px-3 py-1.5 text-xs font-semibold outline-none"
+            value={matchTripId}
+            onChange={(e) => {
+              setMatchTripId(e.target.value);
+              setPages(1);
+            }}
+          >
+            <option value="">ไม่ใช้ — เรียงตามปกติ</option>
+            {matchable.map((trip) => (
+              <option key={trip.id} value={trip.id}>
+                {trip.title}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
+
+      {matching ? (
+        <p className="text-muted mt-2 text-[11px] leading-relaxed">
+          คะแนนมาจากช่วงเวลา งบต่อคน สิ่งที่อยากไป และขนาดกลุ่ม — ทริปคนละประเทศไม่ถูกนับว่าเข้ากัน
+        </p>
+      ) : null}
+
+      {isError && matching ? (
+        <Card className="mt-4 p-4">
+          <p className="text-espresso text-sm font-semibold">เทียบกับทริปนี้ไม่ได้</p>
+          <p className="text-muted mt-1 text-xs">
+            ทริปอาจถูกลบไปแล้ว — เลือกทริปอื่นหรือกลับไปเรียงตามปกติ
+          </p>
+        </Card>
+      ) : null}
 
       {isLoading && items.length === 0 ? (
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -156,6 +210,7 @@ function ExploreCard({ trip }: { trip: ExploreTrip }) {
       <Card className="overflow-hidden p-0">
         <TripCover src={trip.cover} frame="card" />
         <div className="p-3.5">
+          {trip.match ? <MatchBadge match={trip.match} className="mb-2" /> : null}
           <p className="text-espresso line-clamp-1 text-sm font-extrabold">{trip.title}</p>
           <p className="text-muted mt-0.5 line-clamp-1 text-xs">
             {trip.days} วัน · {trip.cities.join(' · ')}
@@ -163,6 +218,15 @@ function ExploreCard({ trip }: { trip: ExploreTrip }) {
               ? ` · ~฿${trip.budgetPerPersonThb.toLocaleString('th-TH')}/คน`
               : ''}
           </p>
+          {trip.reviews.count > 0 ? (
+            <p className="text-muted mt-1.5 flex items-center gap-1.5 text-[11px]">
+              <Stars value={Math.round(trip.reviews.averageRating)} />
+              {trip.reviews.averageRating} ({trip.reviews.count})
+              {trip.reviews.budgetSaid > 0
+                ? ` · ใช้จริง ฿${trip.reviews.actualBudgetPerPerson.toLocaleString('th-TH')}/คน`
+                : ''}
+            </p>
+          ) : null}
           <div className="mt-2.5 flex items-center justify-between">
             <span className="flex items-center gap-1.5">
               <CharacterAvatar characterId={trip.creator.characterId} size="xs" />

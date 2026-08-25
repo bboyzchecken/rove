@@ -4,6 +4,8 @@ package plan
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"time"
 
 	"go.uber.org/fx"
@@ -304,3 +306,63 @@ func (s *store) DeleteVariant(ctx context.Context, tripID, variantID string) err
 }
 
 var _ = time.Now
+
+/* -------------------------------------------------- match signals (A11.3) -- */
+
+// TagSignals reads what a plan is *about* — where it goes and what kind of
+// stops it makes — for every trip in one query.
+//
+// Only public plan content is used: areas, and the category and tags of the POI
+// behind a stop. Wishlists are personal and stay out of it, even in aggregate.
+func (s *store) TagSignals(ctx context.Context, tripIDs []string) (map[string][]string, error) {
+	out := make(map[string][]string, len(tripIDs))
+	if len(tripIDs) == 0 {
+		return out, nil
+	}
+
+	var rows []struct {
+		TripID   string
+		Area     string
+		Category string
+		Tags     []byte
+	}
+	err := s.db.WithContext(ctx).
+		Table("plan_items AS pi").
+		Select("pi.trip_id AS trip_id, pi.area AS area, p.category AS category, p.tags AS tags").
+		Joins("LEFT JOIN pois p ON p.id = pi.poi_id").
+		Where("pi.trip_id IN ?", tripIDs).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	seen := map[string]map[string]bool{}
+	add := func(tripID, tag string) {
+		if tag = strings.TrimSpace(tag); tag == "" {
+			return
+		}
+		if seen[tripID] == nil {
+			seen[tripID] = map[string]bool{}
+		}
+		key := strings.ToLower(tag)
+		if seen[tripID][key] {
+			return
+		}
+		seen[tripID][key] = true
+		out[tripID] = append(out[tripID], tag)
+	}
+
+	for _, row := range rows {
+		add(row.TripID, row.Area)
+		add(row.TripID, row.Category)
+
+		var tags []string
+		if len(row.Tags) > 0 && json.Unmarshal(row.Tags, &tags) == nil {
+			for _, tag := range tags {
+				add(row.TripID, tag)
+			}
+		}
+	}
+
+	return out, nil
+}

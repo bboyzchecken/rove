@@ -50,6 +50,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
+  // Trip Mode is the screen you hold while walking to a station (W10.6). It
+  // gets the whole viewport: no header, no bottom bar, no reason to leave.
+  if (pathname.endsWith('/now')) {
+    return <div className="min-h-dvh">{children}</div>;
+  }
+
   return (
     <div className="min-h-dvh pb-20 md:pb-0">
       <ModeBanner />

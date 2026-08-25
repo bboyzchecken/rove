@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input, fieldClass } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
+import { StoryCardButton } from '@/components/trip/story-card-button';
 import {
   useExportTrip,
   useRotateShareToken,
@@ -169,6 +170,11 @@ export function ShareDialog({
             ))}
           </div>
           {note ? <p className="text-muted mt-2 text-[11px]">{note}</p> : null}
+
+          {/* Not a file format — a picture of the trip, for posting (W10.7). */}
+          <div className="mt-2">
+            <StoryCardButton tripId={tripId} />
+          </div>
         </div>
 
         <Badge tone="sky">ค่าใช้จ่ายและยอดหารกันไม่เคยอยู่ในลิงก์ที่แชร์</Badge>

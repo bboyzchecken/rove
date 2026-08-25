@@ -2,9 +2,24 @@ import { api, type Paginated } from '@/lib/api-client';
 import { env } from '@/lib/env';
 
 import type { RoveRepo } from '../repo';
-import type { AiJob, Airport, CurrentUser, Member, TripConflict } from '../types';
+import type {
+  AdaptInput,
+  AiJob,
+  Airport,
+  CurrentUser,
+  Member,
+  PhotoBookTheme,
+  TripConflict,
+} from '../types';
 import type {
   ActivityDto,
+  AdaptCloneDto,
+  DiscountCodeDto,
+  EarningsDto,
+  LeadDto,
+  RedemptionListDto,
+  ReviewListDto,
+  AdaptDiffDto,
   AdminStatsDto,
   AirportDto,
   AiCreditsDto,
@@ -57,6 +72,14 @@ import type {
 } from './dto';
 import {
   fromBooking,
+  toAdaptDiff,
+  toDiscountCode,
+  toEarningsStatement,
+  toLead,
+  toRedemptionBoard,
+  toReview,
+  toReviewBoard,
+  toReviewSummary,
   fromExpense,
   fromFlightLeg,
   fromPlanItem,
@@ -684,7 +707,12 @@ export const liveRepo: RoveRepo = {
     async buyCredits(tripId, input) {
       const dto = await api.post<AiCreditsDto & { simulated: boolean; order?: OrderDto }>(
         `/trips/${tripId}/ai/credits/purchase`,
-        { quantity: input.quantity, method: input.method, channel: input.channel },
+        {
+          quantity: input.quantity,
+          method: input.method,
+          channel: input.channel,
+          discount_code: input.discountCode ?? '',
+        },
       );
       // The drafts are granted even if filing the receipt failed, and the API
       // says so by omitting it. Failing the purchase here would be a lie about
@@ -760,6 +788,8 @@ export const liveRepo: RoveRepo = {
           creator: toPublicCreator(dto.creator),
           viewCount: dto.view_count,
           cloneCount: dto.clone_count,
+          reviews: toReviewSummary(dto.reviews),
+          reviewEntries: (dto.review_entries ?? []).map(toReview),
         };
       } catch {
         return null;
@@ -774,6 +804,7 @@ export const liveRepo: RoveRepo = {
           q: filters.q,
           country: filters.country,
           sort: filters.sort,
+          match: filters.match,
           limit: filters.limit != null ? String(filters.limit) : undefined,
           offset: filters.offset != null ? String(filters.offset) : undefined,
         },
@@ -791,6 +822,79 @@ export const liveRepo: RoveRepo = {
 
     async cloneFromPublic(tokenOrSlug) {
       return toTrip(await api.post<TripDto>(`/public/trips/${tokenOrSlug}/clone`));
+    },
+
+    async adaptPreview(tokenOrSlug, input) {
+      return toAdaptDiff(
+        await api.post<AdaptDiffDto>(
+          `/public/trips/${tokenOrSlug}/adapt/preview`,
+          adaptBody(input),
+        ),
+      );
+    },
+
+    async cloneAdapted(tokenOrSlug, input) {
+      const dto = await api.post<AdaptCloneDto>(
+        `/public/trips/${tokenOrSlug}/adapt`,
+        adaptBody(input),
+      );
+      return { trip: toTrip(dto.trip), diff: toAdaptDiff(dto.diff) };
+    },
+  },
+
+  /* ----------------------------- points out, money owed (M22) -- */
+  rewards: {
+    async redemptions() {
+      return toRedemptionBoard(await api.get<RedemptionListDto>('/users/me/points/redemptions'));
+    },
+
+    async redeem(amountThb) {
+      return toDiscountCode(
+        await api.post<DiscountCodeDto>('/users/me/points/redeem', { amount_thb: amountThb }),
+      );
+    },
+
+    async earnings() {
+      return toEarningsStatement(await api.get<EarningsDto>('/users/me/earnings'));
+    },
+  },
+
+  leads: {
+    async list(tripId) {
+      const dto = await api.get<LeadDto[]>(`/trips/${tripId}/leads`);
+      return dto.map(toLead);
+    },
+
+    async create(tripId, input) {
+      return toLead(
+        await api.post<LeadDto>(`/trips/${tripId}/leads`, {
+          contact_name: input.contactName,
+          contact_phone: input.contactPhone ?? '',
+          contact_line: input.contactLine ?? '',
+          note: input.note ?? '',
+        }),
+      );
+    },
+  },
+
+  /* ----------------------------------------------- reviews (M21) -- */
+  reviews: {
+    async list(tripId) {
+      return toReviewBoard(await api.get<ReviewListDto>(`/trips/${tripId}/reviews`));
+    },
+
+    async save(tripId, input) {
+      return toReviewBoard(
+        await api.put<ReviewListDto>(`/trips/${tripId}/reviews/me`, {
+          rating: input.rating,
+          actual_budget_per_person: input.actualBudgetPerPerson ?? 0,
+          body: input.body ?? '',
+        }),
+      );
+    },
+
+    async remove(tripId) {
+      await api.delete<void>(`/trips/${tripId}/reviews/me`);
     },
   },
 
@@ -820,10 +924,17 @@ export const liveRepo: RoveRepo = {
       await api.delete<void>(`/trips/${tripId}/photos/${photoId}`);
     },
 
-    photoBookUrl(tripId) {
+    async photoBookThemes(tripId) {
+      return api.get<PhotoBookTheme[]>(`/trips/${tripId}/photobook/themes`);
+    },
+
+    photoBookUrl(tripId, options) {
       // Rendered server-side as a self-contained page the user prints —
       // opened in a tab, not fetched, so it is a URL and not a request.
-      return `${env.apiUrl}/api/v1/trips/${tripId}/photobook`;
+      const url = new URL(`/api/v1/trips/${tripId}/photobook`, env.apiUrl);
+      if (options?.theme) url.searchParams.set('theme', options.theme);
+      if (options?.coverPhotoId) url.searchParams.set('cover', options.coverPhotoId);
+      return url.toString();
     },
   },
 
@@ -954,3 +1065,16 @@ export const liveRepo: RoveRepo = {
     },
   },
 };
+
+/**
+ * A zero on the wire means "keep what the source had", so unset fields are
+ * omitted rather than sent as 0 — which the API would read as an instruction.
+ */
+function adaptBody(input: AdaptInput) {
+  return {
+    days: input.days,
+    party_size: input.partySize,
+    budget_per_person_thb: input.budgetPerPersonThb,
+    start_date: input.startDate,
+  };
+}

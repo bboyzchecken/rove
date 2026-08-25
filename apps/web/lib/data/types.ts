@@ -515,6 +515,27 @@ export interface TripPhoto {
   createdAt: string;
 }
 
+/**
+ * A palette the photo book knows how to print (Photo Book V2).
+ *
+ * The catalogue comes from the API rather than the client so the picker can
+ * only ever offer what the renderer supports.
+ */
+export interface PhotoBookTheme {
+  id: string;
+  name: string;
+  paper: string;
+  ink: string;
+  muted: string;
+  accent: string;
+}
+
+/** How to print the book: which palette, and which photo leads the cover. */
+export interface PhotoBookOptions {
+  theme?: string;
+  coverPhotoId?: string;
+}
+
 export interface UploadPhotoInput {
   /** Already resized in the browser (lib/image.ts `photoFromFile`). */
   file: File;
@@ -563,6 +584,52 @@ export interface PublicTripPayload {
   creator: PublicCreator;
   viewCount: number;
   cloneCount: number;
+  /** How it actually went, from the people who went (A11.5). */
+  reviews: ReviewSummary;
+  reviewEntries: TripReview[];
+}
+
+/* ------------------------------------------------- reviews (M21 — A11.5) - */
+
+/**
+ * One traveller's verdict on a finished trip.
+ *
+ * `actualBudgetPerPerson` is a figure the reviewer chose to publish about
+ * their own trip — it is NOT the group's expense ledger, which never leaves
+ * the room at any visibility (W16.5). Zero means they would rather not say.
+ */
+export interface TripReview {
+  userId: string;
+  name: string;
+  characterId: string;
+  /** 1–5. */
+  rating: number;
+  actualBudgetPerPerson: number;
+  body: string;
+  createdAt: string;
+}
+
+export interface ReviewSummary {
+  count: number;
+  averageRating: number;
+  /** Averaged over `budgetSaid` people, never over everybody. */
+  actualBudgetPerPerson: number;
+  budgetSaid: number;
+}
+
+export interface ReviewBoard {
+  summary: ReviewSummary;
+  entries: TripReview[];
+  /** My own review, so the form opens filled in. */
+  mine: TripReview | null;
+  /** False until the trip is over — nobody reviews a holiday they are packing for. */
+  canReview: boolean;
+}
+
+export interface SaveReviewInput {
+  rating: number;
+  actualBudgetPerPerson?: number;
+  body?: string;
 }
 
 /* ------------------------------------------------------ explore (M11) --- */
@@ -579,6 +646,10 @@ export interface ExploreTrip {
   cloneCount: number;
   creator: PublicCreator;
   updatedAt: string;
+  /** Only present when the feed was asked to rank against one of my trips. */
+  match?: MatchResult | null;
+  /** Zero until somebody who went says otherwise (A11.5). */
+  reviews: ReviewSummary;
 }
 
 export interface ExploreFilters {
@@ -587,6 +658,64 @@ export interface ExploreFilters {
   sort?: 'popular' | 'new';
   limit?: number;
   offset?: number;
+  /**
+   * Rank against this trip of mine instead of by popularity (A11.3). Requires
+   * sign-in and membership of the trip — the feed itself stays public.
+   */
+  match?: string;
+}
+
+/**
+ * How well a published plan fits the trip I am already planning (A11.3).
+ *
+ * The reasons are the point. A percentage with nothing next to it is a number
+ * nobody trusts, so the API only sends lines for components that genuinely
+ * agree, and the card shows them verbatim.
+ */
+export interface MatchResult {
+  /** 0–100. Zero means "different country" — not a weak match, no match. */
+  score: number;
+  reasons: string[];
+}
+
+/* ---------------------------------------------- adapting a copy (A11.4) -- */
+
+/** The frame a copied plan should be reshaped to. Omitted fields are kept. */
+export interface AdaptInput {
+  days?: number;
+  partySize?: number;
+  budgetPerPersonThb?: number;
+  startDate?: string;
+}
+
+export type AdaptChangeKind = 'day_added' | 'day_removed' | 'item_removed' | 'item_moved';
+
+export interface AdaptChange {
+  kind: AdaptChangeKind;
+  dayLabel: string;
+  itemTitle: string;
+  reason: string;
+  /** Signed, in the destination currency — the same unit as the plan. */
+  costDeltaDest: number;
+}
+
+export interface AdaptTotals {
+  days: number;
+  items: number;
+  costPerPersonDest: number;
+}
+
+/**
+ * What copying this plan into my frame would change. Shown before anything is
+ * written, and returned again with the copy so the two can be compared.
+ */
+export interface AdaptDiff {
+  changes: AdaptChange[];
+  before: AdaptTotals;
+  after: AdaptTotals;
+  /** What the reshaping could not do — said plainly, not hidden. */
+  warnings: string[];
+  currency: string;
 }
 
 export interface ExploreResult {
@@ -677,6 +806,8 @@ export interface CreateTripInput {
    */
   entryType: 'route' | 'date' | 'clone';
   title: string;
+  /** ISO country of the destination; the route decides it when there is one. */
+  country?: string;
   cities?: string[];
   /** The booked route. When present it decides the dates and the destinations. */
   flights?: FlightLegInput[];
@@ -875,4 +1006,102 @@ export interface BuyCreditsInput {
   method: PaymentMethod;
   /** The label the user actually tapped — kept for the receipt. */
   channel: string;
+  /** A code redeemed from points (A12.10). Ignored when paying with points. */
+  discountCode?: string;
+}
+
+/* ------------------------------------ points out, money owed (M22) ------- */
+
+/**
+ * Points turned into money off (A12.10).
+ *
+ * Issuing one burns the points there and then, so a code that exists is
+ * already paid for. It is single-use and it expires.
+ */
+export interface DiscountCode {
+  code: string;
+  scope: 'ai_credits' | 'booking';
+  amountThb: number;
+  pointsSpent: number;
+  expiresAt: string;
+  usedAt: string | null;
+  usable: boolean;
+}
+
+export interface RedemptionTier {
+  amountThb: number;
+  points: number;
+  afford: boolean;
+}
+
+export interface RedemptionBoard {
+  balance: number;
+  tiers: RedemptionTier[];
+  codes: DiscountCode[];
+}
+
+/**
+ * One line of what a published plan earned its creator (A12.11).
+ *
+ * Not points: this is money a partner owes, in baht. `estimated` means the
+ * commission was derived from a rate table rather than reported.
+ */
+export interface CreatorEarning {
+  tripId: string;
+  partner: string;
+  bookingValueThb: number;
+  commissionThb: number;
+  sharePercent: number;
+  amountThb: number;
+  estimated: boolean;
+  status: 'pending' | 'payable' | 'paid';
+  occurredAt: string;
+}
+
+export interface CreatorPayout {
+  periodStart: string;
+  periodEnd: string;
+  amountThb: number;
+  earningCount: number;
+  status: 'draft' | 'paid';
+  paidAt: string | null;
+}
+
+export interface EarningsStatement {
+  totals: {
+    pendingThb: number;
+    payableThb: number;
+    paidThb: number;
+    count: number;
+  };
+  sharePercent: number;
+  minimumPayoutThb: number;
+  entries: CreatorEarning[];
+  payouts: CreatorPayout[];
+}
+
+/* --------------------------------------- agent lead handoff (A12.12) ----- */
+
+export type LeadStatus = 'new' | 'sent' | 'contacted' | 'won' | 'lost';
+
+/** A group asking a human to take the booking from here. */
+export interface AgentLead {
+  id: string;
+  partner: string;
+  contactName: string;
+  contactPhone: string;
+  contactLine: string;
+  note: string;
+  status: LeadStatus;
+  sentAt: string | null;
+  createdAt: string;
+  /** True when no agent channel is configured — saved, but nobody was messaged. */
+  simulated: boolean;
+}
+
+export interface CreateLeadInput {
+  contactName: string;
+  contactPhone?: string;
+  contactLine?: string;
+  note?: string;
 }

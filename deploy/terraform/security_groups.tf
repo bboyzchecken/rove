@@ -115,11 +115,11 @@ resource "aws_security_group" "rds" {
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description     = "mysql from the api task only"
+    description     = "mysql from the api and worker tasks only"
     from_port       = 3306
     to_port         = 3306
     protocol        = "tcp"
-    security_groups = [aws_security_group.ecs_api.id]
+    security_groups = [aws_security_group.ecs_api.id, aws_security_group.ecs_worker.id]
   }
 
   egress {
@@ -140,12 +140,13 @@ resource "aws_security_group" "redis" {
   name_prefix = "${var.project}-redis-"
   vpc_id      = aws_vpc.main.id
 
+  # Both sides of the AI queue: the API pushes, the worker pops (Phase 3).
   ingress {
-    description     = "redis from the api task only"
+    description     = "redis from the api and worker tasks only"
     from_port       = 6379
     to_port         = 6379
     protocol        = "tcp"
-    security_groups = [aws_security_group.ecs_api.id]
+    security_groups = [aws_security_group.ecs_api.id, aws_security_group.ecs_worker.id]
   }
 
   egress {

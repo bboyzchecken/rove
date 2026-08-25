@@ -1,13 +1,14 @@
 import type { ReactNode } from 'react';
 
-import { TripHeader } from '@/components/trip/trip-header';
-import { TripRealtime } from '@/components/trip/trip-realtime';
-import { TripTabs } from '@/components/trip/trip-tabs';
+import { TripRoomShell } from '@/components/trip/trip-room-shell';
 
 /**
  * Trip room shell (M2 — W2.1): cover, frame summary, then the tab strip that
  * every tab renders under. On a phone the tabs scroll horizontally; the app's
  * own bottom bar stays put underneath.
+ *
+ * The chrome itself lives in a client component so Trip Mode can opt out of it
+ * without moving every other page in this folder (W10.6).
  */
 export default async function TripLayout({
   children,
@@ -18,13 +19,5 @@ export default async function TripLayout({
 }) {
   const { tripId } = await params;
 
-  return (
-    <div>
-      <TripHeader tripId={tripId} />
-      <TripTabs tripId={tripId} />
-      {/* Owns the room's single SSE connection and renders "who is here". */}
-      <TripRealtime tripId={tripId} />
-      <div className="px-4 pb-5">{children}</div>
-    </div>
-  );
+  return <TripRoomShell tripId={tripId}>{children}</TripRoomShell>;
 }

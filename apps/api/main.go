@@ -11,12 +11,21 @@ import (
 	"go.uber.org/fx"
 	"gorm.io/gorm"
 
+	// GOMAXPROCS defaults to the number of CPUs on the HOST, which on Fargate
+	// is the underlying instance, not the 0.25 vCPU the task was given
+	// (api_cpu = 256 in deploy/terraform/variables.tf). Go then runs more
+	// threads than the CFS quota allows and the kernel throttles them in
+	// bursts — average CPU looks fine while p99 latency jumps to seconds.
+	// This import reads the cgroup quota at init and sets GOMAXPROCS to match.
+	_ "go.uber.org/automaxprocs"
+
 	"github.com/bboyzchecken/rove/apps/api/pkg/core"
 	handlers "github.com/bboyzchecken/rove/apps/api/pkg/handlers/api"
 	"github.com/bboyzchecken/rove/apps/api/pkg/logger"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/affiliate"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/ai"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/airports"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/email"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
 	fxsvc "github.com/bboyzchecken/rove/apps/api/pkg/services/fx"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/notify"
@@ -38,6 +47,9 @@ import (
 	planstore "github.com/bboyzchecken/rove/apps/api/pkg/store/plan"
 	poistore "github.com/bboyzchecken/rove/apps/api/pkg/store/poi"
 	pointsstore "github.com/bboyzchecken/rove/apps/api/pkg/store/points"
+	leadstore "github.com/bboyzchecken/rove/apps/api/pkg/store/lead"
+	reviewstore "github.com/bboyzchecken/rove/apps/api/pkg/store/review"
+	rewardstore "github.com/bboyzchecken/rove/apps/api/pkg/store/reward"
 	prepstore "github.com/bboyzchecken/rove/apps/api/pkg/store/prep"
 	tripstore "github.com/bboyzchecken/rove/apps/api/pkg/store/trip"
 	userstore "github.com/bboyzchecken/rove/apps/api/pkg/store/user"
@@ -59,7 +71,14 @@ func main() {
 	case "seed":
 		runSeed(cfg)
 	default:
-		log.WithField("env", cfg.Environment).Infof("starting rove api on :%s", cfg.Port)
+		if cfg.IsWorker() {
+			log.WithField("env", cfg.Environment).Info("starting rove ai worker")
+			runWorker(cfg)
+			return
+		}
+		log.WithField("env", cfg.Environment).
+			WithField("role", cfg.Role).
+			Infof("starting rove api on :%s", cfg.Port)
 		runServer(cfg)
 	}
 }
@@ -144,7 +163,21 @@ func loadConfig() core.Config {
 			"airalo":     viper.GetString("AFFILIATE_AIRALO_ID"),
 		},
 		AffiliateWebhookSecret: viper.GetString("AFFILIATE_WEBHOOK_SECRET"),
+
+		Role: orString(viper.GetString("ROVE_ROLE"), ai.RoleAll),
+
+		AgentEmail:      viper.GetString("AGENT_LEAD_EMAIL"),
+		AgentLineUserID: viper.GetString("AGENT_LEAD_LINE_USER_ID"),
+		AgentPartner:    orString(viper.GetString("AGENT_LEAD_PARTNER"), "rove-agent"),
 	}
+}
+
+// orString is the two-line default this config file needs exactly once.
+func orString(value, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
 }
 
 func splitCSV(s string) []string {
@@ -184,6 +217,9 @@ func storeModules() fx.Option {
 		billingstore.Module,
 		mediastore.Module,
 		communitystore.Module,
+		reviewstore.Module,
+		rewardstore.Module,
+		leadstore.Module,
 	)
 }
 
@@ -201,8 +237,10 @@ func serviceModules() fx.Option {
 		affiliate.Module,
 		storage.Module,
 		notify.Module,
+		email.Module,
 		ai.Module,
 		ai.RunnerModule,
+		ai.ConsumerModule,
 	)
 }
 
@@ -218,6 +256,42 @@ func runServer(cfg core.Config) {
 		fx.WithLogger(fxLogger),
 	)
 	app.Run()
+}
+
+// runWorker is the AI service without the web server (Phase 3 — INFRA).
+//
+// It shares the whole graph with the API — same stores, same pipeline, same
+// events hub — and differs in exactly two ways: it does not listen on a port,
+// and it does not migrate. Migrations belong to the process people deploy
+// first, and two services racing to run them is a lock nobody needs.
+func runWorker(cfg core.Config) {
+	app := fx.New(
+		fx.Supply(cfg),
+		fx.Provide(core.NewDatabase, core.NewRedis),
+		storeModules(),
+		serviceModules(),
+		fx.Invoke(startWorker),
+		fx.WithLogger(fxLogger),
+	)
+	app.Run()
+}
+
+func startWorker(lc fx.Lifecycle, consumer ai.Consumer) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	lc.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			go consumer.Run(ctx)
+			return nil
+		},
+		OnStop: func(context.Context) error {
+			// Stops the queue loop. Drafts already running keep their own
+			// three-minute timeout, which is shorter than the ECS stop grace
+			// period, so a deploy does not cut one in half.
+			cancel()
+			return nil
+		},
+	})
 }
 
 // migrateOnBoot keeps a fresh environment one command away from working; the
