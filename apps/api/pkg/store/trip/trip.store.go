@@ -130,11 +130,17 @@ func (s *store) ListPublic(ctx context.Context, f models.ExploreFilter) ([]model
 	return out, total, err
 }
 
+// MaxCreatorTrips caps the creator page. Unbounded, a prolific creator turned
+// one public request into a scan of every trip they ever published — and the
+// page only shows a grid, so the tail was never rendered anyway.
+const MaxCreatorTrips = 48
+
 func (s *store) ListPublicByOwner(ctx context.Context, ownerID string) ([]models.Trip, error) {
 	var out []models.Trip
 	err := s.db.WithContext(ctx).
 		Where("owner_id = ? AND visibility = ?", ownerID, models.VisibilityPublic).
 		Order("updated_at DESC").
+		Limit(MaxCreatorTrips).
 		Find(&out).Error
 	return out, err
 }

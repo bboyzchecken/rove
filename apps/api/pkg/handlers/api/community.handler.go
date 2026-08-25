@@ -234,7 +234,36 @@ type pollDTO struct {
 	Answered int `json:"answered"`
 }
 
+// toPollDTO renders one poll, fetching its own answers. Use it for the single
+// poll a mutation just touched; a LIST goes through pollDTOs instead, which
+// reads the room's votes once.
 func (s *Server) toPollDTO(ctx contextT, poll models.Poll, userID string) pollDTO {
+	votes, _ := s.collab.ListVotes(ctx, poll.TripID, models.TargetPoll, poll.ID)
+	return pollDTOOf(poll, votes, userID)
+}
+
+// pollDTOs renders a whole board in two queries: the polls, and every vote in
+// the room. Asking for each poll's answers separately made a discussion tab
+// with a dozen polls a dozen extra round trips.
+func (s *Server) pollDTOs(ctx contextT, tripID string, polls []models.Poll, userID string) []pollDTO {
+	byPoll := map[string][]models.Vote{}
+	if votes, err := s.collab.ListTripVotes(ctx, tripID); err == nil {
+		for _, vote := range votes {
+			if vote.TargetType != models.TargetPoll {
+				continue
+			}
+			byPoll[vote.TargetID] = append(byPoll[vote.TargetID], vote)
+		}
+	}
+
+	out := make([]pollDTO, 0, len(polls))
+	for _, poll := range polls {
+		out = append(out, pollDTOOf(poll, byPoll[poll.ID], userID))
+	}
+	return out
+}
+
+func pollDTOOf(poll models.Poll, votes []models.Vote, userID string) pollDTO {
 	labels := jsonStrings(toJSONRaw(poll.Options))
 	options := make([]pollOptionDTO, 0, len(labels))
 	for i, label := range labels {
@@ -243,17 +272,15 @@ func (s *Server) toPollDTO(ctx contextT, poll models.Poll, userID string) pollDT
 
 	answered := 0
 	myAnswer := -1
-	if votes, err := s.collab.ListVotes(ctx, poll.TripID, models.TargetPoll, poll.ID); err == nil {
-		for _, vote := range votes {
-			if vote.Value < 0 || vote.Value >= len(options) {
-				continue // an option that was edited away
-			}
-			options[vote.Value].Votes++
-			options[vote.Value].Who = append(options[vote.Value].Who, vote.UserID)
-			answered++
-			if vote.UserID == userID {
-				myAnswer = vote.Value
-			}
+	for _, vote := range votes {
+		if vote.Value < 0 || vote.Value >= len(options) {
+			continue // an option that was edited away
+		}
+		options[vote.Value].Votes++
+		options[vote.Value].Who = append(options[vote.Value].Who, vote.UserID)
+		answered++
+		if vote.UserID == userID {
+			myAnswer = vote.Value
 		}
 	}
 
@@ -283,12 +310,7 @@ func (s *Server) handleListPolls(c echo.Context) error {
 		return request.Internal(c, "โหลดโพลไม่สำเร็จ")
 	}
 
-	userID := request.UserID(c)
-	out := make([]pollDTO, 0, len(polls))
-	for _, poll := range polls {
-		out = append(out, s.toPollDTO(ctx, poll, userID))
-	}
-	return c.JSON(http.StatusOK, out)
+	return c.JSON(http.StatusOK, s.pollDTOs(ctx, request.TripID(c), polls, request.UserID(c)))
 }
 
 type createPollRequest struct {

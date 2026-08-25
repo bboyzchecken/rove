@@ -59,15 +59,50 @@ type publicTripDTO struct {
 }
 
 func (s *Server) publicCreatorOf(ctx contextT, ownerID string) publicCreatorDTO {
-	creator := publicCreatorDTO{Name: "นักเดินทาง", CharacterID: "shiba"}
 	if owner, err := s.users.GetByID(ctx, ownerID); err == nil {
-		creator.Name = owner.DisplayName
-		creator.Handle = owner.Handle
-		if owner.CharacterID != nil && *owner.CharacterID != "" {
-			creator.CharacterID = *owner.CharacterID
-		}
+		return toPublicCreatorDTO(*owner)
 	}
-	return creator
+	return unknownCreator()
+}
+
+// unknownCreator is what a trip whose owner cannot be read renders as. A public
+// page must not 500 because one account row is missing.
+func unknownCreator() publicCreatorDTO {
+	return publicCreatorDTO{Name: "นักเดินทาง", CharacterID: defaultCharacter}
+}
+
+func toPublicCreatorDTO(owner models.User) publicCreatorDTO {
+	return publicCreatorDTO{
+		Name:        owner.DisplayName,
+		Handle:      owner.Handle,
+		CharacterID: characterOf(owner),
+	}
+}
+
+// publicCreatorsFor resolves every owner on a page of trips in one query. The
+// explore feed and the creator profile both render a creator per card, and
+// looking each one up separately made a twelve-card page thirteen queries — and
+// the creator profile, which is every card by the SAME person, one query per
+// trip for a row it already had.
+func (s *Server) publicCreatorsFor(ctx contextT, trips []models.Trip) map[string]publicCreatorDTO {
+	out := make(map[string]publicCreatorDTO, len(trips))
+	ids := make([]string, 0, len(trips))
+	for _, t := range trips {
+		if _, ok := out[t.OwnerID]; ok {
+			continue
+		}
+		out[t.OwnerID] = unknownCreator()
+		ids = append(ids, t.OwnerID)
+	}
+
+	owners, err := s.users.ListByIDs(ctx, ids)
+	if err != nil {
+		return out
+	}
+	for _, owner := range owners {
+		out[owner.ID] = toPublicCreatorDTO(owner)
+	}
+	return out
 }
 
 func (s *Server) handlePublicTrip(c echo.Context) error {
@@ -134,7 +169,10 @@ type exploreTripDTO struct {
 	Reviews reviewSummaryDTO `json:"reviews"`
 }
 
-func (s *Server) exploreTripOf(ctx contextT, trip models.Trip) exploreTripDTO {
+// exploreTripOf takes the creator rather than looking it up, so a page of cards
+// costs one owner query instead of one per card. Build the map with
+// publicCreatorsFor.
+func exploreTripOf(trip models.Trip, creator publicCreatorDTO) exploreTripDTO {
 	slug := ""
 	if trip.Slug != nil {
 		slug = *trip.Slug
@@ -149,7 +187,7 @@ func (s *Server) exploreTripOf(ctx contextT, trip models.Trip) exploreTripDTO {
 		BudgetPerPersonTHB: trip.BudgetPerPersonTHB,
 		ViewCount:          trip.ViewCount,
 		CloneCount:         trip.CloneCount,
-		Creator:            s.publicCreatorOf(ctx, trip.OwnerID),
+		Creator:            creator,
 		UpdatedAt:          trip.UpdatedAt.UTC().Format(time.RFC3339),
 	}
 }
@@ -208,10 +246,11 @@ func (s *Server) handleExplore(c echo.Context) error {
 		return request.Internal(c, "โหลดแพลนสาธารณะไม่สำเร็จ")
 	}
 
+	creators := s.publicCreatorsFor(ctx, trips)
 	items := make([]exploreTripDTO, 0, len(trips))
 	ids := make([]string, 0, len(trips))
 	for _, trip := range trips {
-		items = append(items, s.exploreTripOf(ctx, trip))
+		items = append(items, exploreTripOf(trip, creators[trip.OwnerID]))
 		ids = append(ids, trip.ID)
 	}
 
@@ -305,10 +344,16 @@ func (s *Server) exploreByMatch(c echo.Context, filter models.ExploreFilter, mat
 		ranked = ranked[:filter.Limit]
 	}
 
+	page := make([]models.Trip, 0, len(ranked))
+	for _, row := range ranked {
+		page = append(page, row.trip)
+	}
+	creators := s.publicCreatorsFor(ctx, page)
+
 	items := make([]exploreTripDTO, 0, len(ranked))
 	pageIDs := make([]string, 0, len(ranked))
 	for _, row := range ranked {
-		dto := s.exploreTripOf(ctx, row.trip)
+		dto := exploreTripOf(row.trip, creators[row.trip.OwnerID])
 		result := row.result
 		dto.Match = &result
 		items = append(items, dto)
@@ -403,18 +448,18 @@ func (s *Server) handleCreatorProfile(c echo.Context) error {
 	out := creatorProfileDTO{
 		Name:        user.DisplayName,
 		Handle:      handle,
-		CharacterID: "shiba",
+		CharacterID: characterOf(*user),
 		Trips:       make([]exploreTripDTO, 0, len(trips)),
 	}
-	if user.CharacterID != nil && *user.CharacterID != "" {
-		out.CharacterID = *user.CharacterID
-	}
+	// Every card on this page belongs to the person the page is about, and that
+	// row is already in hand — the old code looked it up once per trip.
+	creator := toPublicCreatorDTO(*user)
 	ids := make([]string, 0, len(trips))
 	for _, trip := range trips {
 		out.PublicTrips++
 		out.TotalViews += trip.ViewCount
 		out.TotalClones += trip.CloneCount
-		out.Trips = append(out.Trips, s.exploreTripOf(ctx, trip))
+		out.Trips = append(out.Trips, exploreTripOf(trip, creator))
 		ids = append(ids, trip.ID)
 	}
 	out.Trips = s.withReviews(ctx, out.Trips, ids)

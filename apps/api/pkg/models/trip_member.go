@@ -69,6 +69,9 @@ type TripMemberStore interface {
 	Add(ctx context.Context, m *TripMember) error
 	Get(ctx context.Context, tripID, userID string) (*TripMember, error)
 	ListByTrip(ctx context.Context, tripID string) ([]TripMember, error)
+	// ListByTrips hydrates a whole page of trips at once — the trip list shows
+	// a member stack per row and must not query per row (§7.1).
+	ListByTrips(ctx context.Context, tripIDs []string) ([]TripMember, error)
 	UpdateRole(ctx context.Context, tripID, userID, role string) error
 	Remove(ctx context.Context, tripID, userID string) error
 

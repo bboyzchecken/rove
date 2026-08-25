@@ -106,9 +106,10 @@ function keysFor(tripId: string, type: TripEventType): readonly (readonly unknow
         queryKeys.tripOverview(tripId),
       ];
 
+    // A whole itinerary landed or was replaced: the day count, the checklist
+    // and the frame on the overview all really did change.
     case 'plan.ready':
     case 'plan.updated':
-    case 'item.updated':
       return [
         queryKeys.planDays(tripId),
         queryKeys.budget(tripId),
@@ -116,6 +117,19 @@ function keysFor(tripId: string, type: TripEventType): readonly (readonly unknow
         queryKeys.tripOverview(tripId),
         // Variants ride the plan events: a new candidate, a vote, an adopt and
         // a freeze all publish one of these (M6).
+        queryKeys.variants(tripId),
+      ];
+
+    // One card moved. Deliberately NOT the overview: the only thing there that
+    // an item edit changes is a count nobody is looking at while someone else
+    // drags, and the overview is the most expensive read in the API. Fanned out
+    // to everyone in the room on every drag, it was the single biggest source
+    // of load in the product.
+    case 'item.updated':
+      return [
+        queryKeys.planDays(tripId),
+        queryKeys.budget(tripId),
+        queryKeys.coverage(tripId),
         queryKeys.variants(tripId),
       ];
 

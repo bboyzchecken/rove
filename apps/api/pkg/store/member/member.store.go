@@ -41,6 +41,18 @@ func (s *store) ListByTrip(ctx context.Context, tripID string) ([]models.TripMem
 	return ms, err
 }
 
+// ListByTrips is the roster for a whole page of trips in one query. The trip
+// list renders an avatar stack per row, and doing that a trip at a time is how
+// twenty trips became sixty queries.
+func (s *store) ListByTrips(ctx context.Context, tripIDs []string) ([]models.TripMember, error) {
+	if len(tripIDs) == 0 {
+		return nil, nil
+	}
+	var ms []models.TripMember
+	err := s.db.WithContext(ctx).Where("trip_id IN ?", tripIDs).Find(&ms).Error
+	return ms, err
+}
+
 func (s *store) UpdateRole(ctx context.Context, tripID, userID, role string) error {
 	return s.db.WithContext(ctx).
 		Model(&models.TripMember{}).

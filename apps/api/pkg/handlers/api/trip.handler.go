@@ -42,19 +42,30 @@ func (s *Server) handleListTrips(c echo.Context) error {
 		return request.Internal(c, "โหลดรายการทริปไม่สำเร็จ")
 	}
 
+	// Two queries for the whole page, not three per row: the member stack and
+	// the viewer's own role are the only things a row needs beyond the trip
+	// itself, and both come out of one members read plus one users read.
+	tripIDs := make([]string, 0, len(trips))
+	for _, t := range trips {
+		tripIDs = append(tripIDs, t.ID)
+	}
+	membersByTrip, usersByID := s.loadRosters(ctx, tripIDs)
+
 	items := make([]tripDTO, 0, len(trips))
 	for _, t := range trips {
 		dto := toTripDTO(t)
 
-		if roster, err := s.loadMembers(ctx, t.ID); err == nil {
-			dto.MemberIDs = roster.ids()
-			dto.MemberCharacterIDs = roster.characterIDs()
-			for _, m := range roster.members {
-				if m.UserID == userID {
-					dto.Role = m.Role
-				}
+		members := membersByTrip[t.ID]
+		dto.MemberIDs = make([]string, 0, len(members))
+		dto.MemberCharacterIDs = make([]string, 0, len(members))
+		for _, m := range members {
+			dto.MemberIDs = append(dto.MemberIDs, m.UserID)
+			dto.MemberCharacterIDs = append(dto.MemberCharacterIDs, characterOf(usersByID[m.UserID]))
+			if m.UserID == userID {
+				dto.Role = m.Role
 			}
 		}
+
 		if t.StartDate != nil {
 			days := int(domain.Day(*t.StartDate).Sub(domain.Day(time.Now())).Hours() / 24)
 			dto.DaysUntil = &days
@@ -378,17 +389,18 @@ func (s *Server) handleTripOverview(c echo.Context) error {
 		return request.Internal(c, "โหลดสมาชิกไม่สำเร็จ")
 	}
 
-	coverage, err := s.recomputeCoverage(ctx, tripID)
-	if err != nil {
-		return request.Internal(c, "คำนวณความครอบคลุมไม่สำเร็จ")
-	}
-
-	wishes, _ := s.wishlist.ListByTrip(ctx, tripID)
 	days, _ := s.plans.ListDays(ctx, tripID)
 	items, _ := s.plans.ListItems(ctx, tripID)
 	bookings, _ := s.bookings.ListByTrip(ctx, tripID)
 	prep, _ := s.prep.ListByTrip(ctx, tripID)
 	activity, _ := s.collab.ListActivity(ctx, tripID, "", 8)
+
+	// Derived, not re-derived-and-stored: the write-back belongs to whatever
+	// changed the plan or the wishlist, and every one of those paths already
+	// calls recomputeCoverage. The wishes come off the roster and the items are
+	// the ones read just above, so nothing here is queried twice.
+	wishes := roster.wishes
+	_, coverage := coverageOf(wishes, items)
 
 	withoutWishlist := 0
 	for _, m := range roster.members {
