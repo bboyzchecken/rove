@@ -6,6 +6,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -198,10 +199,36 @@ func (s *Server) setupMiddleware() {
 		AllowCredentials: true,
 		MaxAge:           600,
 	}))
+	// Nothing in front of this compresses: an ALB forwards the body untouched,
+	// unlike a CDN. A trip room's plan payload is a few hundred kilobytes of
+	// JSON that gzips to a fraction of that, and the audience is on a phone.
+	s.e.Use(middleware.GzipWithConfig(middleware.GzipConfig{
+		Level: 5,
+		// Below this the header overhead costs more than the saving.
+		MinLength: 1024,
+		Skipper:   skipCompression,
+	}))
 	// 8M: a ticket PDF is a few megabytes; photos arrive browser-resized and
 	// far smaller. Anything bigger than this is a mistake, not a document.
 	s.e.Use(middleware.BodyLimit("8M"))
 	s.e.Use(s.RateLimit())
+}
+
+// skipCompression leaves alone the responses where gzip either cannot help or
+// would actively hurt: the SSE stream (frames must leave the moment they are
+// written, and buffering them is the one thing that breaks realtime), the
+// health probes an ALB hits every 15s, and bytes that arrive compressed
+// already.
+func skipCompression(c echo.Context) bool {
+	path := c.Path()
+	switch path {
+	case "/healthz", "/readyz":
+		return true
+	}
+	if strings.HasSuffix(path, "/events") {
+		return true
+	}
+	return strings.HasPrefix(path, "/uploads")
 }
 
 // registerRoutes is the map of the whole API. Each register* method lives in

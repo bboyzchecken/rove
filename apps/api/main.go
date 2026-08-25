@@ -11,6 +11,14 @@ import (
 	"go.uber.org/fx"
 	"gorm.io/gorm"
 
+	// GOMAXPROCS defaults to the number of CPUs on the HOST, which on Fargate
+	// is the underlying instance, not the 0.25 vCPU the task was given
+	// (api_cpu = 256 in deploy/terraform/variables.tf). Go then runs more
+	// threads than the CFS quota allows and the kernel throttles them in
+	// bursts — average CPU looks fine while p99 latency jumps to seconds.
+	// This import reads the cgroup quota at init and sets GOMAXPROCS to match.
+	_ "go.uber.org/automaxprocs"
+
 	"github.com/bboyzchecken/rove/apps/api/pkg/core"
 	handlers "github.com/bboyzchecken/rove/apps/api/pkg/handlers/api"
 	"github.com/bboyzchecken/rove/apps/api/pkg/logger"

@@ -21,11 +21,14 @@ resource "aws_db_parameter_group" "mysql8" {
   }
 
   # db.t4g.micro's default (DBInstanceClassMemory/12582880 ≈ 85) is lower than
-  # api_max_count × the api's own pool (10 × 25 = 250, database.go
-  # SetMaxOpenConns) — past ~3 tasks the 4th+ gets "too many connections"
-  # while ECS still happily scales toward 10. This does not fix that ceiling,
-  # it raises it; see ADR 0004 "known gaps" for the matching fix on the app
-  # side (shrink the per-task pool so N tasks × pool always stays under this).
+  # the fleet needs, so it is raised here. The other half of the deal lives in
+  # database.go: SetMaxOpenConns(12) × api_max_count (10) = 120, which fits
+  # under this with room left for the migration on boot and an
+  # `aws ecs execute-command` shell.
+  #
+  # Keep api_max_count × SetMaxOpenConns < max_connections. Raising either
+  # number on its own is how the 7th task starts answering "too many
+  # connections" while ECS reports a healthy scale-out (ADR 0004).
   parameter {
     name  = "max_connections"
     value = "150"
