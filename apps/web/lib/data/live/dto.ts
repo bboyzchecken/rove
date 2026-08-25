@@ -845,8 +845,17 @@ export interface AdminStatsDto {
   ai_cost_today_usd: number;
   ai_cost_cap_usd: number;
   clicks_today: number;
-  mock_mode: boolean;
+  stub_providers: boolean;
+  stubbed: string[];
   commit: string;
+}
+
+/** GET /meta/mode — see apps/api/pkg/handlers/api/mode.handler.go. */
+export interface ModeDto {
+  live: boolean;
+  stubbed: string[];
+  dev_login: boolean;
+  env: string;
 }
 
 export interface ParsedTicketDto {
@@ -870,4 +879,11 @@ export interface InviteDto {
   url: string;
   expires_at: string;
   role: 'editor' | 'viewer';
+}
+
+export interface InvitePreviewDto {
+  trip_id: string;
+  title: string;
+  role: 'editor' | 'viewer';
+  expires_at: string;
 }

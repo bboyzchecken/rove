@@ -33,10 +33,11 @@ export function AdminScreen() {
 
   if (me && !me.isAdmin) {
     return (
-      <main className="mx-auto max-w-2xl px-4 py-16 text-center">
+      // A div, not a <main>: AppShell already opened one around this screen.
+      <div className="px-4 py-16 text-center">
         <h1 className="font-display text-espresso text-xl font-extrabold">หน้านี้สำหรับแอดมิน</h1>
         <p className="text-muted mt-2 text-sm">บัญชีนี้ไม่มีสิทธิ์เข้าถึง</p>
-      </main>
+      </div>
     );
   }
 
@@ -51,9 +52,9 @@ export function AdminScreen() {
           </h1>
           <p className="text-muted mt-1 text-sm">ตัวเลขรวมของระบบ · รีเฟรชอัตโนมัติทุกนาที</p>
         </div>
-        {stats?.mockMode ? (
-          <Badge tone="sun" size="md">
-            <FlaskConical className="size-3.5" /> โหมดทดลอง
+        {stats?.stubbed?.length ? (
+          <Badge tone="sun" size="md" title={stats.stubbed.join(', ')}>
+            <FlaskConical className="size-3.5" /> จำลอง {stats.stubbed.length} บริการ
           </Badge>
         ) : null}
       </div>

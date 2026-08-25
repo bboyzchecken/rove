@@ -50,6 +50,17 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Tailwind v4's preflight sets `cursor: default` on buttons, so on a desktop
+ * every button in the app looked like text — nothing said "this is clickable"
+ * until you pressed it. Put the hand back. A disabled control keeps the
+ * default arrow, because there it is telling the truth. */
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']),
+summary,
+label[for] {
+  cursor: pointer;
+}
+
 /* Section headers: small, bold, wide-tracked uppercase Inter. */
 .section-label {
   font-weight: 700;

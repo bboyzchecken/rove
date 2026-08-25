@@ -7,6 +7,8 @@
  */
 export const queryKeys = {
   me: () => ['me'] as const,
+  /** Which providers behind this screen are real — see features/meta. */
+  mode: () => ['meta', 'mode'] as const,
   characters: () => ['characters'] as const,
   dreams: () => ['dreams'] as const,
   inbox: () => ['inbox'] as const,
@@ -82,4 +84,7 @@ export const queryKeys = {
     ['adapt-preview', tokenOrSlug, input] as const,
 
   poiSearch: (q: string, city?: string) => ['poi', 'search', q, city ?? ''] as const,
+
+  /** Pre-auth invite landing page — keyed by token, not tripId. */
+  invitePreview: (token: string) => ['invite', token] as const,
 } as const;

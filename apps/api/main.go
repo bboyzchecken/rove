@@ -90,6 +90,21 @@ func command() string {
 	return ""
 }
 
+// stubProviders reads STUB_PROVIDERS, the switch that replaces the third
+// parties with stand-ins. MOCK_MODE is the name it used to have and is still
+// honoured so an existing .env keeps working — see core.Config for why the two
+// were split apart.
+func stubProviders() bool {
+	return viper.GetBool("STUB_PROVIDERS") || viper.GetBool("MOCK_MODE")
+}
+
+// devLogin reads DEV_LOGIN, the switch that registers the provider-less sign-in
+// door. It used to be implied by MOCK_MODE, which meant turning the stubs off
+// also locked everybody out; same fallback for compatibility, same reason.
+func devLogin() bool {
+	return viper.GetBool("DEV_LOGIN") || viper.GetBool("MOCK_MODE")
+}
+
 func loadConfig() core.Config {
 	viper.SetDefault("PORT", "5000")
 	viper.SetDefault("ENV", "development")
@@ -104,7 +119,8 @@ func loadConfig() core.Config {
 		Commit:         viper.GetString("COMMIT"),
 		Port:           viper.GetString("PORT"),
 		JwtSecret:      viper.GetString("JWT_SECRET_KEY"),
-		MockMode:       viper.GetBool("MOCK_MODE"),
+		StubProviders:  stubProviders(),
+		DevLogin:       devLogin(),
 		AdminEmails:    splitCSV(viper.GetString("ADMIN_EMAILS")),
 		AuthCookieName: viper.GetString("AUTH_COOKIE_NAME"),
 		AppBaseURL:     viper.GetString("APP_BASE_URL"),
@@ -224,7 +240,7 @@ func storeModules() fx.Option {
 }
 
 // serviceModules registers everything that talks to the outside world. Each of
-// them degrades to a deterministic stand-in when MOCK_MODE is on or its key is
+// them degrades to a deterministic stand-in when STUB_PROVIDERS is on or its key is
 // missing, which is what lets UAT run the real API against a real database
 // without a single third-party account.
 func serviceModules() fx.Option {

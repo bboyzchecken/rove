@@ -32,8 +32,9 @@ func New(t *testing.T) *Harness {
 	return newHarness(t, false)
 }
 
-// NewMock is New with MOCK_MODE on — for exercising routes that only
-// register while mocking, such as the /auth/demo dev-login door.
+// NewMock is New with the provider stubs and the dev-login door on — for
+// exercising routes that only register in that configuration, such as
+// /auth/demo.
 func NewMock(t *testing.T) *Harness {
 	t.Helper()
 	return newHarness(t, true)
@@ -63,7 +64,8 @@ func newHarness(t *testing.T, mock bool) *Harness {
 
 	cfg := core.Config{
 		Environment:    "test",
-		MockMode:       mock,
+		StubProviders:  mock,
+		DevLogin:       mock,
 		Port:           "0",
 		JwtSecret:      "test-secret-not-used-anywhere-real",
 		AuthCookieName: "rove_token",

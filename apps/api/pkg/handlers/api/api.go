@@ -249,6 +249,7 @@ func (s *Server) registerRoutes() {
 
 	v1 := s.e.Group("/api/v1")
 
+	s.registerModeRoutes(v1)     // which providers are real — see mode.handler.go
 	s.registerAuthRoutes(v1)     // A0.4 / A0.5
 	s.registerUserRoutes(v1)     // A3.1 / A14 / A15 / A17
 	s.registerPublicRoutes(v1)   // A10.1 — shared + public trips

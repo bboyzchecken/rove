@@ -1,8 +1,11 @@
-import type { Character } from './types';
+import type { Character } from '@/lib/data/model';
 
 /**
  * The 20 fixed characters (DEV_SPEC M14). The same list is seeded server-side
  * from `apps/api/data/characters.json` — keep the ids identical.
+ *
+ * Real catalogue data, used in both modes — which is why it lives in
+ * `lib/catalog/` and not, as it used to, in a folder called `mock`.
  */
 export const CHARACTERS: Character[] = [
   { id: 'shiba', name: 'ชิบะ', image: '/characters/char-01-shiba.webp', accent: 'primary' },

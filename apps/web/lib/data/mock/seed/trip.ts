@@ -1,4 +1,4 @@
-import type { BudgetLine, ExpenseEntry, Member, PlanDay, Trip, WishlistItem } from './types';
+import type { BudgetLine, ExpenseEntry, Member, PlanDay, Trip, WishlistItem } from '../../model';
 
 /**
  * The demo trip every prototype screen renders: four friends, eight days,

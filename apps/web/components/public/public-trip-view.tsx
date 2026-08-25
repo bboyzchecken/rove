@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bus, Car, Copy, Eye, EyeOff, Footprints, TrainFront, Wand2 } from 'lucide-react';
 
-import { RoveLogo } from '@/components/brand/rove-logo';
+import { PublicShell } from '@/components/common/public-shell';
 import { AdaptDialog } from '@/components/public/adapt-dialog';
 import { ReviewLine, ReviewSummaryLine } from '@/components/trip/trip-review';
 import { SectionHeader } from '@/components/common/section';
@@ -38,23 +38,26 @@ export function PublicTripView({ tokenOrSlug }: { tokenOrSlug: string }) {
 
   if (isLoading) {
     return (
-      <main className="mx-auto max-w-2xl space-y-3 px-4 py-10">
-        <div className="rounded-brand bg-surface h-40 animate-pulse" />
-        <div className="rounded-brand bg-surface h-64 animate-pulse" />
-      </main>
+      <PublicShell>
+        <div className="space-y-3 py-8">
+          <div className="rounded-brand bg-surface h-40 animate-pulse" />
+          <div className="rounded-brand bg-surface h-64 animate-pulse" />
+        </div>
+      </PublicShell>
     );
   }
 
   if (!data) {
     return (
-      <main className="mx-auto max-w-2xl px-6 py-16 text-center">
-        <RoveLogo size="md" className="mx-auto" />
-        <h1 className="font-display text-espresso mt-6 text-xl font-extrabold">ไม่พบแพลนนี้</h1>
-        <p className="text-muted mt-2 text-sm">ลิงก์อาจถูกปิดหรือสร้างใหม่ไปแล้ว</p>
-        <ButtonLink href="/" className="mt-5">
-          กลับหน้าแรก
-        </ButtonLink>
-      </main>
+      <PublicShell width="focused" center>
+        <div className="py-16 text-center">
+          <h1 className="font-display text-espresso text-xl font-extrabold">ไม่พบแพลนนี้</h1>
+          <p className="text-muted mt-2 text-sm">ลิงก์อาจถูกปิดหรือสร้างใหม่ไปแล้ว</p>
+          <ButtonLink href="/explore" className="mt-5">
+            ไปหน้าสำรวจ
+          </ButtonLink>
+        </div>
+      </PublicShell>
     );
   }
 
@@ -70,11 +73,21 @@ export function PublicTripView({ tokenOrSlug }: { tokenOrSlug: string }) {
   };
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-6">
-      <div className="flex items-center justify-between">
-        <RoveLogo size="sm" />
-        <Badge tone="outline">แพลนที่แชร์มา</Badge>
-      </div>
+    <PublicShell
+      actions={
+        <>
+          <ButtonLink href="/explore" size="sm" variant="ghost">
+            สำรวจแพลนอื่น
+          </ButtonLink>
+          <ButtonLink href="/new" size="sm" variant="soft">
+            เริ่มทริปของฉัน
+          </ButtonLink>
+        </>
+      }
+    >
+      <Badge tone="outline" className="mt-6">
+        แพลนที่แชร์มา
+      </Badge>
 
       <TripCover src={trip.cover} frame="banner" priority className="rounded-brand mt-4" />
 
@@ -233,6 +246,6 @@ export function PublicTripView({ tokenOrSlug }: { tokenOrSlug: string }) {
         tokenOrSlug={tokenOrSlug}
         source={trip}
       />
-    </main>
+    </PublicShell>
   );
 }

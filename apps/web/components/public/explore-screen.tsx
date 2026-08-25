@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Copy, Eye, Search, Sparkles } from 'lucide-react';
 
-import { RoveLogo } from '@/components/brand/rove-logo';
+import { PublicShell } from '@/components/common/public-shell';
 import { MatchBadge } from '@/components/public/match-badge';
 import { Stars } from '@/components/trip/trip-review';
 import { TripCover } from '@/components/trip/trip-cover';
@@ -58,14 +58,14 @@ export function ExploreScreen() {
   const matching = Boolean(matchTripId);
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-6">
-      <div className="flex items-center justify-between">
-        <RoveLogo size="sm" />
+    <PublicShell
+      width="wide"
+      actions={
         <ButtonLink href="/new" size="sm" variant="soft">
           เริ่มทริปของฉัน
         </ButtonLink>
-      </div>
-
+      }
+    >
       <h1 className="font-display text-espresso mt-6 text-2xl font-extrabold tracking-tight">
         ตามรอยทริปที่คนไปมาแล้วจริงๆ
       </h1>
@@ -197,7 +197,7 @@ export function ExploreScreen() {
           </Button>
         </div>
       ) : null}
-    </main>
+    </PublicShell>
   );
 }
 

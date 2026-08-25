@@ -75,3 +75,10 @@ func (s *store) Count(ctx context.Context) (int64, error) {
 	err := s.db.WithContext(ctx).Model(&models.User{}).Count(&n).Error
 	return n, err
 }
+
+func (s *store) CountAdmins(ctx context.Context) (int64, error) {
+	var n int64
+	err := s.db.WithContext(ctx).Model(&models.User{}).
+		Where("role = ?", models.RoleAdmin).Count(&n).Error
+	return n, err
+}

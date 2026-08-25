@@ -119,7 +119,7 @@ func (p *pipeline) Generate(ctx context.Context, in GenerateInput, onStep StepFu
 	step("จับกลุ่มสถานที่ตามโซน", 0.3)
 
 	var result *DraftResult
-	if p.cfg.UseMock() || p.cfg.Anthropic.ApiKey == "" {
+	if p.cfg.UseStubs() || p.cfg.Anthropic.ApiKey == "" {
 		// The simulated path builds a real plan out of real POIs — it just does
 		// the arranging in Go instead of asking a model. Everything downstream
 		// (validation, persistence, coverage) runs exactly as it does live.
@@ -252,7 +252,7 @@ func (p *pipeline) buildFrame(ctx context.Context, in GenerateInput) (*frame, er
 /* -------------------------------------------------------------- simulate -- */
 
 // simulate lays out the shortlist without a model: one anchor in the morning,
-// lunch, one or two in the afternoon, dinner. It is what MOCK_MODE runs, and
+// lunch, one or two in the afternoon, dinner. It is what STUB_PROVIDERS runs, and
 // what a model failure falls back to — a plan that is merely sensible is far
 // better than an error page.
 func (p *pipeline) simulate(f *frame) *DraftResult {
@@ -715,7 +715,7 @@ func openQuestions(in GenerateInput) []string {
 // model is unavailable — it falls back to a regex that handles the shape
 // airline confirmations actually use, which is enough to reach a trip frame.
 func (p *pipeline) ParseTicket(ctx context.Context, text string) (*ParsedTicket, error) {
-	if p.cfg.UseMock() || p.cfg.Anthropic.ApiKey == "" {
+	if p.cfg.UseStubs() || p.cfg.Anthropic.ApiKey == "" {
 		return parseTicketHeuristic(text), nil
 	}
 

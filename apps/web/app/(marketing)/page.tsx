@@ -2,14 +2,15 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, CalendarDays, CalendarSearch, Plane } from 'lucide-react';
 
-import { RoveLogo } from '@/components/brand/rove-logo';
 import { RoveMark } from '@/components/brand/rove-mark';
+import { PublicShell, SHELL_SECTION } from '@/components/common/public-shell';
 import { SectionHeader } from '@/components/common/section';
 import { ButtonLink } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
-import { CHARACTERS } from '@/lib/mock';
+import { DEMO_PUBLIC_PATH } from '@/lib/demo-trip';
+import { CHARACTERS } from '@/lib/catalog/characters';
 
 /**
  * Landing page (M1 — W1.1). Three entry cards, each of which must reach a
@@ -102,21 +103,25 @@ const DESTINATIONS: { label: string; accent: 'primary' | 'matcha' | 'sky' | 'sun
 
 export default function LandingPage() {
   return (
-    <div>
-      <header className="mx-auto flex h-16 max-w-5xl items-center justify-between px-5">
-        <RoveLogo size="sm" />
-        <div className="flex items-center gap-2">
+    <PublicShell
+      width="wide"
+      bleed
+      actions={
+        <>
+          <ButtonLink href="/explore" variant="ghost" size="sm">
+            สำรวจแพลน
+          </ButtonLink>
           <ButtonLink href="/login" variant="ghost" size="sm">
             เข้าสู่ระบบ
           </ButtonLink>
           <ButtonLink href="/new" size="sm">
             เริ่มวางแพลน
           </ButtonLink>
-        </div>
-      </header>
-
+        </>
+      }
+    >
       {/* ------------------------------------------------------------ hero */}
-      <section className="mx-auto grid max-w-5xl items-center gap-8 px-5 pt-6 pb-12 md:grid-cols-2 md:pt-12">
+      <section className={`${SHELL_SECTION} grid items-center gap-8 pt-6 pb-12 md:grid-cols-2 md:pt-12`}>
         <div className="animate-rove-rise">
           <p className="text-primary font-display flex items-center gap-1.5 text-sm font-bold tracking-wide">
             <RoveMark className="size-3.5" />
@@ -134,8 +139,13 @@ export default function LandingPage() {
             <ButtonLink href="/new" size="lg">
               เริ่มทริปแรก <ArrowRight className="size-4" />
             </ButtonLink>
-            {/* The seeded demo room — a dynamic route, so typedRoutes needs the cast. */}
-            <ButtonLink href={'/t/demo' as never} variant="outline" size="lg">
+            {/*
+              The published example plan, not the demo *room*: /t/:id is behind
+              the sign-in wall, and a landing page whose "look around first"
+              button asks you to sign in first is not a look around. Dynamic
+              route, so typedRoutes needs the cast.
+            */}
+            <ButtonLink href={DEMO_PUBLIC_PATH as never} variant="outline" size="lg">
               ดูทริปตัวอย่าง
             </ButtonLink>
           </div>
@@ -163,7 +173,7 @@ export default function LandingPage() {
       </section>
 
       {/* --------------------------------------------------- destinations */}
-      <section className="mx-auto max-w-5xl px-5 pb-12">
+      <section className={`${SHELL_SECTION} pb-12`}>
         <div className="flex flex-wrap items-center gap-2">
           <span className="section-label mr-1">ไปได้ทุกที่</span>
           {DESTINATIONS.map((d) => (
@@ -178,7 +188,7 @@ export default function LandingPage() {
       </section>
 
       {/* ---------------------------------------------------------- entry */}
-      <section className="mx-auto max-w-5xl px-5 pb-14">
+      <section className={`${SHELL_SECTION} pb-14`}>
         <SectionHeader label="เริ่มยังไงก็ได้ · ไม่เกิน 3 หน้าจอ" />
         <div className="grid gap-3 sm:grid-cols-3">
           {ENTRIES.map((entry) => (
@@ -202,7 +212,7 @@ export default function LandingPage() {
 
       {/* ---------------------------------------------------------- steps */}
       <section className="bg-surface">
-        <div className="mx-auto max-w-5xl px-5 py-14">
+        <div className={`${SHELL_SECTION} py-14`}>
           <SectionHeader label="ทำงานยังไง" />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {STEPS.map((step) => (
@@ -219,7 +229,7 @@ export default function LandingPage() {
       </section>
 
       {/* -------------------------------------------------------- features */}
-      <section className="mx-auto max-w-5xl px-5 py-14">
+      <section className={`${SHELL_SECTION} py-14`}>
         <SectionHeader label="สิ่งที่แอปวางแพลนอื่นไม่ค่อยมี" />
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => (
@@ -233,7 +243,7 @@ export default function LandingPage() {
       </section>
 
       {/* ------------------------------------------------------- character */}
-      <section className="mx-auto max-w-5xl px-5 pb-14">
+      <section className={`${SHELL_SECTION} pb-14`}>
         <Card accent="joyfull" className="overflow-hidden p-6 sm:p-8">
           <div className="flex flex-wrap items-center justify-between gap-6">
             <div className="max-w-md">
@@ -257,20 +267,6 @@ export default function LandingPage() {
         </Card>
       </section>
 
-      <footer className="border-border border-t">
-        <div className="text-muted mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-8 text-xs">
-          <RoveLogo size="sm" tone="mono" />
-          <nav className="flex flex-wrap items-center gap-4">
-            <Link href="/terms" className="hover:text-espresso">
-              เงื่อนไขการใช้งาน
-            </Link>
-            <Link href="/privacy" className="hover:text-espresso">
-              นโยบายความเป็นส่วนตัว
-            </Link>
-          </nav>
-          <p>ต้นแบบสำหรับนำเสนอ · ข้อมูลในหน้าจอเป็นตัวอย่าง</p>
-        </div>
-      </footer>
-    </div>
+    </PublicShell>
   );
 }

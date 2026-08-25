@@ -9,8 +9,9 @@ import {
   RATIONALES,
   TRIP,
   WISHLIST,
-} from '@/lib/mock/trip';
-import { CURRENT_USER, DREAMS, PAST_TRIPS, UPCOMING, YEAR_STATS } from '@/lib/mock/user';
+} from './seed/trip';
+import { CURRENT_USER, DREAMS, PAST_TRIPS, UPCOMING, YEAR_STATS } from './seed/user';
+import { DEMO_PUBLIC_SLUG } from '@/lib/demo-trip';
 
 import { AI_PAY_CHANNELS, FREE_SUBSCRIPTION, seedOrders } from './billing';
 
@@ -319,13 +320,16 @@ function seedDemoTrip(): TripRecord {
       { id: 'a4', memberId: 'm1', text: 'ตั้งงบไว้ที่ 45,000 บาท/คน', createdAt: '2026-08-16T03:30:00.000Z' },
     ],
     ai: { used: AI_CREDITS.used, included: AI_CREDITS.freePerTrip, extra: 0 },
+    // Published, because this is also the trip the landing page offers to an
+    // anonymous visitor as "ดูทริปตัวอย่าง" (/p/japan-autumn-8d). The same
+    // slug is seeded into MySQL for live mode, so one URL answers in both.
     share: {
-      visibility: 'private',
-      shareToken: null,
+      visibility: 'public',
+      shareToken: 'tok-demo',
       shareUrl: null,
-      publicSlug: null,
-      viewCount: 0,
-      cloneCount: 0,
+      publicSlug: DEMO_PUBLIC_SLUG,
+      viewCount: 312,
+      cloneCount: 18,
     },
   };
 }
@@ -516,7 +520,7 @@ function seedPublicTrips(): TripRecord[] {
 
 export function seedDb(): MockDb {
   return {
-    version: 7,
+    version: 8,
     user: {
       id: CURRENT_USER.id,
       name: CURRENT_USER.name,
@@ -641,7 +645,7 @@ export function loadDb(): MockDb {
         const parsed = JSON.parse(raw) as MockDb;
         // A seed change bumps the version; an old blob is thrown away rather
         // than migrated — this is demo data, not anyone's real trip.
-        if (parsed.version === 7) {
+        if (parsed.version === 8) {
           memory = parsed;
           return memory;
         }

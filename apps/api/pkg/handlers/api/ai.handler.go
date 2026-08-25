@@ -452,7 +452,7 @@ func (s *Server) handleParseTicket(c echo.Context) error {
 	out := parsedTicketDTO{
 		Flights:   make([]parsedTicketFlightDTO, 0, len(parsed.Flights)),
 		Cities:    ai.TicketCities(parsed),
-		Simulated: s.cfg.UseMock() || s.cfg.Anthropic.ApiKey == "",
+		Simulated: s.cfg.UseStubs() || s.cfg.Anthropic.ApiKey == "",
 	}
 	for _, f := range parsed.Flights {
 		flight := parsedTicketFlightDTO{

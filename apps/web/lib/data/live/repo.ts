@@ -4,11 +4,13 @@ import { env } from '@/lib/env';
 import type { RoveRepo } from '../repo';
 import type {
   AdaptInput,
+  AdminStats,
   AiJob,
   Airport,
   CurrentUser,
   Member,
   PhotoBookTheme,
+  ProviderMode,
   TripConflict,
 } from '../types';
 import type {
@@ -21,6 +23,7 @@ import type {
   ReviewListDto,
   AdaptDiffDto,
   AdminStatsDto,
+  ModeDto,
   AirportDto,
   AiCreditsDto,
   AiJobDto,
@@ -37,6 +40,7 @@ import type {
   ExpenseEntryDto,
   ExpenseSummaryDto,
   InviteDto,
+  InvitePreviewDto,
   LockedDatesDto,
   MeDto,
   MemberDto,
@@ -101,6 +105,7 @@ import {
   toExpense,
   toExpenseSummary,
   toInvite,
+  toInvitePreview,
   toLocked,
   toMember,
   toCreatorProfile,
@@ -134,7 +139,7 @@ import {
   toWindow,
   toYearStats,
 } from './mappers';
-import { CHARACTERS } from '@/lib/mock/characters';
+import { CHARACTERS } from '@/lib/catalog/characters';
 
 /**
  * The live repository — every call reaches the Go API and lands in MySQL.
@@ -310,6 +315,9 @@ export const liveRepo: RoveRepo = {
 
     async invite(tripId, role) {
       return toInvite(await api.post<InviteDto>(`/trips/${tripId}/invites`, { role }));
+    },
+    async preview(token) {
+      return toInvitePreview(await api.get<InvitePreviewDto>(`/invites/${token}`));
     },
     async join(token) {
       return api.post<{ tripId: string }>(`/invites/${token}/join`).then((r) => r);
@@ -1033,8 +1041,22 @@ export const liveRepo: RoveRepo = {
         aiCostTodayUsd: dto.ai_cost_today_usd,
         aiCostCapUsd: dto.ai_cost_cap_usd,
         clicksToday: dto.clicks_today,
-        mockMode: dto.mock_mode,
+        stubProviders: dto.stub_providers,
+        stubbed: (dto.stubbed ?? []) as AdminStats['stubbed'],
         commit: dto.commit,
+      };
+    },
+  },
+
+  /* -------------------------------------------------------------- meta -- */
+  meta: {
+    async mode() {
+      const dto = await api.get<ModeDto>('/meta/mode');
+      return {
+        live: dto.live,
+        stubbed: (dto.stubbed ?? []) as ProviderMode['stubbed'],
+        devLogin: dto.dev_login,
+        env: dto.env,
       };
     },
   },

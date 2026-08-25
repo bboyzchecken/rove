@@ -53,7 +53,7 @@ func (s *service) Daily(ctx context.Context, lat, lng float64, from, to time.Tim
 		return cached, nil
 	}
 
-	if s.cfg.UseMock() {
+	if s.cfg.UseStubs() {
 		return seasonal(lat, from, to), nil
 	}
 

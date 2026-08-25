@@ -1,8 +1,7 @@
 import Image from 'next/image';
-import Link from 'next/link';
-import { ArrowLeft, TriangleAlert } from 'lucide-react';
+import { TriangleAlert } from 'lucide-react';
 
-import { RoveLogo } from '@/components/brand/rove-logo';
+import { BackHome, PublicShell } from '@/components/common/public-shell';
 import { Card } from '@/components/ui/card';
 
 /**
@@ -35,17 +34,9 @@ export function LegalPage({
   contact: React.ReactNode;
 }) {
   return (
-    <div className="mx-auto max-w-2xl px-5 py-6">
-      <div className="flex items-center justify-between">
-        <Link href="/" aria-label="ROVE">
-          <RoveLogo size="sm" />
-        </Link>
-        <Link href="/" className="text-muted inline-flex items-center gap-1 text-xs font-semibold">
-          <ArrowLeft className="size-3.5" /> กลับหน้าแรก
-        </Link>
-      </div>
-
-      <header className="mt-8 flex items-start gap-4">
+    <PublicShell actions={<BackHome />}>
+      {/* A div, not a <header>: the site header is the one in PublicShell. */}
+      <div className="mt-6 flex items-start gap-4">
         <Image
           src={image}
           alt=""
@@ -59,7 +50,7 @@ export function LegalPage({
           </h1>
           <p className="text-muted mt-1 text-xs">อัปเดตล่าสุด {updated}</p>
         </div>
-      </header>
+      </div>
 
       {/* This is the part a reader must not miss, so it is not a footnote. */}
       <Card accent="sun" className="mt-5 p-4">
@@ -109,15 +100,6 @@ export function LegalPage({
         <p className="font-display text-espresso font-bold">ติดต่อเรา</p>
         <div className="text-muted mt-2 space-y-1 text-sm leading-relaxed">{contact}</div>
       </Card>
-
-      <footer className="text-muted mt-8 flex flex-wrap gap-4 text-xs">
-        <Link href="/terms" className="hover:text-espresso">
-          เงื่อนไขการใช้งาน
-        </Link>
-        <Link href="/privacy" className="hover:text-espresso">
-          นโยบายความเป็นส่วนตัว
-        </Link>
-      </footer>
-    </div>
+    </PublicShell>
   );
 }

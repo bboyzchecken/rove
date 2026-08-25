@@ -16,11 +16,15 @@ export const env = {
   posthogKey: process.env.NEXT_PUBLIC_POSTHOG_KEY ?? '',
   posthogHost: process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://us.i.posthog.com',
   /**
-   * Dev-only sign-in door. Live mode has no way in until real OAuth credentials
-   * exist, so this reveals a button on `/admin/login` — never the public
+   * Dev-only sign-in door. Until real OAuth credentials exist there is no other
+   * way in, so this reveals a button on `/admin/login` — never the public
    * `/login` screen (§16) — that trades nothing for a session on a fixed demo
-   * account, always promoted to admin. It only works while the API runs with
-   * MOCK_MODE=true, and `/api/auth/demo` refuses outright in production.
+   * account, always promoted to admin.
+   *
+   * It is an *extra* on that page, not the reason it exists: turning this off
+   * leaves the staff door working on the same OAuth as everyone else, with
+   * admin coming from the API's ADMIN_EMAILS. Needs DEV_LOGIN=true on the API
+   * side too, and `/api/auth/demo` refuses outright in production.
    */
   devLogin: process.env.NEXT_PUBLIC_DEV_LOGIN === 'true',
 } as const;

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Copy, Eye, Sparkles } from 'lucide-react';
 
-import { RoveLogo } from '@/components/brand/rove-logo';
+import { PublicShell } from '@/components/common/public-shell';
 import { SectionHeader, Stat } from '@/components/common/section';
 import { TripCover } from '@/components/trip/trip-cover';
 import { ButtonLink } from '@/components/ui/button';
@@ -21,35 +21,38 @@ export function CreatorScreen({ handle }: { handle: string }) {
 
   if (isLoading) {
     return (
-      <main className="mx-auto max-w-3xl space-y-3 px-4 py-10">
-        <div className="rounded-brand bg-surface h-32 animate-pulse" />
-        <div className="rounded-brand bg-surface h-64 animate-pulse" />
-      </main>
+      <PublicShell width="wide">
+        <div className="space-y-3 py-8">
+          <div className="rounded-brand bg-surface h-32 animate-pulse" />
+          <div className="rounded-brand bg-surface h-64 animate-pulse" />
+        </div>
+      </PublicShell>
     );
   }
 
   if (!creator) {
     return (
-      <main className="mx-auto max-w-2xl px-6 py-16 text-center">
-        <RoveLogo size="md" className="mx-auto" />
-        <h1 className="font-display text-espresso mt-6 text-xl font-extrabold">ไม่พบโปรไฟล์นี้</h1>
-        <p className="text-muted mt-2 text-sm">อาจพิมพ์ชื่อผิด หรือเจ้าของยังไม่ได้เปิดโปรไฟล์</p>
-        <ButtonLink href="/explore" className="mt-5">
-          ไปหน้าสำรวจ
-        </ButtonLink>
-      </main>
+      <PublicShell width="focused" center>
+        <div className="py-16 text-center">
+          <h1 className="font-display text-espresso text-xl font-extrabold">ไม่พบโปรไฟล์นี้</h1>
+          <p className="text-muted mt-2 text-sm">อาจพิมพ์ชื่อผิด หรือเจ้าของยังไม่ได้เปิดโปรไฟล์</p>
+          <ButtonLink href="/explore" className="mt-5">
+            ไปหน้าสำรวจ
+          </ButtonLink>
+        </div>
+      </PublicShell>
     );
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-6">
-      <div className="flex items-center justify-between">
-        <RoveLogo size="sm" />
+    <PublicShell
+      width="wide"
+      actions={
         <ButtonLink href="/explore" size="sm" variant="soft">
           สำรวจแพลนอื่น
         </ButtonLink>
-      </div>
-
+      }
+    >
       <Card accent="joyfull" className="mt-6 p-5">
         <div className="flex items-center gap-4">
           <CharacterAvatar characterId={creator.characterId} size="lg" />
@@ -120,6 +123,6 @@ export function CreatorScreen({ handle }: { handle: string }) {
           เริ่มทริปของฉัน
         </ButtonLink>
       </Card>
-    </main>
+    </PublicShell>
   );
 }

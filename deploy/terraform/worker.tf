@@ -53,7 +53,8 @@ resource "aws_ecs_task_definition" "worker" {
       environment = [
         { name = "ENV", value = "production" },
         { name = "ROVE_ROLE", value = "worker" },
-        { name = "MOCK_MODE", value = "false" },
+        { name = "STUB_PROVIDERS", value = "false" },
+        { name = "DEV_LOGIN", value = "false" },
         { name = "APP_BASE_URL", value = "https://${var.api_subdomain}.${var.domain_name}" },
         { name = "WEB_BASE_URL", value = "https://${var.domain_name}" },
         { name = "MYSQL_HOST", value = aws_db_instance.main.address },

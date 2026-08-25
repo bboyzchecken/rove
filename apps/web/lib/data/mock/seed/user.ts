@@ -6,7 +6,7 @@ import type {
   RecapDecision,
   RecapSpend,
   YearStats,
-} from './types';
+} from '../../model';
 
 /**
  * What opening a trip to the public pays (DEV_SPEC §6.5). The API awards the

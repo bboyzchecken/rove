@@ -32,6 +32,7 @@ import type {
   FlightLeg,
   FlightLegInput,
   InviteLink,
+  InvitePreview,
   LockedDates,
   CreatorProfile,
   ExploreTrip,
@@ -97,6 +98,7 @@ import type {
   ExportDto,
   FlightDto,
   InviteDto,
+  InvitePreviewDto,
   LockedDatesDto,
   CreatorProfileDto,
   DocumentDto,
@@ -1210,4 +1212,8 @@ export function toParsedTicket(dto: ParsedTicketDto): ParsedTicket {
 
 export function toInvite(dto: InviteDto): InviteLink {
   return { token: dto.token, url: dto.url, expiresAt: dto.expires_at, role: dto.role };
+}
+
+export function toInvitePreview(dto: InvitePreviewDto): InvitePreview {
+  return { tripId: dto.trip_id, title: dto.title, role: dto.role, expiresAt: dto.expires_at };
 }

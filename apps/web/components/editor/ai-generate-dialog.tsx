@@ -11,8 +11,8 @@ import { Card } from '@/components/ui/card';
 import { FieldLabel, Input, Textarea, fieldClass } from '@/components/ui/field';
 import { useMe } from '@/features/auth/queries';
 import { useAiCredits, useAiDraft, useBuyAiCredits } from '@/features/ai/queries';
+import { useIsStubbed } from '@/features/meta/queries';
 import { useWishlist } from '@/features/wishlist/queries';
-import { mockSkips } from '@/lib/data';
 import type { Order } from '@/lib/data';
 import { cn } from '@/lib/utils';
 
@@ -44,6 +44,10 @@ export function AiGenerateDialog({
   const { data: wishlist = [] } = useWishlist(tripId);
   const buyCredits = useBuyAiCredits(tripId);
   const draft = useAiDraft(tripId);
+  // Asked of whatever is actually serving this screen, not of the build flag:
+  // a `live` web app in front of an API with no ANTHROPIC_API_KEY still gets a
+  // canned draft, and used to say nothing about it.
+  const aiIsStubbed = useIsStubbed('ai');
 
   const [brief, setBrief] = useState('');
   const [pace, setPace] = useState<'relaxed' | 'balanced' | 'packed'>('balanced');
@@ -228,9 +232,9 @@ export function AiGenerateDialog({
               />
             </label>
 
-            {mockSkips.aiGeneration ? (
+            {aiIsStubbed ? (
               <Badge tone="sun" size="md">
-                โหมดทดลอง: ใช้ร่างตัวอย่าง ไม่ได้เรียกโมเดลจริง
+                ตอนนี้ใช้ร่างตัวอย่าง ยังไม่ได้เรียกโมเดลจริง
               </Badge>
             ) : null}
 

@@ -11,12 +11,29 @@ type Config struct {
 	JwtSecret   string
 	AdminEmails []string
 
-	// MockMode keeps the API fully functional without any third party: the
-	// database is still real and every write still lands in MySQL, but the
-	// providers that need a key or a bill (Anthropic, Google, FX, weather,
-	// storage, e-mail) are replaced by deterministic stand-ins. It is what UAT
-	// runs on, and it is never on in production.
-	MockMode bool
+	// StubProviders replaces the third parties that need a key or a bill
+	// (Anthropic, Google, FX, weather, storage, e-mail) with deterministic
+	// stand-ins. It is never on in production.
+	//
+	// It is NOT a mock database. Every write still lands in MySQL exactly as it
+	// would otherwise — which is the whole reason this field is no longer
+	// called MockMode. "Mock mode" is the web app's own thing
+	// (NEXT_PUBLIC_DATA_MODE=mock: browser-only, nothing is saved anywhere),
+	// and one name covering both made "is any of this real?" a question with no
+	// answer. Two axes, two names:
+	//
+	//   NEXT_PUBLIC_DATA_MODE=mock  → nothing is real, nothing is stored
+	//   STUB_PROVIDERS=true         → the data is real, the providers are not
+	//
+	// Reads STUB_PROVIDERS, falling back to the old MOCK_MODE.
+	StubProviders bool
+
+	// DevLogin registers POST /auth/demo: a sign-in with no provider behind it,
+	// for a machine that has no OAuth credentials yet. It used to ride along
+	// with MOCK_MODE, which meant turning off the provider stubs also took away
+	// the only way to sign in. Its own switch, so each can be answered on its
+	// own. Never on in production.
+	DevLogin bool
 
 	// Name of the httpOnly cookie the Next.js BFF sets; the API accepts it as
 	// an alternative to the Authorization header.
@@ -111,10 +128,14 @@ type FXConfig struct {
 
 func (c Config) IsProduction() bool { return c.Environment == "production" }
 
-// UseMock reports whether a provider should be stubbed. Production always
-// wins: MOCK_MODE=true in a production environment is a misconfiguration, not
-// an instruction.
-func (c Config) UseMock() bool { return c.MockMode && !c.IsProduction() }
+// UseStubs reports whether a provider should be stubbed. Production always
+// wins: STUB_PROVIDERS=true in a production environment is a misconfiguration,
+// not an instruction.
+func (c Config) UseStubs() bool { return c.StubProviders && !c.IsProduction() }
+
+// UseDevLogin reports whether the provider-less sign-in door exists. Same
+// production override, for the same reason.
+func (c Config) UseDevLogin() bool { return c.DevLogin && !c.IsProduction() }
 func (c Config) IsDevelopment() bool {
 	return c.Environment == "" || c.Environment == "development" || c.Environment == "local"
 }

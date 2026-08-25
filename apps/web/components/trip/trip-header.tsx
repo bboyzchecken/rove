@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Compass, ImageUp } from 'lucide-react';
+import { Compass, ImageUp, Pencil } from 'lucide-react';
 
 import { TripCover } from '@/components/trip/trip-cover';
 import { TripCoverSheet } from '@/components/trip/trip-cover-sheet';
+import { TripFrameDialog } from '@/components/trip/trip-frame-dialog';
 import { Badge } from '@/components/ui/badge';
 import { ButtonLink } from '@/components/ui/button';
 import { CharacterStack } from '@/components/ui/character-avatar';
@@ -20,6 +21,11 @@ import { thaiRangeLabel, toIsoDate } from '@/lib/data/domain';
  * hide the artwork it is sitting on. The one thing that does sit on the cover
  * is the button that changes it — a picture is edited where it is seen, and
  * there is nothing under it to hide.
+ *
+ * The title is edited where it is seen too. It was editable only from a small
+ * "แก้ไข" link on the ภาพรวม tab, three taps from the title itself and on a
+ * different screen from where every other tab shows it — so from the room, the
+ * name of the trip simply could not be changed.
  */
 const STATUS_LABEL: Record<string, string> = {
   planning: 'กำลังวางแพลน',
@@ -38,6 +44,7 @@ export function TripHeader({ tripId }: { tripId: string }) {
   const { data, isLoading } = useTripOverview(tripId);
   const { data: me } = useMe();
   const [picking, setPicking] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   if (isLoading || !data) {
     return (
@@ -89,7 +96,22 @@ export function TripHeader({ tripId }: { tripId: string }) {
             )}
           </div>
           <h1 className="font-display text-espresso text-xl font-extrabold tracking-tight sm:text-2xl">
-            {trip.title}
+            {canEdit ? (
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                title="แก้ชื่อและกรอบทริป"
+                className="hover:text-primary group inline-flex items-start gap-1.5 text-left transition"
+              >
+                {trip.title}
+                <Pencil
+                  className="text-muted group-hover:text-primary mt-1.5 size-3.5 shrink-0"
+                  strokeWidth={2.5}
+                />
+              </button>
+            ) : (
+              trip.title
+            )}
           </h1>
           <p className="text-muted mt-0.5 text-xs">
             {hasDates
@@ -116,6 +138,10 @@ export function TripHeader({ tripId }: { tripId: string }) {
         open={picking}
         onClose={() => setPicking(false)}
       />
+
+      {editing ? (
+        <TripFrameDialog tripId={tripId} trip={trip} open onClose={() => setEditing(false)} />
+      ) : null}
     </div>
   );
 }

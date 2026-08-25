@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Luggage, Plus, Sparkles, UserRound } from 'lucide-react';
+import { Compass, LayoutDashboard, Luggage, Plus, UserRound } from 'lucide-react';
 
+import { LocaleSwitchCompact } from '@/components/common/locale-switch';
 import { ModeBanner } from '@/components/common/mode-banner';
 import { RoveLogo } from '@/components/brand/rove-logo';
 import { InboxBell } from '@/components/collab/inbox-bell';
@@ -24,12 +25,20 @@ import { cn } from '@/lib/utils';
  * The logo goes to the public landing page — /home is this user's dashboard,
  * not the site's front door, and conflating the two is what made the map
  * confusing.
+ *
+ * "ที่อยากไป" is not here even though it is a real destination: /dreams is one
+ * tap from /home, /profile and the profile menu, whereas /explore had no way in
+ * at all outside the 404. A tab is worth more to the screen nobody can reach.
+ *
+ * The header here and `PublicShell`'s are deliberately the same frame —
+ * `max-w-5xl`, the same gutter, the same height, logo left and actions right —
+ * so signing in does not move the chrome. Change one and change the other.
  */
 const NAV = [
   { href: '/home', label: 'สรุปของฉัน', icon: LayoutDashboard },
-  { href: '/trips', label: 'ทริปของฉัน', icon: Luggage },
+  { href: '/explore', label: 'สำรวจ', icon: Compass },
   { href: '/new', label: 'สร้างทริป', icon: Plus, accent: true },
-  { href: '/dreams', label: 'ที่อยากไป', icon: Sparkles },
+  { href: '/trips', label: 'ทริปของฉัน', icon: Luggage },
   { href: '/profile', label: 'ฉัน', icon: UserRound },
 ] as const;
 
@@ -82,6 +91,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="flex items-center gap-1">
+            <LocaleSwitchCompact className="mr-1" />
             <InboxBell />
             <Link href="/profile" aria-label="โปรไฟล์">
               <CharacterAvatar characterId={me?.characterId ?? 'shiba'} size="sm" />

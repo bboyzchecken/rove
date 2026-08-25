@@ -21,9 +21,9 @@ import (
 func TestFXGraphIsComplete(t *testing.T) {
 	err := fx.ValidateApp(
 		fx.Supply(core.Config{
-			Environment: "test",
-			MockMode:    true,
-			Port:        "5000",
+			Environment:   "test",
+			StubProviders: true,
+			Port:          "5000",
 		}),
 		// The two infrastructure clients are the only things stubbed: they open
 		// real connections, and everything downstream only needs the type.
@@ -50,9 +50,9 @@ func newTestRedis() *redis.Client { return nil }
 func TestWorkerGraphIsComplete(t *testing.T) {
 	err := fx.ValidateApp(
 		fx.Supply(core.Config{
-			Environment: "test",
-			MockMode:    true,
-			Role:        ai.RoleWorker,
+			Environment:   "test",
+			StubProviders: true,
+			Role:          ai.RoleWorker,
 		}),
 		fx.Provide(func() *gorm.DB { return nil }),
 		fx.Provide(newTestRedis),

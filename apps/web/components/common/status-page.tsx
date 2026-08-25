@@ -1,6 +1,6 @@
 import Image from 'next/image';
 
-import { RoveLogo } from '@/components/brand/rove-logo';
+import { BackHome, PublicShell } from '@/components/common/public-shell';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -30,10 +30,8 @@ export function StatusPage({
   detail?: React.ReactNode;
 }) {
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col px-5 py-6">
-      <RoveLogo size="sm" />
-
-      <div className="flex flex-1 flex-col items-center justify-center py-10 text-center">
+    <PublicShell width="focused" center actions={<BackHome />}>
+      <div className="flex flex-col items-center py-10 text-center">
         <Image
           src={image}
           alt=""
@@ -62,6 +60,6 @@ export function StatusPage({
           </p>
         ) : null}
       </div>
-    </main>
+    </PublicShell>
   );
 }

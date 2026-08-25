@@ -59,23 +59,40 @@ export function FieldLabel({ className, ...props }: React.ComponentProps<'span'>
   );
 }
 
-/** Label, control, and the note under it that says when a blank is fine. */
+/**
+ * Label, control, and the note under it that says when a blank is fine.
+ *
+ * A `<label>` by default, so tapping the caption puts the cursor in the input
+ * — which is the whole point on a phone. Pass `group` when the field holds
+ * *buttons* rather than one input: a button is a labelable element, so a
+ * `<label>` around a stepper hands every stray click — the caption, the hint,
+ * the whitespace — to the first button in it. That is how "ชวนเพิ่มทีหลังได้ตลอด"
+ * became a second minus button.
+ */
 export function Field({
   label,
   hint,
   className,
+  group = false,
   children,
 }: {
   label?: React.ReactNode;
   hint?: React.ReactNode;
   className?: string;
+  /** The field is a set of controls, not one input — renders a div, not a label. */
+  group?: boolean;
   children: React.ReactNode;
 }) {
+  const Tag = group ? 'div' : 'label';
+
   return (
-    <label className={cn('block', className)}>
+    <Tag
+      className={cn('block', className)}
+      {...(group && typeof label === 'string' ? { role: 'group', 'aria-label': label } : {})}
+    >
       {label ? <FieldLabel>{label}</FieldLabel> : null}
       {children}
       {hint ? <span className="text-muted mt-1 block text-[11px]">{hint}</span> : null}
-    </label>
+    </Tag>
   );
 }

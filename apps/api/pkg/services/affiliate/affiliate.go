@@ -127,7 +127,7 @@ func (s *service) PartnersFor(_ context.Context, itemType string) ([]Partner, er
 	for _, p := range partners {
 		// A partner without an affiliate id is not yet approved; showing its
 		// link would give away the click for nothing.
-		p.Enabled = s.cfg.Affiliate[p.Key] != "" || s.cfg.UseMock()
+		p.Enabled = s.cfg.Affiliate[p.Key] != "" || s.cfg.UseStubs()
 		if !p.Enabled {
 			continue
 		}

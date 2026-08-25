@@ -9,6 +9,8 @@ import { LOCALES } from '@/i18n/locales';
 import { cn } from '@/lib/utils';
 
 const LABEL: Record<string, string> = { th: 'ไทย', en: 'English' };
+/** Two letters is all a header has room for; the full name lives on the title. */
+const SHORT: Record<string, string> = { th: 'TH', en: 'EN' };
 
 /**
  * The language switch (Phase 3).
@@ -50,6 +52,44 @@ export function LocaleSwitch() {
       <p className="text-muted mt-1.5 text-[11px] leading-relaxed">
         ตอนนี้แปลแล้วเฉพาะเมนูและป้ายกำกับ — เนื้อหาส่วนใหญ่ยังเป็นภาษาไทย
       </p>
+    </div>
+  );
+}
+
+/**
+ * The same switch, sized for a header.
+ *
+ * A setting buried three taps deep in the profile menu is a setting nobody
+ * finds, and language is the one choice a visitor makes before they have an
+ * account to have settings in — so it rides the top bar on every surface,
+ * signed in or not. Two locales fit as a segmented pair; a third would want a
+ * menu.
+ */
+export function LocaleSwitchCompact({ className }: { className?: string }) {
+  const locale = useLocale();
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <div
+      className={cn('bg-surface flex items-center rounded-full p-0.5', className)}
+      role="group"
+      aria-label="ภาษา / Language"
+    >
+      {LOCALES.map((option) => (
+        <button
+          key={option}
+          onClick={() => startTransition(() => setLocale(option))}
+          disabled={pending || option === locale}
+          title={LABEL[option] ?? option}
+          aria-current={option === locale}
+          className={cn(
+            'rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide transition',
+            option === locale ? 'bg-espresso text-bg' : 'text-muted hover:text-espresso',
+          )}
+        >
+          {SHORT[option] ?? option.toUpperCase()}
+        </button>
+      ))}
     </div>
   );
 }

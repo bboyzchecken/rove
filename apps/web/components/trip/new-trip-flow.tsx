@@ -24,7 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
-import { FieldLabel, Input, Textarea, fieldClass } from '@/components/ui/field';
+import { Field, Input, Textarea, fieldClass } from '@/components/ui/field';
 import { useCharacters, useUpdateMe } from '@/features/auth/queries';
 import { useCreateTrip } from '@/features/trip/queries';
 import { track } from '@/lib/analytics';
@@ -436,7 +436,7 @@ export function NewTripFlow() {
                 </Card>
               ) : null}
 
-              <Field label="ไปกันกี่คน">
+              <Field label="ไปกันกี่คน" group>
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setParty((p) => Math.max(1, p - 1))}
@@ -596,11 +596,3 @@ function normaliseEntry(value: string | null): Entry | null {
   }
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <FieldLabel>{label}</FieldLabel>
-      {children}
-    </label>
-  );
-}

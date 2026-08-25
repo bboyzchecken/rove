@@ -43,6 +43,9 @@ func runSeed(cfg core.Config) {
 	if err := seedPOIs(ctx, db); err != nil {
 		logger.L().WithError(err).Fatal("seed pois")
 	}
+	if err := seedDemoTrip(ctx, db); err != nil {
+		logger.L().WithError(err).Fatal("seed example trip")
+	}
 	logger.L().Info("seed complete")
 }
 

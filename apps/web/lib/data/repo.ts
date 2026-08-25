@@ -41,6 +41,7 @@ import type {
   Inbox,
   FlightLegInput,
   InviteLink,
+  InvitePreview,
   LockedDates,
   Member,
   MemberProfile,
@@ -57,6 +58,7 @@ import type {
   Poi,
   Poll,
   PrepTask,
+  ProviderMode,
   PublicTripPayload,
   RedemptionBoard,
   ReviewBoard,
@@ -117,6 +119,7 @@ export interface RoveRepo {
   leads: LeadRepo;
   profile: ProfileRepo;
   admin: AdminRepo;
+  meta: MetaRepo;
 }
 
 export interface AuthRepo {
@@ -171,6 +174,8 @@ export interface TripRepo {
 export interface MemberRepo {
   list(tripId: string): Promise<Member[]>;
   invite(tripId: string, role: 'editor' | 'viewer'): Promise<InviteLink>;
+  /** What the invite landing page shows before asking anyone to sign in. */
+  preview(token: string): Promise<InvitePreview>;
   join(token: string): Promise<{ tripId: string }>;
   updateRole(tripId: string, memberId: string, role: 'owner' | 'editor' | 'viewer'): Promise<Member>;
   remove(tripId: string, memberId: string): Promise<void>;
@@ -442,6 +447,18 @@ export interface PoiRepo {
 
 export interface AdminRepo {
   stats(): Promise<AdminStats>;
+}
+
+/**
+ * "Is what I am looking at real?"
+ *
+ * Asked through the repository like everything else, so the answer comes from
+ * whichever half of the app is actually serving the screen: mock mode answers
+ * from its own definition (nothing is real, nothing is stored), live mode asks
+ * the API which providers it is standing in for.
+ */
+export interface MetaRepo {
+  mode(): Promise<ProviderMode>;
 }
 
 export interface ProfileRepo {

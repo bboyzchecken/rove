@@ -10,19 +10,21 @@ import { serverEnv } from '@/lib/env';
  * was moved off the screen every real user sees and the account it grants is
  * always promoted to admin).
  *
- * Live mode has no other way in while GOOGLE_OAUTH_CLIENT_ID and
+ * There is no other way in while GOOGLE_OAUTH_CLIENT_ID and
  * LINE_LOGIN_CHANNEL_ID are still blank: the API answers 400 for both consent
- * URLs, so /login becomes a wall with no gate. This trades nothing for a session
- * on a fixed demo account, and it exists only where all three of these hold:
+ * URLs, so every sign-in screen becomes a wall with no gate. This trades
+ * nothing for a session on a fixed demo account, and it exists only where all
+ * three of these hold:
  *
  *   - NEXT_PUBLIC_DEV_LOGIN=true in the environment,
  *   - NODE_ENV is not production,
  *   - the API still registers POST /api/v1/auth/demo, which it does only while
- *     MOCK_MODE=true and ENV is not production.
+ *     DEV_LOGIN=true and ENV is not production.
  *
  * Three independent switches, because a sign-in that skips authentication is
  * exactly the thing that must not survive a careless deploy. Delete this file
- * once real OAuth credentials are in place.
+ * once real OAuth credentials are in place — `/admin/login` keeps working
+ * without it.
  *
  * The cookie is set here rather than by the API for the same reason the OAuth
  * callback does it: the JWT must never reach client JavaScript (DEV_SPEC §17).
@@ -47,7 +49,7 @@ export async function GET(request: NextRequest) {
       headers: { 'Content-Type': 'application/json' },
       cache: 'no-store',
     });
-    // 404 here means the API is running with MOCK_MODE=false, so the route was
+    // 404 here means the API is running with DEV_LOGIN=false, so the route was
     // never registered — the same "not configured" story the login screen
     // already tells for an unset provider.
     if (!res.ok) {

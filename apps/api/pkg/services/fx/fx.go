@@ -71,7 +71,7 @@ func (s *service) Rate(ctx context.Context, from, to string) (float64, error) {
 
 	// Mock mode and a missing provider behave identically on purpose: the same
 	// deterministic number, so a UAT budget is reproducible.
-	if s.cfg.UseMock() || s.cfg.FX.ApiURL == "" {
+	if s.cfg.UseStubs() || s.cfg.FX.ApiURL == "" {
 		rate, ok := fallbackRates[key]
 		if !ok {
 			return 0, fmt.Errorf("fx: no fallback rate for %s", key)

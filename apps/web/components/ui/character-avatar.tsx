@@ -1,6 +1,6 @@
 import Image from 'next/image';
 
-import { getCharacter } from '@/lib/mock';
+import { getCharacter } from '@/lib/catalog/characters';
 import { cn } from '@/lib/utils';
 
 /**

@@ -197,6 +197,15 @@ export function useInviteMember(tripId: string) {
   });
 }
 
+/** The invite landing page's pre-auth preview — no session needed to fetch it. */
+export function useInvitePreview(token: string) {
+  return useQuery({
+    queryKey: queryKeys.invitePreview(token),
+    queryFn: () => repo.members.preview(token),
+    retry: false,
+  });
+}
+
 export function useJoinTrip() {
   const queryClient = useQueryClient();
   return useMutation({

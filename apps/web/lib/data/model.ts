@@ -1,10 +1,14 @@
 /**
- * View models for the investor prototype.
+ * The domain model — the shapes the whole app speaks.
  *
- * These deliberately mirror the shapes the Go API will return (DEV_SPEC §4.2,
- * §5) so that swapping this module for the real query hooks is a change of
- * import, not a rewrite of the components. Anything the API will compute —
- * coverage %, per-person split, settle-up — is precomputed here as a literal.
+ * These mirror what the Go API returns (DEV_SPEC §4.2, §5), which is what lets
+ * the mock and live repositories be swapped by an env var instead of a rewrite.
+ * `types.ts` next door re-exports them alongside the app-facing payloads.
+ *
+ * This file used to live in `lib/mock/`, which was a lie by filename: live
+ * code imports it on every render. Only the seed data under
+ * `lib/data/mock/seed/` is actually mock, and it is now the only thing that
+ * says so.
  */
 
 export type WishKind = 'must' | 'nice' | 'avoid';

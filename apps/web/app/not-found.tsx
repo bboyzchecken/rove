@@ -11,13 +11,15 @@ export default function NotFound() {
       code="404"
       title="ไม่เจอหน้านี้"
       hint="ลิงก์อาจพิมพ์ผิด หรือทริปนี้ถูกลบ/เปลี่ยนเป็นส่วนตัวไปแล้ว ถ้าเพื่อนส่งลิงก์มาให้ ลองขอลิงก์ใหม่อีกที"
+      // "กลับหน้าแรก" lives in the header on every one of these screens, so the
+      // buttons here are for going somewhere useful instead.
       actions={
         <>
-          <ButtonLink href="/home" size="lg" block>
-            กลับหน้าแรก
+          <ButtonLink href="/explore" size="lg" block>
+            ดูแพลนที่คนอื่นทำไว้
           </ButtonLink>
-          <ButtonLink href="/" variant="outline" size="lg" block>
-            ดูว่า ROVE ทำอะไรได้บ้าง
+          <ButtonLink href="/home" variant="outline" size="lg" block>
+            ไปหน้าสรุปของฉัน
           </ButtonLink>
         </>
       }

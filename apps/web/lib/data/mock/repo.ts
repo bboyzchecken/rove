@@ -1,7 +1,7 @@
 import { DEFAULT_COVER } from '@/lib/covers';
-import { getCharacter, CHARACTERS } from '@/lib/mock/characters';
-import { AI_CREDITS, DAYS } from '@/lib/mock/trip';
-import { PAST_TRIP_ARCHIVES, POINTS_PER_PUBLISH } from '@/lib/mock/user';
+import { getCharacter, CHARACTERS } from '@/lib/catalog/characters';
+import { AI_CREDITS, DAYS } from './seed/trip';
+import { PAST_TRIP_ARCHIVES, POINTS_PER_PUBLISH } from './seed/user';
 
 import { getAirport, getAirports, searchAirports } from '../airports';
 import { buildRoute, routeCities } from '../route';
@@ -55,6 +55,7 @@ import type {
   ReviewBoard,
   ReviewSummary,
   ShareState,
+  StubbedProvider,
   Trip,
   TripDocument,
   TripPhoto,
@@ -92,6 +93,22 @@ import {
  */
 
 const LATENCY = 140;
+
+/**
+ * Everything mock mode stands in for — which is everything, because there is
+ * no backend behind it at all. Listed rather than shortened to a boolean so a
+ * screen asking "is the AI real here?" gets the same shape of answer in both
+ * modes.
+ */
+const MOCK_STUBBED: StubbedProvider[] = [
+  'ai',
+  'places',
+  'weather',
+  'fx',
+  'storage',
+  'notifications',
+  'affiliate',
+];
 
 function delay<T>(value: T, ms = LATENCY): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), ms));
@@ -942,6 +959,24 @@ export const mockRepo: RoveRepo = {
         expiresAt: expires.toISOString(),
         role,
       });
+    },
+
+    async preview() {
+      // No real token lookup in mock mode — the landing page always previews
+      // the one demo trip a token could plausibly point at.
+      return delay(
+        mutate((db) => {
+          const record = db.trips[0]!;
+          const expires = new Date();
+          expires.setDate(expires.getDate() + 7);
+          return {
+            tripId: record.trip.id,
+            title: record.trip.title,
+            role: 'editor' as const,
+            expiresAt: expires.toISOString(),
+          };
+        }),
+      );
     },
 
     async join(token) {
@@ -2669,8 +2704,23 @@ export const mockRepo: RoveRepo = {
         aiCostTodayUsd: 0,
         aiCostCapUsd: 5,
         clicksToday: 0,
-        mockMode: true,
+        stubProviders: true,
+        stubbed: [...MOCK_STUBBED],
         commit: 'local',
+      });
+    },
+  },
+
+  /* -------------------------------------------------------------- meta -- */
+  meta: {
+    async mode() {
+      // Mock mode does not ask anything: by definition none of it is real and
+      // none of it leaves the browser.
+      return delay({
+        live: false,
+        stubbed: [...MOCK_STUBBED],
+        devLogin: true,
+        env: 'mock',
       });
     },
   },

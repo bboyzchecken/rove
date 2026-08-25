@@ -20,7 +20,7 @@ import type {
   Settlement,
   Trip,
   TripStatus,
-} from '@/lib/mock/types';
+} from './model';
 
 export type {
   Airport,
@@ -52,7 +52,7 @@ export type {
   WishKind,
   WishlistItem,
   YearStats,
-} from '@/lib/mock/types';
+} from './model';
 
 /* ------------------------------------------------------------------ auth -- */
 
@@ -856,6 +856,14 @@ export interface InviteLink {
   role: 'editor' | 'viewer';
 }
 
+/** What the invite landing page can show before anyone signs in. */
+export interface InvitePreview {
+  tripId: string;
+  title: string;
+  role: 'editor' | 'viewer';
+  expiresAt: string;
+}
+
 /* ------------------------------------------------------------------ plan -- */
 
 export interface MoveItemInput {
@@ -876,8 +884,39 @@ export interface AdminStats {
   aiCostTodayUsd: number;
   aiCostCapUsd: number;
   clicksToday: number;
-  mockMode: boolean;
+  /** Third parties currently answered by a stand-in — never "the data is fake". */
+  stubProviders: boolean;
+  stubbed: StubbedProvider[];
   commit: string;
+}
+
+/**
+ * A third party the backend is standing in for.
+ *
+ * Named rather than boolean because "บางอย่างเป็นของจำลอง" is not something a
+ * UAT tester can act on, and because a missing API key and STUB_PROVIDERS=true
+ * produce the same fact from outside.
+ */
+export type StubbedProvider =
+  | 'ai'
+  | 'places'
+  | 'weather'
+  | 'fx'
+  | 'storage'
+  | 'notifications'
+  | 'affiliate';
+
+/**
+ * What is real behind this screen (see `lib/data/mode.ts` for the other axis).
+ *
+ * `live: false` here does not mean mock mode — it means the API is real and
+ * some of the providers behind it are not.
+ */
+export interface ProviderMode {
+  live: boolean;
+  stubbed: StubbedProvider[];
+  devLogin: boolean;
+  env: string;
 }
 
 /** One entry of the undo trail (W5.7). */
