@@ -1,13 +1,8 @@
+import { FREE_DRAFTS_PER_TRIP, FREE_PLAN_ID } from '@/lib/catalog/plans';
+
 import { AI_CREDITS } from './seed/trip';
 
-import type {
-  Order,
-  OrderKind,
-  PayChannel,
-  PaymentMethod,
-  Subscription,
-  SubscriptionPlan,
-} from '../types';
+import type { Order, OrderKind, PayChannel, PaymentMethod, Subscription } from '../types';
 
 /**
  * Bill & Payment (M20) — the mock side.
@@ -17,10 +12,8 @@ import type {
  * behave like a real one (numbering, totals, the seeded history a UAT tester
  * opens the screen expecting to see).
  *
- * The plan catalogue is already three rows even though none of them is on sale.
- * A billing screen that has to be rebuilt the day subscriptions ship is a
- * billing screen that was designed for one product; this one is designed for
- * the second one too.
+ * The plan catalogue itself moved to `lib/catalog/plans.ts` in M26 and is
+ * re-exported below, so mock mode and the public pricing page read one list.
  */
 
 /**
@@ -34,49 +27,19 @@ export const AI_PAY_CHANNELS: PayChannel[] = [
   { id: 'truemoney', label: 'TrueMoney Wallet' },
 ];
 
-export const FREE_PLAN_ID = 'free';
-
-export const PLANS: SubscriptionPlan[] = [
-  {
-    id: FREE_PLAN_ID,
-    name: 'ROVE ฟรี',
-    tagline: 'ทุกอย่างที่ต้องใช้วางแผนทริปกับเพื่อน',
-    priceThb: 0,
-    interval: 'month',
-    perks: [
-      `ให้ AI ร่างแพลนฟรี ${AI_CREDITS.freePerTrip} ครั้งต่อทริป`,
-      'ห้องทริป สมาชิกไม่จำกัด',
-      'หารบิล งบ และรายจ่ายจริง',
-      `ร่างเพิ่มครั้งละ ฿${AI_CREDITS.priceThb} หรือ ${AI_CREDITS.pointsPerRun} แต้ม`,
-    ],
-    includedDraftsPerPeriod: 0,
-    available: true,
-  },
-  {
-    id: 'rove_plus_monthly',
-    name: 'ROVE Plus รายเดือน',
-    tagline: 'ร่างด้วย AI ได้ทุกทริปโดยไม่ต้องซื้อทีละครั้ง',
-    priceThb: 129,
-    interval: 'month',
-    perks: [
-      'ให้ AI ร่างแพลน 15 ครั้งต่อเดือน ใช้ได้ทุกทริป',
-      'ปรับแพลนซ้ำได้ไม่จำกัด',
-      'เอกสารและ export ไม่มีลายน้ำ',
-    ],
-    includedDraftsPerPeriod: 15,
-    available: false,
-  },
-  {
-    id: 'rove_plus_yearly',
-    name: 'ROVE Plus รายปี',
-    tagline: 'จ่ายทีเดียว ถูกกว่ารายเดือนสองเดือน',
-    priceThb: 1_290,
-    interval: 'year',
-    perks: ['ทุกอย่างของรายเดือน', 'คิดเป็น ฿107 ต่อเดือน', 'ล็อกราคาไว้ทั้งปี'],
-    includedDraftsPerPeriod: 15,
-    available: false,
-  },
-];
+/**
+ * The catalogue lives in `lib/catalog/plans.ts` — one copy on this side of the
+ * wire, shared with the public pricing page, which cannot fetch it because the
+ * catalogue endpoint is behind sign-in.
+ */
+export {
+  FREE_ACTIVE_TRIPS,
+  FREE_PLAN_ID,
+  PLANS,
+  ROVE_YEAR_PLAN_ID,
+  TRIP_PASS_PLAN_ID,
+  UNLIMITED_DRAFTS,
+} from '@/lib/catalog/plans';
 
 /**
  * Everyone is on the free plan until a gateway exists. It is a real
@@ -93,7 +56,7 @@ export const FREE_SUBSCRIPTION: Subscription = {
   currentPeriodStart: null,
   currentPeriodEnd: null,
   cancelAtPeriodEnd: false,
-  includedDraftsPerPeriod: 0,
+  includedDraftsPerPeriod: FREE_DRAFTS_PER_TRIP,
 };
 
 /* ------------------------------------------------------------- numbering -- */
@@ -176,10 +139,18 @@ export function buildOrder(id: string, input: DraftOrderInput, existing: Order[]
   };
 }
 
+/** What the old per-draft product cost, before M26 withdrew it. */
+const LEGACY_DRAFT_PRICE_THB = 39;
+
 /**
- * The history a UAT tester finds already there: one draft bought with a card,
- * one paid for with points. Two rows is enough to show that the list groups,
- * totals and links to receipts — and that points purchases are in it too.
+ * The history a UAT tester finds already there: one draft bought back when
+ * drafts were sold one at a time, and one Trip Pass that came back because the
+ * trip it unlocked ended in a booking.
+ *
+ * The withdrawn product is in the list on purpose. Receipts are a record of
+ * what happened, not of what is currently for sale, and a billing screen that
+ * cannot render its own history is one that would have to be repaired every
+ * time the price list changes.
  */
 export function seedOrders(): Order[] {
   const out: Order[] = [];
@@ -192,36 +163,39 @@ export function seedOrders(): Order[] {
         title: 'ร่างแพลนด้วย AI เพิ่ม 1 ครั้ง',
         lineLabel: 'สิทธิ์ให้ AI ร่างแพลน (ทริปญี่ปุ่นใบไม้เปลี่ยนสี 2569)',
         quantity: 1,
-        unitAmountThb: AI_CREDITS.priceThb,
+        unitAmountThb: LEGACY_DRAFT_PRICE_THB,
         method: 'promptpay',
         methodLabel: 'พร้อมเพย์ (QR)',
         tripId: 'demo',
         tripTitle: 'ญี่ปุ่นใบไม้เปลี่ยนสี 2569',
-        issuedAt: '2026-08-12T09:20:00.000Z',
+        issuedAt: '2026-05-12T09:20:00.000Z',
       },
       out,
     ),
   );
 
-  out.push(
-    buildOrder(
-      'ord_seed_2',
-      {
-        kind: 'ai_credit',
-        title: 'ร่างแพลนด้วย AI เพิ่ม 2 ครั้ง',
-        lineLabel: 'สิทธิ์ให้ AI ร่างแพลน (แลกด้วยแต้ม ROVE)',
-        quantity: 2,
-        unitAmountThb: AI_CREDITS.priceThb,
-        method: 'points',
-        methodLabel: `${AI_CREDITS.pointsPerRun * 2} แต้ม ROVE`,
-        pointsSpent: AI_CREDITS.pointsPerRun * 2,
-        tripId: 'demo',
-        tripTitle: 'ญี่ปุ่นใบไม้เปลี่ยนสี 2569',
-        issuedAt: '2026-08-18T02:05:00.000Z',
-      },
-      out,
-    ),
+  const refunded = buildOrder(
+    'ord_seed_2',
+    {
+      kind: 'trip_pass',
+      title: 'Trip Pass — โซลกับเพื่อนสนิท',
+      lineLabel: 'ปลดล็อกทริป (ให้ AI ร่างและปรับแพลนไม่จำกัด)',
+      quantity: 1,
+      unitAmountThb: AI_CREDITS.passPriceThb,
+      method: 'promptpay',
+      methodLabel: 'พร้อมเพย์ (QR)',
+      tripId: 'seoul',
+      tripTitle: 'โซลกับเพื่อนสนิท',
+      issuedAt: '2026-01-20T02:05:00.000Z',
+    },
+    out,
   );
+  // Booked through ROVE on 26 Jan, so the pass was paid back (A26.4). The
+  // status changes and the row stays: a refund is a new fact about an order,
+  // never a receipt quietly rewritten.
+  refunded.status = 'refunded';
+  refunded.refundedAt = '2026-01-26T09:25:00.000Z';
+  out.push(refunded);
 
   return out;
 }

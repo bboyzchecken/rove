@@ -49,14 +49,23 @@ type AIJob struct {
 
 func (AIJob) TableName() string { return "ai_jobs" }
 
-// DefaultIncludedDrafts is what every trip gets for free (§16).
-const DefaultIncludedDrafts = 2
+// DefaultIncludedDrafts is what every trip gets for free (§16, raised to 3 in
+// M26 — see domain.DefaultIncludedDrafts for why).
+const DefaultIncludedDrafts = 3
 
-// AICredit is the per-trip draft meter (§16). `included` is granted on trip
-// creation; `extra` is bought or paid for with points.
+// AICredit is the per-trip draft meter (§16).
+//
+// `included` is granted on trip creation and `used` counts every run. `extra`
+// is the old per-draft purchase, which M26 stopped selling: it is still added
+// to the quota so that credits somebody paid for before the change keep
+// working, but nothing writes to it any more.
+//
+// A trip with a pass is not represented here at all. Being unmetered is a fact
+// about a paid order, and copying it onto this row would mean two records that
+// can disagree about whether the trip was paid for.
 type AICredit struct {
 	TripID   string `gorm:"type:char(36);primaryKey" json:"trip_id"`
-	Included int    `gorm:"not null;default:2" json:"included"`
+	Included int    `gorm:"not null;default:3" json:"included"`
 	Extra    int    `gorm:"not null;default:0" json:"extra"`
 	Used     int    `gorm:"not null;default:0" json:"used"`
 }

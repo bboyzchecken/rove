@@ -2,7 +2,16 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { AtSign, Award, Bell, BarChart3, CheckCheck, Sparkles, UserCheck } from 'lucide-react';
+import {
+  AtSign,
+  Award,
+  Bell,
+  BarChart3,
+  CheckCheck,
+  Sparkles,
+  Undo2,
+  UserCheck,
+} from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { Sheet } from '@/components/ui/sheet';
@@ -23,6 +32,7 @@ const KIND_ICON: Record<NotificationKind, typeof Bell> = {
   poll_opened: BarChart3,
   plan_ready: Sparkles,
   points: Award,
+  refund: Undo2,
 };
 
 export function InboxBell({ className }: { className?: string }) {

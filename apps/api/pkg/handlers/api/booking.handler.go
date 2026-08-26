@@ -2,6 +2,7 @@ package api
 
 import (
 	"crypto/subtle"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 
 	"github.com/bboyzchecken/rove/apps/api/pkg/domain"
 	"github.com/bboyzchecken/rove/apps/api/pkg/handlers/api/request"
+	"github.com/bboyzchecken/rove/apps/api/pkg/logger"
 	"github.com/bboyzchecken/rove/apps/api/pkg/models"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/affiliate"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
@@ -183,6 +185,8 @@ func (s *Server) handleUpdateBooking(c echo.Context) error {
 
 	if !wasBooked && booking.Status == models.BookingBooked {
 		s.awardBookingPoints(ctx, tripID, *booking)
+		// The promise that makes the paywall bearable (M26 — A26.4).
+		s.refundTripPass(ctx, tripID)
 	}
 
 	s.track(c, tripID, "", events.TypeBookingChanged, "booking", booking.ID)
@@ -312,6 +316,10 @@ func (s *Server) handleAffiliateWebhook(c echo.Context) error {
 		return request.Internal(c, "บันทึกไม่สำเร็จ")
 	}
 
+	// A confirmed booking is what the Trip Pass was promised against, whichever
+	// door the confirmation came through (M26 — A26.4).
+	s.refundTripPass(ctx, click.TripID)
+
 	if click.SourceCreatorID != nil && *click.SourceCreatorID != "" {
 		_ = s.points.Add(ctx, &models.UserPoints{
 			UserID: *click.SourceCreatorID,
@@ -334,6 +342,80 @@ func (s *Server) handleAffiliateWebhook(c echo.Context) error {
 	}
 
 	return c.NoContent(http.StatusOK)
+}
+
+// refundTripPass pays the Trip Pass back once the trip produces a booking
+// (M26 — A26.4).
+//
+// This is the sentence the whole price structure rests on: "จองผ่านเรา แล้วไม่
+// ต้องจ่ายค่าวางแผน". A commission on a booking is worth ฿1,200–1,700, so
+// handing ฿299 back is not generosity, it is buying the booking — and the
+// paywall stops being a thing standing between us and the larger revenue.
+//
+// Once per trip however many bookings it produces, and that is not enforced by
+// remembering we already paid: the UPDATE only matches a pass that is still
+// `paid`, so two partner postbacks arriving together cannot both win.
+//
+// The credit is a discount code rather than a reversal at a gateway because
+// there is no gateway yet (§16). It is the one form of "money back" this
+// product can honour today, and it is honoured against the next trip.
+//
+// Best effort, like the points award beside it: a booking that was confirmed
+// must not be un-confirmed because the refund could not be written. What that
+// costs is a support ticket with a receipt behind it, which is recoverable —
+// the failure is logged loudly for exactly that reason.
+func (s *Server) refundTripPass(ctx contextT, tripID string) {
+	pass, err := s.billing.TripPass(ctx, tripID)
+	if err != nil {
+		logger.L().WithError(err).Error("read trip pass for refund")
+		return
+	}
+	if pass == nil {
+		return
+	}
+	// Nothing was actually charged — a fully discounted pass costs ฿0, and
+	// refunding zero would mint a worthless code and a receipt that reads as if
+	// money moved twice.
+	if pass.TotalTHB <= 0 {
+		return
+	}
+
+	now := time.Now().UTC()
+	credit := &models.DiscountCode{
+		UserID:    pass.UserID,
+		Code:      domain.NewDiscountCode(),
+		Scope:     models.DiscountScopeTripPass,
+		AmountTHB: pass.TotalTHB,
+		// No points were burned for this one. It is money coming back, not
+		// loyalty being spent, and counting it as points spent would overstate
+		// what the points economy has paid out.
+		PointsSpent: 0,
+		ExpiresAt:   now.Add(domain.DiscountValidity),
+	}
+
+	won, err := s.billing.RefundTripPass(ctx, pass.ID, credit, now)
+	if err != nil {
+		logger.L().WithError(err).Error("refund trip pass")
+		return
+	}
+	if !won {
+		// Already refunded on an earlier booking. Nothing to say.
+		return
+	}
+
+	// A refund nobody is told about is a refund nobody spends. Written straight
+	// to the inbox rather than through notifyOne, which skips a notification
+	// addressed to whoever caused it — and here that person is usually the buyer
+	// ticking their own booking as done.
+	_ = s.notifications.Create(ctx, &models.Notification{
+		UserID: pass.UserID,
+		TripID: &tripID,
+		Kind:   models.NotifyRefund,
+		Title:  fmt.Sprintf("คืนค่า Trip Pass ฿%.0f ให้แล้ว", pass.TotalTHB),
+		Body: fmt.Sprintf("ทริป%s มีการจองผ่าน ROVE — โค้ด %s ใช้เป็นส่วนลดทริปหน้าได้",
+			pass.TripTitle, credit.Code),
+		Link: "/billing/" + pass.ID,
+	})
 }
 
 // awardBookingPoints credits the creator of the trip this one was copied from.

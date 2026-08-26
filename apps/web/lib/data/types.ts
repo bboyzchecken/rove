@@ -314,11 +314,22 @@ export interface AiDraftResult {
   openQuestions: string[];
 }
 
+/**
+ * The draft meter and the paywall's price list, which are read at the same
+ * moment: how many drafts are left, and what it costs to stop counting them.
+ */
 export interface AiCredits {
   used: number;
   included: number;
+  /** Drafts bought one at a time before M26. Nothing adds to this any more. */
   extra: number;
-  pricePerDraftThb: number;
+  /** True once anybody in the room has paid for the trip (M26 — A26.2). */
+  hasPass: boolean;
+  passPriceThb: number;
+  /** Whether the pass comes back when the trip produces a booking. */
+  passRefundable: boolean;
+  /** The pass divided by the party, rounded up — the number on the button. */
+  passPerPersonThb: number;
   /** Channels the payment sheet offers. */
   payChannels: PayChannel[];
 }
@@ -433,7 +444,14 @@ export interface TripRecap {
 
 /* ------------------------------------------------- community (M9) ------- */
 
-export type NotificationKind = 'mention' | 'assigned' | 'poll_opened' | 'plan_ready' | 'points';
+export type NotificationKind =
+  | 'mention'
+  | 'assigned'
+  | 'poll_opened'
+  | 'plan_ready'
+  | 'points'
+  /** The Trip Pass came back because the trip produced a booking (M26). */
+  | 'refund';
 
 /**
  * One thing that happened *to you*. Distinct from an ActivityEvent, which is
@@ -944,7 +962,7 @@ export interface PlanVersion {
  * for a subscription invoice, and `provider`/`providerRef` are the hooks a real
  * gateway will write into. Nothing here needs a schema change to bill monthly.
  */
-export type OrderKind = 'ai_credit' | 'subscription' | 'points_topup';
+export type OrderKind = 'ai_credit' | 'trip_pass' | 'subscription' | 'points_topup';
 
 export type OrderStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 
@@ -992,7 +1010,12 @@ export interface Order {
 
 export type SubscriptionStatus = 'none' | 'active' | 'past_due' | 'canceled';
 
-export type BillingInterval = 'month' | 'year';
+/**
+ * `trip` is not a length of time. It is the unit the main product is sold in,
+ * because people travel a couple of times a year rather than every month
+ * (M26).
+ */
+export type BillingInterval = 'trip' | 'month' | 'year';
 
 /** One row of the price list. `available` is false until a gateway exists. */
 export interface SubscriptionPlan {
@@ -1002,8 +1025,10 @@ export interface SubscriptionPlan {
   priceThb: number;
   interval: BillingInterval;
   perks: string[];
-  /** Drafts the plan hands out every period. */
+  /** Drafts the plan hands out every period; -1 when it does not meter. */
   includedDraftsPerPeriod: number;
+  /** The Trip Pass's whole argument: pay, book through ROVE, get it back. */
+  refundableOnBooking: boolean;
   available: boolean;
 }
 
@@ -1040,12 +1065,16 @@ export interface BillingSummary {
 }
 
 /** What the payment sheet sends when someone buys drafts. */
-export interface BuyCreditsInput {
-  quantity: number;
+/**
+ * Buying the pass. No quantity: what is being bought is the trip, once — and
+ * no points method, because points reach a price through a discount code now
+ * rather than as a second currency (M26 — A26.5).
+ */
+export interface BuyTripPassInput {
   method: PaymentMethod;
   /** The label the user actually tapped — kept for the receipt. */
   channel: string;
-  /** A code redeemed from points (A12.10). Ignored when paying with points. */
+  /** A code redeemed from points (A12.10). */
   discountCode?: string;
 }
 

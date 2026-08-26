@@ -203,3 +203,17 @@ func (s *store) ListPublicByOwner(ctx context.Context, ownerID string) ([]models
 		Find(&out).Error
 	return out, err
 }
+
+// ActiveOwnedIDs lists trips this user owns that are not over (M26 — A26.3).
+//
+// Owned, not joined: being invited into somebody else's trip cannot use up the
+// one slot a free account has, or a single popular friend could lock a person
+// out of planning anything of their own.
+func (s *store) ActiveOwnedIDs(ctx context.Context, userID string) ([]string, error) {
+	var ids []string
+	err := s.db.WithContext(ctx).
+		Model(&models.Trip{}).
+		Where("owner_id = ? AND status <> ?", userID, models.TripStatusDone).
+		Pluck("id", &ids).Error
+	return ids, err
+}

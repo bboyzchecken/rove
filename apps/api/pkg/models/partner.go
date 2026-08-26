@@ -11,11 +11,14 @@ import (
 
 /* ------------------------------------------------- discount codes (A12.10) */
 
-// Discount code scopes. `ai_credits` is the only thing ROVE charges for today;
-// `booking` exists so the day a partner supports codes is a deploy and not a
-// migration on a table people already hold codes in.
+// Discount code scopes. `trip_pass` is what ROVE charges for since M26;
+// `ai_credits` is kept because codes issued against the old per-draft product
+// are in people's hands and must not quietly stop working when the thing they
+// were scoped to is withdrawn. `booking` exists so the day a partner supports
+// codes is a deploy and not a migration on a table people already hold codes in.
 const (
 	DiscountScopeAICredits = "ai_credits"
+	DiscountScopeTripPass  = "trip_pass"
 	DiscountScopeBooking   = "booking"
 )
 

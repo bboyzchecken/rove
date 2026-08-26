@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -111,6 +112,14 @@ func (s *Server) handleCreateTrip(c echo.Context) error {
 	ctx := c.Request().Context()
 	userID := request.UserID(c)
 
+	// Checked before the row is written, not after (M26 — A26.3). A trip that
+	// appears and then has to be taken away is worse than one that was never
+	// created, and the wishlist and invites hanging off it make "taken away"
+	// less clean than it sounds.
+	if answered, err := s.checkTripAllowance(c, ctx, userID); answered {
+		return err
+	}
+
 	trip := &models.Trip{
 		OwnerID:            userID,
 		Title:              req.Title,
@@ -175,6 +184,65 @@ func (s *Server) handleCreateTrip(c echo.Context) error {
 	_ = s.collab.Log(ctx, &models.Activity{TripID: trip.ID, UserID: userID, Text: "สร้างห้องทริป"})
 
 	return c.JSON(http.StatusCreated, s.withRoute(ctx, toTripDTO(*trip), trip.ID))
+}
+
+// checkTripAllowance enforces the free tier's one-trip-at-a-time rule.
+//
+// The cap is on trips being *planned*, not on trips ever created: a finished
+// trip stops counting, so nobody has to delete their memories to plan the next
+// holiday. Trips already paid for do not count either — the money for those
+// has been taken, and charging for the slot as well would be charging twice.
+//
+// One is deliberately tight. The free tier is generous where it costs almost
+// nothing (three AI drafts, unlimited members, the whole planning surface) and
+// firm on the one axis that decides whether anybody ever reaches the paywall.
+//
+// It reports whether the request has already been answered, not whether it
+// failed: request.Error writes the response and returns nil, so a caller that
+// checked `err != nil` would print a refusal and then go on to create the trip
+// anyway. `answered` is the signal; err is only there to be passed along.
+func (s *Server) checkTripAllowance(c echo.Context, ctx contextT, userID string) (answered bool, err error) {
+	sub, err := s.billing.ActiveSubscription(ctx, userID)
+	if err != nil {
+		return true, request.Internal(c, "ตรวจสิทธิ์ไม่สำเร็จ")
+	}
+	if sub != nil && sub.PlanID == domain.YearPlanID {
+		return false, nil
+	}
+
+	owned, err := s.trips.ActiveOwnedIDs(ctx, userID)
+	if err != nil {
+		return true, request.Internal(c, "ตรวจสิทธิ์ไม่สำเร็จ")
+	}
+	// The common case — nobody near the cap — costs one query, not two.
+	if len(owned) < domain.FreeActiveTrips {
+		return false, nil
+	}
+
+	paid, err := s.billing.PassTripIDs(ctx, userID)
+	if err != nil {
+		return true, request.Internal(c, "ตรวจสิทธิ์ไม่สำเร็จ")
+	}
+	unlocked := make(map[string]struct{}, len(paid))
+	for _, id := range paid {
+		unlocked[id] = struct{}{}
+	}
+
+	onFreeTier := 0
+	for _, id := range owned {
+		if _, ok := unlocked[id]; !ok {
+			onFreeTier++
+		}
+	}
+	if onFreeTier < domain.FreeActiveTrips {
+		return false, nil
+	}
+
+	// 402 rather than 403: this is not a permission the account lacks, it is a
+	// price, and the client shows a paywall on exactly this code.
+	return true, request.Error(c, http.StatusPaymentRequired, fmt.Sprintf(
+		"แผนฟรีวางแผนได้ครั้งละ %d ทริป — ปิดทริปที่วางอยู่ให้เสร็จ หรือปลดล็อกด้วย Trip Pass ฿%d ก่อนเริ่มทริปใหม่",
+		domain.FreeActiveTrips, domain.TripPassPriceTHB))
 }
 
 func (s *Server) handleGetTrip(c echo.Context) error {

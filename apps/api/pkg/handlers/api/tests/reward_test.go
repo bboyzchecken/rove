@@ -108,7 +108,9 @@ func TestRedeemIsClosedWhileTheRateIsBeingRepriced(t *testing.T) {
 	}
 }
 
-// Closing the mint is not defaulting on codes already issued.
+// Closing the mint is not defaulting on codes already issued — and neither is
+// withdrawing the product they were scoped to (M26). An old ai_credits code
+// still comes off the price of a pass.
 func TestCodesIssuedBeforeTheCloseStillSpend(t *testing.T) {
 	h := testsupport.New(t)
 	user, token := h.User("saver")
@@ -123,12 +125,13 @@ func TestCodesIssuedBeforeTheCloseStillSpend(t *testing.T) {
 	}
 
 	var order creditsResponse
-	h.Request(http.MethodPost, "/api/v1/trips/"+trip.ID+"/ai/credits/purchase", token,
-		map[string]any{"quantity": 1, "method": "promptpay", "discount_code": code.Code}).
+	h.Request(http.MethodPost, "/api/v1/trips/"+trip.ID+"/pass", token,
+		map[string]any{"method": "promptpay", "discount_code": code.Code}).
 		ExpectStatus(http.StatusOK).Decode(&order)
 
-	if order.Order == nil || order.Order.TotalTHB != 0 {
-		t.Fatalf("order = %+v, want the ฿39 draft cleared by the existing code", order.Order)
+	want := float64(domain.TripPassPriceTHB) - 100
+	if order.Order == nil || order.Order.TotalTHB != want {
+		t.Fatalf("order = %+v, want ฿%.0f after the ฿100 code", order.Order, want)
 	}
 }
 
@@ -138,27 +141,30 @@ func TestDiscountCodeIsSingleUseAndOnlyMine(t *testing.T) {
 	_, otherToken := h.User("other")
 
 	trip := h.Trip(user, "โตเกียว")
-	other := h.Trip(mustUser(h, "other"), "โอซาก้า")
+	nextTrip := h.Trip(user, "โอซาก้า")
+	other := h.Trip(mustUser(h, "other"), "เกียวโต")
 
 	code := issueCode(h, user.ID, 100)
 
 	// Somebody else's code does not exist as far as they are concerned.
-	h.Request(http.MethodPost, "/api/v1/trips/"+other.ID+"/ai/credits/purchase", otherToken,
-		map[string]any{"quantity": 1, "method": "promptpay", "discount_code": code.Code}).
+	h.Request(http.MethodPost, "/api/v1/trips/"+other.ID+"/pass", otherToken,
+		map[string]any{"method": "promptpay", "discount_code": code.Code}).
 		ExpectStatus(http.StatusBadRequest)
 
 	var first creditsResponse
-	h.Request(http.MethodPost, "/api/v1/trips/"+trip.ID+"/ai/credits/purchase", token,
-		map[string]any{"quantity": 1, "method": "promptpay", "discount_code": code.Code}).
+	h.Request(http.MethodPost, "/api/v1/trips/"+trip.ID+"/pass", token,
+		map[string]any{"method": "promptpay", "discount_code": code.Code}).
 		ExpectStatus(http.StatusOK).Decode(&first)
 
-	if first.Order == nil || first.Order.DiscountTHB != 39 || first.Order.TotalTHB != 0 {
-		t.Fatalf("order = %+v, want the ฿39 draft cleared by the code with no change", first.Order)
+	want := float64(domain.TripPassPriceTHB) - 100
+	if first.Order == nil || first.Order.DiscountTHB != 100 || first.Order.TotalTHB != want {
+		t.Fatalf("order = %+v, want ฿100 off ฿%d", first.Order, domain.TripPassPriceTHB)
 	}
 
-	// The same code a second time is spent.
-	h.Request(http.MethodPost, "/api/v1/trips/"+trip.ID+"/ai/credits/purchase", token,
-		map[string]any{"quantity": 1, "method": "promptpay", "discount_code": code.Code}).
+	// The same code a second time is spent. On a *different* trip, because the
+	// same one would answer "already unlocked" before it ever looked at a code.
+	h.Request(http.MethodPost, "/api/v1/trips/"+nextTrip.ID+"/pass", token,
+		map[string]any{"method": "promptpay", "discount_code": code.Code}).
 		ExpectStatus(http.StatusBadRequest)
 }
 

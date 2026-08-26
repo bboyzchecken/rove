@@ -1,11 +1,14 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/bboyzchecken/rove/apps/api/pkg/domain"
 	"github.com/bboyzchecken/rove/apps/api/pkg/handlers/api/request"
 	"github.com/bboyzchecken/rove/apps/api/pkg/models"
 )
@@ -22,6 +25,8 @@ func (s *Server) registerAdminRoutes(g *echo.Group) {
 	g.PATCH("/poi/:poiId", s.handleAdminUpsertPOI)
 	g.GET("/characters", s.handleAdminCharacters)
 	g.POST("/characters", s.handleAdminUpsertCharacter)
+	// Campaign codes — the founding discount and anything like it (W26.4).
+	g.POST("/discount-codes", s.handleAdminIssueDiscountCode)
 	// The partner economy's ops screens (A12.11 / A12.12).
 	s.registerPayoutRoutes(g)
 }
@@ -153,4 +158,66 @@ func (s *Server) handleAdminUpsertCharacter(c echo.Context) error {
 		return request.Internal(c, "บันทึกตัวละครไม่สำเร็จ")
 	}
 	return c.JSON(http.StatusOK, character)
+}
+
+/* ------------------------------------------- campaign codes (M26 — W26.4) */
+
+type issueDiscountRequest struct {
+	// Who gets it, by handle — an admin typing a UUID is an admin issuing a
+	// code to the wrong person eventually.
+	Handle    string  `json:"handle" validate:"required"`
+	AmountTHB float64 `json:"amount_thb" validate:"required"`
+	// Days until it expires. Defaults to the founding window.
+	Days int `json:"days"`
+}
+
+// handleAdminIssueDiscountCode mints a campaign code without burning points.
+//
+// This exists so the early-adopter discount can be a *code* rather than a lower
+// number on the pricing page (W26.4). The list price has to read ฿299 from the
+// first day it is shown, because the first price a customer sees becomes the
+// reference every later price is judged against — putting ฿199 on the page now
+// means ฿299 is permanently "the price they put up", while a gift that expires
+// is just a gift that expired.
+//
+// Separate from handleRedeemPoints, and not gated by domain.RedemptionOpen: the
+// mint is closed because the *points* rate is unmeasured (see revenue.go), and
+// nothing here converts points into anything. What it does is spend marketing
+// budget, deliberately, on a named person.
+func (s *Server) handleAdminIssueDiscountCode(c echo.Context) error {
+	var req issueDiscountRequest
+	if err := request.BindAndValidate(c, &req); err != nil {
+		return err
+	}
+	if req.AmountTHB <= 0 || req.AmountTHB > domain.MaxFoundingDiscountTHB {
+		return request.BadRequest(c, fmt.Sprintf(
+			"มูลค่าโค้ดต้องอยู่ระหว่าง ฿1 ถึง ฿%d", domain.MaxFoundingDiscountTHB))
+	}
+
+	ctx := c.Request().Context()
+	user, err := s.users.GetByHandle(ctx, strings.TrimPrefix(strings.TrimSpace(req.Handle), "@"))
+	if err != nil {
+		return request.NotFound(c, "ไม่พบผู้ใช้นี้")
+	}
+
+	validity := domain.FoundingCodeValidity
+	if req.Days > 0 {
+		validity = time.Duration(req.Days) * 24 * time.Hour
+	}
+
+	code := &models.DiscountCode{
+		UserID:    user.ID,
+		Code:      domain.NewDiscountCode(),
+		Scope:     models.DiscountScopeTripPass,
+		AmountTHB: req.AmountTHB,
+		// Zero points: nobody paid for this one in the points economy, and
+		// recording a cost here would inflate what that economy has paid out.
+		PointsSpent: 0,
+		ExpiresAt:   time.Now().UTC().Add(validity),
+	}
+	if err := s.discounts.Create(ctx, code); err != nil {
+		return request.Internal(c, "ออกโค้ดไม่สำเร็จ")
+	}
+
+	return c.JSON(http.StatusCreated, toDiscountDTO(*code))
 }

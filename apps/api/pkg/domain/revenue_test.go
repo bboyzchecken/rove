@@ -5,11 +5,15 @@ import (
 	"testing"
 )
 
-func TestPointsForDiscountFollowsTheDraftPrice(t *testing.T) {
-	// 300 points buys one draft; ฿39 buys the same draft. A ฿50 code must
-	// therefore cost more than 300 points, or redeeming beats spending.
-	if got := PointsForDiscount(50); got <= PointsPerAIDraft {
-		t.Fatalf("a ฿50 code costs %d points, which is cheaper than the ฿39 it can buy", got)
+func TestPointsForDiscountMatchesTheRewardPromised(t *testing.T) {
+	// The rate was rebased in M26 onto the thing points actually buy: a Trip
+	// Pass. The promise made to users is sixteen referrals for one free trip
+	// (docs/customer-acquisition.md), so a pass must not cost more points than
+	// sixteen referrals earn — otherwise the reward is advertised and withheld.
+	sixteen := 16 * PointsPerReferral
+	if got := PointsForDiscount(TripPassPriceTHB); got > sixteen {
+		t.Fatalf("a Trip Pass costs %d points, more than the %d that sixteen referrals earn",
+			got, sixteen)
 	}
 	if got := PointsForDiscount(100); got != 800 {
 		t.Errorf("PointsForDiscount(100) = %d, want 800", got)

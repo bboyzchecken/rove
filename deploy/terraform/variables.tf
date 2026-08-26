@@ -212,5 +212,13 @@ variable "notification_email" {
 variable "monthly_budget_usd" {
   description = "AWS Budgets alert threshold — a tripwire, not a hard cap (AWS Budgets cannot stop spend by itself)."
   type        = number
-  default     = 70
+  # Raised from 70 in M26 alongside the AI daily cap. Infrastructure is about
+  # $70 of this; the rest is headroom for model spend, which is now the largest
+  # variable line and moves with how many people are planning trips.
+  #
+  # Set below what a month of maximum AI spend would cost on purpose. The daily
+  # cap is the hard stop; this is the letter that arrives well before a month of
+  # hitting it, and a month of hitting it is something somebody should read
+  # about rather than discover on the invoice.
+  default = 250
 }

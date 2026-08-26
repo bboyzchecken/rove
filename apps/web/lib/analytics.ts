@@ -35,7 +35,7 @@ export interface AnalyticsEvents {
   ai_generate_started: { pace: string; has_brief: boolean };
   ai_generate_finished: { ms: number; simulated: boolean; days: number };
   ai_draft_applied: { days: number; items: number };
-  ai_credits_purchased: { quantity: number; channel: string };
+  trip_pass_purchased: { channel: string; hasCode: boolean };
 
   // M18/M19 — memories and paperwork.
   photo_uploaded: { from_item: boolean };
@@ -76,7 +76,7 @@ export interface AnalyticsEvents {
 
   // M20 — bill & payment.
   billing_viewed: { orders: number };
-  receipt_viewed: { kind: 'ai_credit' | 'subscription' | 'points_topup' };
+  receipt_viewed: { kind: 'trip_pass' | 'ai_credit' | 'subscription' | 'points_topup' };
   home_dashboard_viewed: Record<string, never>;
   calendar_viewed: Record<string, never>;
 }

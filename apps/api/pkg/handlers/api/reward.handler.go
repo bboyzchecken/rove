@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -128,7 +129,7 @@ func (s *Server) handleRedeemPoints(c echo.Context) error {
 	code := &models.DiscountCode{
 		UserID:      userID,
 		Code:        domain.NewDiscountCode(),
-		Scope:       models.DiscountScopeAICredits,
+		Scope:       models.DiscountScopeTripPass,
 		AmountTHB:   float64(req.AmountTHB),
 		PointsSpent: cost,
 		ExpiresAt:   time.Now().UTC().Add(domain.DiscountValidity),
@@ -144,7 +145,12 @@ func (s *Server) handleRedeemPoints(c echo.Context) error {
 //
 // Returns nil for an empty code — no discount is not an error — and an error
 // message the buyer can act on for anything else.
-func (s *Server) resolveDiscount(ctx contextT, userID, code, scope string) (*models.DiscountCode, string) {
+//
+// It takes several scopes because a purchase can honour more than one: M26
+// withdrew the per-draft product, and codes already issued against it are
+// accepted on a Trip Pass rather than being left pointing at something that no
+// longer exists.
+func (s *Server) resolveDiscount(ctx contextT, userID, code string, scopes ...string) (*models.DiscountCode, string) {
 	if code == "" {
 		return nil, ""
 	}
@@ -161,7 +167,7 @@ func (s *Server) resolveDiscount(ctx contextT, userID, code, scope string) (*mod
 	if found.UserID != userID {
 		return nil, "ไม่พบโค้ดนี้"
 	}
-	if found.Scope != scope {
+	if !slices.Contains(scopes, found.Scope) {
 		return nil, "โค้ดนี้ใช้กับรายการนี้ไม่ได้"
 	}
 	if !found.Usable(time.Now().UTC()) {

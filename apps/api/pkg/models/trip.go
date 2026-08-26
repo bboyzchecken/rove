@@ -100,6 +100,11 @@ type TripStore interface {
 	BumpViewCount(ctx context.Context, tripID string) error
 	BumpCloneCount(ctx context.Context, tripID string) error
 	Count(ctx context.Context) (int64, error)
+	// ActiveOwnedIDs lists the trips this user owns that are not finished. It
+	// answers the free tier's "one trip at a time" rule (M26 — A26.3), and
+	// returns ids rather than a count because the caller has to subtract the
+	// ones that already have a pass.
+	ActiveOwnedIDs(ctx context.Context, userID string) ([]string, error)
 	// TitlesByIDs resolves a set of trip ids to their titles in one query, so a
 	// points ledger can name its rows instead of printing UUIDs (A23.1).
 	TitlesByIDs(ctx context.Context, ids []string) (map[string]string, error)

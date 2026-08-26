@@ -31,7 +31,10 @@ func (s *Server) registerAIRoutes(g *echo.Group) {
 	g.GET("/:tripId/ai/jobs/:jobId", s.handleAIJob, view)
 	g.GET("/:tripId/ai/jobs/:jobId/stream", s.handleAIJobStream, view)
 	g.POST("/:tripId/ai/jobs/:jobId/apply", s.handleApplyDraft, edit, s.PlanUnfrozen)
-	g.POST("/:tripId/ai/credits/purchase", s.handleBuyCredits, edit)
+	// The pass is a billing route living with the AI ones on purpose: it is read
+	// and bought at the same moment as the meter it removes, and the billing
+	// group is under /users/me where a trip-scoped role check cannot reach.
+	g.POST("/:tripId/pass", s.handleBuyTripPass, edit)
 }
 
 // registerAIPublicRoutes holds the one AI endpoint that is not trip-scoped:
@@ -41,11 +44,51 @@ func (s *Server) registerAIPublicRoutes(g *echo.Group) {
 }
 
 func (s *Server) handleAICredits(c echo.Context) error {
-	credits, err := s.aiJobs.Credits(c.Request().Context(), request.TripID(c))
+	ctx := c.Request().Context()
+	tripID := request.TripID(c)
+
+	credits, err := s.aiJobs.Credits(ctx, tripID)
 	if err != nil {
 		return request.Internal(c, "โหลดโควตาไม่สำเร็จ")
 	}
-	return c.JSON(http.StatusOK, toCreditsDTO(*credits))
+
+	unlocked, partySize, err := s.unlockState(ctx, tripID, request.UserID(c))
+	if err != nil {
+		return request.Internal(c, "ตรวจสิทธิ์ทริปไม่สำเร็จ")
+	}
+	return c.JSON(http.StatusOK, toCreditsDTO(*credits, unlocked, partySize))
+}
+
+// unlockState answers the two questions the meter and the paywall both ask:
+// is this trip already paid for, and how many people are splitting the bill.
+//
+// It returns an error rather than guessing. Guessing "locked" charges somebody
+// twice for a pass they hold; guessing "unlocked" hands out unmetered model
+// time. Neither is a decision a failed SELECT is entitled to make (A26.2).
+func (s *Server) unlockState(ctx contextT, tripID, userID string) (unlocked bool, partySize int, err error) {
+	// Party size is cosmetic — it only divides a price on a button — so a trip
+	// that fails to load falls back to one person rather than failing the read.
+	partySize = 1
+	if trip, tripErr := s.trips.GetByID(ctx, tripID); tripErr == nil {
+		partySize = maxInt(trip.PartySize, 1)
+	}
+
+	// The pass belongs to the trip, not to the buyer: whoever in the room paid,
+	// the whole room is unlocked (A26.2).
+	pass, err := s.billing.TripPass(ctx, tripID)
+	if err != nil {
+		return false, partySize, err
+	}
+	if pass != nil {
+		return true, partySize, nil
+	}
+
+	// A year covers every trip its holder is planning, pass or no pass.
+	sub, err := s.billing.ActiveSubscription(ctx, userID)
+	if err != nil {
+		return false, partySize, err
+	}
+	return sub != nil && sub.PlanID == domain.YearPlanID, partySize, nil
 }
 
 type generateRequest struct {
@@ -75,13 +118,23 @@ func (s *Server) handleAIGenerate(c echo.Context) error {
 
 	// The meter comes before the model: a quota discovered halfway through a
 	// draft is a bad surprise attached to a paid action (§16).
+	//
+	// A trip with a pass is not metered at all (M26 — A26.2). `used` keeps
+	// counting anyway: the dots on the panel are a record of what the group has
+	// run, and blanking them under a pass would make the paid state look like a
+	// different product rather than the same one with the ceiling removed.
+	unlocked, _, err := s.unlockState(ctx, tripID, userID)
+	if err != nil {
+		return request.Internal(c, "ตรวจสิทธิ์ทริปไม่สำเร็จ")
+	}
+
 	credits, err := s.aiJobs.Credits(ctx, tripID)
 	if err != nil {
 		return request.Internal(c, "โหลดโควตาไม่สำเร็จ")
 	}
-	if credits.Used >= credits.Included+credits.Extra {
-		return request.Error(c, http.StatusPaymentRequired,
-			"ใช้ครบโควตาร่างแล้ว — ซื้อเพิ่มก่อนถึงจะร่างใหม่ได้")
+	if !unlocked && credits.Used >= credits.Included+credits.Extra {
+		return request.Error(c, http.StatusPaymentRequired, fmt.Sprintf(
+			"ใช้สิทธิ์ร่างฟรีครบแล้ว — ปลดล็อกทริปนี้ ฿%d แล้วร่างได้ไม่จำกัด", domain.TripPassPriceTHB))
 	}
 	if err := ai.CheckDailyCap(ctx, s.aiJobs, s.cfg.Anthropic.DailyCostCapUSD); err != nil {
 		return request.Error(c, http.StatusTooManyRequests, err.Error())
@@ -307,125 +360,107 @@ func draftDaysToModels(tripID, planID string, draftDays []ai.DraftDay) ([]models
 	return days, items
 }
 
-type buyCreditsRequest struct {
-	Quantity int `json:"quantity"`
-	// The channel id ("promptpay", "points", …). The label below is what the
-	// user actually tapped and is quoted verbatim on the receipt.
+type buyTripPassRequest struct {
+	// The channel id ("promptpay", "card", …). The label below is what the user
+	// actually tapped and is quoted verbatim on the receipt.
 	Method  string `json:"method"`
 	Channel string `json:"channel"`
-	// A discount code redeemed from points (A12.10).
+	// A code redeemed from points (A12.10). Since M26 this is the way points
+	// reach a price at all.
 	DiscountCode string `json:"discount_code"`
 }
 
-// handleBuyCredits adds paid drafts. There is no payment gateway in Phase 1:
-// points are debited for real, and a cash purchase is recorded and flagged
-// `simulated` so nothing in the UI can imply a charge that did not happen.
+// handleBuyTripPass unlocks one trip for everyone in its room (M26 — A26.2).
 //
-// Either way it leaves a receipt (M20). A purchase the user cannot look up
-// afterwards is a purchase they have to take our word for.
-func (s *Server) handleBuyCredits(c echo.Context) error {
-	var req buyCreditsRequest
+// There is no quantity and no points option. What is sold is the trip, once;
+// and points arrive as a discount code against that price rather than as a
+// second currency for a per-draft product that no longer exists (A26.5).
+//
+// There is still no payment gateway (§16), so a cash purchase is recorded and
+// flagged `simulated` — nothing in the UI may imply a charge that did not
+// happen. Either way it leaves a receipt (M20), which for a pass is not just
+// paperwork: the order *is* the entitlement, so the row that proves the room is
+// unlocked and the row the user can look up afterwards are the same row.
+func (s *Server) handleBuyTripPass(c echo.Context) error {
+	var req buyTripPassRequest
 	if err := request.BindAndValidate(c, &req); err != nil {
 		return err
-	}
-	if req.Quantity <= 0 {
-		req.Quantity = 1
 	}
 
 	ctx := c.Request().Context()
 	tripID := request.TripID(c)
 	userID := request.UserID(c)
 
+	trip, err := s.trips.GetByID(ctx, tripID)
+	if err != nil {
+		return request.NotFound(c, "ไม่พบทริป")
+	}
 	credits, err := s.aiJobs.Credits(ctx, tripID)
 	if err != nil {
 		return request.Internal(c, "โหลดโควตาไม่สำเร็จ")
 	}
 
-	// The id decides; the label is only ever printed. Older clients that sent a
-	// label alone are still understood — that is what the rune check is for now.
+	// Already paid for — by this person or by anyone else in the room. Answered
+	// as success rather than as an error: the trip is unlocked, which is what the
+	// caller was asking for, and charging twice is the only wrong outcome
+	// available here. Two people tapping pay at the same moment is not a rare
+	// case in a group trip; it is the normal one.
+	existing, err := s.billing.TripPass(ctx, tripID)
+	if err != nil {
+		return request.Internal(c, "ตรวจสิทธิ์ทริปไม่สำเร็จ")
+	}
+	if existing != nil {
+		return c.JSON(http.StatusOK, toCreditsDTO(*credits, true, trip.PartySize))
+	}
+
 	method := domain.NormalisePayMethod(req.Method)
-	if req.Method == "" && containsRunes(req.Channel, "แต้ม") {
-		method = domain.PayMethodPoints
+	if method == domain.PayMethodPoints {
+		// Points do not buy a pass directly (A26.5). A direct debit here would
+		// price points against ฿299 in a second place, and two places holding an
+		// exchange rate is exactly the drift M26 exists to end.
+		return request.BadRequest(c, "จ่ายค่า Trip Pass ด้วยแต้มโดยตรงไม่ได้ — แลกแต้มเป็นโค้ดส่วนลดก่อน")
 	}
 
-	usingPoints := method == domain.PayMethodPoints
-	if usingPoints {
-		balance, err := s.points.Balance(ctx, userID)
-		if err != nil {
-			return request.Internal(c, "อ่านแต้มไม่สำเร็จ")
-		}
-		cost := domain.PointsPerAIDraft * req.Quantity
-		if balance < cost {
-			return request.BadRequest(c, "แต้มไม่พอ")
-		}
-		err = s.points.Add(ctx, &models.UserPoints{
-			UserID: userID,
-			Delta:  -cost,
-			Reason: models.PointsReasonAIDraft,
-			Note:   "แลกโควตาร่างแพลน",
-			TripID: &tripID,
-		})
-		if err != nil {
-			return request.Internal(c, "หักแต้มไม่สำเร็จ")
-		}
-	}
-
-	// A code redeemed from points (A12.10). Only cash orders can take one:
-	// paying with points already zeroes the bill.
-	var discount *models.DiscountCode
-	if !usingPoints {
-		found, problem := s.resolveDiscount(ctx, userID, strings.ToUpper(strings.TrimSpace(req.DiscountCode)), models.DiscountScopeAICredits)
-		if problem != "" {
-			return request.BadRequest(c, problem)
-		}
-		discount = found
-	}
-
-	credits.Extra += req.Quantity
-	if err := s.aiJobs.SaveCredits(ctx, credits); err != nil {
-		return request.Internal(c, "บันทึกโควตาไม่สำเร็จ")
-	}
-
-	tripTitle := ""
-	if trip, err := s.trips.GetByID(ctx, tripID); err == nil {
-		tripTitle = trip.Title
-	}
-	pointsSpent := 0
-	if usingPoints {
-		pointsSpent = domain.PointsPerAIDraft * req.Quantity
+	// Codes minted for the old per-draft product are accepted as well. That
+	// product going away is not the code holder's doing, and a code that stops
+	// working because we changed our price list is a promise withdrawn.
+	discount, problem := s.resolveDiscount(ctx, userID,
+		strings.ToUpper(strings.TrimSpace(req.DiscountCode)),
+		models.DiscountScopeTripPass, models.DiscountScopeAICredits)
+	if problem != "" {
+		return request.BadRequest(c, problem)
 	}
 
 	order, err := s.recordOrder(ctx, recordOrderInput{
 		UserID:      userID,
-		Kind:        domain.OrderKindAICredit,
-		Title:       fmt.Sprintf("ร่างแพลนด้วย AI เพิ่ม %d ครั้ง", req.Quantity),
-		LineLabel:   "สิทธิ์ให้ AI ร่างแพลน",
-		Quantity:    req.Quantity,
-		UnitTHB:     domain.PricePerDraftTHB,
+		Kind:        domain.OrderKindTripPass,
+		Title:       "Trip Pass — " + trip.Title,
+		LineLabel:   "ปลดล็อกทริป (ให้ AI ร่างและปรับแพลนไม่จำกัด)",
+		Quantity:    1,
+		UnitTHB:     domain.TripPassPriceTHB,
 		Method:      method,
 		MethodLabel: orDefault(req.Channel, domain.PayMethodLabel(method)),
-		PointsSpent: pointsSpent,
 		Discount:    discount,
 		TripID:      &tripID,
-		TripTitle:   tripTitle,
+		TripTitle:   trip.Title,
 	})
 	if err != nil {
-		// The drafts are already granted and the points are already spent, so a
-		// receipt that failed to write must not fail the purchase — it is logged
-		// and the credits are returned without one.
-		logger.L().WithError(err).Error("record order for ai credits")
+		// Unlike the old draft purchase, nothing was granted before this point:
+		// the receipt *is* the entitlement, so a receipt that failed to write is a
+		// purchase that did not happen, and the caller is told so rather than
+		// being handed an unlock with no record behind it.
+		logger.L().WithError(err).Error("record order for trip pass")
+		return request.Internal(c, "บันทึกการชำระเงินไม่สำเร็จ — ยังไม่ได้ปลดล็อกทริป")
 	}
 
-	out := toCreditsDTO(*credits)
+	out := toCreditsDTO(*credits, true, trip.PartySize)
 	// A cash purchase has no gateway behind it yet; say so rather than let the
 	// UI imply money moved.
 	out.Simulated = domain.IsCashMethod(method)
-	if order != nil {
-		dto := toOrderDTO(*order)
-		out.Order = &dto
-	}
+	dto := toOrderDTO(*order)
+	out.Order = &dto
 
-	s.track(c, tripID, "ซื้อโควตาร่างเพิ่ม "+itoa(req.Quantity)+" ครั้ง", "", "ai_job", tripID)
+	s.track(c, tripID, "ปลดล็อกทริปด้วย Trip Pass", "", "ai_job", tripID)
 	return c.JSON(http.StatusOK, out)
 }
 

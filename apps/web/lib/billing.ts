@@ -10,6 +10,9 @@ import { formatMoney, formatThaiDate } from '@/lib/format';
  */
 
 export const ORDER_KIND_LABEL: Record<Order['kind'], string> = {
+  trip_pass: 'Trip Pass — ปลดล็อกทริป',
+  // Withdrawn in M26, kept because receipts issued under it are still in the
+  // history and a label that goes missing turns a receipt into a blank row.
   ai_credit: 'สิทธิ์ร่างแพลนด้วย AI',
   subscription: 'แพ็กเกจสมาชิก',
   points_topup: 'เติมแต้ม ROVE',
@@ -48,9 +51,24 @@ export function orderAmountLabel(order: Order) {
   return formatMoney(order.totalThb, order.currency);
 }
 
+const INTERVAL_LABEL: Record<SubscriptionPlan['interval'], string> = {
+  trip: 'ทริป',
+  month: 'เดือน',
+  year: 'ปี',
+};
+
 export function planPriceLabel(plan: SubscriptionPlan) {
   if (plan.priceThb === 0) return 'ฟรี';
-  return `${formatMoney(plan.priceThb, 'THB')} / ${plan.interval === 'year' ? 'ปี' : 'เดือน'}`;
+  return `${formatMoney(plan.priceThb, 'THB')} / ${INTERVAL_LABEL[plan.interval]}`;
+}
+
+/**
+ * How many drafts a plan hands out, in words. Unlimited is a sentinel rather
+ * than a big number (`-1`), so it has to be spelled out rather than printed.
+ */
+export function planDraftsLabel(plan: SubscriptionPlan) {
+  if (plan.includedDraftsPerPeriod < 0) return 'ให้ AI ร่างได้ไม่จำกัด';
+  return `ให้ AI ร่างได้ ${plan.includedDraftsPerPeriod} ครั้ง`;
 }
 
 /** The line under the plan name — renewal, expiry, or the reason there is none. */
@@ -67,7 +85,7 @@ export function subscriptionStatusLine(subscription: Subscription) {
     case 'canceled':
       return 'ยกเลิกแล้ว';
     default:
-      return 'ไม่มีค่าใช้จ่ายรายเดือน จ่ายเฉพาะตอนซื้อสิทธิ์ร่างเพิ่ม';
+      return 'ไม่มีค่าใช้จ่ายรายเดือน จ่ายเป็นทริป ๆ ไปตอนปลดล็อก';
   }
 }
 

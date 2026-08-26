@@ -3,8 +3,14 @@ package domain
 // ROVE points (DEV_SPEC §6.5).
 //
 // Points are earned for bringing people in and for trips other people actually
-// book from, and spent on extra AI drafts. Every rate lives here so the paywall
-// copy, the ledger and the admin dashboard cannot drift apart.
+// book from. Every rate lives here so the paywall copy, the ledger and the
+// admin dashboard cannot drift apart.
+//
+// What points *buy* moved in M26. There is no longer a per-draft price for
+// them to be an alternative to: drafting is free up to the trip's quota and
+// unmetered under a Trip Pass. The way out of the points economy is the
+// discount code (A12.10, revenue.go), which now applies to the pass — so the
+// far end of a referral is ฿299 off a trip rather than one more draft.
 
 const (
 	// PointsPerReferral is paid when someone you invited joins their first trip.
@@ -16,14 +22,7 @@ const (
 	PointsPerClone = 260
 	// PointsPerPublish is a one-off for opening your first trip to the public.
 	PointsPerPublish = 500
-	// PointsPerAIDraft is what an extra draft costs.
-	PointsPerAIDraft = 300
-	// PricePerDraftTHB is the cash alternative (§16).
-	PricePerDraftTHB = 39
 )
 
-// PayChannels — see billing.go: what a draft can be paid with is a billing
+// PayChannels — see billing.go: what a purchase can be paid with is a billing
 // fact, and it grew an id once receipts had to name the method (M20).
-
-// CanAffordDraft reports whether a balance covers one extra draft.
-func CanAffordDraft(balance int) bool { return balance >= PointsPerAIDraft }

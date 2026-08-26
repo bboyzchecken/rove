@@ -14,9 +14,10 @@ import (
 
 // RedemptionOpen is the switch on minting new discount codes (Phase 6).
 //
-// Closed 26 ส.ค. 2569. The rate below was derived from exactly one internal
-// price and never from what a point costs to award, so every code minted at it
-// is a liability nobody has measured. Codes are also about to stop being
+// Closed 26 ส.ค. 2569, and M26 did not reopen it. The rate below was rebased
+// onto a price that exists, but it is still not derived from what a point costs
+// to award, so every code minted at it is a liability nobody has measured.
+// Codes are also about to stop being
 // ROVE-only — a partner voucher priced at a guessed rate cannot be repriced
 // after it is in someone's hand. See docs/phase-6-points-economy.md.
 //
@@ -27,20 +28,50 @@ const RedemptionOpen = false
 
 // PointsPerBahtRedeemed is the exchange rate out of the points economy.
 //
-// It is set from the one price the product already has: an extra AI draft is
-// 300 points or ฿39, which is 7.7 points per baht. Eight is that number,
-// rounded the way that does not quietly make points worth more when redeemed
-// than when spent directly.
+// Rebased in M26. It used to be derived from 300 points ÷ ฿39 per AI draft;
+// that price no longer exists, and a rate whose only justification has been
+// deleted is exactly the kind of untraceable number M26 was called to remove.
+//
+// The rate is kept at 8 and now stands on what it buys at the other end: a
+// Trip Pass is ฿299, so ฿299 × 8 = 2,392 points, which is sixteen referrals at
+// PointsPerReferral. Sixteen friends for a free trip is the promise already
+// made in docs/customer-acquisition.md, so the rate is that promise written as
+// a number rather than a division left over from a deleted price.
+//
+// Moving it is therefore not a tuning knob: it changes how many people someone
+// has to bring in for the reward they were told about.
 const PointsPerBahtRedeemed = 8
 
 // RedemptionTiers are the amounts a code can be issued for. A free-text field
 // would let someone burn 9,999 points on a ฿1,249.875 code that no receipt can
 // print cleanly.
+//
+// The top tier is the Trip Pass itself, to the baht: the reason to save points
+// is now a specific thing you can hold, not a vague discount. (It reads as 300
+// rather than 299 because the tiers are the amounts a code is *worth*, and
+// ApplyDiscount already refuses to hand back the ฿1 nobody spent.)
 var RedemptionTiers = []int{50, 100, 300}
 
 // DiscountValidity is how long a code lives. Long enough to plan a trip
 // around, short enough that the liability does not sit on the books forever.
 const DiscountValidity = 180 * 24 * time.Hour
+
+// FoundingCodeValidity is how long a founder's discount lasts (M26 — W26.4).
+//
+// The early-adopter discount is a code with an expiry rather than a lower price
+// on the page, and the expiry is the whole point. The first price somebody sees
+// becomes the number they measure every later price against, so launching at
+// ฿199 would mean ฿299 is forever "the price they put up". A gift that runs out
+// is not a price rise — the sticker was ฿299 the whole time.
+//
+// Ninety days: long enough to cover a trip planned from scratch, short enough
+// that it is visibly a launch offer and not the real price wearing a hat.
+const FoundingCodeValidity = 90 * 24 * time.Hour
+
+// MaxFoundingDiscountTHB caps what one issued code can be worth. A campaign
+// tool that can mint any amount is a campaign tool that can mint ฿100,000 on a
+// typo, and nothing downstream would question it.
+const MaxFoundingDiscountTHB = TripPassPriceTHB
 
 func PointsForDiscount(amountTHB int) int { return amountTHB * PointsPerBahtRedeemed }
 

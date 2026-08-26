@@ -130,7 +130,12 @@ export interface TripRecord {
   comments: Comment[];
   votes: Vote[];
   activity: ActivityEvent[];
-  ai: { used: number; included: number; extra: number };
+  /**
+   * The draft meter, plus whether anybody in the room has paid for the trip.
+   * `extra` is the pre-M26 per-draft purchase, kept so seeded history still
+   * adds up; nothing writes to it now.
+   */
+  ai: { used: number; included: number; extra: number; hasPass: boolean };
   share: ShareState;
   /**
    * Who published it — set only on the seeded explore records, which belong to
@@ -329,7 +334,7 @@ function seedDemoTrip(): TripRecord {
       { id: 'a3', memberId: 'm1', text: 'ให้ AI ร่างแพลน 8 วัน', createdAt: '2026-08-18T08:00:00.000Z' },
       { id: 'a4', memberId: 'm1', text: 'ตั้งงบไว้ที่ 45,000 บาท/คน', createdAt: '2026-08-16T03:30:00.000Z' },
     ],
-    ai: { used: AI_CREDITS.used, included: AI_CREDITS.freePerTrip, extra: 0 },
+    ai: { used: AI_CREDITS.used, included: AI_CREDITS.freePerTrip, extra: 0, hasPass: false },
     // Published, because this is also the trip the landing page offers to an
     // anonymous visitor as "ดูทริปตัวอย่าง" (/p/japan-autumn-8d). The same
     // slug is seeded into MySQL for live mode, so one URL answers in both.
@@ -405,7 +410,7 @@ function seedDateTrip(): TripRecord {
       { id: 'da1', memberId: 'm4', text: 'ใส่วันว่างเดือนธันวาแล้ว', createdAt: '2026-08-19T01:00:00.000Z' },
       { id: 'da2', memberId: 'm1', text: 'สร้างห้องทริปและชวนเพื่อน 3 คน', createdAt: '2026-08-18T12:00:00.000Z' },
     ],
-    ai: { used: 0, included: AI_CREDITS.freePerTrip, extra: 0 },
+    ai: { used: 0, included: AI_CREDITS.freePerTrip, extra: 0, hasPass: false },
     share: {
       visibility: 'private',
       shareToken: null,
@@ -530,7 +535,7 @@ function seedPublicTrips(): TripRecord[] {
 
 export function seedDb(): MockDb {
   return {
-    version: 9,
+    version: 10,
     user: {
       id: CURRENT_USER.id,
       name: CURRENT_USER.name,
@@ -631,7 +636,7 @@ function seedEarnings(): EarningsStatement {
 /* ------------------------------------------------------------- constants -- */
 
 export const AI_META = {
-  pricePerDraftThb: AI_CREDITS.priceThb,
+  passPriceThb: AI_CREDITS.passPriceThb,
   payChannels: AI_PAY_CHANNELS,
   rationales: RATIONALES,
   openQuestions: OPEN_QUESTIONS,
@@ -656,7 +661,7 @@ export function loadDb(): MockDb {
         const parsed = JSON.parse(raw) as MockDb;
         // A seed change bumps the version; an old blob is thrown away rather
         // than migrated — this is demo data, not anyone's real trip.
-        if (parsed.version === 9) {
+        if (parsed.version === 10) {
           memory = parsed;
           return memory;
         }

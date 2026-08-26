@@ -503,23 +503,42 @@ type aiJobDTO struct {
 	Result     json.RawMessage `json:"result"`
 }
 
+// aiCreditsDTO is the meter *and* the paywall's price list, because they are
+// read at the same moment: how many drafts are left, and what it costs to stop
+// counting them.
 type aiCreditsDTO struct {
-	Used             int                 `json:"used"`
-	Included         int                 `json:"included"`
-	Extra            int                 `json:"extra"`
-	PricePerDraftTHB int                 `json:"price_per_draft_thb"`
+	Used     int `json:"used"`
+	Included int `json:"included"`
+	// Extra is the old per-draft purchase, kept so credits bought before M26
+	// still count. Nothing adds to it any more.
+	Extra int `json:"extra"`
+	// HasPass unlocks the trip for everyone in the room (A26.2). When it is
+	// true the numbers above are history, not a limit.
+	HasPass bool `json:"has_pass"`
+	// What unlocking costs, and what comes back. The web app renders the refund
+	// promise from these rather than from a hardcoded sentence, so the number on
+	// the button and the number that is charged cannot come apart (A26.3/W26.2).
+	PassPriceTHB     int                 `json:"pass_price_thb"`
+	PassRefundable   bool                `json:"pass_refundable"`
+	PassPerPersonTHB int                 `json:"pass_per_person_thb"`
 	PayChannels      []domain.PayChannel `json:"pay_channels"`
 	Simulated        bool                `json:"simulated,omitempty"`
 	// The receipt the purchase produced (M20). Only on the purchase response.
 	Order *orderDTO `json:"order,omitempty"`
 }
 
-func toCreditsDTO(c models.AICredit) aiCreditsDTO {
+// toCreditsDTO needs the party size because the price the group actually
+// argues about is the per-person one, not the ฿299 (W26.3).
+func toCreditsDTO(c models.AICredit, hasPass bool, partySize int) aiCreditsDTO {
+	pass := domain.PlanByID(domain.TripPassPlanID)
 	return aiCreditsDTO{
 		Used:             c.Used,
 		Included:         c.Included,
 		Extra:            c.Extra,
-		PricePerDraftTHB: domain.PricePerDraftTHB,
+		HasPass:          hasPass,
+		PassPriceTHB:     pass.PriceTHB,
+		PassRefundable:   pass.RefundableOnBooking,
+		PassPerPersonTHB: domain.SplitPerPersonTHB(partySize),
 		PayChannels:      domain.PayChannels,
 	}
 }
@@ -615,14 +634,17 @@ type subscriptionDTO struct {
 }
 
 type subscriptionPlanDTO struct {
-	ID                      string   `json:"id"`
-	Name                    string   `json:"name"`
-	Tagline                 string   `json:"tagline"`
-	PriceTHB                int      `json:"price_thb"`
-	Interval                string   `json:"interval"`
-	Perks                   []string `json:"perks"`
-	IncludedDraftsPerPeriod int      `json:"included_drafts_per_period"`
-	Available               bool     `json:"available"`
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Tagline  string `json:"tagline"`
+	PriceTHB int    `json:"price_thb"`
+	// "trip", "month" or "year" — the unit the row is sold in (M26).
+	Interval string   `json:"interval"`
+	Perks    []string `json:"perks"`
+	// -1 when the plan does not meter drafting (domain.UnlimitedDrafts).
+	IncludedDraftsPerPeriod int  `json:"included_drafts_per_period"`
+	RefundableOnBooking     bool `json:"refundable_on_booking"`
+	Available               bool `json:"available"`
 }
 
 type billingSummaryDTO struct {

@@ -101,7 +101,7 @@ export interface MemberDto {
 
 export interface NotificationDto {
   id: string;
-  kind: 'mention' | 'assigned' | 'poll_opened' | 'plan_ready' | 'points';
+  kind: 'mention' | 'assigned' | 'poll_opened' | 'plan_ready' | 'points' | 'refund';
   title: string;
   body: string;
   link: string;
@@ -624,7 +624,10 @@ export interface AiCreditsDto {
   used: number;
   included: number;
   extra: number;
-  price_per_draft_thb: number;
+  has_pass: boolean;
+  pass_price_thb: number;
+  pass_refundable: boolean;
+  pass_per_person_thb: number;
   pay_channels: PayChannelDto[] | null;
 }
 
@@ -645,7 +648,7 @@ export interface OrderLineDto {
 export interface OrderDto {
   id: string;
   number: string;
-  kind: 'ai_credit' | 'subscription' | 'points_topup';
+  kind: 'ai_credit' | 'trip_pass' | 'subscription' | 'points_topup';
   status: 'pending' | 'paid' | 'failed' | 'refunded';
   title: string;
   lines: OrderLineDto[] | null;
@@ -686,9 +689,11 @@ export interface SubscriptionPlanDto {
   name: string;
   tagline: string;
   price_thb: number;
-  interval: 'month' | 'year';
+  interval: 'trip' | 'month' | 'year';
   perks: string[] | null;
+  /** -1 when the plan does not meter drafting. */
   included_drafts_per_period: number;
+  refundable_on_booking: boolean;
   available: boolean;
 }
 

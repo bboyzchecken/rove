@@ -720,19 +720,18 @@ export const liveRepo: RoveRepo = {
       return dto.map(toPlanDay);
     },
 
-    async buyCredits(tripId, input) {
+    async buyPass(tripId, input) {
       const dto = await api.post<AiCreditsDto & { simulated: boolean; order?: OrderDto }>(
-        `/trips/${tripId}/ai/credits/purchase`,
+        `/trips/${tripId}/pass`,
         {
-          quantity: input.quantity,
           method: input.method,
           channel: input.channel,
           discount_code: input.discountCode ?? '',
         },
       );
-      // The drafts are granted even if filing the receipt failed, and the API
-      // says so by omitting it. Failing the purchase here would be a lie about
-      // something that already happened.
+      // A trip that was already unlocked answers with the state and no receipt
+      // rather than an error — two people in a room tapping pay at the same
+      // second is the normal case, not a fault.
       return {
         ...toAiCredits(dto),
         simulated: dto.simulated,

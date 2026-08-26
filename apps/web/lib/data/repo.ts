@@ -15,7 +15,7 @@ import type {
   BookingKind,
   BookingStatus,
   BudgetSummary,
-  BuyCreditsInput,
+  BuyTripPassInput,
   CalendarTrip,
   Character,
   Comment,
@@ -308,13 +308,14 @@ export interface AiRepo {
   /** Applies a finished draft to the plan. */
   apply(tripId: string, jobId: string): Promise<PlanDay[]>;
   /**
-   * Buys extra drafts and files the receipt (M20): a purchase returns the order
-   * it created, so the payment sheet can link straight to it. Mock mode always
-   * succeeds and says the charge was simulated.
+   * Unlocks the trip and files the receipt (M26 — A26.2): the purchase returns
+   * the order it created, so the payment sheet can link straight to it. A trip
+   * that is already unlocked answers with the state and no new receipt. Mock
+   * mode always succeeds and says the charge was simulated.
    */
-  buyCredits(
+  buyPass(
     tripId: string,
-    input: BuyCreditsInput,
+    input: BuyTripPassInput,
   ): Promise<AiCredits & { simulated: boolean; order: Order | null }>;
 }
 

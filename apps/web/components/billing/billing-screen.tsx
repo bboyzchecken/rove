@@ -75,17 +75,21 @@ export function BillingScreen() {
           </div>
         </Card>
 
-        {upcoming.length > 0 ? (
-          <div className="mt-2.5 space-y-2">
-            {upcoming.map((plan) => (
-              <PlanRow key={plan.id} plan={plan} />
-            ))}
-            <p className="text-muted/80 px-1 text-[11px] leading-relaxed">
-              แพ็กเกจรายเดือนยังไม่เปิดขาย — ตอนนี้จ่ายเฉพาะตอนซื้อสิทธิ์ร่างเพิ่มเป็นครั้ง ๆ
-              ไม่มีการตัดเงินอัตโนมัติ
-            </p>
-          </div>
-        ) : null}
+        <div className="mt-2.5 space-y-2">
+          {upcoming.map((plan) => (
+            <PlanRow key={plan.id} plan={plan} />
+          ))}
+          {/* The pass is bought inside a trip, never here (A26.2): a pass with
+              no trip attached is not a thing that can exist. So this screen
+              points at the price list and stops. */}
+          <p className="text-muted/80 px-1 text-[11px] leading-relaxed">
+            ไม่มีค่าใช้จ่ายรายเดือนและไม่มีการตัดเงินอัตโนมัติ · ปลดล็อกเป็นทริป ๆ ไปจากในห้องทริปนั้น
+            —{' '}
+            <Link href="/pricing" className="text-primary font-semibold">
+              ดูราคาทั้งหมด
+            </Link>
+          </p>
+        </div>
       </section>
 
       {/* summary -------------------------------------------------------- */}
@@ -214,6 +218,9 @@ function OrderRow({ order }: { order: Order }) {
  * A plan that is not on sale yet. It says so on the row rather than behind a
  * disabled button: a price tag with nothing to press is a promise, and it
  * should read like one.
+ *
+ * Only ROVE Year lands here now. Free needs no row, and the Trip Pass is bought
+ * where the trip is — this screen is the record of what was paid, not a till.
  */
 function PlanRow({ plan }: { plan: SubscriptionPlan }) {
   return (

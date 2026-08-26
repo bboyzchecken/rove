@@ -12,6 +12,7 @@ const (
 	NotifyPollOpened = "poll_opened" // the group is waiting on your answer
 	NotifyPlanReady  = "plan_ready"  // the AI draft you started finished
 	NotifyPoints     = "points"      // your public trip earned something
+	NotifyRefund     = "refund"      // the Trip Pass came back (M26 — A26.4)
 )
 
 // Notification is one thing that happened *to one person*.

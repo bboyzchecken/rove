@@ -149,4 +149,27 @@ type BillingStore interface {
 	// ActiveSubscription returns nil (with no error) for a free user.
 	ActiveSubscription(ctx context.Context, userID string) (*Subscription, error)
 	SaveSubscription(ctx context.Context, sub *Subscription) error
+
+	// --- Trip Pass (M26 — A26.2) ---------------------------------------------
+	// The pass is an order, not a row of its own: `orders.trip_id` already says
+	// which trip a purchase was for, and a second table would be a second
+	// opinion about whether the trip was paid for.
+
+	// TripPass returns the pass bought for a trip by anyone in its room, or nil
+	// when the trip is still on the free tier. A refunded pass still counts —
+	// the money went back *because* a booking happened, and revoking the unlock
+	// at that moment would punish the thing the refund is rewarding.
+	TripPass(ctx context.Context, tripID string) (*Order, error)
+	// PassTripIDs lists the trips this user has bought a pass for, which is what
+	// the free tier's one-open-trip rule has to exclude.
+	PassTripIDs(ctx context.Context, userID string) ([]string, error)
+	// RefundTripPass marks a pass refunded and issues the credit for it, in one
+	// transaction, and reports whether *this* call is the one that did it.
+	//
+	// The guard is in the WHERE clause rather than in a read beforehand, so two
+	// confirmations arriving together cannot both pay a refund out (A26.4). The
+	// credit is written alongside because the two halves are one promise: a pass
+	// marked refunded with no credit behind it is money taken and not returned,
+	// and a credit with no mark is a refund that can be claimed again.
+	RefundTripPass(ctx context.Context, orderID string, credit *DiscountCode, at time.Time) (bool, error)
 }

@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { track } from '@/lib/analytics';
 import { repo } from '@/lib/data';
-import type { AiGenerateInput, AiJob, BuyCreditsInput } from '@/lib/data';
+import type { AiGenerateInput, AiJob, BuyTripPassInput } from '@/lib/data';
 import { queryKeys } from '@/lib/query-keys';
 
 /**
@@ -84,23 +84,19 @@ export function useAiDraft(tripId: string) {
 }
 
 /**
- * Buying drafts. Two caches move on success and they are not the same cache:
- * the trip's meter, and this user's billing history — the purchase leaves a
- * receipt behind (M20), and the profile is allowed to be looked at next.
+ * Unlocking a trip (M26 — A26.2). Two caches move on success and they are not
+ * the same cache: the trip's meter, and this user's billing history — the
+ * purchase leaves a receipt behind (M20), and the profile is allowed to be
+ * looked at next.
  */
-export function useBuyAiCredits(tripId: string) {
+export function useBuyTripPass(tripId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: BuyCreditsInput) => repo.ai.buyCredits(tripId, input),
+    mutationFn: (input: BuyTripPassInput) => repo.ai.buyPass(tripId, input),
     onSuccess: (credits, input) => {
-      track('ai_credits_purchased', { quantity: input.quantity, channel: input.method });
+      track('trip_pass_purchased', { channel: input.method, hasCode: Boolean(input.discountCode) });
       queryClient.setQueryData(queryKeys.aiCredits(tripId), credits);
       void queryClient.invalidateQueries({ queryKey: queryKeys.billing() });
-      // Points are money here: a draft paid for with them changes the balance
-      // the profile and the dialog both read from `me`.
-      if (input.method === 'points') {
-        void queryClient.invalidateQueries({ queryKey: queryKeys.me() });
-      }
     },
   });
 }

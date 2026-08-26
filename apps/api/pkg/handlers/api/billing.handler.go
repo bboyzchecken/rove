@@ -90,6 +90,7 @@ func (s *Server) handleListPlans(c echo.Context) error {
 			Interval:                plan.Interval,
 			Perks:                   plan.Perks,
 			IncludedDraftsPerPeriod: plan.IncludedDraftsPerPeriod,
+			RefundableOnBooking:     plan.RefundableOnBooking,
 			Available:               plan.Available,
 		})
 	}

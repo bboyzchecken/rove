@@ -67,7 +67,19 @@ resource "aws_ecs_task_definition" "worker" {
         { name = "AI_MODEL_PLANNER", value = "claude-opus-5" },
         { name = "AI_MODEL_FAST", value = "claude-haiku-4-5-20251001" },
         { name = "AI_MAX_TOKENS", value = "8000" },
-        { name = "AI_DAILY_COST_CAP_USD", value = "5" },
+        # M26 (A26.6): drafting is unmetered under a Trip Pass, so the old $5 —
+        # about 80 free trips of model time — would have been spent inside the
+        # first hour of a busy day and taken the feature down with it.
+        #
+        # $20 is roughly 330 free trips or 65 heavy paid ones per day. At that
+        # volume the revenue on one day dwarfs the cap several times over, so
+        # the number is not rationing anything: it is the stop that keeps a
+        # runaway loop or an abusive account from becoming an open tab.
+        #
+        # Deliberately above the monthly budget alarm when sustained (see
+        # variables.tf). Hitting this ceiling every day for a month *should*
+        # send an e-mail — that is a business event, not a quiet cost.
+        { name = "AI_DAILY_COST_CAP_USD", value = "20" },
         { name = "OPEN_METEO_BASE", value = "https://api.open-meteo.com" },
       ]
       # The same secret set as the API: the worker runs the whole pipeline, so

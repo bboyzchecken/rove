@@ -982,7 +982,10 @@ export function toAiCredits(dto: AiCreditsDto): AiCredits {
     used: dto.used,
     included: dto.included,
     extra: dto.extra,
-    pricePerDraftThb: dto.price_per_draft_thb,
+    hasPass: dto.has_pass ?? false,
+    passPriceThb: dto.pass_price_thb,
+    passRefundable: dto.pass_refundable ?? false,
+    passPerPersonThb: dto.pass_per_person_thb,
     payChannels: (dto.pay_channels ?? []).map((channel) => ({
       id: channel.id,
       label: channel.label,
@@ -1049,6 +1052,7 @@ export function toSubscriptionPlan(dto: SubscriptionPlanDto): SubscriptionPlan {
     interval: dto.interval,
     perks: dto.perks ?? [],
     includedDraftsPerPeriod: dto.included_drafts_per_period,
+    refundableOnBooking: dto.refundable_on_booking ?? false,
     available: dto.available,
   };
 }

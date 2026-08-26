@@ -127,6 +127,9 @@ function SiteFooter() {
       >
         <RoveLogo size="sm" tone="mono" />
         <nav className="flex flex-wrap items-center gap-4">
+          <Link href="/pricing" className="hover:text-espresso">
+            ราคา
+          </Link>
           <Link href="/terms" className="hover:text-espresso">
             เงื่อนไขการใช้งาน
           </Link>

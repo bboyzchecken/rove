@@ -237,6 +237,26 @@ func Migrate(db *gorm.DB) error {
 				return dropIndexes(tx, ledgerIndexes)
 			},
 		},
+		{
+			// M26 — the Trip Pass (A26.2). No new table: a pass is an order with
+			// `kind = 'trip_pass'` and a trip on it, so what this adds is the index
+			// that lookup needs, plus the raised free-draft default.
+			//
+			// Trips that already exist keep the two drafts they were created with.
+			// Handing three to a trip halfway through planning would be a quota that
+			// grew while nobody was looking, which is a stranger thing to see than a
+			// number that stayed where it was.
+			ID: "202608270000_trip_pass",
+			Migrate: func(tx *gorm.DB) error {
+				if err := tx.AutoMigrate(&models.AICredit{}); err != nil {
+					return err
+				}
+				return createIndexes(tx, tripPassIndexes)
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return dropIndexes(tx, tripPassIndexes)
+			},
+		},
 	})
 
 	return m.Migrate()
@@ -306,6 +326,19 @@ var ledgerIndexes = []hotPathIndex{
 		// EarnedByTrip: WHERE user_id AND reason GROUP BY trip_id — the
 		// audience card's one query (A23.2).
 		why: "audience card, points per published trip",
+	},
+}
+
+// tripPassIndexes serve M26 — "is this trip paid for" is asked on every read of
+// the AI panel and before every draft, so it is a hot path from the day it
+// ships rather than one that became one later.
+var tripPassIndexes = []hotPathIndex{
+	{
+		name: "idx_orders_trip_pass", table: "orders", columns: "(trip_id, kind, status)",
+		// TripPass: WHERE trip_id AND kind AND status IN (...). `trip_id` alone
+		// was indexed, which was enough while a trip had at most a receipt or two
+		// and is not what this column is being asked now.
+		why: "trip pass lookup",
 	},
 }
 

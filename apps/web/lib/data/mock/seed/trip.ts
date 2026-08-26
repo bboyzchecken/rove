@@ -1,3 +1,5 @@
+import { FREE_DRAFTS_PER_TRIP, TRIP_PASS_PRICE_THB } from '@/lib/catalog/plans';
+
 import type { BudgetLine, ExpenseEntry, Member, PlanDay, Trip, WishlistItem } from '../../model';
 
 /**
@@ -663,12 +665,16 @@ export const OPEN_QUESTIONS = [
  * draft is paid for with ROVE points — which members earn by inviting friends
  * and by publishing trips others book from — or bought outright.
  */
+/**
+ * The meter's seeded state. The two numbers that are also prices come from
+ * `lib/catalog/plans.ts` rather than being typed again here — one copy of ฿299
+ * on this side of the wire, which is the whole lesson of M26.
+ */
 export const AI_CREDITS = {
-  freePerTrip: 2,
+  freePerTrip: FREE_DRAFTS_PER_TRIP,
   /** Drafts already spent on this trip. */
   used: 1,
-  pointsPerRun: 300,
-  priceThb: 39,
+  passPriceThb: TRIP_PASS_PRICE_THB,
   /** Points a member earns when someone they invited joins their first trip. */
   pointsPerReferral: 150,
 };

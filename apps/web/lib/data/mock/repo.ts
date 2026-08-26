@@ -34,6 +34,7 @@ import type {
   AdaptInput,
   AgentLead,
   DiscountCode,
+  AiCredits,
   AiJob,
   AvailabilityBoard,
   BookingEntry,
@@ -67,7 +68,7 @@ import type {
   Vote,
   WishlistItem,
 } from '../types';
-import { buildOrder, PLANS } from './billing';
+import { buildOrder, FREE_ACTIVE_TRIPS, PLANS } from './billing';
 import { BOOKING_OFFERS, POIS, prepTemplateFor, rankDestinations } from './catalog';
 import {
   AI_META,
@@ -544,6 +545,30 @@ async function routeOf(record: TripRecord): Promise<TripRoute> {
  * are locked dates — there is nothing left to coordinate once a seat is paid
  * for (M2.5).
  */
+/**
+ * The meter as the paywall reads it (M26). One function rather than an object
+ * literal in three places, because the price on the button and the price on the
+ * receipt drifting apart is exactly what M26 was called in to fix.
+ */
+function creditsView(record: TripRecord): AiCredits {
+  return {
+    used: record.ai.used,
+    included: record.ai.included,
+    extra: record.ai.extra,
+    hasPass: record.ai.hasPass,
+    passPriceThb: AI_META.passPriceThb,
+    passRefundable: true,
+    passPerPersonThb: splitPerPersonThb(record.trip.partySize),
+    payChannels: AI_META.payChannels,
+  };
+}
+
+/** Rounded up, so nobody collects the shares and ends up ฿3 short. */
+function splitPerPersonThb(party: number) {
+  if (party <= 1) return AI_META.passPriceThb;
+  return Math.ceil(AI_META.passPriceThb / party);
+}
+
 function applyRoute(record: TripRecord, route: TripRoute, memberId: string) {
   if (route.flights.length === 0 && route.stops.length === 0) return;
 
@@ -700,6 +725,19 @@ export const mockRepo: RoveRepo = {
     },
 
     async create(input) {
+      // The free tier plans one trip at a time (M26 — A26.3). Enforced here as
+      // well as in the API, because mock mode is where the paywall is designed:
+      // a limit that only exists on the server is a limit nobody sees until it
+      // is too late to change how it reads.
+      const openTrips = loadDb().trips.filter(
+        (record) => !record.creator && record.trip.status !== 'done' && !record.ai.hasPass,
+      );
+      if (openTrips.length >= FREE_ACTIVE_TRIPS) {
+        throw new Error(
+          `แผนฟรีวางแผนได้ครั้งละ ${FREE_ACTIVE_TRIPS} ทริป — ปิดทริปที่วางอยู่ให้เสร็จ หรือปลดล็อกด้วย Trip Pass ฿${AI_CREDITS.passPriceThb} ก่อนเริ่มทริปใหม่`,
+        );
+      }
+
       // The route decides the frame, so it is resolved before the record is
       // written — a trip is never stored with dates its tickets disagree with.
       const legs = withIds(input.flights ?? []);
@@ -775,7 +813,7 @@ export const mockRepo: RoveRepo = {
           comments: [],
           votes: [],
           activity: [],
-          ai: { used: 0, included: 2, extra: 0 },
+          ai: { used: 0, included: AI_CREDITS.freePerTrip, extra: 0, hasPass: false },
           share: {
             visibility: 'private',
             shareToken: null,
@@ -1830,13 +1868,7 @@ export const mockRepo: RoveRepo = {
       return delay(
         mutate((db) => {
           const record = tripRecord(db, tripId);
-          return {
-            used: record.ai.used,
-            included: record.ai.included,
-            extra: record.ai.extra,
-            pricePerDraftThb: AI_META.pricePerDraftThb,
-            payChannels: AI_META.payChannels,
-          };
+          return creditsView(record);
         }),
       );
     },
@@ -1844,9 +1876,14 @@ export const mockRepo: RoveRepo = {
     async generate(tripId, input) {
       const job = mutate((db) => {
         const record = tripRecord(db, tripId);
+        // A trip with a pass is not metered (M26 — A26.2). `used` keeps
+        // counting either way: the dots on the panel are a record of what the
+        // group has run, not only a countdown.
         const quota = record.ai.included + record.ai.extra;
-        if (record.ai.used >= quota) {
-          throw new Error('ใช้ครบโควตาร่างแล้ว — ซื้อเพิ่มก่อนถึงจะร่างใหม่ได้');
+        if (!record.ai.hasPass && record.ai.used >= quota) {
+          throw new Error(
+            `ใช้สิทธิ์ร่างฟรีครบแล้ว — ปลดล็อกทริปนี้ ฿${AI_CREDITS.passPriceThb} แล้วร่างได้ไม่จำกัด`,
+          );
         }
         record.ai.used += 1;
         log(record, db.user.id, input.kind === 'draft' ? 'ให้ AI ร่างแพลน' : 'ให้ AI ปรับแพลน');
@@ -1909,34 +1946,32 @@ export const mockRepo: RoveRepo = {
       );
     },
 
-    async buyCredits(tripId, input) {
+    async buyPass(tripId, input) {
       // No payment gateway in mock mode — the sheet always succeeds and the
       // caller is told the charge was simulated. The receipt, however, is real:
       // it is written to the same order log live mode keeps (M20).
-      const quantity = Math.max(1, input.quantity);
-      const points = input.method === 'points' ? AI_CREDITS.pointsPerRun * quantity : 0;
-
       return delay(
         mutate((db) => {
-          if (points > 0 && db.user.points < points) throw new Error('แต้มไม่พอ');
-
           const record = tripRecord(db, tripId);
-          record.ai.extra += quantity;
-          if (points > 0) {
-            addPoints(db, -points, 'ai_draft', `ร่างแพลนด้วย AI เพิ่ม ${quantity} ครั้ง`, tripId);
+
+          // Already unlocked: the room got what it asked for and nobody is
+          // charged twice. Same answer the API gives (A26.2).
+          if (record.ai.hasPass) {
+            return { ...creditsView(record), simulated: false, order: null };
           }
+
+          record.ai.hasPass = true;
 
           const order = buildOrder(
             mockId('ord'),
             {
-              kind: 'ai_credit',
-              title: `ร่างแพลนด้วย AI เพิ่ม ${quantity} ครั้ง`,
-              lineLabel: `สิทธิ์ให้ AI ร่างแพลน (ทริป${record.trip.title})`,
-              quantity,
-              unitAmountThb: AI_META.pricePerDraftThb,
+              kind: 'trip_pass',
+              title: `Trip Pass — ${record.trip.title}`,
+              lineLabel: 'ปลดล็อกทริป (ให้ AI ร่างและปรับแพลนไม่จำกัด)',
+              quantity: 1,
+              unitAmountThb: AI_CREDITS.passPriceThb,
               method: input.method,
               methodLabel: input.channel,
-              pointsSpent: points,
               tripId,
               tripTitle: record.trip.title,
               issuedAt: nowIso(),
@@ -1945,13 +1980,9 @@ export const mockRepo: RoveRepo = {
           );
           db.orders.push(order);
 
-          log(record, db.user.id, `ซื้อโควตาร่างเพิ่ม ${quantity} ครั้ง (${input.channel})`);
+          log(record, db.user.id, `ปลดล็อกทริปด้วย Trip Pass (${input.channel})`);
           return {
-            used: record.ai.used,
-            included: record.ai.included,
-            extra: record.ai.extra,
-            pricePerDraftThb: AI_META.pricePerDraftThb,
-            payChannels: AI_META.payChannels,
+            ...creditsView(record),
             simulated: order.simulated,
             order: clone(order),
           };
@@ -2237,7 +2268,7 @@ export const mockRepo: RoveRepo = {
           copy.documents = [];
           copy.polls = [];
           copy.profiles = {};
-          copy.ai = { used: 0, included: 2, extra: 0 };
+          copy.ai = { used: 0, included: AI_CREDITS.freePerTrip, extra: 0, hasPass: false };
           copy.share = {
             visibility: 'private',
             shareToken: null,

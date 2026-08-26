@@ -195,3 +195,83 @@ func (s *store) ActiveSubscription(ctx context.Context, userID string) (*models.
 func (s *store) SaveSubscription(ctx context.Context, sub *models.Subscription) error {
 	return s.db.WithContext(ctx).Save(sub).Error
 }
+
+/* ------------------------------------------------------------ trip pass -- */
+
+// passStatuses is what counts as "this trip was paid for".
+//
+// A refunded pass is in the list on purpose: the refund is what happens when
+// the trip produces a booking, so treating it as an expiry would lock the room
+// at the exact moment the group did the thing the pass was rewarding.
+var passStatuses = []string{domain.OrderPaid, domain.OrderRefunded}
+
+func (s *store) TripPass(ctx context.Context, tripID string) (*models.Order, error) {
+	var order models.Order
+	err := s.db.WithContext(ctx).
+		Where("trip_id = ? AND kind = ? AND status IN ?", tripID, domain.OrderKindTripPass, passStatuses).
+		// Oldest first: if a room somehow bought two, the first one is the one the
+		// refund is owed against.
+		Order("issued_at ASC").
+		First(&order).Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		// Not an error: a trip on the free tier simply has no pass.
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &order, nil
+}
+
+func (s *store) PassTripIDs(ctx context.Context, userID string) ([]string, error) {
+	var ids []string
+	err := s.db.WithContext(ctx).
+		Model(&models.Order{}).
+		Where("user_id = ? AND kind = ? AND status IN ? AND trip_id IS NOT NULL",
+			userID, domain.OrderKindTripPass, passStatuses).
+		// DISTINCT inside Pluck rather than .Distinct(), which Pluck overwrites
+		// with its own SELECT and quietly drops.
+		Pluck("DISTINCT trip_id", &ids).Error
+	return ids, err
+}
+
+// RefundTripPass is a conditional update, not a read followed by a write.
+//
+// Two partner postbacks for the same trip can land in the same millisecond, and
+// the only thing standing between that and paying a refund twice is that
+// `status = 'paid'` is in the WHERE clause. Whoever's UPDATE matches a row is
+// the one that owes the credit; the other is told it did nothing and stops.
+//
+// The credit is written in the same transaction, which is why this reaches into
+// `discount_codes` from the billing store rather than leaving the caller to do
+// it in two steps. Splitting them would put a crash between "your money is
+// refunded" and "here is the refund".
+func (s *store) RefundTripPass(ctx context.Context, orderID string, credit *models.DiscountCode, at time.Time) (bool, error) {
+	won := false
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		res := tx.Model(&models.Order{}).
+			Where("id = ? AND kind = ? AND status = ?", orderID, domain.OrderKindTripPass, domain.OrderPaid).
+			Updates(map[string]any{"status": domain.OrderRefunded, "refunded_at": at})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected != 1 {
+			// Somebody else already refunded this pass. Not an error — it is the
+			// second booking on a trip, which is a good thing that happened.
+			return nil
+		}
+
+		if credit != nil {
+			if err := tx.Create(credit).Error; err != nil {
+				return err
+			}
+		}
+		won = true
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+	return won, nil
+}

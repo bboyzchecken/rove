@@ -2,32 +2,38 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Check, CreditCard, Gift, ReceiptText, Sparkles, UserPlus, Wallet, X } from 'lucide-react';
+import { Check, Gift, ReceiptText, RotateCcw, Sparkles, Users, X } from 'lucide-react';
 
 import { RoveMark } from '@/components/brand/rove-mark';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { FieldLabel, Textarea, fieldClass } from '@/components/ui/field';
-import { useMe } from '@/features/auth/queries';
-import { useAiCredits, useAiDraft, useBuyAiCredits } from '@/features/ai/queries';
+import { useAiCredits, useAiDraft, useBuyTripPass } from '@/features/ai/queries';
 import { useIsStubbed } from '@/features/meta/queries';
 import { useWishlist } from '@/features/wishlist/queries';
 import type { Order } from '@/lib/data';
+import { formatMoney } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 /**
- * "ให้ AI ร่างแพลน" (M4 — W4.1) plus the meter in front of it.
+ * "ให้ AI ร่างแพลน" (M4 — W4.1) plus the gate in front of it.
  *
- * Drafts are metered (§16): the trip's included runs come first, then points
- * or a purchase. The gate lives inside this dialog rather than on a separate
- * page, because the moment someone wants another draft is the moment to show
- * what a draft costs — and how to earn it back by inviting friends.
+ * The trip's free drafts come first; after that the trip is unlocked once with
+ * a Trip Pass (M26 — W26.2). The gate lives inside this dialog rather than on a
+ * separate page, because the moment someone wants another draft is the moment
+ * to say what it costs.
+ *
+ * What it costs is one sentence, and its second half matters more than its
+ * first: the pass comes back in full if the trip is booked through ROVE. A
+ * commission is worth several times the pass, so the refund is not a discount
+ * we are being nice about — it is the paywall getting out of the way of the
+ * larger revenue. Saying so plainly is both the honest line and the better
+ * pitch, which is why it sits on the button and not in the terms (W26.3).
  *
  * Progress is the job's own, streamed from the repository (SSE in live mode,
  * a timer in mock mode). Nothing here is on a fake clock.
  */
-const POINTS_PER_RUN = 300;
 const POINTS_PER_REFERRAL = 150;
 
 export function AiGenerateDialog({
@@ -40,9 +46,8 @@ export function AiGenerateDialog({
   onClose: () => void;
 }) {
   const { data: credits } = useAiCredits(tripId);
-  const { data: me } = useMe();
   const { data: wishlist = [] } = useWishlist(tripId);
-  const buyCredits = useBuyAiCredits(tripId);
+  const buyPass = useBuyTripPass(tripId);
   const draft = useAiDraft(tripId);
   // Asked of whatever is actually serving this screen, not of the build flag:
   // a `live` web app in front of an API with no ANTHROPIC_API_KEY still gets a
@@ -61,22 +66,22 @@ export function AiGenerateDialog({
   // halfway through its own progress bar.
   const [freeAtStart, setFreeAtStart] = useState<number | null>(null);
 
+  const hasPass = credits?.hasPass ?? false;
   const quota = (credits?.included ?? 0) + (credits?.extra ?? 0);
-  const runsLeft = Math.max(0, quota - (credits?.used ?? 0));
   const freeLeft = Math.max(0, (credits?.included ?? 0) - (credits?.used ?? 0));
-  const points = me?.points ?? 0;
-  const canUsePoints = points >= POINTS_PER_RUN;
+  // Under a pass the meter is history, not a limit.
+  const runsLeft = hasPass ? Infinity : Math.max(0, quota - (credits?.used ?? 0));
+  const passPrice = credits?.passPriceThb ?? 0;
+  const perPerson = credits?.passPerPersonThb ?? passPrice;
 
-  // Preselect whichever option the user can actually complete right now, but
-  // let an explicit tap win — derived, so it never fights a re-render.
-  const [chosen, setChosen] = useState<'points' | 'purchase' | null>(null);
-  // ช่องกรอกโค้ดส่วนลด (A12.10) ปิดไว้ตั้งแต่ 26 ส.ค. 2569 รอ Phase 6:
+  // ช่องกรอกโค้ดส่วนลด (A12.10) ยังปิดอยู่ตั้งแต่ 26 ส.ค. 2569 รอ Phase 6:
   // โค้ดกำลังย้ายไปหน้า "สิทธิพิเศษ/คูปองของฉัน" ของตัวเอง และจะเลิกเป็นของ
   // ROVE-only (เช่นโค้ดพาร์ตเนอร์) — วิธีใช้โค้ดจึงต้องออกแบบใหม่ทั้งอัน
   // ไม่ใช่ช่องพิมพ์มือข้างปุ่มจ่ายเงิน (docs/phase-6-points-economy.md)
-  // "ใช้แต้ม ROVE" ด้านล่างไม่ได้ปิด — นั่นคือขาที่แต้มถูกใช้ในราคาของตัวเอง
-  const choice = chosen ?? (canUsePoints ? 'points' : 'purchase');
-  const setChoice = setChosen;
+  //
+  // "ใช้แต้ม ROVE" หายไปตั้งแต่ M26 เพราะสิ่งที่แต้มเคยซื้อ (ร่างทีละครั้ง)
+  // ไม่มีขายแล้ว ปลายทางของแต้มตอนนี้คือโค้ดส่วนลดค่า Trip Pass ซึ่งรอโรงมินต์
+  // เปิดใน Phase 6 — การ์ด "ชวนเพื่อน" ด้านล่างจึงพูดตามจริงว่ายังไม่เปิด
 
   // Same rule for the channel: the first accepted one unless the user says
   // otherwise. Which one it was ends up on the receipt, so it cannot be a
@@ -108,20 +113,18 @@ export function AiGenerateDialog({
   const steps = job ? Math.round(job.progress * 100) : 0;
 
   async function unlock() {
-    const usingPoints = choice === 'points';
-    const label = usingPoints ? `${POINTS_PER_RUN} แต้ม ROVE` : (channel?.label ?? 'บัตรเครดิต');
+    const label = channel?.label ?? 'บัตรเครดิต';
 
-    const result = await buyCredits.mutateAsync({
-      quantity: 1,
-      method: usingPoints ? 'points' : (channel?.id ?? 'card'),
+    const result = await buyPass.mutateAsync({
+      method: channel?.id ?? 'card',
       channel: label,
     });
 
     setReceipt(result.order);
     setPurchaseNote(
       result.simulated
-        ? `โหมดทดลอง: ยังไม่ได้ตัดเงินจริง (${label}) — เพิ่มสิทธิ์ร่างให้แล้ว 1 ครั้ง`
-        : `ชำระผ่าน ${label} เรียบร้อย`,
+        ? `โหมดทดลอง: ยังไม่ได้ตัดเงินจริง (${label}) — ปลดล็อกทริปนี้ให้แล้ว`
+        : `ชำระผ่าน ${label} เรียบร้อย — ทริปนี้ปลดล็อกแล้วทั้งห้อง`,
     );
   }
 
@@ -157,16 +160,18 @@ export function AiGenerateDialog({
                     ? 'กำลังร่างแพลนให้…'
                     : runsLeft > 0
                       ? 'ให้ AI ร่างแพลน'
-                      : 'ใช้สิทธิ์ร่างครบแล้ว'}
+                      : 'ใช้สิทธิ์ร่างฟรีครบแล้ว'}
               </p>
               <p className="text-muted text-xs">
                 {draft.isDone
                   ? `${job?.result?.days.length ?? 0} วัน · ${job?.result?.days.reduce((n, d) => n + d.items.length, 0) ?? 0} รายการ`
                   : draft.isRunning
                     ? (job?.step ?? 'กำลังเริ่ม')
-                    : runsLeft > 0
-                      ? `ร่างได้อีก ${runsLeft} ครั้ง · อ่านที่อยากไป ${wishlist.length} รายการ`
-                      : 'ร่างต่อได้ด้วยแต้มหรือจ่ายเงิน'}
+                    : hasPass
+                      ? `ร่างได้ไม่จำกัด · อ่านที่อยากไป ${wishlist.length} รายการ`
+                      : runsLeft > 0
+                        ? `ร่างได้อีก ${runsLeft} ครั้ง · อ่านที่อยากไป ${wishlist.length} รายการ`
+                        : 'ปลดล็อกทริปนี้แล้วร่างต่อได้ไม่จำกัด'}
               </p>
             </div>
           </div>
@@ -251,38 +256,38 @@ export function AiGenerateDialog({
         {/* ------------------------------------------------------ paywall */}
         {!job && runsLeft === 0 ? (
           <div>
-            <p className="section-label mb-2">เลือกวิธีร่างต่อ</p>
+            <p className="section-label mb-2">ปลดล็อกทริปนี้</p>
 
-            <div className="space-y-2" role="radiogroup" aria-label="วิธีจ่ายค่าร่างแพลน">
-              <PayOption
-                selected={choice === 'points'}
-                disabled={!canUsePoints}
-                onSelect={() => setChoice('points')}
-                icon={<Wallet className="size-4" />}
-                title="ใช้แต้ม ROVE"
-                price={`${POINTS_PER_RUN} แต้ม`}
-                note={
-                  canUsePoints
-                    ? `มีอยู่ ${points.toLocaleString('th-TH')} แต้ม — พอร่างได้อีก ${Math.floor(points / POINTS_PER_RUN)} ครั้ง`
-                    : `มีอยู่ ${points.toLocaleString('th-TH')} แต้ม ยังไม่พอ ขาดอีก ${(POINTS_PER_RUN - points).toLocaleString('th-TH')} แต้ม`
-                }
-                badge={canUsePoints ? 'ไม่ต้องจ่ายเงิน' : undefined}
-              />
+            {/* The offer, stated once and in full: price, who it covers, what
+                comes back — in that order, because the last one is the part
+                that decides it (W26.2 / W26.3). */}
+            <Card accent="primary" className="p-4">
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="font-display text-espresso text-lg font-extrabold">Trip Pass</p>
+                <p className="font-display text-espresso nums text-2xl font-extrabold">
+                  {formatMoney(passPrice, 'THB')}
+                </p>
+              </div>
 
-              <PayOption
-                selected={choice === 'purchase'}
-                onSelect={() => setChoice('purchase')}
-                icon={<CreditCard className="size-4" />}
-                title="จ่ายเงินครั้งเดียว"
-                price={`฿${credits?.pricePerDraftThb ?? 39}`}
-                note="ใช้กับทริปนี้ ไม่ผูกมัดรายเดือน ไม่ตัดเงินอัตโนมัติ"
-              />
-            </div>
+              <ul className="mt-3 space-y-2">
+                <PassPoint icon={<Sparkles className="size-4" />}>
+                  ให้ AI ร่างและปรับแพลนได้ <strong className="text-espresso">ไม่จำกัด</strong> ในทริปนี้
+                </PassPoint>
+                <PassPoint icon={<Users className="size-4" />}>
+                  ปลดล็อกให้ <strong className="text-espresso">ทั้งห้อง</strong> — หารกันแล้วคนละ{' '}
+                  <span className="nums">{formatMoney(perPerson, 'THB')}</span>
+                </PassPoint>
+                <PassPoint icon={<RotateCcw className="size-4" />}>
+                  จองผ่าน ROVE แล้ว <strong className="text-espresso">คืนให้เต็มจำนวน</strong> —
+                  เท่ากับไม่ได้จ่ายค่าวางแผนเลย
+                </PassPoint>
+              </ul>
+            </Card>
 
             {/* The channel is picked here rather than on a next screen: it is
                 what the receipt will say, and a method that turns out not to
                 be accepted is the failure this row prevents. */}
-            {choice === 'purchase' && channels.length > 0 ? (
+            {channels.length > 0 ? (
               <div className="mt-2.5" role="radiogroup" aria-label="ช่องทางชำระเงิน">
                 <p className="text-muted mb-1.5 text-[11px] font-semibold">ช่องทางชำระเงิน</p>
                 <div className="flex flex-wrap gap-1.5">
@@ -307,41 +312,43 @@ export function AiGenerateDialog({
               </div>
             ) : null}
 
-            {buyCredits.isError ? (
+            {buyPass.isError ? (
               <p className="text-danger mt-2 text-xs">
-                {buyCredits.error instanceof Error
-                  ? buyCredits.error.message
+                {buyPass.error instanceof Error
+                  ? buyPass.error.message
                   : 'จ่ายไม่สำเร็จ — ลองใหม่อีกครั้ง'}
               </p>
             ) : null}
 
+            {/* The refund is on the button, not under it. It is the condition
+                the money is being handed over on, and a condition that only
+                appears in the terms is a condition nobody read. */}
             <Button
               block
               size="lg"
               className="mt-4"
-              disabled={(choice === 'points' && !canUsePoints) || buyCredits.isPending}
+              disabled={buyPass.isPending}
               onClick={() => void unlock()}
             >
               <Sparkles className="size-4" />
-              {buyCredits.isPending
+              {buyPass.isPending
                 ? 'กำลังดำเนินการ…'
-                : choice === 'points'
-                  ? `ใช้ ${POINTS_PER_RUN} แต้มแล้วร่างเลย`
-                  : `จ่าย ฿${credits?.pricePerDraftThb ?? 39} แล้วร่างเลย`}
+                : `ปลดล็อก ${formatMoney(passPrice, 'THB')} — ได้คืนถ้าจองผ่าน ROVE`}
             </Button>
+            <p className="text-muted mt-2 text-center text-[11px] leading-relaxed">
+              คืนเป็นเครดิตเต็มจำนวนเมื่อมีการจองผ่าน ROVE จากทริปนี้ · คืนหนึ่งครั้งต่อทริป
+            </p>
 
             <Card accent="matcha" className="mt-3 p-4">
               <div className="flex items-start gap-3">
                 <Gift className="text-espresso mt-0.5 size-5 shrink-0" />
                 <div>
-                  <p className="text-espresso text-sm font-semibold">อยากได้แต้มเพิ่มแบบไม่จ่าย?</p>
+                  <p className="text-espresso text-sm font-semibold">สะสมแต้มไว้ลดค่า Trip Pass</p>
                   <p className="text-muted mt-1 text-xs leading-relaxed">
                     ชวนเพื่อนมาใช้ ROVE ได้ {POINTS_PER_REFERRAL} แต้มต่อคน
-                    และได้อีกทุกครั้งที่มีคนจองตามทริปที่คุณเปิดสาธารณะไว้
+                    และได้อีกทุกครั้งที่มีคนจองตามทริปที่คุณเปิดสาธารณะไว้ ·
+                    ตอนนี้การแลกแต้มเป็นโค้ดส่วนลดปิดปรับปรุงอยู่ แต้มที่สะสมไว้ไม่หายไปไหน
                   </p>
-                  <Button variant="soft" size="sm" className="mt-2.5" onClick={onClose}>
-                    <UserPlus className="size-3.5" /> ไปหน้าชวนเพื่อน
-                  </Button>
                 </div>
               </div>
             </Card>
@@ -411,67 +418,14 @@ export function AiGenerateDialog({
   );
 }
 
-/**
- * One payment choice. The price sits on the same line as the name, so the two
- * ways to pay can be compared without opening either of them.
- */
-function PayOption({
-  selected,
-  disabled = false,
-  onSelect,
-  icon,
-  title,
-  price,
-  note,
-  badge,
-}: {
-  selected: boolean;
-  disabled?: boolean;
-  onSelect: () => void;
-  icon: React.ReactNode;
-  title: string;
-  price: string;
-  note: string;
-  badge?: string;
-}) {
+/** One line of what the pass buys. */
+function PassPoint({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      disabled={disabled}
-      onClick={onSelect}
-      className={cn(
-        'rounded-brand w-full border-2 p-3.5 text-left transition',
-        selected ? 'border-primary bg-primary/8' : 'border-border bg-surface hover:border-muted/40',
-        disabled && 'cursor-not-allowed opacity-55',
-      )}
-    >
-      <div className="flex items-center gap-3">
-        <span
-          className={cn(
-            'flex size-5 shrink-0 items-center justify-center rounded-full border-2',
-            selected ? 'border-primary' : 'border-muted/40',
-          )}
-          aria-hidden="true"
-        >
-          {selected ? <span className="bg-primary size-2.5 rounded-full" /> : null}
-        </span>
-
-        <span className="text-espresso flex min-w-0 flex-1 items-center gap-1.5 text-sm font-semibold">
-          {icon}
-          {title}
-          {badge ? (
-            <Badge tone="matcha" className="ml-1">
-              {badge}
-            </Badge>
-          ) : null}
-        </span>
-
-        <span className="text-espresso nums shrink-0 text-sm font-bold">{price}</span>
-      </div>
-
-      <p className="text-muted mt-1.5 pl-8 text-xs leading-relaxed">{note}</p>
-    </button>
+    <li className="text-muted flex items-start gap-2.5 text-xs leading-relaxed">
+      <span className="text-primary mt-px shrink-0" aria-hidden="true">
+        {icon}
+      </span>
+      <span>{children}</span>
+    </li>
   );
 }
