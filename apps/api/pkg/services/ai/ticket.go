@@ -12,7 +12,7 @@ import (
 
 // Reading a pasted booking e-mail without a model (M1 — A1.2 fallback).
 //
-// This is what MOCK_MODE uses and what the live path falls back to when the
+// This is what STUB_PROVIDERS uses and what the live path falls back to when the
 // model is unavailable. It handles the shape airline confirmations actually
 // take — a flight number, two airport codes and a date on one line — which is
 // enough to reach a trip frame the user can correct.

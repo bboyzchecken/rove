@@ -1,11 +1,12 @@
 'use client';
 
-import { AlertTriangle } from 'lucide-react';
+import Link from 'next/link';
+import { AlertTriangle, GitCompareArrows, Lock } from 'lucide-react';
 
 import { SectionHeader, Stat } from '@/components/common/section';
 import { PlanBoard } from '@/components/editor/plan-board';
 import { Card } from '@/components/ui/card';
-import { usePlanDays } from '@/features/plan/queries';
+import { usePlanDays, useVariants } from '@/features/plan/queries';
 import { useTrip } from '@/features/trip/queries';
 import { formatDuration } from '@/lib/format';
 
@@ -13,6 +14,10 @@ import { formatDuration } from '@/lib/format';
 export function PlanScreen({ tripId }: { tripId: string }) {
   const { data: days = [] } = usePlanDays(tripId);
   const { data: trip } = useTrip(tripId);
+  const { data: variantList } = useVariants(tripId);
+
+  const frozen = trip?.status === 'ready';
+  const variantCount = variantList?.variants.length ?? 0;
 
   const items = days.flatMap((d) => d.items);
   const stats = {
@@ -26,6 +31,27 @@ export function PlanScreen({ tripId }: { tripId: string }) {
 
   return (
     <div className="space-y-6">
+      {frozen ? (
+        <Card accent="sun" className="flex items-center gap-3 p-3.5">
+          <Lock className="text-espresso size-4 shrink-0" />
+          <p className="text-espresso flex-1 text-xs leading-relaxed">
+            แพลนถูกสรุปแล้ว — ไทม์ไลน์ล็อกอยู่จนกว่าเจ้าของทริปจะปลดล็อกที่หน้าเทียบแพลน
+          </p>
+        </Card>
+      ) : null}
+
+      {days.length > 0 ? (
+        <div className="flex justify-end">
+          <Link
+            href={`/t/${tripId}/plan/compare` as never}
+            className="bg-surface text-espresso hover:bg-border font-display flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition"
+          >
+            <GitCompareArrows className="size-4" />
+            เทียบแพลน{variantCount > 0 ? ` (${variantCount})` : ''}
+          </Link>
+        </div>
+      ) : null}
+
       {days.length > 0 ? (
         <section>
           <SectionHeader label="แพลนที่ AI ร่างไว้" />

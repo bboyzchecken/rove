@@ -58,7 +58,7 @@ var Module = uberfx.Module("services.places", uberfx.Provide(New))
 // POI table is the source the planner falls back to, and a fabricated Google
 // result would be indistinguishable from a real one in the database.
 func (s *service) Lookup(ctx context.Context, query string) ([]Place, error) {
-	if s.cfg.UseMock() || s.cfg.Google.MapsServerKey == "" {
+	if s.cfg.UseStubs() || s.cfg.Google.MapsServerKey == "" {
 		return nil, nil
 	}
 
@@ -104,7 +104,7 @@ func (s *service) Lookup(ctx context.Context, query string) ([]Place, error) {
 }
 
 func (s *service) Get(ctx context.Context, placeID string) (*Place, error) {
-	if s.cfg.UseMock() || s.cfg.Google.MapsServerKey == "" {
+	if s.cfg.UseStubs() || s.cfg.Google.MapsServerKey == "" {
 		return nil, nil
 	}
 
@@ -164,7 +164,7 @@ func (s *service) Distance(ctx context.Context, fromLat, fromLng, toLat, toLng f
 		mode = "transit"
 	}
 
-	if s.cfg.UseMock() || s.cfg.Google.MapsServerKey == "" {
+	if s.cfg.UseStubs() || s.cfg.Google.MapsServerKey == "" {
 		return estimate(fromLat, fromLng, toLat, toLng, mode), nil
 	}
 

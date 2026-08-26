@@ -22,19 +22,24 @@ func (s *Server) registerAdminRoutes(g *echo.Group) {
 	g.PATCH("/poi/:poiId", s.handleAdminUpsertPOI)
 	g.GET("/characters", s.handleAdminCharacters)
 	g.POST("/characters", s.handleAdminUpsertCharacter)
+	// The partner economy's ops screens (A12.11 / A12.12).
+	s.registerPayoutRoutes(g)
 }
 
 type adminStatsDTO struct {
-	Users      int64   `json:"users"`
-	Trips      int64   `json:"trips"`
-	POIs       int64   `json:"pois"`
-	Characters int64   `json:"characters"`
+	Users      int64 `json:"users"`
+	Trips      int64 `json:"trips"`
+	POIs       int64 `json:"pois"`
+	Characters int64 `json:"characters"`
 	// AI spend for the current UTC day, which is the window the cap uses.
 	AICostTodayUSD float64 `json:"ai_cost_today_usd"`
 	AICostCapUSD   float64 `json:"ai_cost_cap_usd"`
 	ClicksToday    int64   `json:"clicks_today"`
-	MockMode       bool    `json:"mock_mode"`
-	Commit         string  `json:"commit"`
+	// Which third parties are stand-ins right now — NOT "is the data fake".
+	// See core.Config.StubProviders for why those are two different questions.
+	StubProviders bool     `json:"stub_providers"`
+	Stubbed       []string `json:"stubbed"`
+	Commit        string   `json:"commit"`
 }
 
 func (s *Server) handleAdminStats(c echo.Context) error {
@@ -56,7 +61,8 @@ func (s *Server) handleAdminStats(c echo.Context) error {
 		AICostTodayUSD: cost,
 		AICostCapUSD:   s.cfg.Anthropic.DailyCostCapUSD,
 		ClicksToday:    clicks,
-		MockMode:       s.cfg.UseMock(),
+		StubProviders:  s.cfg.UseStubs(),
+		Stubbed:        stubbedProviders(s.cfg),
 		Commit:         s.cfg.Commit,
 	})
 }

@@ -16,6 +16,11 @@ import (
 // Members and invites (A2.2 / A2.3).
 func (s *Server) registerMemberRoutes(g *echo.Group) {
 	g.GET("/:tripId/members", s.handleListMembers, s.TripRoleMiddleware(models.TripRoleViewer))
+	// Trip-scoped member profiles (A3.1). Everyone reads the roster's profiles;
+	// each member writes only their own, so the guard is editor + "me" routes.
+	g.GET("/:tripId/profile/me", s.handleMyTripProfile, s.TripRoleMiddleware(models.TripRoleViewer))
+	g.PUT("/:tripId/profile/me", s.handleSaveTripProfile, s.TripRoleMiddleware(models.TripRoleEditor))
+	g.GET("/:tripId/profiles", s.handleListTripProfiles, s.TripRoleMiddleware(models.TripRoleViewer))
 	// Owner-only, per the API contract in DEV_SPEC §7: an editor who could mint
 	// invite links could widen the set of people with write access to someone
 	// else's trip without asking them.
@@ -166,6 +171,129 @@ func (s *Server) handleJoinTrip(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, map[string]string{"tripId": invite.TripID})
+}
+
+/* ----------------------------------------------- member profiles (A3.1) -- */
+
+type memberProfileDTO struct {
+	UserID        string   `json:"user_id"`
+	VisitedBefore bool     `json:"visited_before"`
+	Pace          string   `json:"pace"`
+	WalkLevel     int      `json:"walk_level"`
+	CanDrive      bool     `json:"can_drive"`
+	HasIDP        bool     `json:"has_idp"`
+	BudgetMinTHB  int      `json:"budget_min_thb"`
+	BudgetMaxTHB  int      `json:"budget_max_thb"`
+	Dietary       []string `json:"dietary"`
+	Notes         string   `json:"notes"`
+	// False when this is the default the API synthesised — the tab uses it to
+	// nudge "ยังไม่ได้บอกสไตล์เที่ยวของคุณ".
+	Filled bool `json:"filled"`
+}
+
+func toMemberProfileDTO(p models.MemberProfile, filled bool) memberProfileDTO {
+	dietary := jsonStrings(toJSONRaw(p.Dietary))
+	if dietary == nil {
+		dietary = []string{}
+	}
+	return memberProfileDTO{
+		UserID:        p.UserID,
+		VisitedBefore: p.VisitedBefore,
+		Pace:          p.Pace,
+		WalkLevel:     p.WalkLevel,
+		CanDrive:      p.CanDrive,
+		HasIDP:        p.HasIDP,
+		BudgetMinTHB:  p.BudgetMinTHB,
+		BudgetMaxTHB:  p.BudgetMaxTHB,
+		Dietary:       dietary,
+		Notes:         p.Notes,
+		Filled:        filled,
+	}
+}
+
+// defaultMemberProfile is what "no row yet" looks like — the form opens with
+// sane middles instead of zeros.
+func defaultMemberProfile(userID string) models.MemberProfile {
+	return models.MemberProfile{
+		UserID:    userID,
+		Pace:      models.PaceBalanced,
+		WalkLevel: 2,
+	}
+}
+
+func (s *Server) handleMyTripProfile(c echo.Context) error {
+	ctx := c.Request().Context()
+	userID := request.UserID(c)
+
+	profile, err := s.members.GetProfile(ctx, request.TripID(c), userID)
+	if err != nil {
+		fallback := defaultMemberProfile(userID)
+		return c.JSON(http.StatusOK, toMemberProfileDTO(fallback, false))
+	}
+	return c.JSON(http.StatusOK, toMemberProfileDTO(*profile, true))
+}
+
+type saveProfileRequest struct {
+	VisitedBefore bool     `json:"visited_before"`
+	Pace          string   `json:"pace" validate:"omitempty,oneof=relaxed balanced packed"`
+	WalkLevel     int      `json:"walk_level" validate:"omitempty,min=1,max=3"`
+	CanDrive      bool     `json:"can_drive"`
+	HasIDP        bool     `json:"has_idp"`
+	BudgetMinTHB  int      `json:"budget_min_thb"`
+	BudgetMaxTHB  int      `json:"budget_max_thb"`
+	Dietary       []string `json:"dietary"`
+	Notes         string   `json:"notes"`
+}
+
+func (s *Server) handleSaveTripProfile(c echo.Context) error {
+	var req saveProfileRequest
+	if err := request.BindAndValidate(c, &req); err != nil {
+		return err
+	}
+	if req.BudgetMinTHB < 0 || req.BudgetMaxTHB < 0 {
+		return request.BadRequest(c, "งบติดลบไม่ได้")
+	}
+	if req.BudgetMaxTHB > 0 && req.BudgetMinTHB > req.BudgetMaxTHB {
+		return request.BadRequest(c, "งบต่ำสุดต้องไม่เกินงบสูงสุด")
+	}
+
+	ctx := c.Request().Context()
+	tripID := request.TripID(c)
+
+	profile := &models.MemberProfile{
+		TripID:        tripID,
+		UserID:        request.UserID(c),
+		VisitedBefore: req.VisitedBefore,
+		Pace:          orDefault(req.Pace, models.PaceBalanced),
+		WalkLevel:     req.WalkLevel,
+		CanDrive:      req.CanDrive,
+		HasIDP:        req.HasIDP,
+		BudgetMinTHB:  req.BudgetMinTHB,
+		BudgetMaxTHB:  req.BudgetMaxTHB,
+		Dietary:       jsonArray(req.Dietary),
+		Notes:         req.Notes,
+	}
+	if profile.WalkLevel == 0 {
+		profile.WalkLevel = 2
+	}
+	if err := s.members.UpsertProfile(ctx, profile); err != nil {
+		return request.Internal(c, "บันทึกโปรไฟล์ไม่สำเร็จ")
+	}
+
+	s.track(c, tripID, "", events.TypeMemberJoined, "profile", profile.UserID)
+	return c.JSON(http.StatusOK, toMemberProfileDTO(*profile, true))
+}
+
+func (s *Server) handleListTripProfiles(c echo.Context) error {
+	profiles, err := s.members.ListProfiles(c.Request().Context(), request.TripID(c))
+	if err != nil {
+		return request.Internal(c, "โหลดโปรไฟล์ไม่สำเร็จ")
+	}
+	out := make([]memberProfileDTO, 0, len(profiles))
+	for _, p := range profiles {
+		out = append(out, toMemberProfileDTO(p, true))
+	}
+	return c.JSON(http.StatusOK, out)
 }
 
 type updateRoleRequest struct {

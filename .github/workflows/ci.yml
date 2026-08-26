@@ -72,6 +72,23 @@ jobs:
           path: apps/web/playwright-report
           retention-days: 7
 
+  terraform:
+    name: terraform (fmt + validate)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: deploy/terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - run: terraform fmt -check -recursive
+      # -backend=false: validate the syntax and provider schemas without
+      # touching real state or needing AWS credentials.
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate
+
   compose:
     name: stack boots
     runs-on: ubuntu-latest

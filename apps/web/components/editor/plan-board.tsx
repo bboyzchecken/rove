@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 
 import { AiCreditPanel } from '@/components/editor/ai-credit-panel';
+import { ItemPhotoStrip } from '@/components/photo/item-photo-strip';
 import { AiGenerateDialog } from '@/components/editor/ai-generate-dialog';
 import { ItemSheet } from '@/components/editor/item-sheet';
 import { RouteMap } from '@/components/editor/route-map';
@@ -274,6 +275,7 @@ export function PlanBoard({ tripId, fxRate }: { tripId: string; fxRate: number }
                   {day.items.map((item, i) => (
                     <div key={item.id}>
                       <SortableTimelineCard
+                        tripId={tripId}
                         item={item}
                         members={members}
                         fxRate={fxRate}
@@ -429,12 +431,14 @@ function rationalesFor(items: PlanItem[], members: Member[]) {
 }
 
 function SortableTimelineCard({
+  tripId,
   item,
   members,
   fxRate,
   onEdit,
   onBook,
 }: {
+  tripId: string;
   item: PlanItem;
   members: Member[];
   fxRate: number;
@@ -532,6 +536,9 @@ function SortableTimelineCard({
             {item.warning}
           </p>
         ) : null}
+
+        {/* W18.2 — the pictures taken at this stop, and the way to add one. */}
+        <ItemPhotoStrip tripId={tripId} itemId={item.id} />
       </Card>
     </div>
   );

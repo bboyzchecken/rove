@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { FieldLabel, Input, fieldClass } from '@/components/ui/field';
+import { Field, Input, fieldClass } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
 import { useUpdateTrip } from '@/features/trip/queries';
 import type { Trip } from '@/lib/data';
@@ -132,11 +132,3 @@ export function TripFrameDialog({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <FieldLabel>{label}</FieldLabel>
-      {children}
-    </label>
-  );
-}

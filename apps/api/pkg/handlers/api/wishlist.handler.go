@@ -38,11 +38,24 @@ func (s *Server) handleListWishes(c echo.Context) error {
 	return c.JSON(http.StatusOK, out)
 }
 
+// handleCoverage reads the coverage summary. It derives it rather than
+// recomputing-and-storing it: the stored state is written by every path that
+// changes a wish or an item, so a GET that wrote too was only adding a
+// transaction to the request the trip room refetches most.
 func (s *Server) handleCoverage(c echo.Context) error {
-	summary, err := s.recomputeCoverage(c.Request().Context(), request.TripID(c))
+	ctx := c.Request().Context()
+	tripID := request.TripID(c)
+
+	wishes, err := s.wishlist.ListByTrip(ctx, tripID)
 	if err != nil {
 		return request.Internal(c, "คำนวณความครอบคลุมไม่สำเร็จ")
 	}
+	items, err := s.plans.ListItems(ctx, tripID)
+	if err != nil {
+		return request.Internal(c, "คำนวณความครอบคลุมไม่สำเร็จ")
+	}
+
+	_, summary := coverageOf(wishes, items)
 	return c.JSON(http.StatusOK, toCoverageDTO(summary))
 }
 

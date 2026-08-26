@@ -97,3 +97,87 @@ export function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
 }
+
+/* ------------------------------------------------------ trip photos (M18) - */
+
+/** What the photo picker accepts. HEIC is handled by the OS on the way in. */
+export const PHOTO_ACCEPT = 'image/jpeg,image/png,image/webp';
+
+/** Refused before decoding — a RAW-sized file is a mistake, not a snapshot. */
+export const PHOTO_MAX_FILE_BYTES = 25 * 1024 * 1024;
+
+/** Longest edge after resizing. Big enough to fill a phone screen and print. */
+const PHOTO_MAX_EDGE = 1600;
+
+/** The upload budget per photo, after re-encoding. */
+const PHOTO_MAX_ENCODED_BYTES = 900 * 1024;
+
+/**
+ * A trip photo, resized in the browser before it is uploaded (M18 — W18.2).
+ *
+ * Unlike a cover this is NOT cropped: the whole frame the person took is what
+ * they want to keep. It is only scaled down to a sane edge and re-encoded, so
+ * a 12MB phone original leaves as a few hundred kilobytes of WebP — which is
+ * what makes uploading over hotel wifi bearable.
+ *
+ * Returns a `File`, not a data URL: photos go to object storage through
+ * multipart, they do not ride inside a row the way a cover does.
+ */
+export async function photoFromFile(file: File): Promise<File> {
+  if (!PHOTO_ACCEPT.split(',').includes(file.type)) {
+    throw new Error('ใช้ได้เฉพาะไฟล์ JPG PNG หรือ WebP');
+  }
+  if (file.size > PHOTO_MAX_FILE_BYTES) {
+    throw new Error(`ไฟล์ใหญ่เกิน ${Math.round(PHOTO_MAX_FILE_BYTES / 1024 / 1024)}MB`);
+  }
+
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new Error('เปิดไฟล์รูปนี้ไม่ได้ ลองไฟล์อื่น');
+  }
+
+  try {
+    const scale = Math.min(1, PHOTO_MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('เบราว์เซอร์นี้ย่อรูปให้ไม่ได้');
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+    for (const quality of QUALITIES) {
+      const blob = await toBlob(canvas, quality);
+      if (blob && blob.size <= PHOTO_MAX_ENCODED_BYTES) {
+        const ext = blob.type === 'image/webp' ? 'webp' : 'jpg';
+        return new File([blob], `${baseName(file.name)}.${ext}`, { type: blob.type });
+      }
+    }
+    throw new Error('รูปนี้หนักเกินไป ลองรูปอื่น');
+  } finally {
+    bitmap.close();
+  }
+}
+
+/** Same WebP-or-JPEG check as `encode`, but as a real Blob for uploading. */
+function toBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob?.type === 'image/webp') return resolve(blob);
+        // The browser refused WebP and silently gave PNG — ask for JPEG.
+        canvas.toBlob((jpeg) => resolve(jpeg), 'image/jpeg', quality);
+      },
+      'image/webp',
+      quality,
+    );
+  });
+}
+
+function baseName(filename: string) {
+  const dot = filename.lastIndexOf('.');
+  const name = dot > 0 ? filename.slice(0, dot) : filename;
+  return name.replace(/[^\w-]+/g, '_').slice(0, 40) || 'photo';
+}

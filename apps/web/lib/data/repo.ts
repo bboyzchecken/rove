@@ -1,6 +1,9 @@
 import type {
   ActivityEvent,
+  AdaptDiff,
+  AdaptInput,
   AdminStats,
+  AgentLead,
   Airport,
   AiCredits,
   AiGenerateInput,
@@ -19,38 +22,68 @@ import type {
   CommentTarget,
   CoverageSummary,
   CreateItemInput,
+  CreateLeadInput,
   CreateTripInput,
+  CreatePollInput,
+  CreatorProfile,
   CurrentUser,
+  DiscountCode,
+  EarningsStatement,
   DateWindow,
   DestinationSuggestion,
   DreamItem,
   ExpenseEntry,
   ExpenseSummary,
+  ExploreFilters,
+  ExploreResult,
   ExportFormat,
   ExportResult,
+  Inbox,
   FlightLegInput,
   InviteLink,
+  InvitePreview,
   LockedDates,
   Member,
+  MemberProfile,
   MoveItemInput,
   Order,
   ParsedTicket,
   PastTrip,
+  PlatformStats,
+  PointsLedger,
+  PublicReview,
+  AudienceSummary,
+  PhotoBookOptions,
+  PhotoBookTheme,
   PlanDay,
   PlanItem,
+  PlanVariant,
   PlanVersion,
   Poi,
+  Poll,
   PrepTask,
+  ProviderMode,
+  PublicTripPayload,
+  RedemptionBoard,
+  ReviewBoard,
+  SaveReviewInput,
   ShareState,
   Subscription,
   SubscriptionPlan,
   Trip,
+  TripConflict,
+  TripDocument,
+  TripPhoto,
   TripOverview,
   TripRecap,
   TripRoute,
   TripSummary,
   TripVisibility,
   UpdateTripInput,
+  UploadDocumentInput,
+  UploadPhotoInput,
+  VariantList,
+  VariantVotes,
   Vote,
   VoteTarget,
   WishlistItem,
@@ -82,8 +115,15 @@ export interface RoveRepo {
   billing: BillingRepo;
   share: ShareRepo;
   poi: PoiRepo;
+  photos: PhotoRepo;
+  documents: DocumentRepo;
+  community: CommunityRepo;
+  reviews: ReviewRepo;
+  rewards: RewardRepo;
+  leads: LeadRepo;
   profile: ProfileRepo;
   admin: AdminRepo;
+  meta: MetaRepo;
 }
 
 export interface AuthRepo {
@@ -138,9 +178,20 @@ export interface TripRepo {
 export interface MemberRepo {
   list(tripId: string): Promise<Member[]>;
   invite(tripId: string, role: 'editor' | 'viewer'): Promise<InviteLink>;
+  /** What the invite landing page shows before asking anyone to sign in. */
+  preview(token: string): Promise<InvitePreview>;
   join(token: string): Promise<{ tripId: string }>;
   updateRole(tripId: string, memberId: string, role: 'owner' | 'editor' | 'viewer'): Promise<Member>;
   remove(tripId: string, memberId: string): Promise<void>;
+
+  /** My trip-scoped profile (A3.1); a default with `filled:false` if unset. */
+  myProfile(tripId: string): Promise<MemberProfile>;
+  saveProfile(
+    tripId: string,
+    input: Omit<MemberProfile, 'userId' | 'filled'>,
+  ): Promise<MemberProfile>;
+  /** Every member's saved profile — the AI dialog and conflict check read these. */
+  profiles(tripId: string): Promise<MemberProfile[]>;
 }
 
 /** Date coordination — the step that happens before a trip has dates at all. */
@@ -183,6 +234,23 @@ export interface PlanRepo {
   undo(tripId: string): Promise<PlanDay[]>;
   /** What changed recently, newest first (W5.7). */
   versions(tripId: string): Promise<PlanVersion[]>;
+
+  /* ---- variants & compare (M6) ---- */
+
+  variants(tripId: string): Promise<VariantList>;
+  /** Snapshots the live plan as a named candidate (A6.1). */
+  forkVariant(tripId: string, input: { label: string; keyDecision?: string }): Promise<PlanVariant>;
+  /** Asks the AI for 2–3 candidates in one job (A6.2). Costs one credit each. */
+  generateVariants(tripId: string, input: { count: 2 | 3; brief?: string }): Promise<AiJob>;
+  voteVariant(tripId: string, variantId: string, value: -1 | 0 | 1): Promise<VariantVotes>;
+  /** Owner only — writes the candidate over the live plan. */
+  adoptVariant(tripId: string, variantId: string): Promise<PlanDay[]>;
+  removeVariant(tripId: string, variantId: string): Promise<void>;
+  /** Owner only — "ตกลงตามนี้": edits refuse until unfrozen (A6.4). */
+  freeze(tripId: string): Promise<Trip>;
+  unfreeze(tripId: string): Promise<Trip>;
+  /** The pre-generate disagreement check (A6.5). */
+  conflicts(tripId: string): Promise<TripConflict[]>;
 }
 
 export interface BudgetRepo {
@@ -275,7 +343,132 @@ export interface ShareRepo {
   rotateToken(tripId: string): Promise<ShareState>;
   exportTrip(tripId: string, format: ExportFormat): Promise<ExportResult>;
   /** Read-only payload behind /s/:token and /p/:slug. */
-  publicTrip(tokenOrSlug: string): Promise<{ trip: Trip; days: PlanDay[]; members: Member[] } | null>;
+  publicTrip(tokenOrSlug: string): Promise<PublicTripPayload | null>;
+
+  /* ---- public model (M11) ---- */
+
+  /** The explore feed of published trips (A11.2). */
+  explore(filters: ExploreFilters): Promise<ExploreResult>;
+  /** A creator's public page (W11.2); null when the handle matches nobody. */
+  creator(handle: string): Promise<CreatorProfile | null>;
+  /** Copies a published trip into MY account (A11.1). Requires sign-in. */
+  cloneFromPublic(tokenOrSlug: string): Promise<Trip>;
+
+  /**
+   * What copying this plan into my own dates, group and budget would change
+   * (A11.4). Writes nothing — this is the preview the confirm dialog shows.
+   */
+  adaptPreview(tokenOrSlug: string, input: AdaptInput): Promise<AdaptDiff>;
+  /** The same copy with those changes applied. Requires sign-in. */
+  cloneAdapted(tokenOrSlug: string, input: AdaptInput): Promise<{ trip: Trip; diff: AdaptDiff }>;
+
+  /**
+   * What the platform has to show for itself (M24 — A24.1 / A24.2).
+   *
+   * Public, and read by the landing page before anybody signs in. Both are
+   * "real numbers or nothing": the caller hides its section rather than
+   * padding a young install's figures.
+   */
+  platformStats(): Promise<PlatformStats>;
+  recentReviews(): Promise<PublicReview[]>;
+}
+
+/**
+ * Trip photos (M18). Uploads are `File`s already resized in the browser —
+ * see lib/image.ts `photoFromFile`; the repo never resizes for you, because
+ * a 12MB original crossing hotel wifi is the thing that has to not happen.
+ */
+export interface PhotoRepo {
+  list(tripId: string, filter?: { dayId?: string; itemId?: string; userId?: string }): Promise<TripPhoto[]>;
+  upload(tripId: string, input: UploadPhotoInput): Promise<TripPhoto>;
+  remove(tripId: string, photoId: string): Promise<void>;
+  /** The palettes the renderer can print (Photo Book V2). */
+  photoBookThemes(tripId: string): Promise<PhotoBookTheme[]>;
+  /** The printable photo book (A18.4) — a URL the caller opens in a tab. */
+  photoBookUrl(tripId: string, options?: PhotoBookOptions): string;
+}
+
+/** The document folder (M19): tickets, vouchers, insurance papers. */
+export interface DocumentRepo {
+  list(tripId: string): Promise<TripDocument[]>;
+  upload(tripId: string, input: UploadDocumentInput): Promise<TripDocument>;
+  remove(tripId: string, documentId: string): Promise<void>;
+}
+
+/**
+ * The parts of a room that are about the people in it (M9): the inbox, polls,
+ * and who is looking right now.
+ */
+export interface CommunityRepo {
+  /** Everything addressed to me, across every trip. */
+  inbox(): Promise<Inbox>;
+  /** Empty id marks the whole inbox read. */
+  markRead(notificationId?: string): Promise<Inbox>;
+
+  polls(tripId: string): Promise<Poll[]>;
+  createPoll(tripId: string, input: CreatePollInput): Promise<Poll>;
+  /** -1 withdraws the answer, same gesture as un-voting a variant. */
+  answerPoll(tripId: string, pollId: string, option: number): Promise<Poll>;
+  closePoll(tripId: string, pollId: string): Promise<Poll>;
+  removePoll(tripId: string, pollId: string): Promise<void>;
+
+  /**
+   * "I am here" — fire and forget (W9.3). Nothing is stored: presence is true
+   * for a few seconds and false after, which is an event, not a row.
+   */
+  ping(tripId: string, state: { typing: boolean; tab: string }): Promise<void>;
+}
+
+/**
+ * Trip reviews (M21 — A11.5): how it went, and what it really cost.
+ *
+ * Member-only and post-trip. The roll-up is public — it rides along with the
+ * published plan — but writing one is something only the people who went can
+ * do, and only once the trip is behind them.
+ */
+export interface ReviewRepo {
+  list(tripId: string): Promise<ReviewBoard>;
+  /** Upsert: saving again replaces my review rather than adding a second. */
+  save(tripId: string, input: SaveReviewInput): Promise<ReviewBoard>;
+  remove(tripId: string): Promise<void>;
+}
+
+/**
+ * What points turn into and what a published plan earns (M22).
+ *
+ * Two currencies, kept apart on purpose: points are a score this product
+ * mints, earnings are money a partner owes in baht.
+ */
+export interface RewardRepo {
+  /** My balance, the tiers I can afford, and the codes I already hold. */
+  redemptions(): Promise<RedemptionBoard>;
+  /** Burns the points and returns the code (A12.10). */
+  redeem(amountThb: number): Promise<DiscountCode>;
+  /** What my public plans have earned me, and what has been paid (A12.11). */
+  earnings(): Promise<EarningsStatement>;
+
+  /**
+   * Where my points came from and what they went on (M23 — A23.1).
+   *
+   * Paged rather than capped: thirty rows is a screenful, not a history, and
+   * points redeem for money off — a ledger you cannot read to the end is not
+   * a ledger. Pass the previous page's `nextCursor` to continue.
+   */
+  pointsHistory(cursor?: string): Promise<PointsLedger>;
+
+  /**
+   * Who followed my published plans, and what that paid (M23 — A23.2).
+   *
+   * The same views and clones `/u/[handle]` shows to strangers — but per trip,
+   * joined to the points each one earned, and shown to their owner.
+   */
+  audience(): Promise<AudienceSummary>;
+}
+
+/** Handing a trip to a partner agent (A12.12). */
+export interface LeadRepo {
+  list(tripId: string): Promise<AgentLead[]>;
+  create(tripId: string, input: CreateLeadInput): Promise<AgentLead>;
 }
 
 export interface PoiRepo {
@@ -285,6 +478,18 @@ export interface PoiRepo {
 
 export interface AdminRepo {
   stats(): Promise<AdminStats>;
+}
+
+/**
+ * "Is what I am looking at real?"
+ *
+ * Asked through the repository like everything else, so the answer comes from
+ * whichever half of the app is actually serving the screen: mock mode answers
+ * from its own definition (nothing is real, nothing is stored), live mode asks
+ * the API which providers it is standing in for.
+ */
+export interface MetaRepo {
+  mode(): Promise<ProviderMode>;
 }
 
 export interface ProfileRepo {

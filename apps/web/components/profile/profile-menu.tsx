@@ -9,11 +9,13 @@ import {
   LogOut,
   Pencil,
   ReceiptText,
+  ScrollText,
   ShieldCheck,
   Sparkles,
   type LucideIcon,
 } from 'lucide-react';
 
+import { LocaleSwitch } from '@/components/common/locale-switch';
 import { Card } from '@/components/ui/card';
 import { useDreams, useLogout, useMe } from '@/features/auth/queries';
 import { useBillingSummary } from '@/features/billing/queries';
@@ -61,6 +63,22 @@ export function ProfileMenu({ onEditProfile }: { onEditProfile: () => void }) {
         hint={countLabel(dreams.length, 'รายการ')}
         href="/dreams"
       />
+      {/*
+        Points are the other ledger this account carries (M23 — W23.1), and
+        they sit next to the receipts on purpose: both answer "what happened to
+        something of mine", and both are records rather than screens you browse.
+
+        The hint here IS the balance, unlike the row below it — points are the
+        product's own score, already shown in full at the top of this page, and
+        a row that led somewhere without saying how many would be a row nobody
+        taps.
+      */}
+      <MenuRow
+        icon={ScrollText}
+        label="ประวัติแต้ม"
+        hint={countLabel(me?.points ?? 0, 'แต้ม')}
+        href="/points"
+      />
       {/* The hint is the receipt count, not the amount: a number of baht on a
           menu row is money the user did not ask to be reminded of. */}
       <MenuRow
@@ -72,6 +90,11 @@ export function ProfileMenu({ onEditProfile }: { onEditProfile: () => void }) {
       {me?.isAdmin ? (
         <MenuRow icon={ShieldCheck} label="แอดมิน" hint="เฉพาะทีมงาน" href="/admin" />
       ) : null}
+      {/* A preference about the person, not about a page (Phase 3). */}
+      <div className="border-border border-t px-4 py-3.5">
+        <LocaleSwitch />
+      </div>
+
       <MenuRow icon={FileText} label="เงื่อนไขการใช้งาน" href="/terms" />
       <MenuRow icon={FileText} label="นโยบายความเป็นส่วนตัว" href="/privacy" />
       <SignOutRow />

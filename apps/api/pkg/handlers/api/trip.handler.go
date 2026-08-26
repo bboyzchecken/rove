@@ -42,19 +42,30 @@ func (s *Server) handleListTrips(c echo.Context) error {
 		return request.Internal(c, "โหลดรายการทริปไม่สำเร็จ")
 	}
 
+	// Two queries for the whole page, not three per row: the member stack and
+	// the viewer's own role are the only things a row needs beyond the trip
+	// itself, and both come out of one members read plus one users read.
+	tripIDs := make([]string, 0, len(trips))
+	for _, t := range trips {
+		tripIDs = append(tripIDs, t.ID)
+	}
+	membersByTrip, usersByID := s.loadRosters(ctx, tripIDs)
+
 	items := make([]tripDTO, 0, len(trips))
 	for _, t := range trips {
 		dto := toTripDTO(t)
 
-		if roster, err := s.loadMembers(ctx, t.ID); err == nil {
-			dto.MemberIDs = roster.ids()
-			dto.MemberCharacterIDs = roster.characterIDs()
-			for _, m := range roster.members {
-				if m.UserID == userID {
-					dto.Role = m.Role
-				}
+		members := membersByTrip[t.ID]
+		dto.MemberIDs = make([]string, 0, len(members))
+		dto.MemberCharacterIDs = make([]string, 0, len(members))
+		for _, m := range members {
+			dto.MemberIDs = append(dto.MemberIDs, m.UserID)
+			dto.MemberCharacterIDs = append(dto.MemberCharacterIDs, characterOf(usersByID[m.UserID]))
+			if m.UserID == userID {
+				dto.Role = m.Role
 			}
 		}
+
 		if t.StartDate != nil {
 			days := int(domain.Day(*t.StartDate).Sub(domain.Day(time.Now())).Hours() / 24)
 			dto.DaysUntil = &days
@@ -272,6 +283,16 @@ func (s *Server) handleCloneTrip(c echo.Context) error {
 		return request.NotFound(c, "ไม่พบทริปต้นทาง")
 	}
 
+	copyTrip, err := s.cloneTripForUser(ctx, source, userID)
+	if err != nil {
+		return request.Internal(c, "คัดลอกทริปไม่สำเร็จ")
+	}
+	return c.JSON(http.StatusCreated, toTripDTO(*copyTrip))
+}
+
+// cloneTripForUser is the shared clone core (A11.1): the member route above and
+// the public clone route (public.handler.go) both come through here.
+func (s *Server) cloneTripForUser(ctx contextT, source *models.Trip, userID string) (*models.Trip, error) {
 	copyTrip := *source
 	copyTrip.ID = ""
 	copyTrip.OwnerID = userID
@@ -287,21 +308,21 @@ func (s *Server) handleCloneTrip(c echo.Context) error {
 	copyTrip.UpdatedAt = time.Time{}
 
 	if err := s.trips.Create(ctx, &copyTrip); err != nil {
-		return request.Internal(c, "คัดลอกทริปไม่สำเร็จ")
+		return nil, err
 	}
 	if err := s.members.Add(ctx, &models.TripMember{
 		TripID: copyTrip.ID,
 		UserID: userID,
 		Role:   models.TripRoleOwner,
 	}); err != nil {
-		return request.Internal(c, "คัดลอกทริปไม่สำเร็จ")
+		return nil, err
 	}
 
 	// Copy the itinerary itself. New ids are minted here rather than left to
 	// the create hook, because the item map has to be keyed by the *new* day id
 	// before anything is written.
-	if days, err := s.plans.ListDays(ctx, sourceID); err == nil && len(days) > 0 {
-		items, _ := s.plans.ListItems(ctx, sourceID)
+	if days, err := s.plans.ListDays(ctx, source.ID); err == nil && len(days) > 0 {
+		items, _ := s.plans.ListItems(ctx, source.ID)
 		byDay := map[string][]models.PlanItem{}
 		for _, item := range items {
 			byDay[item.DayID] = append(byDay[item.DayID], item)
@@ -336,7 +357,7 @@ func (s *Server) handleCloneTrip(c echo.Context) error {
 		}
 	}
 
-	_ = s.trips.BumpCloneCount(ctx, sourceID)
+	_ = s.trips.BumpCloneCount(ctx, source.ID)
 
 	// Points for the creator whose trip was worth copying (§6.5).
 	if source.OwnerID != userID {
@@ -349,7 +370,7 @@ func (s *Server) handleCloneTrip(c echo.Context) error {
 		})
 	}
 
-	return c.JSON(http.StatusCreated, toTripDTO(copyTrip))
+	return &copyTrip, nil
 }
 
 /* -------------------------------------------------------------- overview -- */
@@ -368,17 +389,18 @@ func (s *Server) handleTripOverview(c echo.Context) error {
 		return request.Internal(c, "โหลดสมาชิกไม่สำเร็จ")
 	}
 
-	coverage, err := s.recomputeCoverage(ctx, tripID)
-	if err != nil {
-		return request.Internal(c, "คำนวณความครอบคลุมไม่สำเร็จ")
-	}
-
-	wishes, _ := s.wishlist.ListByTrip(ctx, tripID)
 	days, _ := s.plans.ListDays(ctx, tripID)
 	items, _ := s.plans.ListItems(ctx, tripID)
 	bookings, _ := s.bookings.ListByTrip(ctx, tripID)
 	prep, _ := s.prep.ListByTrip(ctx, tripID)
 	activity, _ := s.collab.ListActivity(ctx, tripID, "", 8)
+
+	// Derived, not re-derived-and-stored: the write-back belongs to whatever
+	// changed the plan or the wishlist, and every one of those paths already
+	// calls recomputeCoverage. The wishes come off the roster and the items are
+	// the ones read just above, so nothing here is queried twice.
+	wishes := roster.wishes
+	_, coverage := coverageOf(wishes, items)
 
 	withoutWishlist := 0
 	for _, m := range roster.members {

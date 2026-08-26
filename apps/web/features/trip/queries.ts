@@ -7,6 +7,7 @@ import { repo } from '@/lib/data';
 import type {
   CreateTripInput,
   FlightLegInput,
+  MemberProfile,
   ShareState,
   TripOverview,
   TripVisibility,
@@ -53,6 +54,37 @@ export function useTripMembers(tripId: string) {
     queryKey: queryKeys.tripMembers(tripId),
     queryFn: () => repo.members.list(tripId),
     enabled: Boolean(tripId),
+  });
+}
+
+/* --------------------------------------------- member profiles (A3.1) -- */
+
+export function useMyTripProfile(tripId: string) {
+  return useQuery({
+    queryKey: queryKeys.tripProfileMe(tripId),
+    queryFn: () => repo.members.myProfile(tripId),
+    enabled: Boolean(tripId),
+  });
+}
+
+export function useTripProfiles(tripId: string) {
+  return useQuery({
+    queryKey: queryKeys.tripProfiles(tripId),
+    queryFn: () => repo.members.profiles(tripId),
+    enabled: Boolean(tripId),
+  });
+}
+
+export function useSaveTripProfile(tripId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Omit<MemberProfile, 'userId' | 'filled'>) =>
+      repo.members.saveProfile(tripId, input),
+    onSuccess: (profile) => {
+      track('profile_completed', {});
+      queryClient.setQueryData(queryKeys.tripProfileMe(tripId), profile);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tripProfiles(tripId) });
+    },
   });
 }
 
@@ -162,6 +194,15 @@ export function useInviteMember(tripId: string) {
   return useMutation({
     mutationFn: (role: 'editor' | 'viewer') => repo.members.invite(tripId, role),
     onSuccess: (_invite, role) => track('member_invited', { role }),
+  });
+}
+
+/** The invite landing page's pre-auth preview — no session needed to fetch it. */
+export function useInvitePreview(token: string) {
+  return useQuery({
+    queryKey: queryKeys.invitePreview(token),
+    queryFn: () => repo.members.preview(token),
+    retry: false,
   });
 }
 

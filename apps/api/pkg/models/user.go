@@ -56,4 +56,7 @@ type UserStore interface {
 	ListByIDs(ctx context.Context, ids []string) ([]User, error)
 	GetByHandle(ctx context.Context, handle string) (*User, error)
 	Count(ctx context.Context) (int64, error)
+	// CountAdmins answers "does this install have anyone who can open the admin
+	// screens yet" — see findOrCreateUser.
+	CountAdmins(ctx context.Context) (int64, error)
 }

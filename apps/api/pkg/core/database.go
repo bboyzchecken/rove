@@ -40,9 +40,20 @@ func NewDatabase(cfg Config) (*gorm.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get sql.DB: %w", err)
 	}
-	sqlDB.SetMaxOpenConns(25)
-	sqlDB.SetMaxIdleConns(10)
+	// The pool has to be sized against the SERVER's ceiling, not against one
+	// task's appetite: ECS scales the api to api_max_count (10) tasks, and every
+	// task opens its own pool. 10 × 12 = 120 sits under the 150 that
+	// deploy/terraform/rds.tf sets on db.t4g.micro, with room left for the
+	// migration on boot and an `aws ecs execute-command` shell. Raising
+	// api_max_count without raising max_connections is how the 4th task starts
+	// answering "too many connections" while ECS reports a healthy scale-out
+	// (ADR 0004, "the autoscaling ceiling and the DB connection pool disagree").
+	sqlDB.SetMaxOpenConns(12)
+	sqlDB.SetMaxIdleConns(6)
 	sqlDB.SetConnMaxLifetime(time.Hour)
+	// A task that has gone quiet hands its connections back rather than holding
+	// slots the tasks still serving traffic could use.
+	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
 
 	return db, nil
 }

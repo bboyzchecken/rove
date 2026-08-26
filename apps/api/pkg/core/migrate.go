@@ -132,7 +132,205 @@ func Migrate(db *gorm.DB) error {
 				return tx.Migrator().DropTable("orders", "subscriptions")
 			},
 		},
+		{
+			// M3 — A3.1: what each member wants out of THIS trip. Account-level
+			// profiles already exist; this table is the per-trip layer the AI frame
+			// and the conflict detector (A6.5) read.
+			ID: "202608240000_member_profiles",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.AutoMigrate(&models.MemberProfile{})
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return tx.Migrator().DropTable("member_profiles")
+			},
+		},
+		{
+			// M6 — A6.1: candidate itineraries stored whole as snapshots, kept out
+			// of plan_days so every existing trip-scoped query stays as it is.
+			ID: "202608240001_plan_variants",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.AutoMigrate(&models.PlanVariant{})
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return tx.Migrator().DropTable("plan_variants")
+			},
+		},
+		{
+			// M18/M19 — photos and the document folder. Rows carry storage KEYS;
+			// URLs are minted at read time by the storage service.
+			ID: "202608240002_trip_photos_documents",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.AutoMigrate(&models.TripPhoto{}, &models.TripDocument{})
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return tx.Migrator().DropTable("trip_documents", "trip_photos")
+			},
+		},
+		{
+			// M9 — A9.2/A9.3: the inbox and polls. Poll answers reuse `votes`
+			// with target_type='poll' and the option index in `value`.
+			ID: "202608240003_community",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.AutoMigrate(&models.Notification{}, &models.Poll{})
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return tx.Migrator().DropTable("polls", "notifications")
+			},
+		},
+		{
+			// M21 — A11.5: what people say after the trip, and what it actually
+			// cost them. One row per member per trip; the unique index is what
+			// makes "edit my review" a replace rather than a second opinion.
+			ID: "202608250000_trip_reviews",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.AutoMigrate(&models.TripReview{})
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return tx.Migrator().DropTable("trip_reviews")
+			},
+		},
+		{
+			// M22 — A12.10/A12.11/A12.12: what points turn into, what a published
+			// plan earns its creator, and the groups who asked for a human.
+			ID: "202608250001_partner_economy",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.AutoMigrate(
+					&models.DiscountCode{},
+					&models.CreatorEarning{},
+					&models.Payout{},
+					&models.AgentLead{},
+				)
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return tx.Migrator().DropTable(
+					"agent_leads", "payouts", "creator_earnings", "discount_codes",
+				)
+			},
+		},
+		{
+			// Indexes for the read paths the trip room hits hardest. Every one of
+			// these matched a WHERE that was already indexed but an ORDER BY that
+			// was not, which MySQL answers with a filesort over the whole matched
+			// set — cheap on a seeded database, and the first thing to show up in
+			// slow query logs once a trip has a real amount of history in it.
+			//
+			// Raw SQL rather than tags on the models: the sort column is usually
+			// `created_at`, which lives on the embedded Base and cannot be tagged
+			// per-table without putting the same index on all of them.
+			ID: "202608250002_hot_path_indexes",
+			Migrate: func(tx *gorm.DB) error {
+				return createIndexes(tx, hotPathIndexes)
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return dropIndexes(tx, hotPathIndexes)
+			},
+		},
+		{
+			// M23 — the points ledger became something a person pages through
+			// (A23.1), which turns `user_points` into a keyset-paginated read
+			// with the same shape as the activity feed above.
+			ID: "202608260000_points_ledger_index",
+			Migrate: func(tx *gorm.DB) error {
+				return createIndexes(tx, ledgerIndexes)
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return dropIndexes(tx, ledgerIndexes)
+			},
+		},
 	})
 
 	return m.Migrate()
+}
+
+// hotPathIndex is one index, named so the guard below can ask whether it is
+// already there — a fresh database and an existing one take the same path.
+type hotPathIndex struct {
+	name    string
+	table   string
+	columns string
+	why     string
+}
+
+var hotPathIndexes = []hotPathIndex{
+	{
+		name: "idx_activity_feed", table: "activity_logs", columns: "(trip_id, created_at)",
+		// ListActivity: WHERE trip_id ORDER BY created_at DESC, keyset-paginated.
+		// This table gains a row on every mutation anywhere in the product, so it
+		// is the fastest-growing one there is, and the trip overview reads it.
+		why: "trip feed, keyset-paginated",
+	},
+	{
+		name: "idx_ai_jobs_created", table: "ai_jobs", columns: "(created_at)",
+		// CostSince: SUM(cost_usd) WHERE created_at >= ?. It runs before every
+		// single draft to check the daily cap, and was scanning the whole table.
+		why: "daily AI cost cap",
+	},
+	{
+		name: "idx_trips_public", table: "trips", columns: "(visibility, updated_at)",
+		// ListPublic: WHERE visibility = 'public'. Nothing indexed that column, so
+		// the busiest unauthenticated endpoint in the product scanned trips. Note
+		// this only covers sort=new; sort=popular orders by an expression and
+		// needs a stored score column instead.
+		why: "explore feed",
+	},
+	{
+		name: "idx_plan_items_order", table: "plan_items", columns: "(trip_id, sort_order)",
+		// ListItems: WHERE trip_id ORDER BY sort_order. Read by the plan board,
+		// the overview, validation and coverage — several times per trip request.
+		why: "itinerary read",
+	},
+	{
+		name: "idx_plan_days_order", table: "plan_days", columns: "(trip_id, day_index)",
+		why: "itinerary read",
+	},
+	{
+		name: "idx_wishlist_order", table: "wishlist_items", columns: "(trip_id, sort_order)",
+		why: "wishlist and coverage read",
+	},
+}
+
+// ledgerIndexes serve M23 — reading a person's own points history rather than
+// summing it.
+var ledgerIndexes = []hotPathIndex{
+	{
+		name: "idx_points_ledger", table: "user_points", columns: "(user_id, occurred_at, id)",
+		// ListPage: WHERE user_id ORDER BY (occurred_at, id) DESC. `user_id`
+		// alone was indexed, so every page of a long ledger sorted the whole
+		// account's history to hand back thirty rows. The id is in the index
+		// because it is in the ORDER BY — it is what makes the cursor stable
+		// when two awards land in the same second.
+		why: "points ledger, keyset-paginated",
+	},
+	{
+		name: "idx_points_by_trip", table: "user_points", columns: "(user_id, reason, trip_id)",
+		// EarnedByTrip: WHERE user_id AND reason GROUP BY trip_id — the
+		// audience card's one query (A23.2).
+		why: "audience card, points per published trip",
+	},
+}
+
+// createIndexes is idempotent: an index that is already there is left alone
+// rather than failing the boot of every task in the service.
+func createIndexes(tx *gorm.DB, indexes []hotPathIndex) error {
+	for _, ix := range indexes {
+		if tx.Migrator().HasIndex(ix.table, ix.name) {
+			continue
+		}
+		if err := tx.Exec("CREATE INDEX " + ix.name + " ON " + ix.table + " " + ix.columns).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func dropIndexes(tx *gorm.DB, indexes []hotPathIndex) error {
+	for _, ix := range indexes {
+		if !tx.Migrator().HasIndex(ix.table, ix.name) {
+			continue
+		}
+		if err := tx.Exec("DROP INDEX " + ix.name + " ON " + ix.table).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }

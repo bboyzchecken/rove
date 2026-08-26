@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -11,6 +12,15 @@ import { cn } from '@/lib/utils';
  * Mobile-first (§2.1): a bottom sheet on a phone, a centred card from `sm` up.
  * Anything that floats above the page gets a real shadow — the only place the
  * flat rule is lifted (§15).
+ *
+ * It renders through a portal onto `<body>`, and that is not a detail. A
+ * `backdrop-filter` anywhere up the tree makes that element the containing
+ * block for `position: fixed` descendants — which is exactly what the app
+ * header is (`backdrop-blur-md`, sticky). Opened from the notification bell
+ * that lives inside it, `inset-0` resolved to the 56px-tall header instead of
+ * the viewport, and the sheet came out straddling the top of the page with its
+ * own title scrolled off-screen. On `<body>` there is nothing above it to
+ * capture it.
  */
 export function Sheet({
   open,
@@ -42,9 +52,13 @@ export function Sheet({
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  // `open` is always false on the first render — every caller drives it from
+  // component state — so the server never reaches the portal and there is no
+  // hydration mismatch to guard against. The `document` check is for the one
+  // case that would crash rather than merely look wrong.
+  if (!open || typeof document === 'undefined') return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
       <button
         aria-label="ปิด"
@@ -81,6 +95,7 @@ export function Sheet({
 
         {footer ? <div className="mt-5">{footer}</div> : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

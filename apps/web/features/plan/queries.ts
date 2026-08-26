@@ -2,8 +2,9 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { track } from '@/lib/analytics';
 import { repo } from '@/lib/data';
-import type { CreateItemInput, MoveItemInput, PlanDay, PlanItem } from '@/lib/data';
+import type { CreateItemInput, MoveItemInput, PlanDay, PlanItem, VariantList } from '@/lib/data';
 import { queryKeys } from '@/lib/query-keys';
 
 /**
@@ -175,5 +176,105 @@ export function usePoiSearch(query: string, city?: string) {
     queryKey: queryKeys.poiSearch(query, city),
     queryFn: () => repo.poi.search(query, city),
     enabled: query.trim().length > 0,
+  });
+}
+
+/* --------------------------------------------- variants & compare (M6) --- */
+
+export function useVariants(tripId: string) {
+  return useQuery({
+    queryKey: queryKeys.variants(tripId),
+    queryFn: () => repo.plan.variants(tripId),
+    enabled: Boolean(tripId),
+  });
+}
+
+export function useTripConflicts(tripId: string) {
+  return useQuery({
+    queryKey: queryKeys.conflicts(tripId),
+    queryFn: () => repo.plan.conflicts(tripId),
+    enabled: Boolean(tripId),
+  });
+}
+
+function invalidateVariants(queryClient: ReturnType<typeof useQueryClient>, tripId: string) {
+  void queryClient.invalidateQueries({ queryKey: queryKeys.variants(tripId) });
+}
+
+export function useForkVariant(tripId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { label: string; keyDecision?: string }) =>
+      repo.plan.forkVariant(tripId, input),
+    onSuccess: () => {
+      track('plan_variant_created', {});
+      invalidateVariants(queryClient, tripId);
+    },
+  });
+}
+
+export function useGenerateVariants(tripId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { count: 2 | 3; brief?: string }) =>
+      repo.plan.generateVariants(tripId, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.aiCredits(tripId) });
+    },
+  });
+}
+
+export function useVoteVariant(tripId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { variantId: string; value: -1 | 0 | 1 }) =>
+      repo.plan.voteVariant(tripId, input.variantId, input.value),
+    onSuccess: (votes, input) => {
+      track('vote_cast', {});
+      // Patch the tally in place — a vote should not reload the whole table.
+      queryClient.setQueryData<VariantList>(queryKeys.variants(tripId), (old) =>
+        old
+          ? {
+              ...old,
+              variants: old.variants.map((v) =>
+                v.id === input.variantId ? { ...v, votes } : v,
+              ),
+            }
+          : old,
+      );
+    },
+  });
+}
+
+export function useAdoptVariant(tripId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (variantId: string) => repo.plan.adoptVariant(tripId, variantId),
+    onSuccess: (days: PlanDay[]) => {
+      queryClient.setQueryData(queryKeys.planDays(tripId), days);
+      invalidatePlan(queryClient, tripId);
+      invalidateVariants(queryClient, tripId);
+    },
+  });
+}
+
+export function useRemoveVariant(tripId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (variantId: string) => repo.plan.removeVariant(tripId, variantId),
+    onSuccess: () => invalidateVariants(queryClient, tripId),
+  });
+}
+
+export function useFreezePlan(tripId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (freeze: boolean) =>
+      freeze ? repo.plan.freeze(tripId) : repo.plan.unfreeze(tripId),
+    onSuccess: (_trip, freeze) => {
+      if (freeze) track('plan_frozen', {});
+      void queryClient.invalidateQueries({ queryKey: queryKeys.trip(tripId) });
+      invalidateVariants(queryClient, tripId);
+    },
   });
 }

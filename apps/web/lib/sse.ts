@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { isMockMode } from './data';
@@ -28,7 +28,11 @@ export type TripEventType =
   | 'dates.locked'
   | 'expense.changed'
   | 'prep.changed'
-  | 'booking.changed';
+  | 'booking.changed'
+  | 'photo.changed'
+  | 'document.changed'
+  | 'poll.changed'
+  | 'presence.ping';
 
 export interface TripEvent {
   type: TripEventType;
@@ -36,10 +40,26 @@ export interface TripEvent {
   target_id: string;
   actor_id: string;
   ts: string;
+  /** Carried only where a refetch would be wasteful — AI progress, presence. */
+  payload?: { typing?: boolean; tab?: string; step?: string; progress?: number };
 }
 
-export function useTripEvents(tripId: string | undefined) {
+export function useTripEvents(
+  tripId: string | undefined,
+  /**
+   * Called for every frame, before the cache work. Presence needs the raw
+   * event — it is the one thing in the room that is deliberately not cached
+   * (W9.3) — and this keeps the stream to one connection per room.
+   */
+  onEvent?: (event: TripEvent) => void,
+) {
   const queryClient = useQueryClient();
+  // Held in a ref so a new callback identity does not reconnect the stream.
+  // Written in an effect rather than during render: a ref is not render state.
+  const handler = useRef(onEvent);
+  useEffect(() => {
+    handler.current = onEvent;
+  }, [onEvent]);
 
   useEffect(() => {
     if (!tripId || isMockMode) return;
@@ -51,6 +71,7 @@ export function useTripEvents(tripId: string | undefined) {
     source.onmessage = (message) => {
       try {
         const event = JSON.parse(message.data) as TripEvent;
+        handler.current?.(event);
         for (const key of keysFor(tripId, event.type)) {
           void queryClient.invalidateQueries({ queryKey: key });
         }
@@ -85,14 +106,31 @@ function keysFor(tripId: string, type: TripEventType): readonly (readonly unknow
         queryKeys.tripOverview(tripId),
       ];
 
+    // A whole itinerary landed or was replaced: the day count, the checklist
+    // and the frame on the overview all really did change.
     case 'plan.ready':
     case 'plan.updated':
-    case 'item.updated':
       return [
         queryKeys.planDays(tripId),
         queryKeys.budget(tripId),
         queryKeys.coverage(tripId),
         queryKeys.tripOverview(tripId),
+        // Variants ride the plan events: a new candidate, a vote, an adopt and
+        // a freeze all publish one of these (M6).
+        queryKeys.variants(tripId),
+      ];
+
+    // One card moved. Deliberately NOT the overview: the only thing there that
+    // an item edit changes is a count nobody is looking at while someone else
+    // drags, and the overview is the most expensive read in the API. Fanned out
+    // to everyone in the room on every drag, it was the single biggest source
+    // of load in the product.
+    case 'item.updated':
+      return [
+        queryKeys.planDays(tripId),
+        queryKeys.budget(tripId),
+        queryKeys.coverage(tripId),
+        queryKeys.variants(tripId),
       ];
 
     case 'expense.changed':
@@ -104,11 +142,36 @@ function keysFor(tripId: string, type: TripEventType): readonly (readonly unknow
     case 'booking.changed':
       return [queryKeys.bookings(tripId), queryKeys.tripOverview(tripId)];
 
+    // Every filtered view of the grid is stale at once, so the prefix goes in
+    // rather than one key per filter (M18/M19).
+    case 'photo.changed':
+      return [['trip', tripId, 'photos']];
+
+    case 'document.changed':
+      return [queryKeys.documents(tripId)];
+
+    case 'poll.changed':
+      return [queryKeys.polls(tripId)];
+
+    // Presence is not cached anywhere — usePresence keeps it in memory and
+    // forgets whoever stops pinging (W9.3).
+    case 'presence.ping':
+      return [];
+
     case 'comment.created':
       return [['trip', tripId, 'comments'], queryKeys.tripActivity(tripId)];
 
     case 'member.joined':
       return [queryKeys.tripMembers(tripId), queryKeys.tripOverview(tripId)];
+
+    // Frame edits and the freeze/unfreeze toggle (M6 — A6.4) both land here;
+    // the frozen state lives on the trip itself.
+    case 'trip.updated':
+      return [
+        queryKeys.trip(tripId),
+        queryKeys.tripOverview(tripId),
+        queryKeys.variants(tripId),
+      ];
 
     // The AI job carries its own stream; the plan is refreshed when it lands.
     case 'ai.progress':

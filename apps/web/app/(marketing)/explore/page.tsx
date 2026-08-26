@@ -1,13 +1,19 @@
+import { ExploreScreen } from '@/components/public/explore-screen';
+import { isSignedIn } from '@/lib/session';
+
 /**
- * Explore / discovery feed of public plans.
+ * Explore / discovery feed of public plans (M11 — W11.1).
  *
- * TODO(W11.x — Phase 2): not implemented — Phase 0 placeholder.
+ * Lives under `(marketing)` because it is indexed and reachable without an
+ * account, but it is also a tab in `AppShell.NAV` — so the frame is chosen per
+ * reader rather than per folder (`BrowseShell`). The session is read here, on
+ * the server, so the chrome is right on the first paint.
  */
-export default function ExplorePage() {
-  return (
-    <main className="mx-auto max-w-2xl px-6 py-16">
-      <h1 className="text-xl font-semibold">สำรวจแพลนสาธารณะ</h1>
-      <p className="text-muted mt-2 text-sm">TODO W11.x — Phase 2</p>
-    </main>
-  );
+export const metadata = {
+  title: 'สำรวจแพลนสาธารณะ',
+  description: 'ตามรอยทริปที่คนไปมาแล้วจริงๆ — ก๊อปแพลนไปเป็นของตัวเองแล้วแก้ต่อได้เลย',
+};
+
+export default async function ExplorePage() {
+  return <ExploreScreen signedIn={await isSignedIn()} />;
 }

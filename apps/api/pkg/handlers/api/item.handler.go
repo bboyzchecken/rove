@@ -16,10 +16,12 @@ import (
 func (s *Server) registerItemRoutes(g *echo.Group) {
 	edit := s.TripRoleMiddleware(models.TripRoleEditor)
 
-	g.POST("/:tripId/items", s.handleCreateItem, edit)
-	g.PATCH("/:tripId/items/:itemId", s.handleUpdateItem, edit)
-	g.POST("/:tripId/items/:itemId/move", s.handleMoveItem, edit)
-	g.DELETE("/:tripId/items/:itemId", s.handleDeleteItem, edit)
+	// PlanUnfrozen (A6.4): once the owner freezes the plan, the timeline stops
+	// moving until they unfreeze it.
+	g.POST("/:tripId/items", s.handleCreateItem, edit, s.PlanUnfrozen)
+	g.PATCH("/:tripId/items/:itemId", s.handleUpdateItem, edit, s.PlanUnfrozen)
+	g.POST("/:tripId/items/:itemId/move", s.handleMoveItem, edit, s.PlanUnfrozen)
+	g.DELETE("/:tripId/items/:itemId", s.handleDeleteItem, edit, s.PlanUnfrozen)
 }
 
 type itemRequest struct {

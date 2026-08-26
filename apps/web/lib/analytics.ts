@@ -37,6 +37,16 @@ export interface AnalyticsEvents {
   ai_draft_applied: { days: number; items: number };
   ai_credits_purchased: { quantity: number; channel: string };
 
+  // M18/M19 — memories and paperwork.
+  photo_uploaded: { from_item: boolean };
+  photobook_export_started: { format: 'pdf' | 'print' };
+  document_uploaded: { category: string };
+
+  // M6 — variants & compare.
+  plan_variant_created: Record<string, never>;
+  vote_cast: Record<string, never>;
+  plan_frozen: Record<string, never>;
+
   item_added: { source: 'poi_search' | 'free_text' };
   item_moved: { same_day: boolean };
   item_deleted: Record<string, never>;

@@ -68,6 +68,35 @@ services:
       retries: 12
       start_period: 60s
 
+  # The AI worker, off by default (Phase 3 — INFRA).
+  #
+  #   set ROVE_ROLE=api in .env, then
+  #   docker compose --profile worker up -d
+  #
+  # Both steps matter: the profile starts this container, and ROVE_ROLE=api is
+  # what makes the api container hand drafts over instead of running them
+  # itself. Leave ROVE_ROLE=all and the worker sits on an empty queue while the
+  # api keeps drafting — which is the right default for a laptop, and the
+  # reason the split is opt-in.
+  worker:
+    profiles: ["worker"]
+    build:
+      context: ./apps/api
+      target: dev
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      ROVE_ROLE: worker
+    volumes:
+      - ./apps/api:/app
+      - go_mod_cache:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   web:
     build:
       context: ./apps/web

@@ -1,4 +1,4 @@
-import type { PlanItem } from '@/lib/mock';
+import type { PlanItem } from '@/lib/data';
 
 /**
  * Schematic route preview for one day.

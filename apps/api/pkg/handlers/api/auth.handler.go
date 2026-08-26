@@ -27,10 +27,13 @@ func (s *Server) registerAuthRoutes(g *echo.Group) {
 	g.GET("/auth/me", s.handleMe, s.JwtMiddleware)
 	g.POST("/auth/logout", s.handleLogout)
 
-	// Mock mode needs a way in that does not involve a real provider console.
-	// It is registered only when mocking is on, so it cannot exist in production
-	// by accident.
-	if s.cfg.UseMock() {
+	// A machine with no OAuth credentials still needs a way in. Registered only
+	// when DEV_LOGIN says so and the environment is not production, so it
+	// cannot exist in production by accident.
+	//
+	// It used to hang off MOCK_MODE, which tied "are the providers stubbed?" to
+	// "can anyone sign in at all?" — turning the stubs off locked the door.
+	if s.cfg.UseDevLogin() {
 		g.POST("/auth/demo", s.handleDemoLogin)
 	}
 }
@@ -135,8 +138,12 @@ func (s *Server) handleOAuthExchange(c echo.Context) error {
 	return c.JSON(http.StatusOK, authResponse{Token: token, User: toMeDTO(*user, balance)})
 }
 
-// handleDemoLogin signs in a fixed demo account. Mock mode only — the route is
-// not registered otherwise.
+// handleDemoLogin signs in a fixed demo account. DEV_LOGIN only — the route is
+// not registered otherwise, and the web app only ever links to it from
+// /admin/login, never the public /login screen (§16). The account it grants
+// is always promoted to admin: this door is a break-glass entry for staff,
+// not a way to test as an ordinary user, so it must never be mistaken for the
+// kind of unverified sign-in a mule-account script could farm.
 func (s *Server) handleDemoLogin(c echo.Context) error {
 	ctx, cancel := contextWithTimeout(c, 10*time.Second)
 	defer cancel()
@@ -148,6 +155,12 @@ func (s *Server) handleDemoLogin(c echo.Context) error {
 	}, "")
 	if err != nil {
 		return request.Internal(c, "สร้างบัญชีทดลองไม่สำเร็จ")
+	}
+	if user.Role != models.RoleAdmin {
+		user.Role = models.RoleAdmin
+		if err := s.users.Update(ctx, user); err != nil {
+			return request.Internal(c, "ตั้งสิทธิ์บัญชีทดลองไม่สำเร็จ")
+		}
 	}
 
 	token, err := s.IssueToken(user)
@@ -312,10 +325,15 @@ func (s *Server) findOrCreateUser(
 		user.ReferredBy = &referredBy
 	}
 
-	// The first account to sign in on a fresh install is the admin: someone has
-	// to be able to open the admin screens, and a hardcoded seed user would be
-	// a credential in the repository.
-	if n, err := s.users.Count(ctx); err == nil && n == 0 {
+	// Somebody has to be able to open the admin screens, and a hardcoded seed
+	// account would be a credential in the repository — so the first person to
+	// sign in while nobody is an admin becomes one.
+	//
+	// The test is "is there an admin yet", not "is the users table empty": the
+	// seeder now creates the travellers who own the published example trip, and
+	// under the old rule those rows would have quietly handed the first real
+	// sign-in an ordinary account and left the install with no way in.
+	if n, err := s.users.CountAdmins(ctx); err == nil && n == 0 {
 		user.Role = models.RoleAdmin
 	}
 	for _, email := range s.cfg.AdminEmails {

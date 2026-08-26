@@ -5,6 +5,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
+	"github.com/bboyzchecken/rove/apps/api/pkg/domain"
 	"github.com/bboyzchecken/rove/apps/api/pkg/handlers/api/request"
 	"github.com/bboyzchecken/rove/apps/api/pkg/models"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
@@ -22,25 +23,6 @@ func (s *Server) registerPrepRoutes(g *echo.Group) {
 	g.POST("/:tripId/prep/template", s.handleApplyPrepTemplate, edit)
 	g.GET("/:tripId/prep/note", s.handleGetPrepNote, view)
 	g.PUT("/:tripId/prep/note", s.handleSavePrepNote, edit)
-}
-
-// japanTemplate is the default checklist for a Japan trip (A8.3). It is a
-// country template, not a generic one: "Visit Japan Web" is the item that
-// actually catches people out.
-var japanTemplate = []struct {
-	title    string
-	category string
-}{
-	{"เช็กวันหมดอายุพาสปอร์ต (เหลือ > 6 เดือน)", models.PrepDocument},
-	{"ลงทะเบียน Visit Japan Web ล่วงหน้า", models.PrepDocument},
-	{"ซื้อประกันเดินทาง", models.PrepHealth},
-	{"ซื้อ eSIM / pocket wifi", models.PrepBooking},
-	{"แลกเงินเยน / เปิดบัตรที่กดเงินต่างประเทศได้", models.PrepMoney},
-	{"จองที่พักให้ครบทุกคืน", models.PrepBooking},
-	{"เตรียมยาประจำตัว + ยาแก้หวัด", models.PrepHealth},
-	{"เตรียมเสื้อกันหนาว / ร่มพับ", models.PrepPacking},
-	{"ปลั๊กแปลง Type A + power bank", models.PrepPacking},
-	{"ตั้งกลุ่มแชร์ตำแหน่งไว้ใช้ตอนหลง", models.PrepOther},
 }
 
 func (s *Server) handleListPrep(c echo.Context) error {
@@ -153,18 +135,29 @@ func (s *Server) handleDeletePrep(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
-// handleApplyPrepTemplate seeds the country template, skipping anything already
-// on the list — pressing it twice is harmless.
+// handleApplyPrepTemplate seeds the checklist for wherever the trip is going,
+// skipping anything already on the list — pressing it twice is harmless.
+//
+// The template follows `destination_country` rather than being one Japan list
+// for everyone (Phase 3): the value of a country checklist is the item that
+// catches people out, and K-ETA is not Visit Japan Web.
 func (s *Server) handleApplyPrepTemplate(c echo.Context) error {
 	ctx := c.Request().Context()
 	tripID := request.TripID(c)
 
-	tasks := make([]models.PrepTask, 0, len(japanTemplate))
-	for i, row := range japanTemplate {
+	country := "JP"
+	if trip, err := s.trips.GetByID(ctx, tripID); err == nil && trip.DestinationCountry != "" {
+		country = trip.DestinationCountry
+	}
+	locale := c.QueryParam("locale")
+
+	template := domain.PrepTemplateFor(country)
+	tasks := make([]models.PrepTask, 0, len(template))
+	for i, row := range template {
 		tasks = append(tasks, models.PrepTask{
 			TripID:       tripID,
-			Title:        row.title,
-			Category:     row.category,
+			Title:        row.Title(locale),
+			Category:     row.Category,
 			FromTemplate: true,
 			SortOrder:    i,
 		})

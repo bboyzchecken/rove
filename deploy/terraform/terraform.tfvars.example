@@ -1,0 +1,16 @@
+# cp terraform.tfvars.example terraform.tfvars — it is gitignored, everything
+# in here is non-secret config, actual credentials live in Secrets Manager
+# (README step 6), never here.
+
+aws_region  = "ap-southeast-1"
+domain_name = "rovetravel.site"
+
+github_repo = "bboyzchecken/rove"
+
+# Leave blank to skip alarm/budget e-mails for now, fill in before launch.
+notification_email = ""
+monthly_budget_usd  = 70
+
+# Set to false only if this AWS account already has a GitHub OIDC provider
+# from another project — see variables.tf.
+create_github_oidc_provider = true

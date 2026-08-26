@@ -88,20 +88,30 @@ Go API (Echo) ── Uber FX ── Handlers → Store interfaces → GORM → M
 | Test | `go test` + testify + sqlmock/testcontainers | |
 
 ### 2.3 Infra
-| ส่วน | Phase 1 (low cost) | โตขึ้นแล้วย้ายไป |
-|---|---|---|
-| Compute | **AWS Lightsail instance** 2 vCPU / 2 GB (~$12/mo) รัน Docker Compose | Lightsail 4GB → ECS Fargate / EC2 + RDS |
-| DB | MySQL container บน instance เดียวกัน + snapshot รายวัน | Lightsail Managed Database → RDS |
-| Redis | container เดียวกัน | ElastiCache |
-| Reverse proxy/TLS | **Caddy** container (auto Let's Encrypt) | ALB + ACM |
-| Object storage | Cloudflare R2 (egress ฟรี) — bucket แยก: export, images, documents, photos | คงเดิม |
-| Frontend hosting | Vercel (Hobby) หรือ container บน Lightsail เดียวกัน | Vercel Pro / Amplify |
-| DNS/CDN | Cloudflare (free) | คงเดิม |
-| Backup | Lightsail auto snapshot + `mysqldump` → R2 รายวัน | RDS automated backup |
-| CI/CD | GitHub Actions → build image → GHCR → ssh deploy script | ECR + ECS deploy |
-| Monitoring | Uptime Kuma container + Lightsail metrics + Logrus → file → Loki (ทีหลัง) | CloudWatch/Grafana |
+> **แก้ 23 ส.ค. 2569 — ADR 0004:** ตัด Lightsail ออก ขึ้น ECS Fargate ตั้งแต่วันแรก
+> เพราะซื้อโดเมนแล้วและช่องทางเปิดตัวคืออินฟลูฯ (traffic มาเป็นขั้นบันได ไม่ใช่ทางลาด)
+> การย้าย Lightsail → ECS ทีหลังคือการเปลี่ยน network + secret store + CI target +
+> ย้าย DB พร้อมกัน ซึ่งจะต้องทำตอนที่เว็บกำลังไฟไหม้พอดี
 
-> เป้าหมายค่าใช้จ่าย Phase 1: **≤ $25/เดือน** ไม่รวม AI API และ Google Maps API
+| ส่วน | ใช้จริง (ADR 0004) | ตอนโตแล้วปรับ |
+|---|---|---|
+| Compute | **ECS Fargate** — api + web คนละ service, autoscale 1–10 task | เพิ่ม max, ขยาย cpu/memory |
+| Load balance | **ALB** + host-based routing + ACM | คงเดิม |
+| Autoscale | Target tracking: ALBRequestCountPerTarget + CPU | ปรับ target value |
+| DB | **RDS MySQL 8** `db.t4g.micro` single-AZ | `db_multi_az = true` / class ใหญ่ขึ้น |
+| Redis | **ElastiCache** 1 node `cache.t4g.micro` | replication group |
+| Outbound | NAT **instance** `t4g.nano` (~$3/mo) | NAT Gateway (~$32/mo) |
+| Object storage | Cloudflare R2 (egress ฟรี) — bucket แยก: export, images, documents, photos | คงเดิม |
+| DNS/CDN | Cloudflare (free) | คงเดิม |
+| Secret | AWS Secrets Manager (DB password ให้ RDS หมุนเอง) | คงเดิม |
+| Backup | RDS automated backup 7 วัน + PITR + final snapshot | เพิ่ม retention |
+| IaC | **Terraform** — `deploy/terraform/` | คงเดิม |
+| CI/CD | GitHub Actions (OIDC ไม่มี access key) → ECR → ECS UpdateService | คงเดิม |
+| Monitoring | CloudWatch Logs + alarms → SNS อีเมล + AWS Budgets | Container Insights / Grafana |
+
+> ค่าใช้จ่ายตั้งต้น **~$50–70/เดือน** ตอนยังไม่มีคนใช้ ไม่รวม AI API และ Google Maps API
+> — สูงกว่าเป้าเดิม $25 เพราะ ALB/RDS คิดขั้นต่ำแม้ traffic เป็นศูนย์ แลกกับการรับ
+> traffic spike ได้โดยไม่ต้อง migrate
 
 ---
 
@@ -348,6 +358,16 @@ GET    /api/v1/users/me/points                   {balance, lifetime_earned}
 GET    /api/v1/users/me/points/history           transactions (cursor)
 ```
 
+**ของจริงหลัง M23 (A23.1 / A23.2)** — ไม่มี `/points/history` แยก, ตัว `/points` เองคือประวัติ:
+```
+GET    /api/v1/users/me/points?cursor=           {balance, earned, entries[], next_cursor}
+                                                 entries: {id, delta, reason, note, trip_id, trip_title, occurred_at}
+                                                 30 แถว/หน้า · cursor = "<rfc3339nano>|<uuid>" · next_cursor ว่าง = หมดแล้ว
+GET    /api/v1/users/me/audience                 {total_views, total_clones, points_earned, public_trips, top_trip_id, trips[]}
+                                                 trips: {trip_id, title, slug, views, clones, awarded_clones, points_earned}
+```
+ทั้งคู่ scope ด้วย token อย่างเดียว — **ไม่มี id ใน path ให้แก้** ซึ่งคือสิ่งที่กัน ledger ของคนอื่น (X23.1)
+
 **หมายเหตุจากของที่ทำจริง:** calendar แยกเป็น `GET /users/me/trips/upcoming` + `GET /users/me/trips/past`
 · past trip แต่ละใบพก `end_date` + `visibility` + `public_slug` มาด้วย เพื่อให้การ์ดลิงก์ไปหน้าบันทึกทริป
 (`/recap/:tripId`) และรู้ว่าเปิด public ไปแล้วหรือยัง
@@ -487,6 +507,11 @@ GET  /api/v1/trips/:tripId/bookings
 GET  /public/plans/:slug                         [no auth] public plan (ซ่อน expense เสมอ)
 GET  /public/explore?city=&days=&month=&budget=&tags=&sort=   [no auth]
 POST /public/plans/:slug/view                    นับ view (fire-and-forget)
+
+GET  /api/v1/public/stats                        [no auth] {planners, public_trips, clones, reviews, average_rating, computed_at}
+                                                 cache Redis 10 นาที · planners = COUNT(DISTINCT trips.owner_id)
+                                                 clones = COUNT(trips WHERE source_trip_id IS NOT NULL)
+GET  /api/v1/public/reviews/recent               [no auth] {items[]} — รีวิวที่มี body ของทริป public เท่านั้น (A24.2)
 
 POST /api/v1/trips/:tripId/export                {format:'html'|'pdf'} → {job_id}
 GET  /api/v1/exports/:id                         → signed R2 url
@@ -655,37 +680,62 @@ export const userKeys = {
 
 ---
 
-## 8. Deployment (AWS Lightsail — low cost)
+## 8. Deployment (AWS ECS Fargate + ALB + autoscale)
 
-### 8.1 Phase 1 topology (instance เดียว)
+> **เขียนใหม่ทั้งหัวข้อ 23 ส.ค. 2569 — [ADR 0004](docs/adr/0004-aws-ecs-instead-of-lightsail.md)**
+> ของเดิม (Lightsail กล่องเดียว + Caddy + docker compose, ≤$25/mo) ถูกแทนที่
+> **ขั้นตอนลงมือจริงอยู่ที่ [deploy/AWS_DEPLOY.md](deploy/AWS_DEPLOY.md)** หัวข้อนี้เก็บแค่โครง
+
+### 8.1 Topology
 ```
-Lightsail Ubuntu 2 vCPU / 2 GB / 60 GB SSD  ($12/mo)  + static IP (ฟรีเมื่อ attach)
-└── docker compose -f deploy/docker-compose.prod.yml
-    ├── caddy      :80/:443  → TLS อัตโนมัติ, reverse proxy
-    │     api.rove.app  → api:5000
-    │     rove.app      → web:3000 (ถ้าไม่ใช้ Vercel)
-    ├── api        (Go binary, alpine)
-    ├── web        (Next.js standalone output)  [optional]
-    ├── mysql:8.0  volume ./data/mysql, my.cnf ปรับ innodb_buffer_pool_size=512M
-    └── redis:7    volume ./data/redis, maxmemory 128mb allkeys-lru
+Cloudflare DNS (rovetravel.site)
+└── ALB :443 (ACM cert, idle_timeout 120s รองรับ SSE)
+    ├── rovetravel.site / www → web target group → ECS service "rove-web"  (Fargate, 1–10 task)
+    └── api.rovetravel.site   → api target group → ECS service "rove-api"  (Fargate, 1–10 task)
+                                                    │  (private subnet, ไม่มี public IP)
+                                                    ├── RDS MySQL 8  db.t4g.micro, single-AZ, backup 7 วัน
+                                                    ├── ElastiCache Redis 7  cache.t4g.micro 1 node
+                                                    └── NAT instance t4g.nano → Anthropic / Google / LINE
 ```
-- ถ้า RAM ตึง: ย้าย web ไป Vercel Hobby (ฟรี)
-- เปิดเฉพาะพอร์ต 22/80/443 ใน Lightsail firewall
-- swap file 2GB กัน OOM ตอน build/AI burst
+- 2 AZ, public subnet มีแค่ ALB กับ NAT — ที่เหลืออยู่ private ทั้งหมด
+- Fargate ผสม on-demand 1 task เป็นฐาน + Spot ส่วนที่ scale ขึ้น (weight 1:4)
+- Secret อยู่ใน Secrets Manager, MySQL password ให้ RDS สร้าง/หมุนเอง
+- IaC ทั้งหมด: `deploy/terraform/` (state บน S3 + DynamoDB lock)
 
-### 8.2 CI/CD
-1. GitHub Actions: `go test` + `go build` → build image → push **GHCR**
-2. ssh เข้า Lightsail → `deploy/deploy.sh` → `docker compose pull && up -d` → healthcheck `/healthz`
-3. Web (ถ้าอยู่บน Vercel) deploy อัตโนมัติจาก branch
+### 8.2 Autoscale
+- Target tracking 2 ตัวต่อ service, อันไหนถึงก่อนชนะ:
+  - `ALBRequestCountPerTarget` — api 500, web 400 req/target/นาที (**ตัวหลัก**)
+  - `ECSServiceAverageCPUUtilization` 65%
+- scale-out cooldown 60s / scale-in 300s — ผิดทางขึ้นถูกกว่าผิดทางลงตอน spike
+- CPU อย่างเดียวตอบสนอง spike ช้าไป 1–2 cooldown จึงต้องมี request count คู่กัน
 
-### 8.3 Backup / Ops
-- Lightsail automatic snapshot รายวัน (เก็บ 7 วัน)
-- cron: `mysqldump` gzip → อัป R2 ทุกวัน เก็บ 30 วัน + ทดสอบ restore เดือนละครั้ง
-- Logrus → stdout → docker json-file; Uptime Kuma ping `/healthz` + แจ้ง LINE
-- `/healthz` เช็ค DB + Redis; `/readyz` สำหรับ deploy gate
+### 8.3 CI/CD
+1. GitHub Actions (`release.yml`) trigger จาก tag `v*`
+2. build → push **ECR** (ไม่ใช่ GHCR แล้ว) ผ่าน **OIDC role** — ไม่มี AWS access key ใน GitHub
+3. ดึง task definition ที่ live อยู่มาเปลี่ยนเฉพาะ image → `UpdateService` → รอ stable
+4. api ก่อน web เสมอ (`max-parallel: 1`)
+5. `aws_ecs_service` ตั้ง `ignore_changes = [task_definition, desired_count]` ไม่ให้ Terraform ทับ CI/autoscaler
+   → ผลข้างเคียง: แก้ env var ใน `ecs.tf` ต้อง `--force-new-deployment` เอง (AWS_DEPLOY.md ขั้น 8)
 
-### 8.4 เส้นทาง scale
-2GB → 4GB instance → แยก MySQL ไป Lightsail Managed DB → ECS Fargate + RDS + ElastiCache เมื่อ trips/วัน > ~2k
+### 8.4 Backup / Ops
+- RDS automated backup 7 วัน + PITR + final snapshot ตอนลบ + `deletion_protection`
+- CloudWatch Logs `/ecs/rove-api`, `/ecs/rove-web` เก็บ 14 วัน
+- Alarm → SNS อีเมล: ALB 5xx, unhealthy host, RDS CPU/storage, Redis CPU, NAT instance down
+- AWS Budgets เตือนที่ 80% actual และ 100% forecast (**เตือนได้อย่างเดียว หยุด spend ไม่ได้**)
+- `/healthz` = ALB health check, `/readyz` เช็ค DB + Redis สำหรับตรวจหลัง deploy
+
+### 8.5 ข้อจำกัดที่รู้ตัว (ADR 0004)
+| จุด | ความเสี่ยง | แก้เมื่อ |
+|---|---|---|
+| NAT instance ตัวเดียว | outbound (AI/Maps/LINE) ตาย เว็บยังขึ้น | เปลี่ยนเป็น NAT Gateway |
+| RDS single-AZ | ไม่มี failover อัตโนมัติ | `db_multi_az = true` |
+| Fargate Spot | ถูกดึงคืนได้ (เตือนล่วงหน้า 2 นาที) | ลบ block Spot |
+| **migration รันทุก task ตอน boot** | หลาย task boot พร้อมกัน = แย่งกันรัน | ใส่ MySQL advisory lock ครอบ `core.Migrate` |
+| SSR ของ web เรียก api ผ่าน ALB สาธารณะ | เพิ่ม 1 hop | ECS Service Connect |
+
+### 8.6 เส้นทาง scale ต่อจากนี้
+ทุกข้อคือแก้ตัวแปรใน `terraform.tfvars` แล้ว apply — ไม่ต้อง migrate:
+ยก `api_max_count` → `db_instance_class` ใหญ่ขึ้น → `db_multi_az` → Redis replication group → RDS read replica
 
 ---
 
@@ -715,8 +765,8 @@ Lightsail Ubuntu 2 vCPU / 2 GB / 60 GB SSD  ($12/mo)  + static IP (ฟรีเ�
 - [x] A0.6 `pkg/store/store.go` pagination + `pkg/utils/*` ตาม template
 - [x] A0.7 Redis client + rate limit middleware + cache helper (รวม FX cache helper)  ·  **หมายเหตุ:** gen 240/นาที, ai 12/ชม.; ไม่มี Redis = ข้ามการนับ (dev ไม่ต้องรัน container)
 - [x] A0.8 `/healthz`, `/readyz`, request logger, CORS (allow WebBaseURL), Recover, Secure
-- [x] A0.9 Dockerfile multi-stage + GitHub Actions (test/build/push GHCR)  ·  **หมายเหตุ:** ci.yml: go build/vet/test -race, web typecheck/lint/test/build, playwright, docker compose boot
-- [ ] A0.10 `deploy/` (compose.prod, Caddyfile, deploy.sh) + สร้าง Lightsail instance + domain + TLS ผ่านจริง  ·  **หมายเหตุ:** `deploy/` ครบ (compose.prod, Caddyfile, deploy.sh, backup.sh) แต่ยังไม่ได้สร้าง Lightsail instance / domain / TLS จริง
+- [x] A0.9 Dockerfile multi-stage + GitHub Actions (test/build/push **ECR**)  ·  **หมายเหตุ:** ci.yml: go build/vet/test -race, web typecheck/lint/test/build, playwright, docker compose boot, terraform fmt/validate · release.yml: OIDC → ECR → ECS UpdateService (เปลี่ยนจาก GHCR ตาม ADR 0004)
+- [ ] A0.10 ~~Lightsail~~ **AWS ECS Fargate + ALB + autoscale ผ่าน Terraform** + domain + TLS ผ่านจริง  ·  **หมายเหตุ:** โค้ดครบแล้วและ `terraform validate` ผ่าน — `deploy/terraform/` (16 ไฟล์), `deploy/AWS_DEPLOY.md` (ขั้นตอน 16 ขั้น), ADR 0004 · **ยังไม่ได้ provision จริงบน AWS** ยังไม่มี account/DNS/secret ของจริง · ของเดิม (compose.prod, Caddyfile, deploy.sh, backup.sh) เลิกใช้แล้ว เก็บไว้อ้างอิงเฉย ๆ
 
 ### Web (`rove-web`)
 - [x] W0.1 `pnpm create next-app@latest` (App Router, TS strict) + บันทึกเวอร์ชันใน Decision Log  ·  **หมายเหตุ:** Next 16.3.1 App Router + Turbopack, React 19.2.8, TS 5.9.3 strict — บันทึกใน §16
@@ -724,7 +774,7 @@ Lightsail Ubuntu 2 vCPU / 2 GB / 60 GB SSD  ($12/mo)  + static IP (ฟรีเ�
 - [x] W0.3 TanStack Query provider + devtools + default options §7.1
 - [x] W0.4 `lib/api-client.ts` (fetch wrapper: base url, auth, error → typed) + `features/` skeleton  ·  **หมายเหตุ:** `features/*/queries.ts` 9 โมดูล + `lib/data/` แยก mock/live repo
 - [x] W0.5 Auth flow: LINE/Google button → callback route → set httpOnly cookie → `useMe()`
-- [ ] W0.6 Zustand store สำหรับ UI state + next-intl + PostHog + flags  ·  **หมายเหตุ:** Zustand + PostHog + `lib/flags.ts` ครบ — next-intl ยังไม่ได้ wire (มีแค่ `messages/th.json` ยังไม่มี provider)
+- [x] W0.6 Zustand store สำหรับ UI state + next-intl + PostHog + flags  ·  **หมายเหตุ:** next-intl wire แล้ว — `i18n/request.ts` + plugin ใน next.config + `NextIntlClientProvider` ใน root layout · แท็บห้องทริปอ่าน label จาก `messages/th.json` เป็นตัวพิสูจน์ท่อ (ภาษาที่สองเริ่มจากตรงนั้น)
 - [ ] W0.7 Vercel (หรือ container) deploy preview ต่อ PR  ·  **หมายเหตุ:** CI build ผ่านทุก PR แต่ยังไม่มี preview deploy ต่อ PR
 
 ### Data / Ops
@@ -796,7 +846,7 @@ Lightsail Ubuntu 2 vCPU / 2 GB / 60 GB SSD  ($12/mo)  + static IP (ฟรีเ�
 - [x] X2.5 e2e `e2e/date-coordination.spec.ts`
 
 ### M3 Wishlist & Coverage
-- [ ] A3.1 member_profiles GET/PUT  ·  **หมายเหตุ:** **ยังไม่มีตาราง `member_profiles`** — โปรไฟล์ตอนนี้เป็นระดับ user (`PATCH /users/me`) ไม่ใช่ระดับทริป
+- [x] A3.1 member_profiles GET/PUT  ·  **หมายเหตุ:** ตาราง `member_profiles` (PK รวม trip_id+user_id) + `GET|PUT /trips/:id/profile/me` + `GET /trips/:id/profiles` — ฟอร์ม "สไตล์เที่ยวของคุณ" อยู่บนแท็บที่อยากไป (pace/เดิน/งบ/อาหาร/ขับรถ) · โปรไฟล์ระดับ user (`PATCH /users/me`) ยังอยู่แยกกัน
 - [x] A3.2 wishlist CRUD (เขียนได้เฉพาะของตัวเอง ยกเว้น owner)
 - [ ] A3.3 AI normalize wishlist (job) → tags + poi_id  ·  **หมายเหตุ:** มีแค่ค่าคงที่ `AIKindNormalize` — ยังไม่มี job ที่รันจริง (ตอนนี้ match ด้วย `domain.NormalizeName` ตอน generate แทน)
 - [x] A3.4 `pkg/domain/coverage.go` + unit tests + `GET /coverage`
@@ -811,7 +861,7 @@ Lightsail Ubuntu 2 vCPU / 2 GB / 60 GB SSD  ($12/mo)  + static IP (ฟรีเ�
 - [x] A4.2 tools: lookup_poi, get_poi, distance (Google + redis cache), weather, fx
 - [x] A4.3 buildFrame (anchors: flights, prepaid stay, dated must-do, zones)
 - [x] A4.4 generatePlan → PlanDraft (1 variant)  ·  **หมายเหตุ:** ไม่มีคีย์ = โหมด simulate ให้ผลแบบ deterministic (ใช้ใน UAT/e2e)
-- [ ] A4.5 `pkg/domain/validate.go` (closed day, นอกเวลาเปิด, วันยาวเกิน, travel ไม่สมจริง, must-do หาย, POI ซ้ำ) + tests  ·  **หมายเหตุ:** `pkg/domain/validate.go` ครบทุกกฎ แต่**ยังไม่มี unit test**
+- [x] A4.5 `pkg/domain/validate.go` (closed day, นอกเวลาเปิด, วันยาวเกิน, travel ไม่สมจริง, must-do หาย, POI ซ้ำ) + tests  ·  **หมายเหตุ:** `validate_test.go` ครอบทุกกฎ + เวลาข้ามเที่ยงคืน + เวลาเปิดที่ parse ไม่ได้ต้องไม่เตือนมั่ว
 - [ ] A4.6 repairPlan (≤2 loops)  ·  **หมายเหตุ:** ยังไม่ได้ทำ — pipeline validate แล้วเขียน warning ลง note ไม่ได้ป้อนกลับให้โมเดลแก้
 - [x] A4.7 explainPlan → rationales + open_questions
 - [x] A4.8 persistPlan ใน transaction + item_versions  ·  **หมายเหตุ:** persist ผ่าน transaction ใน `store/plan` + `AddVersion` ทุกครั้ง
@@ -840,7 +890,7 @@ Lightsail Ubuntu 2 vCPU / 2 GB / 60 GB SSD  ($12/mo)  + static IP (ฟรีเ�
 - [ ] X5.1 ทดสอบ dnd บนมือถือจริง (iOS Safari + Android Chrome)  ·  **หมายเหตุ:** ยังไม่ได้ทดสอบบนเครื่องจริง — Playwright ครอบ webkit ไว้แล้วแต่ไม่ใช่ touch จริง
 
 ### M7 Budget (ประมาณการจาก plan items)
-- [ ] A7.1 `pkg/domain/budget.go` (category rollup, per_person/group/night, prepaid แยก, FX) + tests  ·  **หมายเหตุ:** `pkg/domain/budget.go` ครบทุกกฎ (rollup, per_person/group/night, prepaid, FX) แต่**ยังไม่มี unit test**
+- [x] A7.1 `pkg/domain/budget.go` (category rollup, per_person/group/night, prepaid แยก, FX) + tests  ·  **หมายเหตุ:** `budget_test.go` ครอบทุก basis + prepaid/remaining + ปัดเศษ + party size 0 + FX rate 0
 - [x] A7.2 `GET /plans/:id/budget` + FX service (cache รายวันจาก API) + override manual
 - [x] W7.1 Budget tab: ตาราง category × (JPY, THB, ต่อคน) + total + prepaid + เทียบงบที่ตั้งไว้ + label "ประมาณการ"
 - [x] W7.2 Highlight item ที่ยังไม่มี cost
@@ -879,7 +929,7 @@ Lightsail Ubuntu 2 vCPU / 2 GB / 60 GB SSD  ($12/mo)  + static IP (ฟรีเ�
 ### M13 Admin
 - [ ] A13.1 admin guard + POI CRUD + CSV import + character management  ·  **หมายเหตุ:** admin guard + POI CRUD + character management ครบ — **ยังไม่มี CSV import ผ่าน API** (ตอนนี้ import ได้ทาง `go run . seed` เท่านั้น)
 - [x] A13.2 dashboard endpoints (trips, ai cost, clicks, confirmations, points issued)
-- [x] W13.1 หน้า admin ง่าย ๆ (table + form)
+- [x] W13.1 หน้า admin ง่าย ๆ (table + form)  ·  **หมายเหตุ:** ติ๊กไว้เกินจริงมานาน — ของที่มีคือ 4 ตัวเลข + ช่องค้นหา POI **แบบอ่านอย่างเดียว** ไม่มีฟอร์มสักอัน (ไล่โค้ดใน [docs/phase-5-admin.md](docs/phase-5-admin.md) §1) · 26 ส.ค. 2569 หน้านี้ย้ายเข้าเปลือกของ Phase 5 (`app/(admin)/admin`, ธีม `[data-surface='admin']`) และตาราง POI เปลี่ยนเป็น `DataTable` — **ฟอร์มยังไม่มี** รอ M27
 - [x] A13.2b feature flags table/env  ·  **หมายเหตุ:** `lib/flags.ts` (planVariants, publicExplore ปิดไว้) + env
 
 ### M14 Widget Character (NEW — ง่าย)
@@ -948,43 +998,43 @@ Lightsail Ubuntu 2 vCPU / 2 GB / 60 GB SSD  ($12/mo)  + static IP (ฟรีเ�
 ## 11. Phase 2 — V1 (Variants, Public + Points, Photos, Documents, Community)
 
 ### Plan Variants & Compare
-- [ ] A6.1 create variant (fork จาก day index) + key_decision
-- [ ] A6.2 AI multi-variant (2–3 ตาม key decision candidates)
-- [ ] A6.3 `GET /plans/:id/compare?with=` metrics (cost, per person, travel รวม, coverage%, POI count, warnings)
-- [ ] A6.4 votes + freeze plan
-- [ ] A6.5 conflict detector (pace/budget/must-do ชนกัน) ก่อน generate
-- [ ] W6.1 Compare page (metrics table + parallel timeline + pros/cons)
-- [ ] W6.2 Vote UI + freeze
+- [x] A6.1 create variant (fork จาก day index) + key_decision  ·  **หมายเหตุ:** variant = snapshot ทั้งก้อนในตาราง `plan_variants` (JSON shape เดียวกับ AI draft) — อ่านอย่างเดียว เทียบ/โหวต/adopt ไม่แก้ในตัว · `POST /trips/:id/variants` fork แพลนปัจจุบัน + `from_day_index` บันทึกจุดแตก (Decision Log 24 ส.ค.)
+- [x] A6.2 AI multi-variant (2–3 ตาม key decision candidates)  ·  **หมายเหตุ:** `POST /trips/:id/variants/generate` — job เดียวรัน pipeline 2–3 รอบ (สมดุล/สายชิล/จัดเต็ม — pace เปลี่ยน itemsPerDay จริง) ใช้เครดิตตามจำนวนแบบ ตรวจโควตาก่อนเริ่ม
+- [x] A6.3 compare metrics (cost, per person, travel รวม, coverage%, POI count, warnings)  ·  **หมายเหตุ:** อยู่ใน `GET /trips/:id/variants` — ทุก variant + แพลนปัจจุบันถูกให้คะแนนด้วย `domain.ComputeVariantMetrics` ชุดเดียวกัน (มี unit test)
+- [x] A6.4 votes + freeze plan  ·  **หมายเหตุ:** โหวตใช้ตาราง votes เดิม (`target_type='variant'`, กดซ้ำ = ถอน) · freeze = `POST|DELETE /trips/:id/plan/freeze` [owner] → trip.status='final' + middleware `PlanUnfrozen` กัน item/undo/apply/adopt ตอบ 409
+- [x] A6.5 conflict detector (pace/budget/must-do ชนกัน) ก่อน generate  ·  **หมายเหตุ:** `GET /trips/:id/conflicts` — `domain.DetectConflicts` อ่าน member_profiles (A3.1) + wishlist: pace ชิลชนจัดเต็ม, งบไม่ทับกัน, must ชน avoid (มี unit test)
+- [x] W6.1 Compare page (metrics table + parallel timeline + pros/cons)  ·  **หมายเหตุ:** `/t/[tripId]/plan/compare` — ตารางเทียบ + การ์ดต่อ variant (pros/cons, ไทม์ไลน์กางได้) + ปุ่มร่าง 2/3 แบบ + เก็บแพลนปัจจุบันก่อนสลับ + แบนเนอร์ conflicts
+- [x] W6.2 Vote UI + freeze  ·  **หมายเหตุ:** thumbs up/down ต่อ variant (patch cache ไม่รีโหลดตาราง), ปุ่ม "ตกลงตามนี้ — สรุปแพลน" [owner] + แบนเนอร์ล็อกบนแท็บแพลน · mock/live ทำงานครบทั้งคู่
 
 ### Public Model + Points
-- [ ] A10.4 publish flow: slug + privacy opts + `GET /public/plans/:slug` (expense hidden ทุกกรณี)
-- [ ] A10.5 เมื่อ owner กด publish → แสดง modal อธิบาย "เปิด public = ได้แต้มเมื่อคนจองตาม" + confirm
-- [ ] A11.1 `POST /trips/:id/clone` (reset booking/cost_status, source_trip_id/creator, counters)
-- [ ] A11.2 `GET /public/explore` filters + sort + index ที่จำเป็น
-- [ ] A12.6 `booking_confirmations` → award points ให้ source_creator_id (§6.5)
-- [ ] A12.7 `GET /users/me/points` + `/history` + แสดงบน profile
-- [ ] W10.5 Public plan page (ISR + SEO + OG) + ปุ่ม Clone + ปุ่มจอง (expense section ไม่โชว์)
-- [ ] W11.1 `/explore` + filters + infinite scroll
-- [ ] W11.2 Creator profile `/u/[handle]` + แต้มที่เคยได้
+- [x] A10.4 publish flow: slug + privacy opts + `GET /public/plans/:slug` (expense hidden ทุกกรณี)  ·  **หมายเหตุ:** ทำไว้ตั้งแต่ Phase 1 — endpoint จริงคือ `GET /public/trips/:tokenOrSlug` (token กับ slug ใช้ payload เดียวกัน) · Phase 2 เพิ่ม creator + view/clone counts ลง payload
+- [x] A10.5 เมื่อ owner กด publish → แสดง modal อธิบาย "เปิด public = ได้แต้มเมื่อคนจองตาม" + confirm  ·  **หมายเหตุ:** อยู่บนหน้าบันทึกทริป (W17.6) ตาม Decision Log 20 ส.ค. — จุดชวนเปิด public คือทริปที่จบแล้ว
+- [x] A11.1 `POST /trips/:id/clone` (reset booking/cost_status, source_trip_id/creator, counters)  ·  **หมายเหตุ:** clone ของสมาชิกมีตั้งแต่ Phase 1 — Phase 2 แยก core เป็น `cloneTripForUser` และเพิ่ม `POST /public/trips/:tokenOrSlug/clone` [JWT] ให้คนนอกตามรอยได้ + award แต้ม clone ให้ creator
+- [x] A11.2 `GET /public/explore` filters + sort + index ที่จำเป็น  ·  **หมายเหตุ:** `TripStore.ListPublic` — q (title/cities), country, sort popular (views+clones×5) / new, limit/offset + total · ranked feed ถ่วงน้ำหนักแต้มยังเป็นเรื่องของ Phase 3
+- [x] A12.6 `booking_confirmations` → award points ให้ source_creator_id (§6.5)  ·  **หมายเหตุ:** สองทาง — (1) mark "จองแล้ว" ในแอป award ทันที (stand-in), (2) `POST /webhooks/affiliate/:partner` [secret header, 404 จนกว่าจะตั้ง `AFFILIATE_WEBHOOK_SECRET`] confirm click ครั้งเดียว + award · ตอน postback จริงต่อ partner (A12.9) ต้อง review ไม่ให้จ่ายซ้ำ
+- [x] A12.7 `GET /users/me/points` + `/history` + แสดงบน profile  ·  **หมายเหตุ:** มีตั้งแต่ Phase 1 (`/users/me/points` คืน balance + ledger 30 แถว) · Phase 2 เพิ่ม `PointsStore.Earned` (ยอดขาบวก) ให้หน้า creator
+- [x] W10.5 Public plan page (ISR + SEO + OG) + ปุ่ม Clone + ปุ่มจอง (expense section ไม่โชว์)  ·  **หมายเหตุ:** เพิ่มปุ่ม "เที่ยวตามแพลนนี้" (ล็อกอินแล้ว clone ทันที, ยังไม่ล็อกอินพาไป /login?next=) + creator byline + ยอดดู/ยอดตามรอย · OG per-trip ยังเป็น static (W10.4)
+- [x] W11.1 `/explore` + filters + infinite scroll  ·  **หมายเหตุ:** ค้นหา + quick chips + sort ยอดนิยม/มาใหม่ + ปุ่ม "ดูเพิ่ม" (นับ x/total) · mock seed แพลนสาธารณะ 3 ใบให้ feed ไม่ว่างตั้งแต่แรก
+- [x] W11.2 Creator profile `/u/[handle]` + แต้มที่เคยได้  ·  **หมายเหตุ:** การ์ดโปรไฟล์ + สถิติ (ทริป/ยอดดู/คนตามรอย/แต้มที่เคยได้) + กริดทริป + CTA ชวนเปิด public
 
 ### Travel Photo Feature
-- [ ] A18.1 migration: ตาราง `trip_photos`, S3 upload config (R2 photo bucket)
-- [ ] A18.2 photo upload endpoint (resize/compress ก่อน store) + delete
-- [ ] A18.3 `GET /trips/:tripId/photos?poi_id=` — photos ที่ POI นั้นในทริปนี้
-- [ ] A18.4 photobook export job: เรียง photos ตาม day/poi → render HTML template → PDF/Ebook via gotenberg → R2
-- [ ] W18.1 **Photos tab** ใน trip room — grid รวมทุกรูปในทริป (กรองตาม day, สมาชิก)
-- [ ] W18.2 **Photo ที่ item card** — เมื่อ item มี photos → แสดง thumbnail strip + ปุ่ม upload
-- [ ] W18.3 **POI Photo Grid** (IG-style) — เมื่อเปิด item/POI detail เห็นรูปทั้งหมดที่ถ่ายที่นั้นใน trip นี้ (แบบ Map pin + grid ใน ref image)
-- [ ] W18.4 ปุ่ม "สร้าง Travel Photo Book" → เลือก format (PDF/Ebook) → download link
+- [x] A18.1 migration: ตาราง `trip_photos`, S3 upload config (R2 photo bucket)  ·  **หมายเหตุ:** `services/storage` เขียนใหม่ให้มีของจริงสองหลัง — R2 ผ่าน aws-sdk-go-v2 (presigned GET, TTL 7 วัน) เมื่อมี `R2_*` ครบ, ไม่งั้นลงดิสก์ที่ `./uploads` แล้ว API เสิร์ฟเองที่ `/uploads` (dev/UAT ใช้ได้โดยไม่ต้องมีบัญชี R2) · **แถวเก็บ key ไม่ใช่ URL** — URL ออกตอนอ่าน จึงย้ายหลังบ้านได้โดยไม่ต้อง migrate ข้อมูล
+- [x] A18.2 photo upload endpoint (resize/compress ก่อน store) + delete  ·  **หมายเหตุ:** ย่อที่เบราว์เซอร์ก่อนส่ง (`lib/image.ts` `photoFromFile` — ด้านยาวสุด 1600px, WebP, ≤900KB) แบบเดียวกับรูปปกทริป · API รับ multipart, allowlist jpg/png/webp, ลบได้เฉพาะคนอัปหรือเจ้าของทริป และลบไฟล์ใน bucket ตามด้วย
+- [x] A18.3 `GET /trips/:tripId/photos?poi_id=` — photos ที่ POI นั้นในทริปนี้  ·  **หมายเหตุ:** กรองด้วย `day_id` / `item_id` / `user_id` — รูปที่ผูกกับ item จะสืบ day และ poi ของ item ให้อัตโนมัติ จึงกรองด้วย item ได้ตรง ๆ
+- [x] A18.4 photobook export: เรียง photos ตาม day → render HTML → พิมพ์/บันทึก PDF  ·  **หมายเหตุ:** `GET /trips/:id/photobook` คืนหน้า HTML self-contained ให้สั่งพิมพ์เอง — ตามการตัดสินใจเดิมเรื่อง PDF (§16, 20 ส.ค.) ไม่แบก headless Chrome · ไม่ได้ทำเป็น job → R2 → signed url
+- [x] W18.1 **Photos tab** ใน trip room — grid รวมทุกรูปในทริป (กรองตาม day, สมาชิก)
+- [x] W18.2 **Photo ที่ item card** — เมื่อ item มี photos → แสดง thumbnail strip + ปุ่ม upload
+- [x] W18.3 **POI Photo Grid** (IG-style) — รูปทั้งหมดที่ถ่ายที่ item นั้น อยู่บนการ์ดเลย  ·  **หมายเหตุ:** รวมกับ W18.2 เป็นชิ้นเดียว — strip บนการ์ดคือกริดของ POI นั้นอยู่แล้ว ไม่ต้องเปิด detail แยก
+- [x] W18.4 ปุ่ม "สร้าง Travel Photo Book" → เปิดหน้าพร้อมพิมพ์  ·  **หมายเหตุ:** เลือก format PDF/Ebook ยังไม่มี — พิมพ์จากเบราว์เซอร์ได้ทั้ง PDF และกระดาษ
 - [ ] W18.5 Photo Book แนบกับ profile creator (แสดงใน `/u/[handle]`)
-- [ ] X18.1 ทดสอบ upload image บนมือถือ + preview ลื่น
+- [ ] X18.1 ทดสอบ upload image บนมือถือ + preview ลื่น  ·  **หมายเหตุ:** ยังไม่ได้ทดสอบบนเครื่องจริง
 
 ### Document Folder
-- [ ] A19.1 migration: ตาราง `trip_documents`, R2 document bucket
-- [ ] A19.2 document upload (accept: PDF, image, common docs) + delete
-- [ ] W19.1 **Documents tab** ใน trip room — list ไฟล์แยก category (ตั๋ว/โรงแรม/transport/อื่นๆ)
-- [ ] W19.2 Upload dialog: เลือกไฟล์ + ตั้งชื่อ + เลือก category
-- [ ] W19.3 Preview inline สำหรับ image + ปุ่ม download
+- [x] A19.1 migration: ตาราง `trip_documents`, R2 document bucket  ·  **หมายเหตุ:** ใช้ storage ตัวเดียวกับรูป (`R2_DOCUMENT_BUCKET`, fallback ดิสก์)
+- [x] A19.2 document upload (accept: PDF, image, common docs) + delete  ·  **หมายเหตุ:** allowlist PDF/jpg/png/webp/heic/doc/docx — ไฟล์รันได้ไม่มีสิทธิ์อยู่ในนี้ · body limit ขยับเป็น 8M
+- [x] W19.1 **Documents tab** ใน trip room — list ไฟล์แยก category (ตั๋ว/โรงแรม/transport/ประกัน/อื่นๆ)
+- [x] W19.2 Upload dialog: เลือกไฟล์ + ตั้งชื่อ + เลือก category  ·  **หมายเหตุ:** ไดอะล็อกเปิด**หลัง**เลือกไฟล์ เพราะชื่อไฟล์คือค่าตั้งต้นเดียวที่สมเหตุสมผลของช่องชื่อ
+- [x] W19.3 Preview inline สำหรับ image + ปุ่ม download
 
 ### AI & Itinerary Enhancements
 - [ ] A4.13 auto-fix suggestion จาก issues ("ให้ AI แก้")
@@ -994,9 +1044,9 @@ Lightsail Ubuntu 2 vCPU / 2 GB / 60 GB SSD  ($12/mo)  + static IP (ฟรีเ�
 
 ### More Phase 2
 - [ ] A8.4 rule blocks trigger จาก item (car → IDP/ETC/snow tires, themepark, onsen, rail pass)
-- [ ] A9.2 mentions + notification inbox + LINE Messaging notify
-- [ ] A9.3 tasks (assign/due/done), polls
-- [ ] W9.3 presence/typing indicator (SSE)
+- [x] A9.2 mentions + notification inbox + LINE Messaging notify  ·  **หมายเหตุ:** ตาราง `notifications` (แยกจาก `activity_logs` เพราะอันนี้ "ส่งถึงคนคนหนึ่ง" มีสถานะอ่าน/ยังไม่อ่าน) + `GET|POST /users/me/notifications` · `@handle` ในคอมเมนต์แจ้งเฉพาะ**สมาชิกในทริปนั้น** (มีเทสต์คุมว่าคนนอกไม่โดน และคนเขียนไม่แจ้งตัวเอง) · LINE push ผ่าน `services/notify` — ไม่มี token = เงียบ ไม่พัง
+- [x] A9.3 tasks (assign/due/done), polls  ·  **หมายเหตุ:** tasks มีอยู่แล้วตั้งแต่ M8 (`prep_tasks` มี assignee/due/done ครบ) · เพิ่ม `polls` — คำตอบใช้ตาราง `votes` เดิม (`target_type='poll'`, index ตัวเลือกอยู่ใน `value`) ไม่ต้องมีตารางที่สอง · ปิดโพลได้เฉพาะคนเปิดหรือ owner, โพลที่ปิดแล้วตอบไม่ได้ (มีเทสต์)
+- [x] W9.3 presence/typing indicator (SSE)  ·  **หมายเหตุ:** `POST /trips/:id/presence` publish อย่างเดียว ไม่เก็บลง DB — presence เป็นจริงแค่ไม่กี่วินาที ไม่ใช่แถว · ฝั่งเว็บ ping ทุก 20 วิ (เฉพาะตอนแท็บ visible) แล้วลืมคนที่เงียบเกิน 45 วิ · **ใช้ SSE เส้นเดียวกับ TripRealtime** ไม่เปิด connection ที่สอง
 - [ ] D2.1 seed 20–30 public plans จากทีม/อินฟลูฯ ก่อนเปิด
 - [ ] A12.8 เพิ่ม partner: car rental, eSIM, insurance, flight
 - [ ] A12.9 postback จริงตาม partner ที่ approve
@@ -1005,18 +1055,84 @@ Lightsail Ubuntu 2 vCPU / 2 GB / 60 GB SSD  ($12/mo)  + static IP (ฟรีเ�
 
 ## 12. Phase 3 — V2
 
-- [ ] A11.3 `pkg/domain/match.go` match score (dates, budget, tags, party) + `GET /explore?match=`
-- [ ] A11.4 clone + AI auto-adapt (วัน/คน/งบต่าง) + diff preview
-- [ ] A11.5 reviews + actual budget post-trip
-- [ ] W10.6 Trip Mode `/t/[id]/now` (วันนี้/ถัดไป, กด navigate → Google Maps, PWA offline cache)
-- [ ] W10.7 export .ics + IG story image (1:1 สรุปทริป)
-- [ ] A16.5 Expense settle-up จริง (คำนวณใครโอนใคร ขั้นต่ำสุด)
-- [ ] A12.10 Points redemption: ออก discount code ใช้ลด booking ใน ROVE
-- [ ] A12.11 creator revenue share ledger + payout report (Points → THB ถ้า scale)
-- [ ] A12.12 agent lead handoff (form → email/LINE partner + tracking)
-- [ ] Photo Book V2: auto-layout, cover design, custom theme
-- [ ] I18N: EN + ประเทศที่ 2 (KR/TW): zones, POI, prep rules
-- [ ] INFRA: ย้าย MySQL ไป managed DB / แยก AI worker เป็น service แยก
+- [x] A11.3 `pkg/domain/match.go` match score (dates, budget, tags, party) + `GET /explore?match=`  ·  **หมายเหตุ:** `ScoreMatch` ถ่วงน้ำหนัก 30/25/25/20 — ช่วงเวลา (เดือนแบบวงกลม + ความยาวทริป), งบ (ถูกกว่างบยังเข้าเกณฑ์ แพงกว่าสองเท่า = 0), แท็ก (`TagCoverage` = "สิ่งที่อยากได้มีกี่ส่วน" ไม่ใช่ Jaccard), ขนาดกลุ่ม · คนละประเทศ = 0 ไม่ใช่คะแนนน้อย · `GET /public/explore?match=<tripId>` [OptionalJwt, ต้องเป็นสมาชิกทริปนั้น] จัดอันดับใน Go บน pool 200 ใบ (คะแนนไม่ใช่คอลัมน์) แล้วคืน `scored` มาบอกด้วยว่าจัดอันดับจากกี่ใบ · แท็กของแพลนสาธารณะมาจาก `PlanStore.TagSignals` (area + category/tags ของ POI) ไม่แตะ wishlist ของคนอื่น
+- [x] A11.4 clone + AI auto-adapt (วัน/คน/งบต่าง) + diff preview  ·  **หมายเหตุ:** `POST /public/trips/:tokenOrSlug/adapt/preview` (ไม่เขียนอะไรเลย) และ `POST .../adapt` (clone แล้วปรับ) — `/clone` เดิมยังเป็น clone ธรรมดา · `domain.AdaptPlan` ทำตามลำดับ ยาว→จังหวะ→งบ: ตัดวันที่เงียบที่สุดตรงกลาง (วันแรก/วันสุดท้ายคือโครง) แล้วย้ายไฮไลต์ไปวันที่ยังมีที่ว่าง, กลุ่มใหญ่ขึ้นลดที่ต่อวัน, เกินงบตัดของที่ตัดได้เรียงจากแพงสุด — ที่พัก/เดินทาง/มื้ออาหารไม่เคยถูกตัด และถ้ายังเกินงบก็บอกตรง ๆ · **เป็น deterministic ไม่ใช่ model call** (Decision Log 25 ส.ค.)
+- [x] A11.5 reviews + actual budget post-trip  ·  **หมายเหตุ:** ตาราง `trip_reviews` (unique (trip_id,user_id) — แก้รีวิว = แทนที่ ไม่ใช่ความเห็นที่สอง) · `GET /trips/:id/reviews` + `PUT|DELETE /trips/:id/reviews/me` [สมาชิก, เขียนได้เฉพาะหลังทริปจบ ไม่งั้น 409] · ยอด "ใช้จริงต่อคน" เฉลี่ยเฉพาะคนที่บอก (`budget_said`) ไม่เฉลี่ยรวมคนที่ไม่บอก · roll-up ไปโผล่บนหน้าแพลนสาธารณะ/explore/creator ผ่าน `ReviewStore.SummaryByTrips` (คิวรีเดียวต่อหน้า) · **ไม่ใช่ ledger ค่าใช้จ่าย** — `expense_entries` ยังไม่หลุด public payload (มีเทสต์คุม)
+- [x] W10.6 Trip Mode `/t/[id]/now` (วันนี้/ถัดไป, กด navigate → Google Maps, PWA offline cache)  ·  **หมายเหตุ:** ตอบสามคำถามเท่านั้น — ตอนนี้ / ต่อไป / ไปยังไง · "ตอนนี้" คือที่เริ่มไปแล้วและยังไม่เลย end time · ปุ่มนำทางส่งชื่อที่+ย่าน+เมืองไป Google Maps (`dir/?api=1&destination=`) ไม่วาดแผนที่เอง · ห้องทริปซ่อน header/tabs/bottom bar ทั้งหมดในโหมดนี้ (`TripRoomShell` อ่าน segment) · **offline:** `public/sw.js` แคช shell (navigation = network-first, static = cache-first, ไม่แตะ cross-origin/ไม่แคช redirect ไป /login) + `lib/offline.ts` เก็บ snapshot ของแพลนใน localStorage (อายุ 14 วัน) ไม่ persist query cache ทั้งก้อนเพราะจะพารายจ่าย/รายชื่อคนลงเครื่องไปด้วย · `app/manifest.ts` + ไอคอนเรนเดอร์จาก mark เดียวที่ `app/pwa-icon/[size]`
+- [x] W10.7 export .ics + IG story image (1:1 สรุปทริป)  ·  **หมายเหตุ:** .ics มีตั้งแต่ Phase 1 (`buildICS` — all-day event ต่อวัน ไม่ยิง 20 อีเวนต์ต่อวันเข้าปฏิทินคน) และอยู่ในไดอะล็อกแชร์อยู่แล้ว · story image 1080×1080 วาดด้วย canvas ในเบราว์เซอร์ (`lib/story-image.ts`) — สีอ่านจาก `styles/brand.css` ตอนวาด ไม่ hardcode hex, ตัดคำภาษาไทยแบบทีละตัวอักษรเพราะไม่มีช่องว่าง · มือถือส่งเข้า share sheet ผ่าน `navigator.share({files})` ที่เหลือดาวน์โหลด PNG
+- [x] A16.5 Expense settle-up จริง (คำนวณใครโอนใคร ขั้นต่ำสุด)  ·  **หมายเหตุ:** `domain.Settle` เลิกใช้ greedy ล้วน — หา**กลุ่มย่อยที่หักลบกันเองลงตัว**ให้ได้มากที่สุด (กลุ่ม k คนต้องโอน k-1 ครั้งเสมอ) ด้วย DP บน subset แล้วค่อย greedy ในแต่ละกลุ่ม · เศษจากการปัดเศษต่อคนถูกกลืนเข้ากับยอดที่ใหญ่ที่สุด ไม่ปล่อยให้กลายเป็นหนี้ผี · เกิน 12 คนถอยไปใช้ greedy (3^n) · twin ใน `lib/data/domain.ts` + เทสต์คู่ทั้งสองฝั่ง
+- [~] A12.10 Points redemption: ออก discount code ใช้ลด booking ใน ROVE  ·  **ปิดใช้งาน 26 ส.ค. 2569 — รอ Phase 6:** `domain.RedemptionOpen = false` (`POST /users/me/points/redeem` → 403, `tiers` ว่าง, เอาการ์ดออกจากโปรไฟล์, เอาช่องกรอกโค้ดออกจากไดอะล็อก AI) · โค้ดที่ออกไปแล้วยังใช้ได้ และ "ใช้แต้มร่าง AI" ไม่ถูกปิด · เหตุผล: อัตรา 8 แต้ม = ฿1 อ้างอิงราคาป้ายภายในราคาเดียว ไม่ได้อ้างอิงต้นทุนจริงของรางวัล และการจองที่ยืนยันแล้วจ่ายออกสองทาง (480 แต้มคงที่ + ส่วนแบ่ง 30%) จึงขาดทุนเมื่อยอดจอง < ~฿1,714 → ดู [docs/phase-6-points-economy.md](docs/phase-6-points-economy.md)  ·  **หมายเหตุเดิม (26 ส.ค. 2569):** แตะระดับส่วนลดแล้ว**เปิดไดอะล็อกยืนยัน ไม่ใช่แลกทันที** — บอกว่าใช้กี่แต้ม เหลือกี่แต้ม และย้ำว่าคืนไม่ได้ · เป็นปุ่มเดียวบนโปรไฟล์ที่กดผิดแล้วแก้ไม่ได้ (ไม่มี endpoint ยกเลิกโค้ด และไม่ควรมี — โค้ดที่คืนได้คือโค้ดที่ใช้ก่อนแล้วค่อยคืน) · แลกไม่สำเร็จ = ไดอะล็อกยังเปิดพร้อมข้อความ ไม่ใช่หายไปเฉย ๆ ทั้งที่ยอดไม่ขยับ · **หมายเหตุเดิม:** อัตรา 8 แต้ม = ฿1 (มาจากราคาที่มีอยู่แล้ว: ร่าง 1 ครั้ง = 300 แต้ม = ฿39 — แลกจึงไม่ได้เปรียบกว่าใช้ตรง ๆ) · ระดับที่ออกได้: ฿50/฿100/฿300, อายุ 180 วัน, ใช้ครั้งเดียว, โค้ดรูป `ROVE-XXXXXX` ตัดตัว I O 0 1 ทิ้ง · **หักแต้มตอนออกโค้ด** ไม่ใช่ตอนใช้ — โค้ดที่มีอยู่คือโค้ดที่จ่ายแล้ว · `scope` รองรับ `booking` ไว้แล้วแต่วันนี้ใช้ได้กับ `ai_credits` ซึ่งเป็นสิ่งเดียวที่ ROVE เก็บเงิน · กันใช้ซ้ำด้วย claim → order → attach (แพ้ race = ไม่ได้ส่วนลด ไม่ใช่ได้ฟรี)
+- [x] A12.11 creator revenue share ledger + payout report (Points → THB ถ้า scale)  ·  **หมายเหตุ:** ตาราง `creator_earnings` + `payouts` **แยกจาก `user_points`** — แต้มคือคะแนน, อันนี้คือเงินที่พาร์ตเนอร์ติดค้าง · ส่วนแบ่ง 30% ของค่าคอม · ค่าคอมที่พาร์ตเนอร์ส่งมาชนะเสมอ (รวมกรณีส่งมาเป็น 0), ไม่ส่งมาถึงประเมินจากเรตต่อพาร์ตเนอร์แล้วติดธง `estimated` ให้รายงานเห็น · `GET /users/me/earnings` (ครีเอเตอร์) · `GET|POST /admin/payouts` (รายงานต่อเดือน + ปิดยอดทีละคน, ขั้นต่ำ ฿300 ไม่ถึงทบไปเดือนหน้า) · click id unique กัน webhook ยิงซ้ำ
+- [x] A12.12 agent lead handoff (form → email/LINE partner + tracking)  ·  **หมายเหตุ:** ตาราง `agent_leads` — เก็บ**สแนปช็อต**ของทริป (วัน/จำนวนคน/งบ/ปลายทาง) ตอนส่ง เพราะเอเจนต์เสนอราคาจากสิ่งที่ได้รับ ส่วนห้องยังแก้ต่อ · `POST|GET /trips/:id/leads` [editor/viewer] · ส่งออกทางอีเมล + LINE ตาม `AGENT_LEAD_EMAIL` / `AGENT_LEAD_LINE_USER_ID` — ไม่ตั้งค่า = **เก็บ row ไว้แล้วบอกตรง ๆ ว่ายังไม่ได้ส่ง** (`simulated`) · คิวฝั่ง ops ที่ `GET /admin/leads` + `PATCH /admin/leads/:id`
+- [x] Photo Book V2: auto-layout, cover design, custom theme  ·  **หมายเหตุ:** `domain.PhotoBookLayout` จัดหน้าตามจำนวนรูปของวันนั้นบนกริด 6 คอลัมน์ — 1 รูปเต็มหน้า, 3 รูปมีตัวนำสูง, 7 รูปแถวสุดท้ายกินเต็มแถวแทนที่จะเหลือรูปโดดกับช่องว่าง (มีเทสต์ว่าไม่มีแถวไหนเหลือรู) · ปกใช้รูปในทริปเอง + scrim (เลือกด้วย `?cover=`) และไม่ถูกใส่ซ้ำในเล่ม · ธีม 3 แบบ (กระดาษ/หมึกเข้ม/ฟิล์ม) ผ่าน `?theme=` — พิมพ์ผิดได้เล่ม default ไม่ใช่ error · แคตตาล็อกธีมมาจาก API (`GET /trips/:id/photobook/themes`) ให้ตัวเลือกกับตัวเรนเดอร์ตรงกันเสมอ
+- [~] I18N: EN + ประเทศที่ 2 (KR/TW): zones, POI, prep rules  ·  **ประเทศที่ 2 = เสร็จ:** zones เกาหลี 10 โซน (โซล 5 + วันเดย์ทริป + ปูซาน) มี `Country` และ `ZonesForCountry`, เพื่อนบ้านเป็นสองทางแล้ว (เทสต์จับเจอว่าเดิม `CanShareDay` ตอบไม่เหมือนกันเมื่อสลับลำดับ) · `data/poi/kr.csv` 31 แห่ง, seeder อ่านทุก `data/poi/*.csv` และเอาชื่อไฟล์เป็นรหัสประเทศ · prep rules ย้ายเข้า `domain.PrepTemplateFor(country)` มี TH/EN ทั้งคู่ — JP นำด้วย Visit Japan Web, KR นำด้วย K-ETA/Q-CODE, ประเทศที่ไม่รู้จักยังได้ลิสต์กลาง 6 ข้อ · หน้าเว็บ `Trip.country` ส่งต่อจนถึง mock  ·  **EN = ยังไม่ครบ:** ท่อ next-intl พร้อมแล้ว (`messages/en.json`, locale จากคุกกี้ผ่าน server action, ตัวสลับภาษาในโปรไฟล์) แต่ข้อความบนจอ ~5,800 ชิ้นยังฮาร์ดโค้ดภาษาไทยอยู่ในคอมโพเนนต์ — ต้องดึงออกเป็นคีย์ก่อนถึงจะเรียกว่าแปลแล้ว ตัวสลับภาษาจึงบอกตรง ๆ ว่าตอนนี้แปลเฉพาะเมนู · แผนงานเต็มและข้อเสนอให้ใช้ `[locale]` segment แทนคุกกี้อยู่ที่ [docs/i18n-plan.md](docs/i18n-plan.md) (D1 ยังไม่เคาะ) — ที่ทำไปคือตัวเลือก A ซึ่งถอดทิ้งได้โดยไม่เสีย messages/ตัวสลับ
+- [x] INFRA: ย้าย MySQL ไป managed DB / แยก AI worker เป็น service แยก  ·  **หมายเหตุ:** managed DB ทำไปแล้วตอนย้ายไป ECS (RDS `deploy/terraform/rds.tf`, ADR 0004) · worker แยกด้วย `ROVE_ROLE=api|worker|all` — คิวเป็น Redis list ไม่ใช่ broker เพราะงานอยู่ในตาราง `ai_jobs` อยู่แล้ว คิวถือแค่ซองจดหมาย · `api` push แล้วจบ, **ต่อ Redis ไม่ได้ = ร่างในโปรเซสตัวเองแทน** (เครดิตถูกหักไปแล้ว การทำหายแย่กว่าการช้า) · `worker` รัน pool ตัวเดียวกับโหมด `all` จึงได้ร่างเหมือนกันเป๊ะ · terraform: `worker.tf` (service ไม่มี ingress, FARGATE_SPOT ล้วน — งานที่หลุดกลับไปเป็น `queued` ได้), compose: `--profile worker`
+
+---
+
+## 12b. Phase 4 — ความโปร่งใสของแต้ม และหลักฐานทางสังคม
+
+> **ที่มา:** review 26 ส.ค. 2569 — ไล่โค้ดจริงหลัง Phase 3 แล้วพบว่าสองในสามเรื่องที่คิดว่า
+> "ยังไม่มี" คือของที่ **สร้างเสร็จแล้วแต่ไม่มีทางเข้า** ไม่ใช่ฟีเจอร์ที่ขาด
+> จึงแยกเป็นสองกอง: บั๊กเดินสาย (แก้แล้ว) กับงานจริงของ Phase 4
+
+### แก้แล้ว — ไม่ใช่ฟีเจอร์ แต่เป็นทางเข้าที่หายไป
+- [x] P4.0 `/explore` ไม่มีลิงก์เข้าจากที่ไหนเลยนอกจากหน้า error  ·  **ตามมา 26 ส.ค. 2569:** พอ `/explore` เป็นแท็บแล้ว โผล่บั๊กที่สอง — ตัวหน้าอยู่ `app/(marketing)` ใช้ `PublicShell` กดแท็บเลยหลุดออกจาก chrome ของแอปทั้งก้อน (ไม่มีแถบล่าง ไม่มีทางกลับ) และลามไป `/p/:slug` `/u/:handle` ที่กดต่อจากการ์ด · แก้ด้วย [browse-shell.tsx](apps/web/components/common/browse-shell.tsx) ที่เลือกเปลือกตามสถานะล็อกอิน (อ่านคุกกี้ฝั่ง server ผ่าน [lib/session.ts](apps/web/lib/session.ts) เพื่อไม่ให้เปลือกกระพริบ) · แท็บ "สำรวจ" ติดสถานะ active ต่อเนื่องถึง `/p/` และ `/u/` แบบเดียวกับที่ "ทริปของฉัน" ครอบ `/t/` และ `/recap/` · **หมายเหตุเดิม:** หน้าสำรวจ + filter + sort + match score + infinite scroll ทำครบตั้งแต่ W11.1/A11.3 แต่ `AppShell.NAV` ไม่มีแท็บ และ landing page ไม่มีลิงก์ → เข้าได้เฉพาะคนที่พิมพ์ URL เอง · แก้โดยสลับ `/dreams` ออกจากแท็บหลัก (มีทางเข้าอยู่แล้ว 3 จุด: home, profile, profile menu) แล้วให้ `/explore` แทน — ปุ่ม "สร้างทริป" ยังอยู่กลางแถบล่างตามที่ §7 กำหนด · เพิ่มลิงก์บน landing header และบนหน้าแพลนสาธารณะ (คนที่กด "เที่ยวตามแพลนนี้" ได้ ต้องหาแพลนอื่นต่อได้)
+
+### M23 — ที่มาที่ไปของแต้ม (ผู้ใช้ต้องตรวจสอบตัวเองได้)
+> **ทำไมถึงไม่ใช่ nice-to-have:** แต้มแลกเป็นโค้ดส่วนลดได้จริงที่ 8 แต้ม = ฿1 (A12.10)
+> เมื่อแต้มมีมูลค่าแลกได้ ผู้ใช้ต้องเห็น ledger ของตัวเองว่าได้มาจากไหนและใช้ไปกับอะไร
+> ตอนนี้ **backend มีข้อมูลครบแล้ว แต่ frontend ไม่เคยเรียกเลย**
+
+- [x] A23.1 ต่อ `GET /users/me/points` เข้าหน้าเว็บ  ·  **หมายเหตุ:** ย้ายออกจาก `user.handler.go` มาอยู่ [points.handler.go](apps/api/pkg/handlers/api/points.handler.go) เพราะโตเกินกว่าจะเป็นฟังก์ชันแถมของโปรไฟล์ · ตารางจริงชื่อ `user_points` ไม่ใช่ `points_transactions` และคอลัมน์คือ `delta`/`reason`/`note`/`trip_id`/`occurred_at` (สเปคเดิมเขียนชื่อผิด) · **cursor pagination** ด้วย `(occurred_at, id)` — สองคอลัมน์เพราะแต้มสองรายการลงวินาทีเดียวกันได้ คีย์เดียวจะซ้ำหรือข้ามแถว · cursor เป็น `<rfc3339nano>|<uuid>` อ่านออกโดยตั้งใจ (มันคือตำแหน่งใน ledger ของตัวเอง ไม่ใช่ capability) · resolve `trip_id` เป็นชื่อทริปด้วย `TripStore.TitlesByIDs` คิวรีเดียวต่อหน้า (สองคอลัมน์ ไม่ใช่ทั้งแถว) · คืน `earned` มาด้วย เพราะ "ได้มาทั้งหมด" กับ "คงเหลือ" คนละคำถาม · index `(user_id, occurred_at, id)` ใน migration 202608260000
+- [x] A23.2 `GET /users/me/audience` — สรุปคนตามรอยของเจ้าของบัญชีเอง  ·  **หมายเหตุ:** ต่อทริป + ยอดรวม + `top_trip_id` (คัดจาก clone×5 + view) · **ไม่มีตาราง `plan_clones`** ในโค้ดจริง — การตามรอยเก็บเป็น `trips.clone_count` กับ `trips.source_trip_id` ของฉบับที่ถูกก๊อป จึงใช้ `PointsStore.EarnedByTrip(user, 'trip_cloned')` คิวรีเดียว group by trip แทน join · แยก `clones` กับ `awarded_clones` ไว้คนละช่อง เพราะไม่เท่ากันจริง ๆ (ก๊อปทริปตัวเองไม่ได้แต้ม) และการ์ดต้องอธิบายส่วนต่างได้
+- [x] W23.1 หน้า "ประวัติแต้ม" — **หน้าแยกที่ `/points`** ไม่ใช่การ์ดบนโปรไฟล์  ·  **หมายเหตุ:** [points-screen.tsx](apps/web/components/profile/points-screen.tsx) + [app/(app)/points](apps/web/app/(app)/points/page.tsx) · วางเป็นหน้าแยกแบบเดียวกับ `บิลและการชำระเงิน` เพราะเป็น**บันทึกที่คนตั้งใจมาเปิดหา** ไม่ใช่ของที่เลื่อนผ่าน — ledger ที่อยู่ลึกลงไปสามจอในโปรไฟล์คือ ledger ที่ไม่มีใครตรวจ · ทางเข้าสองทาง: แถวในเมนูโปรไฟล์ (ข้าง ๆ บิล พร้อมยอดคงเหลือเป็น hint) และลิงก์ "ดูประวัติแต้ม" บนการ์ดยอดแต้ม ซึ่งเป็นจุดที่คำถาม "ทำไมได้เท่านี้" เกิดขึ้นจริง · โปรไฟล์เหลือ "มีเท่าไหร่ + แลกอะไรได้", หน้านี้ตอบ "มาจากไหน" · สรุปสามช่อง (ได้มาทั้งหมด / ใช้ไปแล้ว / คงเหลือ) แล้วตามด้วยรายการ · ป้ายกำกับมาจาก `reason` ไม่ใช่จาก `note` ที่ API เขียนมา (reason ใหม่จาก backend จึงตกไปที่ note ไม่ใช่โผล่เป็น `booking_confirmed` ดิบ ๆ) · แถวที่มีทริปกดไปห้องนั้นได้ · `useInfiniteQuery` + ปุ่ม "ดูย้อนหลังเพิ่ม", หมดแล้วบอกว่าหมด · `/points` เพิ่มใน `GUARDED` ของ `proxy.ts`
+- [x] W23.2 การ์ด "คนตามรอยฉัน" บน `/profile`  ·  **หมายเหตุ:** [audience-card.tsx](apps/web/components/profile/audience-card.tsx) — เลือก `/profile` ไม่ใช่ `/home` เพราะของครีเอเตอร์ทั้งหมด (แลกแต้ม, รายได้, ประวัติ) อยู่ที่นี่หมดแล้ว · ยังไม่เปิดสาธารณะ = ไม่มีการ์ด (ไม่ใช่การ์ดว่าง) · ทริปที่มีคนดูแต่ยังไม่ได้แต้มเขียนว่า "ยังไม่ได้แต้มจากใบนี้" แทนที่จะโชว์ 0 เฉย ๆ
+- [x] X23.1 เทสต์: ledger ของ user A ต้องไม่โผล่ใน response ของ user B  ·  **หมายเหตุ:** [points_test.go](apps/api/pkg/handlers/api/tests/points_test.go) — เช็คทั้งสองทิศ (A ไม่เห็น B และ B ไม่เห็น A) เพราะทดสอบทางเดียวผ่านได้ทั้งตอนที่ scope ถูกและตอนที่ scope กลับด้าน · ทั้งสอง endpoint ไม่มี id ใน path เลย สิ่งเดียวที่กั้นคือ handler อ่าน subject จาก token — เทสต์นี้คือสิ่งที่ทำให้ `?user_id=` ที่ "ช่วยให้ debug ง่าย" ตกทันที · มีเทสต์เดินทั้ง ledger 71 แถวว่าไม่มีแถวซ้ำ/หาย และเทสต์ว่า `earned` ไม่ขยับเวลาใช้แต้ม
+
+### M24 — สถิติแพลตฟอร์มสำหรับผู้ใช้ใหม่ (social proof)
+> ของที่มีตอนนี้เป็น **per-trip** (`ReviewStore.SummaryByTrips`) กับ **per-creator** เท่านั้น
+> ไม่มี aggregate ระดับแพลตฟอร์ม และ landing page ไม่มี social proof เลยสักชิ้น
+
+- [x] A24.1 `GET /public/stats`  ·  **หมายเหตุ:** [stats.handler.go](apps/api/pkg/handlers/api/stats.handler.go) · **cache ใน Redis 10 นาที** แบบเดียวกับ `fx` — พลาด cache/Redis ล่ม = คิวรีใหม่ ไม่ใช่พัง (หน้า landing ต้องไม่ล้มเพราะ Redis) · "คนที่วางแพลนกับ ROVE" = `COUNT(DISTINCT owner_id)` ของ `trips` ไม่ใช่จำนวนบัญชี — สมัครแล้วไม่ทำอะไรไม่ใช่การวางแพลน · "คนตามรอย" นับ `trips.source_trip_id IS NOT NULL` (แถวที่ยังอยู่จริง) ไม่ใช่ผลบวก `clone_count` ที่ทริปถูกลบแล้วไม่คืนให้ · `computed_at` ติดไปด้วยเพราะตัวเลขที่แคชไว้ควรบอกได้ว่าสดแค่ไหน
+- [x] A24.2 `GET /public/reviews/recent`  ·  **หมายเหตุ:** join `trip_reviews × trips × users` ใน store · กรองสามชั้น: ทริปต้อง `visibility='public'`, `body <> ''`, และเจ้าของรีวิวต้อง `status='active'` · **รีวิวที่ให้ดาวแต่ไม่เขียนอะไรไม่ถูกยกมาอ้าง** — สรุปนับไปแล้ว การเอามาทำ testimonial คือการใส่คำในปากคน · มีเทสต์ว่า `expense_entries` ไม่หลุดมากับ payload นี้เหมือนทุก public endpoint (W16.5)
+- [x] W24.1 section สถิติบน landing page — วางระหว่าง steps กับ features  ·  **หมายเหตุ:** [platform-stats.tsx](apps/web/components/public/platform-stats.tsx) · เกณฑ์อยู่ที่ [lib/social-proof.ts](apps/web/lib/social-proof.ts) ไม่ได้ฝังในคอมโพเนนต์ เพราะหน้าแอดมินต้องตอบได้ว่า "ทำไมหน้าแรกไม่ขึ้นสถิติ" ด้วยตัวเลขชุดเดียวกัน · ต่ำกว่าเกณฑ์ = ไม่มี section (ไม่มี skeleton, ไม่มี "เร็วๆ นี้") · คะแนนเฉลี่ยขึ้นก็ต่อเมื่อมีรีวิวถึงเกณฑ์แยกอีกชั้น — ค่าเฉลี่ยจากสองรีวิวคือเกร็ดเล่าที่มีทศนิยม · มีเทสต์คุมเกณฑ์ ([social-proof.test.ts](apps/web/lib/__tests__/social-proof.test.ts)) เพราะการแหกกฎนี้หน้าตาเหมือนการปรับปรุง
+- [x] W24.2 การ์ดรีวิว "คนที่เที่ยวตามบอกว่า" บน landing + `/explore`  ·  **หมายเหตุ:** [traveller-reviews.tsx](apps/web/components/public/traveller-reviews.tsx) ใช้ซ้ำทั้งสองหน้า · บน `/explore` วางไว้ **ใต้** ฟีด — คนที่เลื่อนมาถึงตรงนั้นกำลังตัดสินใจว่าจะตามรอยดีไหม · ไม่ตัดข้อความด้วย "…" (รีวิวที่ถูกตัดกลางประโยคอ่านเหมือนรีวิวที่ถูกแก้) · น้อยกว่า 3 รีวิว = ไม่ขึ้น
+- [ ] D24.1 ทบทวนกับที่ปรึกษากฎหมายว่า M23 เพียงพอกับข้อกำหนดเรื่อง "แต้มที่แลกเป็นมูลค่าได้" หรือยัง (ต่อจาก §16 บรรทัด 19 ส.ค. เรื่อง `/terms` เป็นฉบับร่าง)  ·  **ยังค้าง — เป็นงานของคน ไม่ใช่ของโค้ด** · สิ่งที่ M23 ให้ไปแล้วสำหรับการทบทวน: ผู้ใช้เห็น ledger ตัวเองครบทุกแถวย้อนหลังไม่จำกัด (ไม่ใช่ 30 แถวล่าสุด), แต่ละแถวบอกที่มาและทริปต้นทาง, ยอด "ได้มา" กับ "คงเหลือ" แยกกัน, และการหักแต้มตอนแลกโค้ดเป็นแถวใน ledger ไม่ใช่การลบยอด
+
+---
+
+### M26 (แผน 4.1) — ปรับโครงสร้างราคาให้ตรงกับโมเดลธุรกิจ
+
+> **ที่มา:** review ราคา 26 ส.ค. 2569 — ไล่ที่มาของทุกราคาในระบบแล้วพบว่า **฿39 ไม่เคยเป็นราคา
+> มันคือคันเร่งคุมต้นทุน Anthropic** (§16 บรรทัด 19 ส.ค.) และ ฿129/เดือนไม่มีที่มาบันทึกไว้เลย
+> เอกสารเต็ม: [docs/business-plan.md](docs/business-plan.md)
+>
+> **ปัญหาเชิงโครงสร้างสองชั้น**
+> 1. **หน่วยเก็บเงินไม่ตรงกับหน่วยที่ลูกค้าได้คุณค่า** — คนไทยไปญี่ปุ่นปีละ 0.8–2 ครั้ง
+>    ไม่ใช่ทุกเดือน แพ็กเกจรายเดือนจึงเชิญชวนให้ทำสิ่งเดียว: สมัคร → วางแผนจบใน 30 วัน → ยกเลิก
+> 2. **paywall ยืนขวางรายได้ที่ใหญ่กว่า 37 เท่า** — ค่าคอมต่อทริปที่จบด้วยการจองอยู่ที่
+>    ฿1,200–1,700 (`trip-planning-platform-plan.md` §9.3) ทุกครั้งที่ ฿39 ทำให้ใครวางแผนไม่จบ
+>    เราเก็บได้ ฿0 และเสียโอกาส ฿1,450 พร้อมกัน
+>
+> **โครงสร้างใหม่:** ฟรี (1 ทริป · ร่าง 3 ครั้ง) / **Trip Pass ฿299 ต่อทริป คืนเต็มจำนวนเมื่อจองผ่าน ROVE** / ROVE Year ฿990
+> หัวใจอยู่ที่การคืนเงิน — มันเปลี่ยน paywall จากสิ่งกีดขวาง เป็นแรงผลักให้จอง และทำให้พูดกับ
+> ผู้ใช้ได้ทั้งประโยคโดยไม่ต้องปิดบัง: *"ถ้าจองผ่านเรา คุณไม่ต้องจ่ายค่าวางแผนเลย"*
+
+- [ ] A26.1 เปลี่ยน catalogue ใน [billing.go](apps/api/pkg/domain/billing.go) เป็น 3 ชั้นใหม่ — ตัด `rove_plus_monthly` / `rove_plus_yearly` ทิ้งทั้งคู่ · `SubscriptionPlan` ต้องรับ interval `trip` เพิ่มจาก `month`/`year` เพราะหน่วยขายหลักไม่ใช่เวลาอีกต่อไป
+- [ ] A26.2 `OrderKindTripPass` + สิทธิ์ผูกกับทริป — pass เป็นของ **ทริป** ไม่ใช่ของคน (สมาชิกคนไหนในห้องซื้อก็ปลดล็อกให้ทั้งห้อง เพราะทริปเป็นของกลุ่ม) · ใช้ `orders.trip_id` ที่มีอยู่แล้ว ไม่ต้องสร้างตารางใหม่
+- [ ] A26.3 `DefaultIncludedDrafts` 2 → **3** ใน [aijob.go](apps/api/pkg/models/aijob.go) + เพดาน "ทริปที่ใช้งานอยู่ 1 ทริป" สำหรับผู้ใช้ฟรี · ต้นทุนชั้นฟรีอยู่ที่ ~฿2/ทริป ซึ่งถูกกว่าค่าโฆษณาที่พาคนคนนั้นเข้ามาหลายสิบเท่า — ใจกว้างตรงนี้คือการลงทุน ไม่ใช่การรั่วไหล
+- [ ] A26.4 **กลไกคืนเงิน** — เมื่อ `booking_confirmations.status` → `confirmed` และทริปต้นทางมี trip pass ที่ยังไม่เคยคืน ให้ออกเครดิต ฿299 คืน · ต้องอยู่ใน transaction เดียวกับ confirm แบบเดียวกับการให้แต้ม ([booking.handler.go](apps/api/pkg/handlers/api/booking.handler.go)) · **คืนได้ครั้งเดียวต่อทริป** ต่อให้จองสิบครั้ง
+- [ ] A26.5 ปลด `PricePerDraftTHB` / `PointsPerAIDraft` ออกจาก flow หลัก ([points.go](apps/api/pkg/domain/points.go)) · **แต้มไม่ได้หายไป** — ยังแลกส่วนลดได้ที่ 8 แต้ม = ฿1 (A12.10) และตอนนี้แลกเป็นส่วนลดค่า Trip Pass ได้ ซึ่งทำให้ referral/clone มีปลายทางที่ใหญ่กว่าเดิม · ระวัง: `PointsPerBahtRedeemed = 8` ถูก derive จาก 300 แต้ม ÷ ฿39 ([revenue.go](apps/api/pkg/domain/revenue.go)) พอ ฿39 หายไป ต้องบันทึกฐานใหม่ของเลข 8 ไม่งั้นมันจะกลายเป็นค่าที่ไม่มีที่มาอีกตัว
+- [ ] A26.6 ยก `AI_DAILY_COST_CAP_USD` จาก 5 → ตามระดับที่เลือก (ทั้ง [ecs.tf](deploy/terraform/ecs.tf) และ [worker.tf](deploy/terraform/worker.tf) ต้องตรงกัน) + ปรับ `monthly_budget_usd` ให้สอดคล้อง · ร่างไม่จำกัดใต้ pass แปลว่าเพดาน $5/วันจะชนภายในชั่วโมงแรกของวันเปิดตัว
+- [ ] W26.1 หน้าราคา 3 ชั้น — **Trip Pass อยู่ตรงกลาง** ไม่ใช่ซ้ายสุดหรือขวาสุด (center-stage effect) · ROVE Year ทำหน้าที่เป็นจุดอ้างอิงให้ ฿299 ดูสมเหตุสมผล ไม่ได้มีไว้ขายเป็นหลัก
+- [ ] W26.2 เปลี่ยน paywall ใน [ai-credit-panel.tsx](apps/web/components/editor/ai-credit-panel.tsx) + [ai-generate-dialog.tsx](apps/web/components/editor/ai-generate-dialog.tsx) จาก "จ่าย ฿39 แล้วร่างเลย" เป็น "ปลดล็อกทริปนี้ ฿299 — ได้คืนเต็มจำนวนถ้าจองผ่าน ROVE" · ลบ fallback `?? 39` ที่ hardcode อยู่ 3 จุด
+- [ ] W26.3 แสดงเงื่อนไขคืนเงินตรงจุดที่ตัดสินใจจ่าย ไม่ใช่ในหน้าเงื่อนไขการใช้งาน · หาร 4 คน = ฿75/คน เป็นข้อความที่ควรอยู่บนปุ่ม เพราะทริปเป็นของกลุ่มและคนกดจ่ายกำลังคิดแทนกลุ่ม
+- [ ] W26.4 ส่วนลดรุ่นก่อตั้งทำเป็น **discount code ที่มีวันหมดอายุ** ไม่ใช่ราคาป้ายที่ต่ำกว่า · ราคาป้ายต้องเป็น ฿299 ตั้งแต่วันแรก เพราะราคาแรกที่ลูกค้าเห็นกลายเป็นจุดอ้างอิงถาวร การขึ้นราคาทีหลังถูกตีความว่าแพงขึ้นเสมอ แต่ของขวัญที่หมดอายุไม่ใช่การขึ้นราคา — โครงสร้าง `discount_codes` มีอยู่แล้วจาก A12.10
+- [ ] X26.1 เทสต์: คืนเงินเกิดครั้งเดียวต่อทริป แม้มี booking confirm หลายใบ
+- [ ] X26.2 เทสต์: ผู้ใช้ฟรีสร้างทริปที่สองไม่ได้ และผู้ใช้ที่มี pass/Year สร้างได้
+- [ ] D26.1 รันแบบสำรวจ **Van Westendorp** กับผู้ใช้จริง 100–200 คนก่อนล็อกราคาถาวร (ดู [docs/business-plan.md](docs/business-plan.md) §7) — ฿299 มาจากการบรรจบของ 4 มุม แต่มุมที่สี่คือความยินดีจ่ายซึ่ง**ยังไม่เคยวัดจริง**
+- [ ] D26.2 บันทึก Decision Log ที่มาของ ฿299 / ฿990 / โควตาฟรี 3 ร่าง — ความผิดพลาดที่ทำให้ต้องมี M26 คือการที่ ฿39 กับ ฿129 ไม่เคยถูกบันทึกว่ามาจากไหน ถ้าทำซ้ำ รอบหน้าก็จะไล่ที่มาไม่ได้เหมือนเดิม
 
 ---
 
@@ -1097,8 +1213,15 @@ AFFILIATE_KLOOK_AID=
 AFFILIATE_KKDAY_ID=
 AFFILIATE_RENTALCARS_ID=
 AFFILIATE_AIRALO_ID=
+AFFILIATE_WEBHOOK_SECRET=
 ADMIN_EMAILS=
 
+# Agent lead handoff (A12.12) — both empty = stored but not sent
+AGENT_LEAD_EMAIL=
+AGENT_LEAD_LINE_USER_ID=
+AGENT_LEAD_PARTNER=
+
+# ยังไม่ได้ใช้: อัตราแลกแต้มอยู่ใน pkg/domain/revenue.go (8 แต้ม = ฿1, ขั้นต่ำ ฿50)
 POINTS_EARN_RATE_PCT=25
 POINTS_MIN_REDEEM=100
 ```
@@ -1204,8 +1327,14 @@ AUTH_COOKIE_DOMAIN=rove.app
 | — | ID strategy | UUID v4 `CHAR(36)` แทน auto-increment | ป้องกันเดา id, รองรับ clone/share |
 | — | Realtime | SSE + Redis pubsub (ไม่ใช้ WebSocket) | อ่านอย่างเดียวพอ, ผ่าน proxy ง่าย, ต้นทุนต่ำ |
 | — | Server state | TanStack Query เท่านั้น, Zustand เฉพาะ UI | กัน state ซ้ำซ้อน |
-| — | Deploy | Lightsail instance เดียว + Docker Compose | ต้นทุน ≤ $25/mo ใน Phase 1 |
+| — | Deploy | ~~Lightsail instance เดียว + Docker Compose~~ | ~~ต้นทุน ≤ $25/mo ใน Phase 1~~ — แทนที่แล้ว ดูบรรทัด 23 ส.ค. |
+| 23 ส.ค. 2569 | Deploy (แทนที่ของเดิม) | **ECS Fargate + ALB + autoscale 1–10 + RDS + ElastiCache ตั้งแต่วันแรก** ผ่าน Terraform — ตัด Lightsail ทิ้ง · [ADR 0004](docs/adr/0004-aws-ecs-instead-of-lightsail.md) | ซื้อโดเมน rovetravel.site แล้ว + เปิดตัวผ่านอินฟลูฯ = traffic มาเป็นขั้นบันได การ migrate Lightsail→ECS ทีหลังต้องทำตอนเว็บกำลังจะล่มพอดี · ตั้งทุกค่าที่โหมดถูกสุดไว้ก่อน (~$50–70/mo) แล้วยกทีละตัวแปรเมื่อจำเป็น |
 | 19 ส.ค. 2569 | Next.js version | **16.3.1** (App Router + Turbopack), React 19.2.8, TS 5.9.3 strict, Tailwind v4 | บันทึกจริงตาม W0.1 — Tailwind v4 ใช้ `@theme inline` ไม่มี `tailwind.config.js` |
+| 25 ส.ค. 2569 | บันทึกการตัดสินใจ Phase 3 ทั้งชุด | [ADR 0005](docs/adr/0005-phase-3-build-decisions.md) |  |
+| 25 ส.ค. 2569 | แยก AI worker | `ROVE_ROLE` + Redis list (`rove:ai:jobs`) ไม่ใช้ broker · ต่อคิวไม่ได้ = ร่างเองในโปรเซส API | ที่เปลี่ยนไม่ใช่โหลด แต่เป็นรูปทรง — ร่างหนึ่งครั้งใช้ถึงสามนาที ส่วน deploy ใช้ไม่กี่วินาที ทุก release จึงต้องเลือกระหว่างรอหรือฆ่างานทิ้ง · แยกแล้วเว็บรีสตาร์ต/สเกลตามจังหวะตัวเอง และ worker ใช้ Spot ล้วนได้เพราะงานที่หลุดกลับไปเป็น `queued` |
+| 25 ส.ค. 2569 | ภาษาที่สอง | locale เก็บใน**คุกกี้** ไม่ใช่ `/en` prefix | ผู้ใช้กลุ่มเดียว สินค้าตัวเดียว · prefix จะทำให้ลิงก์แชร์และ OG แตกเป็นสองชุดเพื่อความชอบส่วนตัวของคน ๆ เดียว · ตัวสลับภาษาบอกตรง ๆ ว่ายังแปลไม่ครบ ดีกว่าส่งแอปครึ่งอังกฤษเงียบ ๆ |
+| 25 ส.ค. 2569 | "AI auto-adapt" (A11.4) | ปรับแพลนที่ก๊อปมาด้วย **กฎ deterministic ใน `pkg/domain/adapt.go`** ไม่เรียกโมเดล | preview กับตัวจริงต้องตอบเหมือนกันทุกครั้ง ซึ่งโมเดลรับประกันให้ไม่ได้ · การตัดที่เที่ยวที่ห้าของวันหรือตั๋วที่แพงที่สุดเป็นเลขคณิต ไม่ใช่วิจารณญาณ · ได้ของแถมคือรันใน mock mode และเทสต์ได้ (twin: `lib/data/domain.ts`) |
+| 25 ส.ค. 2569 | จัดอันดับ explore ด้วย match score | ดึง pool 200 ใบเรียงตามยอดนิยม แล้วให้คะแนน+เรียงใน Go | คะแนนขึ้นกับทริปของผู้ถามจึงเขียนเป็น SQL ไม่ได้ · response คืน `scored` มาบอกว่าจัดอันดับจากกี่ใบ ไม่แกล้งทำเป็นว่าจัดทั้งแคตตาล็อก — ตัวเลขที่ต้องขยับเมื่อแพลนสาธารณะเกินสองร้อยใบ |
 | 20 ส.ค. 2569 | PDF renderer | **ไม่ใช้ทั้งคู่ใน Phase 1** — export เป็น HTML self-contained แล้วให้ผู้ใช้สั่งพิมพ์เอง | ไม่ต้องแบก headless browser บน instance เดียว (§8.1) และได้ผลลัพธ์ที่ผู้ใช้เลือกขนาดกระดาษเองได้ · ทบทวนใหม่ตอน photo book Phase 2 |
 | — | Affiliate approve status | (บันทึกเมื่อสมัครแต่ละเจ้า) | |
 | — | Brand name | ROVE | ตัด `xxx` placeholder — §15 filled |
@@ -1247,12 +1376,33 @@ AUTH_COOKIE_DOMAIN=rove.app
 | 21 ส.ค. 2569 | จ่ายด้วยแต้มบนใบเสร็จ | คงราคาป้ายไว้ที่ `subtotal` แล้วลด `discount` เต็มจำนวน → `total = ฿0` + `points_spent` แยกช่อง | "฿0" เดี่ยว ๆ อ่านเหมือนบั๊ก · แต้มไม่ใช่บาท จึงไม่บวกรวมในยอดเงินสด แต่ต้องเห็นว่าจ่ายอะไรไป |
 | 21 ส.ค. 2569 | ช่องทางชำระเงิน | `pay_channels` เปลี่ยนจาก `string[]` เป็น `{id,label}` และ purchase รับ `method` | เดิมฝั่ง Go แยกแต้ม/เงินสดด้วยการค้นคำว่า "แต้ม" ในข้อความ · ใบเสร็จที่เขียนว่า "บัตรเครดิต" ทั้งที่จ่ายพร้อมเพย์คือเรื่องร้องเรียน |
 | 21 ส.ค. 2569 | แพ็กเกจรายเดือน | ใส่ catalogue (ฟรี / Plus รายเดือน ฿129 / รายปี ฿1,290) ตั้งแต่ตอนนี้ โดย `available:false` | หน้าจอที่จะขายคือหน้าจอที่เรนเดอร์อยู่แล้ว — วันเปิดขายเป็น deploy ไม่ใช่การรื้อหน้า · ผู้ใช้ฟรีไม่มีแถวใน `subscriptions` ให้ API สังเคราะห์เอา |
+| 24 ส.ค. 2569 | คำตอบโพล (A9.3) | ไม่มีตาราง `poll_votes` — ใช้ `votes` เดิม `target_type='poll'` แล้วเก็บ**ดัชนีตัวเลือกใน `value`** | โพลคือ "หนึ่งคน หนึ่งคำตอบ ต่อหนึ่งเรื่อง" ซึ่งเป็นรูปเดียวกับ thumb บน item/variant เป๊ะ · composite key เดิมทำให้ตอบใหม่ทับของเก่าได้ฟรี ไม่ต้องเขียน dedupe เอง |
+| 24 ส.ค. 2569 | inbox แยกจาก activity feed | ตาราง `notifications` ใหม่ ไม่ยัดลง `activity_logs` | feed คือ "เกิดอะไรขึ้นในห้อง" ใครเปิดก็อ่านอันเดียวกัน · inbox คือ**จดหมายจ่าหน้าถึงคน** มีผู้รับ มีสถานะยังไม่อ่าน และเป็นสิ่งที่ badge นับได้ · สองอย่างนี้ต่างกันที่ "ของใคร" ไม่ใช่แค่รูปแบบการแสดงผล |
+| 24 ส.ค. 2569 | presence (W9.3) | เป็น **event ไม่ใช่แถว** — publish ผ่าน SSE เส้นเดิมของห้อง ไม่เก็บ DB ไม่มี endpoint disconnect | "ใครอยู่ในห้อง" เป็นจริงแค่ไม่กี่วินาที · เก็บลง DB แปลว่าต้องมี logic ลบคนที่ปิดโน้ตบุ๊กโดยไม่บอกลา ซึ่งเป็นบั๊กที่ไม่มีวันจบ · ping หายไปเอง = หายจากห้องเอง |
+| 24 ส.ค. 2569 | ที่เก็บไฟล์ (M18/M19) | `services/storage` มีสองหลังจริง: **R2** (aws-sdk-go-v2, presigned GET) เมื่อ config ครบ · **ดิสก์ `./uploads`** เมื่อไม่ครบ โดย API เสิร์ฟเอง — ไม่มี stub ที่คืน error แล้ว · แถวเก็บ **storage key ไม่ใช่ URL** | เดิม storage เป็น stub ทั้งก้อน ทำให้ฟีเจอร์รูป/เอกสารต้องรอบัญชี R2 ถึงจะ dev ได้ · เก็บ URL ลงแถวแปลว่าวันที่ย้าย bucket หรือ presign หมดอายุ ต้องไล่ migrate ข้อมูล — เก็บ key แล้วออก URL ตอนอ่านไม่มีปัญหานั้น |
+| 24 ส.ค. 2569 | โครงสร้าง plan variant (M6) | variant = **snapshot ทั้งก้อน** ในตาราง `plan_variants` (JSON รูปเดียวกับ AI draft) ไม่ใช่หลายแถวใน `plans`/`plan_days` · adopt ใช้โค้ดเส้นเดียวกับ apply draft | ทุก query ที่ scope ด้วย tripID ทำงานเหมือนเดิมโดยไม่ต้องรื้อ · variant มีไว้เทียบ/โหวต/สลับ ไม่ใช่แก้คู่ขนาน — แก้ได้เมื่อ adopt แล้วเท่านั้น ซึ่งตรงกับพฤติกรรมที่กลุ่มใช้จริง |
+| 24 ส.ค. 2569 | ทางเข้าระบบ | `/login` เหลือ **OAuth อย่างเดียว** (LINE, Google) · ประตู dev-login ย้ายไป `/admin/login` และบัญชีที่ได้ถูกตั้งเป็น `admin` เสมอ | ทางเข้าที่ไม่มีเจ้าของบัญชีมายืนยันตัวตนคือสิ่งที่สคริปต์ปั่นบัญชีม้าต้องการ (แต้ม referral 150/คน + เครดิต AI ฟรี — plan §11) · เงื่อนไข 3 ชั้นเดิม (NEXT_PUBLIC_DEV_LOGIN + non-production + MOCK_MODE) ยังอยู่ครบ ประตูนี้แค่ไม่อยู่บนหน้าที่ผู้ใช้จริงเห็น |
+| 26 ส.ค. 2569 | แยก `MOCK_MODE` เป็น 3 สวิตช์ | `NEXT_PUBLIC_DATA_MODE` (ข้อมูลอยู่ที่ไหน) · `STUB_PROVIDERS` (third party จริงไหม — DB จริงเสมอ) · `DEV_LOGIN` (มีประตู `/auth/demo` ไหม) · เพิ่ม `GET /api/v1/meta/mode` เป็นคำตอบสาธารณะว่าอะไรยังจำลองอยู่ | ชื่อเดียวกินความหมายสองอย่าง ทำให้คำถาม "อันนี้ของจริงไหม" ไม่มีคำตอบ · UI ที่อ่านแค่ฝั่ง web เลยเงียบสนิททั้งที่ API ยัง stub Anthropic/OAuth อยู่ · และการปิด stub เคยล็อกประตูเข้าระบบไปด้วย |
+| 26 ส.ค. 2569 | ประตูทีมงาน | `/admin/login` หลุดจาก sign-in wall ใน `proxy.ts` และใช้ **OAuth ชุดเดียวกับผู้ใช้ทั่วไป** · สิทธิ์ admin มาจาก `ADMIN_EMAILS` · dev-login เป็นของแถมบนหน้านั้น ไม่ใช่เหตุผลที่หน้านั้นมีอยู่ | `'/admin'` อยู่ใน `GUARDED` เลย match `/admin/login` ด้วย → คนที่ยังไม่มี cookie โดนเตะไป `/login` ประตูแอดมินจึงไม่มีวันโผล่ · และการผูกประตูไว้กับ `MOCK_MODE` แปลว่าพอปิด stub ก็ไม่มีทางเข้าเลย |
+| 26 ส.ค. 2569 | ทริปตัวอย่างสำหรับ guest | ปุ่ม "ดูทริปตัวอย่าง" ชี้ `/p/japan-autumn-8d` (หน้า public read-only) ไม่ใช่ `/t/demo` · seed ทริปเดียวกันลง MySQL ผ่าน `apps/api/data/demo-trip.json` · mock mode publish ทริป demo ด้วย slug เดียวกัน | `/t/:id` อยู่หลัง sign-in wall และ live mode ไม่เคยมีทริป id `demo` ใน DB เลย ปุ่มจึงเป็น redirect ไป `/login` ในโหมดหนึ่ง และ 404 ในอีกโหมด · หน้า landing ที่ให้ "ลองดูก่อน" แล้วบังคับล็อกอินก่อน ไม่ใช่การลองดู |
+| 26 ส.ค. 2569 | คนแรกที่เป็น admin | เปลี่ยนจาก "users ว่างเปล่า" เป็น "ยังไม่มีใครเป็น admin" (`users.CountAdmins`) | seeder สร้างนักเดินทาง 4 คนที่เป็นเจ้าของทริปตัวอย่าง ถ้าใช้กฎเดิม การติดตั้งใหม่จะไม่มีทางมี admin เลย |
+| 26 ส.ค. 2569 | แท็บหลักของแอป | `/dreams` ออกจาก `AppShell.NAV` แล้วให้ `/explore` เข้าแทน — ปุ่ม "สร้างทริป" คงอยู่ตำแหน่งกลาง | `/explore` สร้างเสร็จตั้งแต่ W11.1 แต่ไม่มีลิงก์เข้าจากที่ไหนเลยนอกจากหน้า error สามหน้า ส่วน `/dreams` มีทางเข้าอยู่แล้วสามจุด · แท็บมีค่ากับหน้าที่ไม่มีใครไปถึงมากกว่า · เพิ่มแท็บที่หกไม่ได้เพราะจะดัน accent button หลุดจากตำแหน่งที่นิ้วโป้งวาง ซึ่งเป็นเหตุผลที่แถบล่างมีห้าช่อง |
+| 26 ส.ค. 2569 | ledger ของแต้ม (M23) | เปิดประวัติแต้มให้ผู้ใช้ตรวจสอบตัวเองได้ ก่อนขยายวิธีหาแต้มเพิ่ม | แต้มแลกเป็นโค้ดส่วนลดได้จริง (8 แต้ม = ฿1, A12.10) จึงเป็นสิ่งที่มีมูลค่า · `points_transactions` เก็บที่มาครบอยู่แล้วและ `GET /users/me/points` ก็คืนมาแล้ว แต่ไม่มีหน้าไหนเรียก — ข้อมูลที่ผู้ใช้ตรวจไม่ได้เท่ากับไม่มีในทางปฏิบัติ |
+| 26 ส.ค. 2569 | cursor ของ ledger (A23.1) | คีย์เป็น **`(occurred_at, id)`** ไม่ใช่ `occurred_at` เดี่ยว ๆ · รูปแบบ `<rfc3339nano>\|<uuid>` อ่านออกได้ ไม่เข้ารหัส | แต้มสองรายการลงวินาทีเดียวกันได้จริง (เปิดสาธารณะแล้วมีคนก๊อปทันที) และ cursor ที่ชี้ได้สองแถวจะซ้ำหรือข้ามแถวหนึ่งเสมอ · ไม่เข้ารหัสเพราะมันคือ**ตำแหน่งใน ledger ของตัวเอง** ไม่ใช่ capability — ปลอม cursor ก็ไม่ได้อะไรที่ endpoint ไม่ยอมให้อยู่แล้ว |
+| 26 ส.ค. 2569 | นับ "คนตามรอย" (A23.2 / A24.1) | ยอดบนหน้าจอยังใช้ `trips.clone_count` แต่ยอดระดับแพลตฟอร์มนับ **`trips.source_trip_id IS NOT NULL`** · แยก `clones` กับ `awarded_clones` ออกจากกันบนการ์ด | counter คือเลขสำหรับโชว์ ทริปที่ถูกลบไม่คืนให้ · แถวที่มีต้นทางคือสำเนาที่ยังอยู่จริง · และการก๊อปกับการได้แต้มไม่เท่ากันจริง ๆ (ก๊อปทริปตัวเองไม่ได้แต้ม) — การ์ดที่โชว์เลขเดียวจะอธิบายส่วนต่างไม่ได้ |
+| 26 ส.ค. 2569 | เกณฑ์ social proof (W24.1) | ตัวเลขต่ำกว่าเกณฑ์ = **ไม่มี section** ไม่ใช่ปัดขึ้นหรือใส่ "เร็วๆ นี้" · เกณฑ์อยู่ใน `lib/social-proof.ts` ที่เดียว อ่านทั้งหน้าแรกและหน้าแอดมิน | ตัวเลขที่แต่งขึ้นมีค่าน้อยกว่าไม่มีตัวเลข เพราะมันคือสิ่งแรกที่คนอ่านตรวจสอบได้ (เหตุผลเดียวกับ `CreatorEarningsCard`) · แต่การซ่อนตัวเองจากข้างนอกแยกไม่ออกจากบั๊ก จึงต้องมีหน้าที่บอกว่าซ่อนอยู่และขาดอีกเท่าไหร่ — ถ้าเกณฑ์อยู่สองที่ มันจะเถียงกันเองภายในเดือนเดียว |
+| 26 ส.ค. 2569 | รีวิวที่ยกมาอ้างได้ (A24.2) | เฉพาะรีวิวที่ **มี body** และมาจากทริป `visibility='public'` เท่านั้น | ดาว 5 ดวงที่ไม่ได้เขียนอะไรถูกนับในค่าเฉลี่ยไปแล้ว การเอามาทำ testimonial คือการใส่คำในปากคนที่เลือกจะไม่พูด · รีวิวของทริปส่วนตัวคือไดอารี่ ไม่ใช่หลักฐานทางสังคม |
+| 26 ส.ค. 2569 | เปลือกของหน้าที่ใช้ร่วมกันสองฝั่ง | `/explore`, `/p/:slug`, `/u/:handle` **เลือกเปลือกตามคนอ่าน ไม่ใช่ตามโฟลเดอร์** — ล็อกอินแล้วได้ `AppShell` เต็ม (header + แถบล่าง 5 แท็บ), ยังไม่ล็อกอินได้ `PublicShell` เดิม · อ่านสถานะจากคุกกี้**ฝั่ง server** (`lib/session`) ไม่ใช่ `useMe()` · `actions` มุมขวาเหลือไว้ให้คนที่ยังไม่ล็อกอินเท่านั้น · `/s/:token` ไม่เข้าข่าย | P4.0 เอา `/explore` ขึ้นเป็นแท็บใน `AppShell.NAV` แต่ตัวหน้าอยู่ `app/(marketing)` ใช้ `PublicShell` — กดแท็บแล้ว**หลุดออกจาก chrome ทั้งก้อน**: ไม่มีแถบล่าง ไม่มีกระดิ่ง และโลโก้พากลับหน้า landing ไม่ใช่ `/home` · แล้วการ์ดในหน้านั้นพาไป `/p/` `/u/` ซึ่งเป็นเปลือกเดียวกัน ยิ่งกดยิ่งลึกยิ่งไม่มีทางกลับ · `useMe()` ตอบช้าไปหนึ่งเฟรม เปลือกจะสลับให้เห็น ซึ่งบนหน้าที่คนแปลกหน้าใช้ตัดสินสินค้าคือสิ่งที่แย่กว่าปัญหาเดิม · ปุ่มที่เคยมี ("เริ่มทริปของฉัน", "สำรวจแพลนอื่น") เป็นแท็บใน `AppShell` อยู่แล้วทุกอัน — โชว์ซ้ำคือเอาที่ทางของเนื้อหาไปแลกกับปลายทางที่มีอยู่แล้ว |
+| 26 ส.ค. 2569 | ธีมและ layout ของแอดมิน (Phase 5 — M25) | เป็น **scope `[data-surface='admin']` ต่อท้าย `brand.css`** ไม่ใช่ไฟล์สีที่สอง · route group `app/(admin)/` แยกจาก `AppShell` · **desktop-first** ซึ่งเป็นข้อยกเว้นที่ตั้งใจของ §7 · **ไทยล้วน** ตาม `docs/i18n-plan.md` | `brand.css` เป็นที่เดียวที่มีสีแบรนด์ — พาเลตต์ที่อยู่ไฟล์อื่นจะแยกทางกันตั้งแต่ครั้งแรกที่ terracotta เปลี่ยน · ทุก utility อ่าน `hsl(var(--brand-*))` อยู่แล้ว การประกาศ token ใหม่ใต้ attribute เดียวจึงเปลี่ยนธีมทั้งหน้าโดยไม่มีคอมโพเนนต์ไหนรู้เรื่อง · งานแอดมินคือตารางกับฟอร์มที่โต๊ะ ไม่ใช่จอที่ถือบนรถไฟ — และตารางข้อมูลที่มุมโค้ง 24px อ่านไม่ออก |
 
 ---
 
 ## 17. Definition of Done (ทุก task)
 - **API:** มี handler + store + domain logic แยกชั้นถูกต้อง, scope ด้วย tripID, เขียน activity_log, emit SSE, มี unit test ของ domain logic, `go vet`/lint ผ่าน
 - **Web:** ผ่าน typecheck/lint, ใช้ query key factory, mutation มี optimistic + rollback, มี loading/empty/error, ทดสอบที่ 375px, สีและ token อ้างอิงจาก `styles/brand.css` เสมอ (ห้าม hardcode hex)
+- **Web — เปลือกของหน้า:** หน้าที่คนล็อกอินแล้วเข้าถึงได้ต้องอยู่ใน chrome ของแอป (header + แถบล่าง) — ถ้าหน้านั้นเป็นหน้าสาธารณะด้วย ให้ใช้ `BrowseShell` เลือกเปลือกตามสถานะ ห้ามปล่อยให้หน้าที่เป็นแท็บใน `AppShell.NAV` เรนเดอร์ `PublicShell` ให้คนที่ล็อกอินแล้ว
+- **Web — ระยะขอบ:** หน้าจอเต็มหน้าเป็นคนกำหนด gutter (`px-4` ที่ตัวนอกสุด) · `<section>` ข้างในห้ามใส่ `px-*` ซ้ำ ไม่งั้นบางบล็อกจะร่นเข้ามาเทียบกับบล็อกอื่นบนหน้าเดียวกัน (เจอจริงบน `/profile` — การ์ดแต้มร่นเข้าไปกว่าสถิติและเมนู)
+- **Web — การกระทำที่ย้อนไม่ได้:** ทุกปุ่มที่กดแล้วแก้ไม่ได้ (แลกแต้ม, ลบ, ปิดยอด) ต้องมีขั้นยืนยันที่บอก **ราคา · สิ่งที่เหลือหลังทำ · ว่าย้อนไม่ได้** ครบสามอย่าง — ไม่ใช่แค่ "แน่ใจไหม"
 - ไม่มี secret ใน client bundle
 - FX display ต้องมี label โดยประมาณและวันที่ทุกที่
 - Expense payload ไม่ปรากฏใน public/share response

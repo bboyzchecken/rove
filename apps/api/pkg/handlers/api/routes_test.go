@@ -27,16 +27,24 @@ var publicPaths = map[string]bool{
 	"/healthz":                          true,
 	"/readyz":                           true,
 	"/go/:clickId":                      true, // affiliate redirect — a link people click
+	"/api/v1/meta/mode":                 true, // which providers are stand-ins (mode.handler.go)
 	"/api/v1/characters":                true, // static catalogue, also shipped in the web bundle
 	"/api/v1/airports":                  true, // worldwide airport index — public reference data (A1.3)
 	"/api/v1/airports/:iata":            true,
 	"/api/v1/auth/:provider/url":        true,
 	"/api/v1/auth/oauth/:provider":      true,
 	"/api/v1/auth/logout":               true,
-	"/api/v1/auth/demo":                 true, // registered only when MOCK_MODE is on
+	"/api/v1/auth/demo":                 true, // registered only when DEV_LOGIN is on
 	"/api/v1/invites/:token":            true, // preview before signing in
 	"/api/v1/public/trips/:tokenOrSlug": true,
 	"/api/v1/public/explore":            true,
+	"/api/v1/public/creators/:handle":   true, // creator page is the SEO surface (W11.2)
+	// Platform social proof (A24.1 / A24.2). Public on purpose: the landing
+	// page is the one screen that has to render before anybody signs in.
+	"/api/v1/public/stats":          true,
+	"/api/v1/public/reviews/recent": true,
+	// Guarded by a shared secret header, not a JWT; 404s until configured.
+	"/webhooks/affiliate/:partner": true,
 }
 
 // isSynthetic filters the entries Echo adds for a group itself — the 404 and
@@ -54,7 +62,8 @@ func newTestServer(t *testing.T, mock bool) *Server {
 	return NewServer(ServerParams{
 		Config: core.Config{
 			Environment:    "test",
-			MockMode:       mock,
+			StubProviders:  mock,
+			DevLogin:       mock,
 			Port:           "0",
 			JwtSecret:      "test-secret",
 			AuthCookieName: "rove_token",
@@ -79,7 +88,8 @@ func TestEveryPrivateRouteRequiresAToken(t *testing.T) {
 		for _, param := range []string{
 			":tripId", ":userId", ":itemId", ":wishId", ":expenseId", ":taskId",
 			":bookingId", ":commentId", ":jobId", ":dreamId", ":poiId", ":token",
-			":clickId", ":provider", ":tokenOrSlug", ":flightId",
+			":clickId", ":provider", ":tokenOrSlug", ":flightId", ":variantId",
+			":photoId", ":documentId", ":pollId", ":handle", ":notificationId",
 		} {
 			path = strings.ReplaceAll(path, param, "x")
 		}
@@ -111,23 +121,49 @@ func TestTripRoutesAreScopedByTripID(t *testing.T) {
 	}
 }
 
-func TestDemoLoginOnlyExistsInMockMode(t *testing.T) {
+func TestDemoLoginOnlyExistsWithDevLogin(t *testing.T) {
 	live := newTestServer(t, false)
 	for _, route := range live.Echo().Routes() {
 		if route.Path == "/api/v1/auth/demo" {
-			t.Fatal("the demo sign-in must never be registered outside mock mode")
+			t.Fatal("the demo sign-in must never be registered without DEV_LOGIN")
 		}
 	}
 
-	mock := newTestServer(t, true)
+	dev := newTestServer(t, true)
 	found := false
-	for _, route := range mock.Echo().Routes() {
+	for _, route := range dev.Echo().Routes() {
 		if route.Path == "/api/v1/auth/demo" {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatal("mock mode needs a way in that does not involve a provider console")
+		t.Fatal("DEV_LOGIN needs a way in that does not involve a provider console")
+	}
+}
+
+// The two switches are independent on purpose (see core.Config): stubbing the
+// providers must not open a door, and opening the door must not fake the data.
+func TestDevLoginAndProviderStubsAreIndependent(t *testing.T) {
+	stubsOnly := NewServer(ServerParams{Config: core.Config{
+		Environment: "test", StubProviders: true, Port: "0", JwtSecret: "x",
+	}})
+	for _, route := range stubsOnly.Echo().Routes() {
+		if route.Path == "/api/v1/auth/demo" {
+			t.Fatal("STUB_PROVIDERS must not register the dev sign-in door")
+		}
+	}
+
+	doorOnly := NewServer(ServerParams{Config: core.Config{
+		Environment: "test", DevLogin: true, Port: "0", JwtSecret: "x",
+	}})
+	found := false
+	for _, route := range doorOnly.Echo().Routes() {
+		if route.Path == "/api/v1/auth/demo" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("DEV_LOGIN alone must register the dev sign-in door")
 	}
 }
 

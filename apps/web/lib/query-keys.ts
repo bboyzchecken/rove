@@ -7,8 +7,11 @@
  */
 export const queryKeys = {
   me: () => ['me'] as const,
+  /** Which providers behind this screen are real — see features/meta. */
+  mode: () => ['meta', 'mode'] as const,
   characters: () => ['characters'] as const,
   dreams: () => ['dreams'] as const,
+  inbox: () => ['inbox'] as const,
 
   /**
    * Bill & Payment (M20). Not trip-scoped: a receipt outlives the trip it was
@@ -32,6 +35,8 @@ export const queryKeys = {
   tripRoute: (tripId: string) => ['trip', tripId, 'route'] as const,
   tripOverview: (tripId: string) => ['trip', tripId, 'overview'] as const,
   tripMembers: (tripId: string) => ['trip', tripId, 'members'] as const,
+  tripProfileMe: (tripId: string) => ['trip', tripId, 'profile', 'me'] as const,
+  tripProfiles: (tripId: string) => ['trip', tripId, 'profiles'] as const,
   tripActivity: (tripId: string) => ['trip', tripId, 'activity'] as const,
   tripRecap: (tripId: string) => ['trip', tripId, 'recap'] as const,
 
@@ -44,10 +49,15 @@ export const queryKeys = {
 
   planDays: (tripId: string) => ['trip', tripId, 'plan'] as const,
   planVersions: (tripId: string) => ['trip', tripId, 'plan', 'versions'] as const,
+  variants: (tripId: string) => ['trip', tripId, 'variants'] as const,
+  conflicts: (tripId: string) => ['trip', tripId, 'conflicts'] as const,
   prepNote: (tripId: string) => ['trip', tripId, 'prep', 'note'] as const,
   budget: (tripId: string) => ['trip', tripId, 'budget'] as const,
   expenses: (tripId: string) => ['trip', tripId, 'expenses'] as const,
   prep: (tripId: string) => ['trip', tripId, 'prep'] as const,
+  photos: (tripId: string, filter = '') => ['trip', tripId, 'photos', filter] as const,
+  documents: (tripId: string) => ['trip', tripId, 'documents'] as const,
+  polls: (tripId: string) => ['trip', tripId, 'polls'] as const,
   bookings: (tripId: string) => ['trip', tripId, 'bookings'] as const,
   bookingOffers: (tripId: string, kind: string) => ['trip', tripId, 'bookings', 'offers', kind] as const,
 
@@ -61,6 +71,30 @@ export const queryKeys = {
 
   share: (tripId: string) => ['trip', tripId, 'share'] as const,
   publicTrip: (tokenOrSlug: string) => ['public', tokenOrSlug] as const,
+  reviews: (tripId: string) => ['trip', tripId, 'reviews'] as const,
+  /** Points out and money owed (M22). Both belong to a person, not a trip. */
+  redemptions: () => ['me', 'redemptions'] as const,
+  earnings: () => ['me', 'earnings'] as const,
+  /**
+   * Where the points came from, and who followed the plans that earned them
+   * (M23). Under ['me'] with the rest: a ledger belongs to a person, and a
+   * redemption invalidates it along with the balance.
+   */
+  pointsHistory: () => ['me', 'points', 'history'] as const,
+  audience: () => ['me', 'audience'] as const,
+  /** Platform social proof (M24) — public, and the same for every visitor. */
+  platformStats: () => ['public', 'stats'] as const,
+  recentReviews: () => ['public', 'reviews', 'recent'] as const,
+  leads: (tripId: string) => ['trip', tripId, 'leads'] as const,
+  photoBookThemes: (tripId: string) => ['trip', tripId, 'photobook', 'themes'] as const,
+  explore: (filters: string) => ['explore', filters] as const,
+  creator: (handle: string) => ['creator', handle] as const,
+  /** The diff a copy would apply — keyed by the frame it was asked for. */
+  adaptPreview: (tokenOrSlug: string, input: string) =>
+    ['adapt-preview', tokenOrSlug, input] as const,
 
   poiSearch: (q: string, city?: string) => ['poi', 'search', q, city ?? ''] as const,
+
+  /** Pre-auth invite landing page — keyed by token, not tripId. */
+  invitePreview: (token: string) => ['invite', token] as const,
 } as const;

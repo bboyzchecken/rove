@@ -1,15 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { ImageUp } from 'lucide-react';
+import { Compass, ImageUp, Pencil } from 'lucide-react';
 
 import { TripCover } from '@/components/trip/trip-cover';
 import { TripCoverSheet } from '@/components/trip/trip-cover-sheet';
+import { TripFrameDialog } from '@/components/trip/trip-frame-dialog';
 import { Badge } from '@/components/ui/badge';
+import { ButtonLink } from '@/components/ui/button';
 import { CharacterStack } from '@/components/ui/character-avatar';
 import { useMe } from '@/features/auth/queries';
 import { useTripOverview } from '@/features/trip/queries';
-import { thaiRangeLabel } from '@/lib/data/domain';
+import { thaiRangeLabel, toIsoDate } from '@/lib/data/domain';
 
 /**
  * The trip room's masthead (M2 — W2.1).
@@ -19,6 +21,11 @@ import { thaiRangeLabel } from '@/lib/data/domain';
  * hide the artwork it is sitting on. The one thing that does sit on the cover
  * is the button that changes it — a picture is edited where it is seen, and
  * there is nothing under it to hide.
+ *
+ * The title is edited where it is seen too. It was editable only from a small
+ * "แก้ไข" link on the ภาพรวม tab, three taps from the title itself and on a
+ * different screen from where every other tab shows it — so from the room, the
+ * name of the trip simply could not be changed.
  */
 const STATUS_LABEL: Record<string, string> = {
   planning: 'กำลังวางแพลน',
@@ -27,10 +34,17 @@ const STATUS_LABEL: Record<string, string> = {
   done: 'จบทริปแล้ว',
 };
 
+function addDaysIso(iso: string, days: number) {
+  const d = new Date(iso);
+  d.setDate(d.getDate() + days);
+  return toIsoDate(d);
+}
+
 export function TripHeader({ tripId }: { tripId: string }) {
   const { data, isLoading } = useTripOverview(tripId);
   const { data: me } = useMe();
   const [picking, setPicking] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   if (isLoading || !data) {
     return (
@@ -43,6 +57,11 @@ export function TripHeader({ tripId }: { tripId: string }) {
 
   const { trip, members, locked } = data;
   const hasDates = Boolean(trip.startDate && trip.endDate);
+  // Trip Mode is offered from the day before departure until the day after the
+  // trip ends (W10.6). Any earlier and it is a screen with nothing to say.
+  const today = toIsoDate(new Date());
+  const travelling =
+    hasDates && today >= addDaysIso(trip.startDate, -1) && today <= addDaysIso(trip.endDate, 1);
   // A viewer reads the room but does not dress it — the same rule the API keeps.
   const canEdit = members.find((member) => member.id === me?.id)?.role !== 'viewer';
 
@@ -77,7 +96,22 @@ export function TripHeader({ tripId }: { tripId: string }) {
             )}
           </div>
           <h1 className="font-display text-espresso text-xl font-extrabold tracking-tight sm:text-2xl">
-            {trip.title}
+            {canEdit ? (
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                title="แก้ชื่อและกรอบทริป"
+                className="hover:text-primary group inline-flex items-start gap-1.5 text-left transition"
+              >
+                {trip.title}
+                <Pencil
+                  className="text-muted group-hover:text-primary mt-1.5 size-3.5 shrink-0"
+                  strokeWidth={2.5}
+                />
+              </button>
+            ) : (
+              trip.title
+            )}
           </h1>
           <p className="text-muted mt-0.5 text-xs">
             {hasDates
@@ -91,12 +125,23 @@ export function TripHeader({ tripId }: { tripId: string }) {
         <CharacterStack characterIds={members.map((m) => m.characterId)} />
       </div>
 
+      {travelling ? (
+        <ButtonLink href={`/t/${tripId}/now` as never} size="sm" className="mt-3">
+          <Compass className="size-3.5" />
+          โหมดวันเดินทาง
+        </ButtonLink>
+      ) : null}
+
       <TripCoverSheet
         tripId={tripId}
         trip={trip}
         open={picking}
         onClose={() => setPicking(false)}
       />
+
+      {editing ? (
+        <TripFrameDialog tripId={tripId} trip={trip} open onClose={() => setEditing(false)} />
+      ) : null}
     </div>
   );
 }

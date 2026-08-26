@@ -2,6 +2,7 @@ package domain
 
 import (
 	"math"
+	"math/bits"
 	"sort"
 )
 
@@ -131,22 +132,154 @@ func ComputeExpenses(
 	return summary
 }
 
-// Settle nets balances greedily: the largest debt pays the largest credit,
-// repeatedly. For a group of four this always produces at most three
-// transfers, which is what makes "โอนกัน 3 ครั้งก็จบ" true.
+// Settle works out who pays whom, in as few transfers as possible (A16.5).
+//
+// The greedy pairing everyone writes first — largest debt pays largest credit —
+// is not minimal. Four people where A owes B 500 and C owes D 500 is two
+// transfers; greedy can turn it into three by paying A's debt across both
+// creditors. The fix is to find the largest number of subgroups that already
+// settle among themselves: a group of k people always needs k-1 transfers, so
+// the fewest transfers overall is (people who owe or are owed) minus (number of
+// self-settling groups).
+//
+// That search is exponential, which is fine for the size of a group holiday and
+// not fine in general — above settleExactLimit people this falls back to the
+// greedy pairing and says so by simply doing it.
 func Settle(rows []MemberBalance) []Transfer {
-	type side struct {
-		id     string
-		amount float64
+	balances := settleBalances(rows)
+	if len(balances) == 0 {
+		return nil
+	}
+	if len(balances) > settleExactLimit {
+		return settleGreedy(balances)
 	}
 
-	var debtors, creditors []side
+	out := make([]Transfer, 0, len(balances)-1)
+	for _, group := range selfSettlingGroups(balances) {
+		out = append(out, settleGreedy(group)...)
+	}
+	return out
+}
+
+// settleExactLimit is where the exact search stops being worth it. Twelve
+// people is already a large group holiday, and 3^12 subsets is microseconds;
+// each extra person triples that.
+const settleExactLimit = 12
+
+type settleSide struct {
+	id     string
+	amount int64 // whole baht, positive = owed to them
+}
+
+// settleBalances rounds to whole baht and drops the noise.
+//
+// Rounding each member's balance can leave the total a baht or two off zero,
+// which would make the exact partition impossible. The remainder is absorbed
+// into the largest balance, where it is invisible, rather than left to break
+// the algorithm or handed to the user as a phantom debt.
+func settleBalances(rows []MemberBalance) []settleSide {
+	out := make([]settleSide, 0, len(rows))
 	for _, r := range rows {
+		if amount := int64(math.Round(r.BalanceTHB)); amount != 0 {
+			out = append(out, settleSide{id: r.UserID, amount: amount})
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+
+	total := int64(0)
+	largest := 0
+	for i, side := range out {
+		total += side.amount
+		if abs64(side.amount) > abs64(out[largest].amount) {
+			largest = i
+		}
+	}
+	out[largest].amount -= total
+
+	// That adjustment can zero somebody out entirely.
+	kept := out[:0]
+	for _, side := range out {
+		if side.amount != 0 {
+			kept = append(kept, side)
+		}
+	}
+	return kept
+}
+
+// selfSettlingGroups splits the balances into the largest possible number of
+// subsets that each sum to zero. Every extra subset found is one transfer
+// saved.
+func selfSettlingGroups(balances []settleSide) [][]settleSide {
+	n := len(balances)
+	full := 1 << n
+
+	sums := make([]int64, full)
+	for mask := 1; mask < full; mask++ {
+		low := mask & -mask
+		sums[mask] = sums[mask^low] + balances[bits.TrailingZeros(uint(low))].amount
+	}
+
+	// best[mask] is how many zero-sum groups `mask` splits into, -1 when it
+	// cannot be split at all. pick[mask] remembers the group that got there.
+	best := make([]int, full)
+	pick := make([]int, full)
+	for mask := 1; mask < full; mask++ {
+		best[mask] = -1
+
+		if sums[mask] != 0 {
+			continue
+		}
+		// Fixing the lowest set bit stops the same partition being found once
+		// per ordering of its groups.
+		low := mask & -mask
+		for sub := mask; sub > 0; sub = (sub - 1) & mask {
+			if sub&low == 0 || sums[sub] != 0 {
+				continue
+			}
+			rest := mask ^ sub
+			if rest != 0 && best[rest] < 0 {
+				continue
+			}
+			if candidate := best[rest] + 1; candidate > best[mask] {
+				best[mask], pick[mask] = candidate, sub
+			}
+		}
+	}
+
+	groups := make([][]settleSide, 0, 4)
+	for mask := full - 1; mask > 0; {
+		group := pick[mask]
+		if group == 0 {
+			// Unreachable while the balances net to zero, but a partition that
+			// cannot be split is still one valid group.
+			group = mask
+		}
+
+		members := make([]settleSide, 0, bits.OnesCount(uint(group)))
+		for i := 0; i < len(balances); i++ {
+			if group&(1<<i) != 0 {
+				members = append(members, balances[i])
+			}
+		}
+		groups = append(groups, members)
+		mask ^= group
+	}
+	return groups
+}
+
+// settleGreedy pairs the largest debt with the largest credit until everything
+// clears. Within a group that settles among itself this is optimal — it always
+// closes at least one person per transfer.
+func settleGreedy(balances []settleSide) []Transfer {
+	var debtors, creditors []settleSide
+	for _, side := range balances {
 		switch {
-		case r.BalanceTHB < 0:
-			debtors = append(debtors, side{r.UserID, -r.BalanceTHB})
-		case r.BalanceTHB > 0:
-			creditors = append(creditors, side{r.UserID, r.BalanceTHB})
+		case side.amount < 0:
+			debtors = append(debtors, settleSide{side.id, -side.amount})
+		case side.amount > 0:
+			creditors = append(creditors, side)
 		}
 	}
 
@@ -157,14 +290,17 @@ func Settle(rows []MemberBalance) []Transfer {
 	i, j := 0, 0
 
 	for i < len(debtors) && j < len(creditors) {
-		amount := math.Min(debtors[i].amount, creditors[j].amount)
+		amount := debtors[i].amount
+		if creditors[j].amount < amount {
+			amount = creditors[j].amount
+		}
 
 		// Below one baht is rounding noise, not a debt worth a bank transfer.
 		if amount >= 1 {
 			out = append(out, Transfer{
 				FromUserID: debtors[i].id,
 				ToUserID:   creditors[j].id,
-				AmountTHB:  math.Round(amount),
+				AmountTHB:  float64(amount),
 			})
 		}
 
@@ -179,4 +315,11 @@ func Settle(rows []MemberBalance) []Transfer {
 	}
 
 	return out
+}
+
+func abs64(v int64) int64 {
+	if v < 0 {
+		return -v
+	}
+	return v
 }

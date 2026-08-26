@@ -64,11 +64,11 @@ var pricing = map[string]struct{ in, out float64 }{
 const defaultPricingKey = "claude-sonnet-4-20250514"
 
 // NewClient returns the live Anthropic client, or the stand-in when the API key
-// is missing or MOCK_MODE is on. The two are interchangeable by design: UAT
+// is missing or STUB_PROVIDERS is on. The two are interchangeable by design: UAT
 // exercises the same pipeline, the same schema and the same persistence.
 func NewClient(cfg core.Config) Client {
-	if cfg.UseMock() || cfg.Anthropic.ApiKey == "" {
-		logger.L().Info("ai: using the simulated client (no ANTHROPIC_API_KEY or MOCK_MODE=true)")
+	if cfg.UseStubs() || cfg.Anthropic.ApiKey == "" {
+		logger.L().Info("ai: using the simulated client (no ANTHROPIC_API_KEY or STUB_PROVIDERS=true)")
 		return &mockClient{}
 	}
 	return &anthropicClient{
@@ -176,7 +176,7 @@ func (c *anthropicClient) Complete(
 
 // mockClient answers with an empty body and zero cost. The pipeline detects
 // this and builds its draft from the seeded POI table instead of parsing model
-// output, which is what makes MOCK_MODE a complete, playable flow rather than
+// output, which is what makes STUB_PROVIDERS a complete, playable flow rather than
 // a broken one.
 type mockClient struct{}
 

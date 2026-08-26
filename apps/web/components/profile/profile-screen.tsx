@@ -1,9 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Pencil, Sparkles } from 'lucide-react';
+import Link from 'next/link';
+import { ChevronRight, Pencil, Sparkles } from 'lucide-react';
 
 import { ModeLine } from '@/components/common/mode-banner';
+import { AudienceCard } from '@/components/profile/audience-card';
+import { CreatorEarningsCard } from '@/components/profile/creator-earnings';
 import { SectionHeader, Stat } from '@/components/common/section';
 import { CharacterPicker } from '@/components/profile/character-picker';
 import { ProfileEditSheet } from '@/components/profile/profile-edit-sheet';
@@ -57,12 +60,35 @@ export function ProfileScreen() {
               {(me?.points ?? 0).toLocaleString('th-TH')}
             </p>
             <p className="text-muted mt-1 text-xs">
-              ใช้ร่างแพลนด้วย AI เพิ่ม ({POINTS_PER_RUN} แต้ม/ครั้ง) หรือเป็นส่วนลดตอนจองก็ได้
+              ใช้ร่างแพลนด้วย AI เพิ่ม ({POINTS_PER_RUN} แต้ม/ครั้ง)
             </p>
+            <Link
+              href="/points"
+              className="text-espresso mt-2 inline-flex items-center gap-1 text-xs font-semibold hover:underline"
+            >
+              ดูประวัติแต้ม <ChevronRight className="size-3.5" />
+            </Link>
           </div>
           <Sparkles className="text-primary size-8" />
         </div>
       </Card>
+
+      {/*
+        แลกแต้มเป็นโค้ดส่วนลด (A12.10) ปิดไว้ตั้งแต่ 26 ส.ค. 2569 รอ Phase 6 —
+        โค้ดส่วนลดกำลังย้ายไปหน้า "สิทธิพิเศษ" ของตัวเอง และอัตรา 8 แต้ม = ฿1
+        มาจากราคาภายในราคาเดียว ไม่ได้มาจากต้นทุนจริงของแต้ม
+        (docs/phase-6-points-economy.md) — คอมโพเนนต์ยังอยู่ที่
+        components/profile/points-redeem.tsx ไม่ได้ลบทิ้ง
+      */}
+      <CreatorEarningsCard />
+
+      {/*
+        Who followed the plans that earned the points (M23 — W23.2). The
+        ledger itself is a page of its own at /points, reached from the menu
+        below — it is a record you go looking for, not one you scroll past.
+        This card renders nothing until something has been published.
+      */}
+      <AudienceCard />
 
       {/* stats --------------------------------------------------------- */}
       <section>

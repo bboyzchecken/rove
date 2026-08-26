@@ -1,14 +1,21 @@
 'use client';
 
-import { Bus, Car, EyeOff, Footprints, TrainFront } from 'lucide-react';
+import Link from 'next/link';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Bus, Car, Copy, Eye, EyeOff, Footprints, TrainFront, Wand2 } from 'lucide-react';
 
-import { RoveLogo } from '@/components/brand/rove-logo';
+import { BrowseShell } from '@/components/common/browse-shell';
+import { AdaptDialog } from '@/components/public/adapt-dialog';
+import { ReviewLine, ReviewSummaryLine } from '@/components/trip/trip-review';
 import { SectionHeader } from '@/components/common/section';
 import { TripCover } from '@/components/trip/trip-cover';
 import { Badge } from '@/components/ui/badge';
-import { ButtonLink } from '@/components/ui/button';
+import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { CharacterStack } from '@/components/ui/character-avatar';
+import { CharacterAvatar, CharacterStack } from '@/components/ui/character-avatar';
+import { useMe } from '@/features/auth/queries';
+import { useCloneFromPublic } from '@/features/public/queries';
 import { usePublicTrip } from '@/features/trip/queries';
 import { thaiRangeLabel } from '@/lib/data/domain';
 import { formatMoney } from '@/lib/format';
@@ -22,42 +29,75 @@ import { formatMoney } from '@/lib/format';
  */
 const TRAVEL_ICON = { train: TrainFront, walk: Footprints, bus: Bus, car: Car };
 
-export function PublicTripView({ tokenOrSlug }: { tokenOrSlug: string }) {
+export function PublicTripView({
+  tokenOrSlug,
+  // Defaults to the public frame: `/s/[shareToken]` is an unlisted link that
+  // is usually opened by somebody outside the app, and `/p/[slug]` passes the
+  // real answer.
+  signedIn = false,
+}: {
+  tokenOrSlug: string;
+  signedIn?: boolean;
+}) {
   const { data, isLoading } = usePublicTrip(tokenOrSlug);
+  const { data: me } = useMe();
+  const cloneTrip = useCloneFromPublic();
+  const [adapting, setAdapting] = useState(false);
+  const router = useRouter();
 
   if (isLoading) {
     return (
-      <main className="mx-auto max-w-2xl space-y-3 px-4 py-10">
-        <div className="rounded-brand bg-surface h-40 animate-pulse" />
-        <div className="rounded-brand bg-surface h-64 animate-pulse" />
-      </main>
+      <BrowseShell signedIn={signedIn}>
+        <div className="space-y-3 py-8">
+          <div className="rounded-brand bg-surface h-40 animate-pulse" />
+          <div className="rounded-brand bg-surface h-64 animate-pulse" />
+        </div>
+      </BrowseShell>
     );
   }
 
   if (!data) {
     return (
-      <main className="mx-auto max-w-2xl px-6 py-16 text-center">
-        <RoveLogo size="md" className="mx-auto" />
-        <h1 className="font-display text-espresso mt-6 text-xl font-extrabold">ไม่พบแพลนนี้</h1>
-        <p className="text-muted mt-2 text-sm">ลิงก์อาจถูกปิดหรือสร้างใหม่ไปแล้ว</p>
-        <ButtonLink href="/" className="mt-5">
-          กลับหน้าแรก
-        </ButtonLink>
-      </main>
+      <BrowseShell signedIn={signedIn} width="focused" center>
+        <div className="py-16 text-center">
+          <h1 className="font-display text-espresso text-xl font-extrabold">ไม่พบแพลนนี้</h1>
+          <p className="text-muted mt-2 text-sm">ลิงก์อาจถูกปิดหรือสร้างใหม่ไปแล้ว</p>
+          <ButtonLink href="/explore" className="mt-5">
+            ไปหน้าสำรวจ
+          </ButtonLink>
+        </div>
+      </BrowseShell>
     );
   }
 
-  const { trip, days, members } = data;
+  const { trip, days, members, creator, viewCount, cloneCount, reviews, reviewEntries } = data;
   const perPersonJpy = days
     .flatMap((d) => d.items)
     .reduce((sum, item) => sum + (item.costJpy ?? 0), 0);
 
+  const follow = () => {
+    cloneTrip.mutate(tokenOrSlug, {
+      onSuccess: (copied) => router.push(`/t/${copied.id}` as never),
+    });
+  };
+
   return (
-    <main className="mx-auto max-w-2xl px-4 py-6">
-      <div className="flex items-center justify-between">
-        <RoveLogo size="sm" />
-        <Badge tone="outline">แพลนที่แชร์มา</Badge>
-      </div>
+    <BrowseShell
+      signedIn={signedIn}
+      actions={
+        <>
+          <ButtonLink href="/explore" size="sm" variant="ghost">
+            สำรวจแพลนอื่น
+          </ButtonLink>
+          <ButtonLink href="/new" size="sm" variant="soft">
+            เริ่มทริปของฉัน
+          </ButtonLink>
+        </>
+      }
+    >
+      <Badge tone="outline" className="mt-6">
+        แพลนที่แชร์มา
+      </Badge>
 
       <TripCover src={trip.cover} frame="banner" priority className="rounded-brand mt-4" />
 
@@ -76,12 +116,63 @@ export function PublicTripView({ tokenOrSlug }: { tokenOrSlug: string }) {
         <CharacterStack characterIds={members.map((m) => m.characterId)} />
       </div>
 
+      <div className="mt-2 flex items-center justify-between gap-3">
+        {creator.handle ? (
+          <Link
+            href={`/u/${creator.handle}` as never}
+            className="flex items-center gap-2 transition hover:opacity-80"
+          >
+            <CharacterAvatar characterId={creator.characterId} size="xs" />
+            <span className="text-muted text-xs">
+              โดย <span className="text-espresso font-semibold">{creator.name}</span>
+            </span>
+          </Link>
+        ) : (
+          <span className="flex items-center gap-2">
+            <CharacterAvatar characterId={creator.characterId} size="xs" />
+            <span className="text-muted text-xs">
+              โดย <span className="text-espresso font-semibold">{creator.name}</span>
+            </span>
+          </span>
+        )}
+
+        <span className="text-muted flex items-center gap-3 text-[11px]">
+          <span className="flex items-center gap-1">
+            <Eye className="size-3" />
+            {viewCount.toLocaleString('th-TH')}
+          </span>
+          <span className="flex items-center gap-1">
+            <Copy className="size-3" />
+            {cloneCount.toLocaleString('th-TH')} คนตามรอย
+          </span>
+        </span>
+      </div>
+
       {perPersonJpy > 0 ? (
         <Card accent="primary" className="mt-4 p-4">
           <p className="text-muted text-xs">ค่าใช้จ่ายโดยประมาณต่อคน (เฉพาะที่อยู่ในแพลน)</p>
           <p className="font-display text-espresso nums mt-1 text-2xl font-extrabold">
             {formatMoney(Math.round(perPersonJpy * trip.fxRate), 'THB')}
           </p>
+        </Card>
+      ) : null}
+
+      {reviews.count > 0 ? (
+        <Card className="mt-4 p-4">
+          <p className="text-muted text-xs">คนที่ไปมาแล้วบอกว่า</p>
+          <div className="mt-2">
+            <ReviewSummaryLine summary={reviews} />
+          </div>
+          {reviewEntries.some((entry) => entry.body) ? (
+            <div className="divide-border border-border mt-2 divide-y border-t">
+              {reviewEntries
+                .filter((entry) => entry.body)
+                .slice(0, 3)
+                .map((entry) => (
+                  <ReviewLine key={entry.userId} review={entry} />
+                ))}
+            </div>
+          ) : null}
         </Card>
       ) : null}
 
@@ -127,14 +218,44 @@ export function PublicTripView({ tokenOrSlug }: { tokenOrSlug: string }) {
       </p>
 
       <Card accent="sun" className="mt-4 p-4">
-        <p className="text-espresso text-sm font-semibold">อยากได้แพลนแบบนี้ของตัวเองไหม</p>
-        <p className="text-muted mt-1 text-xs">
-          สร้างห้องทริป ชวนเพื่อน หาวันที่ทุกคนว่าง แล้วให้ AI ร่างให้
+        <p className="text-espresso text-sm font-semibold">อยากไปตามแพลนนี้ไหม</p>
+        <p className="text-muted mt-1 text-xs leading-relaxed">
+          ก๊อปทั้งทริปไปเป็นของตัวเอง — แก้วัน เพิ่มเพื่อน ปรับที่เที่ยวต่อได้เลย
+          และเจ้าของแพลนได้แต้มเป็นกำลังใจ
         </p>
-        <ButtonLink href="/new" className="mt-3" size="sm">
-          เริ่มทริปของฉัน
-        </ButtonLink>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {me ? (
+            <>
+              <Button size="sm" onClick={follow} disabled={cloneTrip.isPending}>
+                <Copy className="size-3.5" />
+                {cloneTrip.isPending ? 'กำลังก๊อป…' : 'เที่ยวตามแพลนนี้'}
+              </Button>
+              <Button size="sm" variant="soft" onClick={() => setAdapting(true)}>
+                <Wand2 className="size-3.5" />
+                ปรับให้เข้ากับทริปฉัน
+              </Button>
+            </>
+          ) : (
+            <ButtonLink href={`/login?next=/p/${tokenOrSlug}` as never} size="sm">
+              <Copy className="size-3.5" />
+              เข้าสู่ระบบเพื่อตามรอย
+            </ButtonLink>
+          )}
+          <ButtonLink href="/new" size="sm" variant="soft">
+            เริ่มทริปของฉันเอง
+          </ButtonLink>
+        </div>
+        {cloneTrip.isError ? (
+          <p className="text-warning mt-2 text-xs">ก๊อปไม่สำเร็จ — ลองใหม่อีกครั้ง</p>
+        ) : null}
       </Card>
-    </main>
+
+      <AdaptDialog
+        open={adapting}
+        onClose={() => setAdapting(false)}
+        tokenOrSlug={tokenOrSlug}
+        source={trip}
+      />
+    </BrowseShell>
   );
 }

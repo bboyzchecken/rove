@@ -2,6 +2,15 @@ import { DEFAULT_COVER } from '@/lib/covers';
 
 import type {
   ActivityEvent,
+  AdaptDiff,
+  AgentLead,
+  DiscountCode,
+  EarningsStatement,
+  RedemptionBoard,
+  ReviewBoard,
+  ReviewSummary,
+  TripReview,
+  AdaptTotals,
   AiCredits,
   Airport,
   AiJob,
@@ -23,11 +32,26 @@ import type {
   FlightLeg,
   FlightLegInput,
   InviteLink,
+  InvitePreview,
   LockedDates,
+  CreatorProfile,
+  ExploreTrip,
+  Inbox,
   Member,
+  MemberProfile,
+  Notification,
+  PlanVariant,
+  Poll,
+  PublicCreator,
+  VariantList,
+  VariantMetrics,
   Order,
   ParsedTicket,
   PastTrip,
+  AudienceSummary,
+  PlatformStats,
+  PointsLedger,
+  PublicReview,
   PlanDay,
   PlanItem,
   PlanVersion,
@@ -37,7 +61,9 @@ import type {
   Subscription,
   SubscriptionPlan,
   Trip,
+  TripDocument,
   TripOverview,
+  TripPhoto,
   TripRecap,
   TripRoute,
   TripSummary,
@@ -47,6 +73,15 @@ import type {
 } from '../types';
 import type {
   ActivityDto,
+  AdaptDiffDto,
+  DiscountCodeDto,
+  EarningsDto,
+  LeadDto,
+  RedemptionListDto,
+  ReviewDto,
+  ReviewListDto,
+  ReviewSummaryDto,
+  AdaptTotalsDto,
   AirportDto,
   AiCreditsDto,
   AiJobDto,
@@ -67,11 +102,28 @@ import type {
   ExportDto,
   FlightDto,
   InviteDto,
+  InvitePreviewDto,
   LockedDatesDto,
+  CreatorProfileDto,
+  DocumentDto,
+  ExploreTripDto,
+  InboxDto,
+  NotificationDto,
+  PhotoDto,
+  PollDto,
   MemberDto,
+  MemberProfileDto,
+  PublicCreatorDto,
+  VariantDto,
+  VariantListDto,
+  VariantMetricsDto,
   OrderDto,
   ParsedTicketDto,
   PastTripDto,
+  AudienceDto,
+  PlatformStatsDto,
+  PointsLedgerDto,
+  PublicReviewDto,
   PlanDayDto,
   RouteDto,
   PlanItemDto,
@@ -100,6 +152,7 @@ export function toTrip(dto: TripDto): Trip {
   return {
     id: dto.id,
     title: dto.title,
+    country: dto.destination_country || 'JP',
     cities: dto.destination_cities ?? [],
     startDate: dto.start_date ?? '',
     endDate: dto.end_date ?? '',
@@ -211,6 +264,23 @@ export function toMember(dto: MemberDto): Member {
     role: dto.role,
     characterId: dto.character_id,
     hasWishlist: dto.has_wishlist,
+  };
+}
+
+export function toMemberProfile(dto: MemberProfileDto): MemberProfile {
+  const walk = dto.walk_level === 1 || dto.walk_level === 3 ? dto.walk_level : 2;
+  return {
+    userId: dto.user_id,
+    visitedBefore: dto.visited_before,
+    pace: dto.pace,
+    walkLevel: walk,
+    canDrive: dto.can_drive,
+    hasIdp: dto.has_idp,
+    budgetMinThb: dto.budget_min_thb,
+    budgetMaxThb: dto.budget_max_thb,
+    dietary: dto.dietary ?? [],
+    notes: dto.notes,
+    filled: dto.filled,
   };
 }
 
@@ -427,6 +497,290 @@ export function toPlanVersion(dto: PlanVersionDto): PlanVersion {
     actorId: dto.actor_id,
     createdAt: dto.created_at,
     title: dto.snapshot?.title ?? 'รายการหนึ่ง',
+  };
+}
+
+/* ------------------------------------------------------ community (M9) --- */
+
+export function toNotification(dto: NotificationDto): Notification {
+  return {
+    id: dto.id,
+    kind: dto.kind,
+    title: dto.title,
+    body: dto.body ?? '',
+    link: dto.link ?? '',
+    tripId: dto.trip_id,
+    actorId: dto.actor_id,
+    read: dto.read,
+    createdAt: dto.created_at,
+  };
+}
+
+export function toInbox(dto: InboxDto): Inbox {
+  return { unread: dto.unread, items: (dto.items ?? []).map(toNotification) };
+}
+
+export function toPoll(dto: PollDto): Poll {
+  return {
+    id: dto.id,
+    question: dto.question,
+    itemId: dto.item_id,
+    options: (dto.options ?? []).map((option) => ({
+      index: option.index,
+      label: option.label,
+      votes: option.votes,
+      who: option.who ?? [],
+    })),
+    closed: dto.closed,
+    closesAt: dto.closes_at,
+    createdBy: dto.created_by,
+    createdAt: dto.created_at,
+    myAnswer: dto.my_answer,
+    answered: dto.answered,
+  };
+}
+
+/* --------------------------------------------- photos & documents (M18/19) */
+
+export function toPhoto(dto: PhotoDto): TripPhoto {
+  return {
+    id: dto.id,
+    tripId: dto.trip_id,
+    dayId: dto.day_id,
+    itemId: dto.item_id,
+    userId: dto.user_id,
+    url: dto.url,
+    caption: dto.caption ?? '',
+    takenAt: dto.taken_at,
+    createdAt: dto.created_at,
+  };
+}
+
+export function toDocument(dto: DocumentDto): TripDocument {
+  return {
+    id: dto.id,
+    tripId: dto.trip_id,
+    userId: dto.user_id,
+    name: dto.name,
+    category: dto.category,
+    url: dto.url,
+    contentType: dto.content_type,
+    sizeBytes: dto.size_bytes,
+    createdAt: dto.created_at,
+  };
+}
+
+/* ---------------------------------------------------- public model (M11) - */
+
+export function toPublicCreator(dto: PublicCreatorDto): PublicCreator {
+  return {
+    name: dto.name,
+    handle: dto.handle,
+    characterId: dto.character_id || 'shiba',
+  };
+}
+
+export function toExploreTrip(dto: ExploreTripDto): ExploreTrip {
+  return {
+    slug: dto.slug,
+    title: dto.title,
+    cover: dto.cover_image_url || DEFAULT_COVER,
+    cities: dto.cities ?? [],
+    country: dto.country,
+    days: dto.days,
+    budgetPerPersonThb: dto.budget_per_person_thb,
+    viewCount: dto.view_count,
+    cloneCount: dto.clone_count,
+    creator: toPublicCreator(dto.creator),
+    updatedAt: dto.updated_at,
+    match: dto.match ? { score: dto.match.score, reasons: dto.match.reasons ?? [] } : null,
+    reviews: toReviewSummary(dto.reviews),
+  };
+}
+
+/* ------------------------------- points out, money owed (M22) ------------ */
+
+export function toDiscountCode(dto: DiscountCodeDto): DiscountCode {
+  return {
+    code: dto.code,
+    scope: dto.scope,
+    amountThb: dto.amount_thb,
+    pointsSpent: dto.points_spent,
+    expiresAt: dto.expires_at,
+    usedAt: dto.used_at,
+    usable: dto.usable,
+  };
+}
+
+export function toRedemptionBoard(dto: RedemptionListDto): RedemptionBoard {
+  return {
+    balance: dto.balance,
+    tiers: (dto.tiers ?? []).map((tier) => ({
+      amountThb: tier.amount_thb,
+      points: tier.points,
+      afford: tier.afford,
+    })),
+    codes: (dto.codes ?? []).map(toDiscountCode),
+  };
+}
+
+export function toEarningsStatement(dto: EarningsDto): EarningsStatement {
+  return {
+    totals: {
+      pendingThb: dto.totals?.pending_thb ?? 0,
+      payableThb: dto.totals?.payable_thb ?? 0,
+      paidThb: dto.totals?.paid_thb ?? 0,
+      count: dto.totals?.count ?? 0,
+    },
+    sharePercent: dto.share_percent,
+    minimumPayoutThb: dto.minimum_payout_thb,
+    entries: (dto.entries ?? []).map((entry) => ({
+      tripId: entry.trip_id,
+      partner: entry.partner,
+      bookingValueThb: entry.booking_value_thb,
+      commissionThb: entry.commission_thb,
+      sharePercent: entry.share_percent,
+      amountThb: entry.amount_thb,
+      estimated: entry.estimated,
+      status: entry.status,
+      occurredAt: entry.occurred_at,
+    })),
+    payouts: (dto.payouts ?? []).map((payout) => ({
+      periodStart: payout.period_start,
+      periodEnd: payout.period_end,
+      amountThb: payout.amount_thb,
+      earningCount: payout.earning_count,
+      status: payout.status,
+      paidAt: payout.paid_at,
+    })),
+  };
+}
+
+export function toLead(dto: LeadDto): AgentLead {
+  return {
+    id: dto.id,
+    partner: dto.partner,
+    contactName: dto.contact_name,
+    contactPhone: dto.contact_phone,
+    contactLine: dto.contact_line,
+    note: dto.note,
+    status: dto.status,
+    sentAt: dto.sent_at,
+    createdAt: dto.created_at,
+    simulated: dto.simulated,
+  };
+}
+
+/* ------------------------------------------------- reviews (M21 — A11.5) - */
+
+export function toReviewSummary(dto?: ReviewSummaryDto | null): ReviewSummary {
+  return {
+    count: dto?.count ?? 0,
+    averageRating: dto?.average_rating ?? 0,
+    actualBudgetPerPerson: dto?.actual_budget_per_person ?? 0,
+    budgetSaid: dto?.budget_said ?? 0,
+  };
+}
+
+export function toReview(dto: ReviewDto): TripReview {
+  return {
+    userId: dto.user_id,
+    name: dto.name,
+    characterId: dto.character_id || 'shiba',
+    rating: dto.rating,
+    actualBudgetPerPerson: dto.actual_budget_per_person,
+    body: dto.body,
+    createdAt: dto.created_at,
+  };
+}
+
+export function toReviewBoard(dto: ReviewListDto): ReviewBoard {
+  return {
+    summary: toReviewSummary(dto.summary),
+    entries: (dto.entries ?? []).map(toReview),
+    mine: dto.mine ? toReview(dto.mine) : null,
+    canReview: dto.can_review,
+  };
+}
+
+/** The diff a copy would apply, or did (A11.4). */
+export function toAdaptDiff(dto: AdaptDiffDto): AdaptDiff {
+  return {
+    changes: (dto.changes ?? []).map((change) => ({
+      kind: change.kind,
+      dayLabel: change.day_label,
+      itemTitle: change.item_title,
+      reason: change.reason,
+      costDeltaDest: change.cost_delta_dest,
+    })),
+    before: toAdaptTotals(dto.before),
+    after: toAdaptTotals(dto.after),
+    warnings: dto.warnings ?? [],
+    currency: dto.currency,
+  };
+}
+
+function toAdaptTotals(dto: AdaptTotalsDto): AdaptTotals {
+  return {
+    days: dto.days,
+    items: dto.items,
+    costPerPersonDest: dto.cost_per_person_dest,
+  };
+}
+
+export function toCreatorProfile(dto: CreatorProfileDto): CreatorProfile {
+  return {
+    name: dto.name,
+    handle: dto.handle,
+    characterId: dto.character_id || 'shiba',
+    publicTrips: dto.public_trips,
+    totalViews: dto.total_views,
+    totalClones: dto.total_clones,
+    pointsEarned: dto.points_earned,
+    trips: (dto.trips ?? []).map(toExploreTrip),
+  };
+}
+
+/* -------------------------------------------------------- variants (M6) -- */
+
+export function toVariantMetrics(dto: VariantMetricsDto): VariantMetrics {
+  return {
+    dayCount: dto.day_count,
+    itemCount: dto.item_count,
+    totalCostJpy: dto.total_cost_jpy,
+    perPersonThb: dto.per_person_thb,
+    travelMinutes: dto.travel_minutes,
+    coveragePercent: dto.coverage_percent,
+    mustCovered: dto.must_covered,
+    mustTotal: dto.must_total,
+    warningCount: dto.warning_count,
+  };
+}
+
+export function toVariant(dto: VariantDto): PlanVariant {
+  const mine = dto.votes.mine > 0 ? 1 : dto.votes.mine < 0 ? -1 : 0;
+  return {
+    id: dto.id,
+    label: dto.label,
+    keyDecision: dto.key_decision,
+    summary: dto.summary,
+    source: dto.source,
+    createdBy: dto.created_by,
+    createdAt: dto.created_at,
+    fromDayIndex: dto.from_day_index,
+    pros: dto.pros ?? [],
+    cons: dto.cons ?? [],
+    metrics: toVariantMetrics(dto.metrics),
+    votes: { up: dto.votes.up, down: dto.votes.down, mine },
+    days: (dto.days ?? []).map(toPlanDay),
+  };
+}
+
+export function toVariantList(dto: VariantListDto): VariantList {
+  return {
+    current: toVariantMetrics(dto.current),
+    frozen: dto.frozen,
+    variants: (dto.variants ?? []).map(toVariant),
   };
 }
 
@@ -866,4 +1220,74 @@ export function toParsedTicket(dto: ParsedTicketDto): ParsedTicket {
 
 export function toInvite(dto: InviteDto): InviteLink {
   return { token: dto.token, url: dto.url, expiresAt: dto.expires_at, role: dto.role };
+}
+
+export function toInvitePreview(dto: InvitePreviewDto): InvitePreview {
+  return { tripId: dto.trip_id, title: dto.title, role: dto.role, expiresAt: dto.expires_at };
+}
+
+/* ------------------------------------------- where points came from (M23) - */
+
+export function toPointsLedger(dto: PointsLedgerDto): PointsLedger {
+  return {
+    balance: dto.balance ?? 0,
+    earned: dto.earned ?? 0,
+    entries: (dto.entries ?? []).map((entry) => ({
+      id: entry.id,
+      delta: entry.delta,
+      reason: entry.reason,
+      note: entry.note,
+      tripId: entry.trip_id,
+      tripTitle: entry.trip_title ?? '',
+      occurredAt: entry.occurred_at,
+    })),
+    nextCursor: dto.next_cursor ?? '',
+  };
+}
+
+export function toAudienceSummary(dto: AudienceDto): AudienceSummary {
+  return {
+    totalViews: dto.total_views ?? 0,
+    totalClones: dto.total_clones ?? 0,
+    pointsEarned: dto.points_earned ?? 0,
+    publicTrips: dto.public_trips ?? 0,
+    topTripId: dto.top_trip_id ?? '',
+    trips: (dto.trips ?? []).map((trip) => ({
+      tripId: trip.trip_id,
+      title: trip.title,
+      slug: trip.slug ?? '',
+      views: trip.views ?? 0,
+      clones: trip.clones ?? 0,
+      awardedClones: trip.awarded_clones ?? 0,
+      pointsEarned: trip.points_earned ?? 0,
+    })),
+  };
+}
+
+/* ------------------------------------------- platform social proof (M24) - */
+
+export function toPlatformStats(dto: PlatformStatsDto): PlatformStats {
+  return {
+    planners: dto.planners ?? 0,
+    publicTrips: dto.public_trips ?? 0,
+    clones: dto.clones ?? 0,
+    reviews: dto.reviews ?? 0,
+    averageRating: dto.average_rating ?? 0,
+    computedAt: dto.computed_at ?? '',
+  };
+}
+
+export function toPublicReview(dto: PublicReviewDto): PublicReview {
+  return {
+    tripId: dto.trip_id,
+    tripTitle: dto.trip_title,
+    tripSlug: dto.trip_slug ?? '',
+    country: dto.country ?? '',
+    rating: dto.rating,
+    body: dto.body,
+    actualBudgetPerPerson: dto.actual_budget_per_person ?? 0,
+    name: dto.name,
+    characterId: dto.character_id || 'shiba',
+    createdAt: dto.created_at,
+  };
 }

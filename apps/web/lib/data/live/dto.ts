@@ -97,6 +97,294 @@ export interface MemberDto {
   has_wishlist: boolean;
 }
 
+/* ------------------------------------------------------ community (M9) --- */
+
+export interface NotificationDto {
+  id: string;
+  kind: 'mention' | 'assigned' | 'poll_opened' | 'plan_ready' | 'points';
+  title: string;
+  body: string;
+  link: string;
+  trip_id: string | null;
+  actor_id: string;
+  read: boolean;
+  created_at: string;
+}
+
+export interface InboxDto {
+  unread: number;
+  items: NotificationDto[];
+}
+
+export interface PollOptionDto {
+  index: number;
+  label: string;
+  votes: number;
+  who: string[];
+}
+
+export interface PollDto {
+  id: string;
+  question: string;
+  item_id: string | null;
+  options: PollOptionDto[];
+  closed: boolean;
+  closes_at: string | null;
+  created_by: string;
+  created_at: string;
+  my_answer: number;
+  answered: number;
+}
+
+/* --------------------------------------------- photos & documents (M18/19) */
+
+export interface PhotoDto {
+  id: string;
+  trip_id: string;
+  day_id: string | null;
+  item_id: string | null;
+  user_id: string;
+  url: string;
+  caption: string;
+  taken_at: string | null;
+  created_at: string;
+}
+
+export interface DocumentDto {
+  id: string;
+  trip_id: string;
+  user_id: string;
+  name: string;
+  category: 'ticket' | 'hotel' | 'transport' | 'insurance' | 'other';
+  url: string;
+  content_type: string;
+  size_bytes: number;
+  created_at: string;
+}
+
+/* ---------------------------------------------------- public model (M11) - */
+
+export interface PublicCreatorDto {
+  name: string;
+  handle: string | null;
+  character_id: string;
+}
+
+export interface PublicTripDto {
+  trip: TripDto;
+  days: PlanDayDto[];
+  members: MemberDto[];
+  creator: PublicCreatorDto;
+  view_count: number;
+  clone_count: number;
+  reviews: ReviewSummaryDto;
+  review_entries: ReviewDto[];
+}
+
+/* ------------------------------- points out, money owed (M22) ------------ */
+
+export interface DiscountCodeDto {
+  code: string;
+  scope: 'ai_credits' | 'booking';
+  amount_thb: number;
+  points_spent: number;
+  expires_at: string;
+  used_at: string | null;
+  usable: boolean;
+}
+
+export interface RedemptionListDto {
+  balance: number;
+  tiers: { amount_thb: number; points: number; afford: boolean }[];
+  codes: DiscountCodeDto[];
+}
+
+export interface EarningDto {
+  trip_id: string;
+  partner: string;
+  booking_value_thb: number;
+  commission_thb: number;
+  share_percent: number;
+  amount_thb: number;
+  estimated: boolean;
+  status: 'pending' | 'payable' | 'paid';
+  occurred_at: string;
+}
+
+export interface PayoutDto {
+  period_start: string;
+  period_end: string;
+  amount_thb: number;
+  earning_count: number;
+  status: 'draft' | 'paid';
+  paid_at: string | null;
+}
+
+export interface EarningsDto {
+  totals: { pending_thb: number; payable_thb: number; paid_thb: number; count: number };
+  share_percent: number;
+  minimum_payout_thb: number;
+  entries: EarningDto[];
+  payouts: PayoutDto[];
+}
+
+export interface LeadDto {
+  id: string;
+  partner: string;
+  contact_name: string;
+  contact_phone: string;
+  contact_line: string;
+  note: string;
+  status: 'new' | 'sent' | 'contacted' | 'won' | 'lost';
+  sent_at: string | null;
+  created_at: string;
+  simulated: boolean;
+}
+
+/* ------------------------------------------------- reviews (M21 — A11.5) - */
+
+export interface ReviewDto {
+  user_id: string;
+  name: string;
+  character_id: string;
+  rating: number;
+  actual_budget_per_person: number;
+  body: string;
+  created_at: string;
+}
+
+export interface ReviewSummaryDto {
+  count: number;
+  average_rating: number;
+  actual_budget_per_person: number;
+  budget_said: number;
+}
+
+export interface ReviewListDto {
+  summary: ReviewSummaryDto;
+  entries: ReviewDto[];
+  mine: ReviewDto | null;
+  can_review: boolean;
+}
+
+export interface MatchResultDto {
+  score: number;
+  reasons: string[];
+}
+
+export interface ExploreTripDto {
+  slug: string;
+  title: string;
+  cover_image_url: string;
+  cities: string[];
+  country: string;
+  days: number;
+  budget_per_person_thb: number;
+  view_count: number;
+  clone_count: number;
+  creator: PublicCreatorDto;
+  updated_at: string;
+  match?: MatchResultDto | null;
+  reviews: ReviewSummaryDto;
+}
+
+/* ---------------------------------------------- adapting a copy (A11.4) -- */
+
+export interface AdaptChangeDto {
+  kind: 'day_added' | 'day_removed' | 'item_removed' | 'item_moved';
+  day_label: string;
+  item_title: string;
+  reason: string;
+  cost_delta_dest: number;
+}
+
+export interface AdaptTotalsDto {
+  days: number;
+  items: number;
+  cost_per_person_dest: number;
+}
+
+export interface AdaptDiffDto {
+  changes: AdaptChangeDto[];
+  before: AdaptTotalsDto;
+  after: AdaptTotalsDto;
+  warnings: string[];
+  currency: string;
+}
+
+export interface AdaptCloneDto {
+  trip: TripDto;
+  diff: AdaptDiffDto;
+}
+
+export interface CreatorProfileDto {
+  name: string;
+  handle: string;
+  character_id: string;
+  public_trips: number;
+  total_views: number;
+  total_clones: number;
+  points_earned: number;
+  trips: ExploreTripDto[];
+}
+
+/* -------------------------------------------------------- variants (M6) -- */
+
+export interface VariantMetricsDto {
+  day_count: number;
+  item_count: number;
+  total_cost_jpy: number;
+  per_person_thb: number;
+  travel_minutes: number;
+  coverage_percent: number;
+  must_covered: number;
+  must_total: number;
+  warning_count: number;
+}
+
+export interface VariantVotesDto {
+  up: number;
+  down: number;
+  mine: number;
+}
+
+export interface VariantDto {
+  id: string;
+  label: string;
+  key_decision: string;
+  summary: string;
+  source: 'ai' | 'fork';
+  created_by: string;
+  created_at: string;
+  from_day_index: number;
+  pros: string[];
+  cons: string[];
+  metrics: VariantMetricsDto;
+  votes: VariantVotesDto;
+  days: PlanDayDto[];
+}
+
+export interface VariantListDto {
+  current: VariantMetricsDto;
+  frozen: boolean;
+  variants: VariantDto[];
+}
+
+/** Trip-scoped member profile (A3.1). */
+export interface MemberProfileDto {
+  user_id: string;
+  visited_before: boolean;
+  pace: 'relaxed' | 'balanced' | 'packed';
+  walk_level: number;
+  can_drive: boolean;
+  has_idp: boolean;
+  budget_min_thb: number;
+  budget_max_thb: number;
+  dietary: string[];
+  notes: string;
+  filled: boolean;
+}
+
 export interface MeDto {
   id: string;
   display_name: string;
@@ -557,8 +845,17 @@ export interface AdminStatsDto {
   ai_cost_today_usd: number;
   ai_cost_cap_usd: number;
   clicks_today: number;
-  mock_mode: boolean;
+  stub_providers: boolean;
+  stubbed: string[];
   commit: string;
+}
+
+/** GET /meta/mode — see apps/api/pkg/handlers/api/mode.handler.go. */
+export interface ModeDto {
+  live: boolean;
+  stubbed: string[];
+  dev_login: boolean;
+  env: string;
 }
 
 export interface ParsedTicketDto {
@@ -582,4 +879,73 @@ export interface InviteDto {
   url: string;
   expires_at: string;
   role: 'editor' | 'viewer';
+}
+
+export interface InvitePreviewDto {
+  trip_id: string;
+  title: string;
+  role: 'editor' | 'viewer';
+  expires_at: string;
+}
+
+/* ------------------------------------------- where points came from (M23) - */
+
+export interface PointsEntryDto {
+  id: string;
+  delta: number;
+  reason: string;
+  note: string;
+  trip_id: string | null;
+  trip_title: string;
+  occurred_at: string;
+}
+
+export interface PointsLedgerDto {
+  balance: number;
+  earned: number;
+  entries: PointsEntryDto[];
+  next_cursor: string;
+}
+
+export interface AudienceTripDto {
+  trip_id: string;
+  title: string;
+  slug: string;
+  views: number;
+  clones: number;
+  awarded_clones: number;
+  points_earned: number;
+}
+
+export interface AudienceDto {
+  total_views: number;
+  total_clones: number;
+  points_earned: number;
+  public_trips: number;
+  top_trip_id: string;
+  trips: AudienceTripDto[];
+}
+
+/* ------------------------------------------- platform social proof (M24) - */
+
+export interface PlatformStatsDto {
+  planners: number;
+  public_trips: number;
+  clones: number;
+  reviews: number;
+  average_rating: number;
+  computed_at: string;
+}
+
+export interface PublicReviewDto {
+  trip_id: string;
+  trip_title: string;
+  trip_slug: string;
+  country: string;
+  rating: number;
+  body: string;
+  actual_budget_per_person: number;
+  name: string;
+  character_id: string;
+  created_at: string;
 }

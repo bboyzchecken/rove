@@ -25,6 +25,10 @@ type memberSet struct {
 	users   map[string]models.User
 	// Who has at least one wish, which the member list and the nudge both need.
 	hasWishlist map[string]bool
+	// The rows behind hasWishlist. Carried rather than discarded because the
+	// overview needs the same list again for coverage, and re-querying it was
+	// how one request came to read wishlist_items three times.
+	wishes []models.WishlistItem
 }
 
 func (m memberSet) ids() []string {
@@ -38,13 +42,21 @@ func (m memberSet) ids() []string {
 func (m memberSet) characterIDs() []string {
 	out := make([]string, 0, len(m.members))
 	for _, member := range m.members {
-		character := "shiba"
-		if u, ok := m.users[member.UserID]; ok && u.CharacterID != nil && *u.CharacterID != "" {
-			character = *u.CharacterID
-		}
-		out = append(out, character)
+		out = append(out, characterOf(m.users[member.UserID]))
 	}
 	return out
+}
+
+// defaultCharacter is who someone is until they pick (§15).
+const defaultCharacter = "shiba"
+
+// characterOf tolerates the zero User a map miss hands back, so a member whose
+// account row is missing still renders as somebody.
+func characterOf(u models.User) string {
+	if u.CharacterID != nil && *u.CharacterID != "" {
+		return *u.CharacterID
+	}
+	return defaultCharacter
 }
 
 func (m memberSet) dtos() []memberDTO {
@@ -55,7 +67,7 @@ func (m memberSet) dtos() []memberDTO {
 	return out
 }
 
-// loadMembers hydrates the roster in two queries rather than N+1.
+// loadMembers hydrates the roster in three queries rather than N+1.
 func (s *Server) loadMembers(ctx context.Context, tripID string) (memberSet, error) {
 	members, err := s.members.ListByTrip(ctx, tripID)
 	if err != nil {
@@ -85,7 +97,45 @@ func (s *Server) loadMembers(ctx context.Context, tripID string) (memberSet, err
 		hasWishlist[w.UserID] = true
 	}
 
-	return memberSet{members: members, users: byID, hasWishlist: hasWishlist}, nil
+	return memberSet{members: members, users: byID, hasWishlist: hasWishlist, wishes: wishes}, nil
+}
+
+// loadRosters is loadMembers for a whole page of trips: two queries total,
+// grouped by trip. Best effort — a list that cannot show avatars is still a
+// usable list, so a failure here returns empty maps rather than an error.
+func (s *Server) loadRosters(
+	ctx context.Context,
+	tripIDs []string,
+) (map[string][]models.TripMember, map[string]models.User) {
+	byTrip := map[string][]models.TripMember{}
+	byUser := map[string]models.User{}
+	if len(tripIDs) == 0 {
+		return byTrip, byUser
+	}
+
+	members, err := s.members.ListByTrips(ctx, tripIDs)
+	if err != nil {
+		return byTrip, byUser
+	}
+
+	userIDs := make([]string, 0, len(members))
+	seen := make(map[string]bool, len(members))
+	for _, m := range members {
+		byTrip[m.TripID] = append(byTrip[m.TripID], m)
+		if !seen[m.UserID] {
+			seen[m.UserID] = true
+			userIDs = append(userIDs, m.UserID)
+		}
+	}
+
+	users, err := s.users.ListByIDs(ctx, userIDs)
+	if err != nil {
+		return byTrip, byUser
+	}
+	for _, u := range users {
+		byUser[u.ID] = u
+	}
+	return byTrip, byUser
 }
 
 /* -------------------------------------------------------------- activity -- */
@@ -120,18 +170,14 @@ func (s *Server) track(c echo.Context, tripID, text, eventType, targetType, targ
 
 /* -------------------------------------------------------------- coverage -- */
 
-// recomputeCoverage re-derives every wish's state from the plan and writes it
-// back (A3.5). Called after anything that changes either side.
-func (s *Server) recomputeCoverage(ctx context.Context, tripID string) (domain.CoverageSummary, error) {
-	wishes, err := s.wishlist.ListByTrip(ctx, tripID)
-	if err != nil {
-		return domain.CoverageSummary{}, err
-	}
-	items, err := s.plans.ListItems(ctx, tripID)
-	if err != nil {
-		return domain.CoverageSummary{}, err
-	}
-
+// coverageOf derives every wish's state from the plan. It touches nothing —
+// which is the point: a read that only needs the summary must not drag a write
+// transaction along with it. Callers that also have to persist the result use
+// writeCoverage below.
+func coverageOf(
+	wishes []models.WishlistItem,
+	items []models.PlanItem,
+) ([]domain.CoverageResult, domain.CoverageSummary) {
 	wishInputs := make([]domain.WishInput, 0, len(wishes))
 	for _, w := range wishes {
 		wishInputs = append(wishInputs, domain.WishInput{
@@ -153,6 +199,38 @@ func (s *Server) recomputeCoverage(ctx context.Context, tripID string) (domain.C
 	}
 
 	results := domain.ComputeCoverage(wishInputs, itemInputs)
+	return results, domain.SummariseCoverage(wishInputs, results)
+}
+
+// recomputeCoverage re-derives every wish's state from the plan and writes it
+// back (A3.5).
+//
+// Called after anything that changes either side — and ONLY from there. It used
+// to run on the trip overview and the coverage panel too, which meant the two
+// most-refetched GETs in the product each carried a write transaction; with SSE
+// fanning an edit out to everyone in the room, one person dragging a card
+// turned into a write per member per key. Reads now use coverageOf.
+func (s *Server) recomputeCoverage(ctx context.Context, tripID string) (domain.CoverageSummary, error) {
+	wishes, err := s.wishlist.ListByTrip(ctx, tripID)
+	if err != nil {
+		return domain.CoverageSummary{}, err
+	}
+	items, err := s.plans.ListItems(ctx, tripID)
+	if err != nil {
+		return domain.CoverageSummary{}, err
+	}
+	return s.writeCoverage(ctx, tripID, wishes, items)
+}
+
+// writeCoverage is recomputeCoverage for callers that already hold both sides,
+// so the rows are not fetched twice in one request.
+func (s *Server) writeCoverage(
+	ctx context.Context,
+	tripID string,
+	wishes []models.WishlistItem,
+	items []models.PlanItem,
+) (domain.CoverageSummary, error) {
+	results, summary := coverageOf(wishes, items)
 
 	writes := make(map[string]models.CoverageWrite, len(results))
 	for _, r := range results {
@@ -170,7 +248,7 @@ func (s *Server) recomputeCoverage(ctx context.Context, tripID string) (domain.C
 		return domain.CoverageSummary{}, err
 	}
 
-	return domain.SummariseCoverage(wishInputs, results), nil
+	return summary, nil
 }
 
 func toCoverageDTO(s domain.CoverageSummary) coverageDTO {

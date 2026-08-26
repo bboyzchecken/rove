@@ -308,18 +308,56 @@ export const POIS: Poi[] = [
 /* ----------------------------------------------------------------- prep -- */
 
 /** The Japan template (A8.2). Live mode keys this by destination_country. */
-export const PREP_TEMPLATE: Omit<PrepTask, 'id' | 'done'>[] = [
-  { title: 'เช็กวันหมดอายุพาสปอร์ต (เหลือ > 6 เดือน)', category: 'document', assigneeId: null, fromTemplate: true },
-  { title: 'ลงทะเบียน Visit Japan Web ล่วงหน้า', category: 'document', assigneeId: null, fromTemplate: true },
-  { title: 'ซื้อประกันเดินทาง', category: 'health', assigneeId: null, fromTemplate: true },
-  { title: 'ซื้อ eSIM / pocket wifi', category: 'booking', assigneeId: null, fromTemplate: true },
-  { title: 'แลกเงินเยน / เปิดบัตรที่กดเงินต่างประเทศได้', category: 'money', assigneeId: null, fromTemplate: true },
-  { title: 'จองที่พักให้ครบทุกคืน', category: 'booking', assigneeId: null, fromTemplate: true },
-  { title: 'เตรียมยาประจำตัว + ยาแก้หวัด', category: 'health', assigneeId: null, fromTemplate: true },
-  { title: 'เตรียมเสื้อกันหนาว / ร่มพับ', category: 'packing', assigneeId: null, fromTemplate: true },
-  { title: 'ปลั๊กแปลง Type A + power bank', category: 'packing', assigneeId: null, fromTemplate: true },
-  { title: 'ตั้งกลุ่มแชร์ตำแหน่งไว้ใช้ตอนหลง', category: 'other', assigneeId: null, fromTemplate: true },
+/**
+ * Country prep checklists — twin of `pkg/domain/prep_templates.go`.
+ *
+ * The country's own items lead, because the value of a country checklist is
+ * the thing that catches people out: Visit Japan Web for Japan, K-ETA for
+ * Korea. The common tail is the same wherever the trip goes.
+ */
+type PrepSeed = Omit<PrepTask, 'id' | 'done'>;
+
+const prepItem = (title: string, category: PrepTask['category']): PrepSeed => ({
+  title,
+  category,
+  assigneeId: null,
+  fromTemplate: true,
+});
+
+const PREP_COMMON: PrepSeed[] = [
+  prepItem('เช็กวันหมดอายุพาสปอร์ต (เหลือ > 6 เดือน)', 'document'),
+  prepItem('ซื้อประกันเดินทาง', 'health'),
+  prepItem('ซื้อ eSIM / pocket wifi', 'booking'),
+  prepItem('จองที่พักให้ครบทุกคืน', 'booking'),
+  prepItem('เตรียมยาประจำตัว + ยาแก้หวัด', 'health'),
+  prepItem('ตั้งกลุ่มแชร์ตำแหน่งไว้ใช้ตอนหลง', 'other'),
 ];
+
+const PREP_BY_COUNTRY: Record<string, PrepSeed[]> = {
+  JP: [
+    prepItem('ลงทะเบียน Visit Japan Web ล่วงหน้า', 'document'),
+    prepItem('แลกเงินเยน / เปิดบัตรที่กดเงินต่างประเทศได้', 'money'),
+    prepItem('ปลั๊กแปลง Type A + power bank', 'packing'),
+    prepItem('เตรียมเสื้อกันหนาว / ร่มพับ', 'packing'),
+    prepItem('เช็กว่าต้องซื้อ JR Pass / IC card ไหม', 'booking'),
+  ],
+  KR: [
+    prepItem('เช็ก K-ETA ว่าต้องยื่นไหม (ไทยยกเว้นเป็นช่วง ๆ)', 'document'),
+    prepItem('กรอก Q-CODE ด้านสุขภาพก่อนถึงสนามบิน', 'document'),
+    prepItem('แลกเงินวอน / เตรียมบัตรที่รูดได้ทุกที่', 'money'),
+    prepItem('ปลั๊กแปลง Type C/F 220V', 'packing'),
+    prepItem('เตรียมเสื้อกันลม — โซลลมแรงกว่าที่คิด', 'packing'),
+    prepItem('ซื้อบัตร T-money ไว้ขึ้นรถไฟ/รถเมล์', 'booking'),
+  ],
+};
+
+/** An unknown country still gets six useful lines, not an empty tab. */
+export function prepTemplateFor(country: string): PrepSeed[] {
+  return [...(PREP_BY_COUNTRY[country.toUpperCase()] ?? []), ...PREP_COMMON];
+}
+
+/** The Japan list, kept as a name for callers that predate the second country. */
+export const PREP_TEMPLATE = prepTemplateFor('JP');
 
 /* -------------------------------------------------------------- booking -- */
 

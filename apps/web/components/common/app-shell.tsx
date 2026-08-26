@@ -2,10 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Luggage, Plus, Sparkles, UserRound } from 'lucide-react';
+import { Compass, LayoutDashboard, Luggage, Plus, UserRound } from 'lucide-react';
 
+import { LocaleSwitchCompact } from '@/components/common/locale-switch';
 import { ModeBanner } from '@/components/common/mode-banner';
 import { RoveLogo } from '@/components/brand/rove-logo';
+import { InboxBell } from '@/components/collab/inbox-bell';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
 import { useMe } from '@/features/auth/queries';
 import { cn } from '@/lib/utils';
@@ -23,12 +25,20 @@ import { cn } from '@/lib/utils';
  * The logo goes to the public landing page — /home is this user's dashboard,
  * not the site's front door, and conflating the two is what made the map
  * confusing.
+ *
+ * "ที่อยากไป" is not here even though it is a real destination: /dreams is one
+ * tap from /home, /profile and the profile menu, whereas /explore had no way in
+ * at all outside the 404. A tab is worth more to the screen nobody can reach.
+ *
+ * The header here and `PublicShell`'s are deliberately the same frame —
+ * `max-w-5xl`, the same gutter, the same height, logo left and actions right —
+ * so signing in does not move the chrome. Change one and change the other.
  */
 const NAV = [
   { href: '/home', label: 'สรุปของฉัน', icon: LayoutDashboard },
-  { href: '/trips', label: 'ทริปของฉัน', icon: Luggage },
+  { href: '/explore', label: 'สำรวจ', icon: Compass },
   { href: '/new', label: 'สร้างทริป', icon: Plus, accent: true },
-  { href: '/dreams', label: 'ที่อยากไป', icon: Sparkles },
+  { href: '/trips', label: 'ทริปของฉัน', icon: Luggage },
   { href: '/profile', label: 'ฉัน', icon: UserRound },
 ] as const;
 
@@ -38,6 +48,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // A trip room lives under /t/:id and a finished one under /recap/:id — both
   // belong to the "ทริปของฉัน" tab.
+  //
+  // Browsing works the same way: a published plan (/p/:slug) and a creator
+  // profile (/u/:handle) are where สำรวจ leads, so the tab stays lit while the
+  // reader is down there. Without this, tapping a card put out the only light
+  // saying where they were.
   const isActive = (href: string) => {
     if (href === '/trips') {
       return (
@@ -46,8 +61,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         pathname.startsWith('/recap/')
       );
     }
+    if (href === '/explore') {
+      return (
+        pathname.startsWith('/explore') || pathname.startsWith('/p/') || pathname.startsWith('/u/')
+      );
+    }
     return pathname === href || pathname.startsWith(`${href}/`);
   };
+
+  // Trip Mode is the screen you hold while walking to a station (W10.6). It
+  // gets the whole viewport: no header, no bottom bar, no reason to leave.
+  if (pathname.endsWith('/now')) {
+    return <div className="min-h-dvh">{children}</div>;
+  }
 
   return (
     <div className="min-h-dvh pb-20 md:pb-0">
@@ -74,9 +100,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             ))}
           </nav>
 
-          <Link href="/profile" aria-label="โปรไฟล์">
-            <CharacterAvatar characterId={me?.characterId ?? 'shiba'} size="sm" />
-          </Link>
+          <div className="flex items-center gap-1">
+            <LocaleSwitchCompact className="mr-1" />
+            <InboxBell />
+            <Link href="/profile" aria-label="โปรไฟล์">
+              <CharacterAvatar characterId={me?.characterId ?? 'shiba'} size="sm" />
+            </Link>
+          </div>
         </div>
       </header>
 

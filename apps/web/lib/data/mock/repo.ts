@@ -1,12 +1,13 @@
 import { DEFAULT_COVER } from '@/lib/covers';
-import { getCharacter, CHARACTERS } from '@/lib/mock/characters';
-import { AI_CREDITS, DAYS } from '@/lib/mock/trip';
-import { PAST_TRIP_ARCHIVES, POINTS_PER_PUBLISH } from '@/lib/mock/user';
+import { getCharacter, CHARACTERS } from '@/lib/catalog/characters';
+import { AI_CREDITS, DAYS } from './seed/trip';
+import { PAST_TRIP_ARCHIVES, POINTS_PER_PUBLISH } from './seed/user';
 
 import { getAirport, getAirports, searchAirports } from '../airports';
 import { buildRoute, routeCities } from '../route';
 
 import {
+  adaptPlan,
   addDays,
   budgetFromPlan,
   computeBudget,
@@ -14,17 +15,25 @@ import {
   computeExpenses,
   computeWindows,
   daysBetween,
+  detectConflicts,
   membersFreeInRange,
   parseIsoDate,
   recomputeCoverage,
+  scoreMatch,
   thaiRangeLabel,
   toIsoDate,
   toThb,
   validateDays,
+  variantMetricsOf,
 } from '../domain';
+import type { AdaptOutcome, AdaptRequest, MatchProfile } from '../domain';
 import type { RoveRepo } from '../repo';
 import type {
   ActivityEvent,
+  AdaptDiff,
+  AdaptInput,
+  AgentLead,
+  DiscountCode,
   AiJob,
   AvailabilityBoard,
   BookingEntry,
@@ -39,18 +48,27 @@ import type {
   PastTrip,
   PlanDay,
   PlanItem,
+  PlanVariant,
+  Poll,
+  PointsEntry,
   PrepTask,
   RecapDecision,
+  ReviewBoard,
+  ReviewSummary,
   ShareState,
+  StubbedProvider,
   Trip,
+  TripDocument,
+  TripPhoto,
   TripRecap,
+  TripReview,
   TripRoute,
   TripSummary,
   Vote,
   WishlistItem,
 } from '../types';
 import { buildOrder, PLANS } from './billing';
-import { BOOKING_OFFERS, POIS, PREP_TEMPLATE, rankDestinations } from './catalog';
+import { BOOKING_OFFERS, POIS, prepTemplateFor, rankDestinations } from './catalog';
 import {
   AI_META,
   loadDb,
@@ -60,6 +78,7 @@ import {
   tripRecord,
   type MockDb,
   type TripRecord,
+  type VariantRecord,
 } from './db';
 
 /**
@@ -75,6 +94,22 @@ import {
  */
 
 const LATENCY = 140;
+
+/**
+ * Everything mock mode stands in for — which is everything, because there is
+ * no backend behind it at all. Listed rather than shortened to a boolean so a
+ * screen asking "is the AI real here?" gets the same shape of answer in both
+ * modes.
+ */
+const MOCK_STUBBED: StubbedProvider[] = [
+  'ai',
+  'places',
+  'weather',
+  'fx',
+  'storage',
+  'notifications',
+  'affiliate',
+];
 
 function delay<T>(value: T, ms = LATENCY): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), ms));
@@ -132,6 +167,325 @@ function draftFor(record: TripRecord): PlanDay[] {
 function emit(job: AiJob) {
   runningJobs.set(job.id, job);
   for (const listener of jobListeners.get(job.id) ?? []) listener(clone(job));
+}
+
+/* ------------------------------------------------------ community (M9) --- */
+
+/**
+ * Rebuilds a poll's tally from the votes list, the way the API derives it —
+ * the stored poll carries the question and its options, never the counts, so
+ * the two can never drift apart.
+ */
+function pollWithTally(db: MockDb, poll: Poll): Poll {
+  const record = db.trips.find((t) => t.polls.some((p) => p.id === poll.id));
+  const votes = (record?.votes ?? []).filter(
+    (v) => v.targetType === 'poll' && v.targetId === poll.id,
+  );
+
+  const options = poll.options.map((option) => ({
+    ...option,
+    votes: 0,
+    who: [] as string[],
+  }));
+  let answered = 0;
+  let myAnswer = -1;
+
+  for (const vote of votes) {
+    const index = vote.value;
+    if (index < 0 || index >= options.length) continue;
+    options[index]!.votes += 1;
+    options[index]!.who.push(vote.memberId);
+    answered += 1;
+    if (vote.memberId === db.user.id) myAnswer = index;
+  }
+
+  return { ...clone(poll), options, answered, myAnswer };
+}
+
+/* ---------------------------------------------------- public model (M11) - */
+
+/** Published records live in two lists: my trips and the seeded explore set. */
+function findPublished(db: MockDb, tokenOrSlug: string): TripRecord | null {
+  const match = (t: TripRecord) =>
+    t.share.shareToken === tokenOrSlug || t.share.publicSlug === tokenOrSlug;
+  return db.trips.find(match) ?? db.publicTrips.find(match) ?? null;
+}
+
+function creatorOf(db: MockDb, record: TripRecord) {
+  if (record.creator) {
+    return {
+      name: record.creator.name,
+      handle: record.creator.handle,
+      characterId: record.creator.characterId,
+    };
+  }
+  return { name: db.user.name, handle: db.user.handle || null, characterId: db.user.characterId };
+}
+
+function exploreOf(db: MockDb, record: TripRecord) {
+  return {
+    slug: record.share.publicSlug ?? record.trip.id,
+    title: record.trip.title,
+    cover: record.trip.cover,
+    cities: [...record.trip.cities],
+    country: '',
+    days: record.trip.nights + 1,
+    budgetPerPersonThb: record.trip.budgetPerPersonThb,
+    viewCount: record.share.viewCount,
+    cloneCount: record.share.cloneCount,
+    creator: creatorOf(db, record),
+    updatedAt: nowIso(),
+    reviews: summariseReviews(record.reviews),
+  };
+}
+
+/**
+ * The roll-up the API computes in `summariseReviews` / `SummaryByTrips`.
+ *
+ * The budget average counts only the people who gave a number — averaging over
+ * everybody would quietly report a cheaper trip than anyone had.
+ */
+function summariseReviews(reviews: TripReview[]): ReviewSummary {
+  if (reviews.length === 0) {
+    return { count: 0, averageRating: 0, actualBudgetPerPerson: 0, budgetSaid: 0 };
+  }
+
+  const said = reviews.filter((r) => r.actualBudgetPerPerson > 0);
+  return {
+    count: reviews.length,
+    averageRating:
+      Math.round((reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length) * 10) / 10,
+    actualBudgetPerPerson:
+      said.length === 0
+        ? 0
+        : Math.round(said.reduce((sum, r) => sum + r.actualBudgetPerPerson, 0) / said.length),
+    budgetSaid: said.length,
+  };
+}
+
+/** Nobody reviews a holiday they are still packing for. */
+function tripIsOver(record: TripRecord) {
+  return record.trip.status === 'done' || record.trip.endDate < toIsoDate(new Date());
+}
+
+function reviewBoardOf(db: MockDb, record: TripRecord): ReviewBoard {
+  return {
+    summary: summariseReviews(record.reviews),
+    entries: clone(record.reviews),
+    mine: clone(record.reviews.find((r) => r.userId === db.user.id) ?? null),
+    canReview: tripIsOver(record),
+  };
+}
+
+/**
+ * The redemption rate and tiers, mirroring `pkg/domain/revenue.go`.
+ *
+ * Eight points to the baht comes from the one price the product already has:
+ * a draft is 300 points or ฿39.
+ */
+const POINTS_PER_BAHT = 8;
+/** One page of the points ledger — matches `pointsPageSize` on the API. */
+const POINTS_PAGE_SIZE = 30;
+const REDEMPTION_TIERS = [50, 100, 300];
+/**
+ * Minting discount codes from points is closed pending Phase 6, exactly as it
+ * is on the API (`domain.RedemptionOpen`). Mock mode has to show the same shut
+ * door, or the demo sells something the real product refuses.
+ * See docs/phase-6-points-economy.md.
+ */
+const REDEMPTION_OPEN = false;
+
+/** Same shape as the API's — readable off a screen, typable on a phone. */
+function mockDiscountCode() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let out = 'ROVE-';
+  for (let i = 0; i < 6; i += 1) {
+    out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return out;
+}
+
+/** The frame a copied plan is reshaped to (A11.4). */
+function adaptRequestOf(source: TripRecord, input: AdaptInput): AdaptRequest {
+  return {
+    days: input.days,
+    partySize: input.partySize,
+    fromPartySize: source.trip.partySize,
+    // The traveller thinks in baht, the plan is priced in yen.
+    budgetPerPersonDest: input.budgetPerPersonThb
+      ? input.budgetPerPersonThb / (source.trip.fxRate || 0.235)
+      : 0,
+  };
+}
+
+function diffOf(outcome: AdaptOutcome, currency: string): AdaptDiff {
+  return {
+    changes: outcome.changes,
+    before: outcome.before,
+    after: outcome.after,
+    warnings: outcome.warnings,
+    currency,
+  };
+}
+
+function adaptDiffOf(source: TripRecord, input: AdaptInput): AdaptDiff {
+  return diffOf(adaptPlan(source.days, adaptRequestOf(source, input)), source.trip.destCurrency);
+}
+
+/**
+ * What a trip is *about*, for the match score (A11.3).
+ *
+ * The API reads areas and POI tags out of the plan; the mock records carry the
+ * same information as cities and item areas, so the two agree on any trip a
+ * UAT session can produce.
+ */
+function matchTagsOf(record: TripRecord, includeWishlist: boolean) {
+  const tags = [...record.trip.cities];
+  for (const day of record.days) {
+    for (const item of day.items) if (item.area) tags.push(item.area);
+  }
+  if (includeWishlist) {
+    for (const wish of record.wishlist) {
+      if (wish.kind === 'avoid') continue;
+      tags.push(...(wish.tags ?? []));
+    }
+  }
+  return tags;
+}
+
+function matchProfileOf(record: TripRecord, includeWishlist = false): MatchProfile {
+  return {
+    // Mock records carry no ISO country code, so country is left unset — every
+    // seeded plan is in the same place and the filter would only ever tie.
+    startDate: record.trip.startDate,
+    days: record.trip.nights + 1,
+    budgetPerPersonThb: record.trip.budgetPerPersonThb,
+    partySize: record.trip.partySize,
+    tags: matchTagsOf(record, includeWishlist),
+  };
+}
+
+/* -------------------------------------------------------- variants (M6) -- */
+
+/** Mirrors the API's variantFlavours — pace really changes the itinerary. */
+const VARIANT_FLAVOURS = [
+  {
+    pace: 'balanced' as const,
+    itemsPerDay: 4,
+    label: 'สมดุล',
+    key: 'เก็บที่สำคัญให้ครบ โดยไม่ต้องรีบ',
+    pros: ['สมดุลระหว่างเก็บที่เที่ยวกับเวลาพัก', 'เหมาะกับกลุ่มที่จังหวะต่างกัน'],
+    cons: ['ไม่สุดสักทาง ถ้ากลุ่มอยากได้แนวชัดๆ'],
+  },
+  {
+    pace: 'relaxed' as const,
+    itemsPerDay: 3,
+    label: 'สายชิล',
+    key: 'วันละไม่กี่ที่ มีเวลานั่งคาเฟ่และเดินเล่น',
+    pros: ['ไม่เหนื่อย มีเวลาซึมซับแต่ละที่', 'เผื่อเวลาหลงทาง/ต่อคิวได้สบาย'],
+    cons: ['อาจเก็บ must-do ได้ไม่ครบ'],
+  },
+  {
+    pace: 'packed' as const,
+    itemsPerDay: 6,
+    label: 'จัดเต็ม',
+    key: 'อัดให้ครบทุกอย่างที่กลุ่มอยากไป',
+    pros: ['เก็บครบทุกอย่างที่กลุ่มอยากไป', 'คุ้มค่าตั๋วเครื่องบินที่สุด'],
+    cons: ['เหนื่อย — วันเริ่มเช้าและจบดึก', 'เวลาแต่ละที่จำกัด'],
+  },
+];
+
+function variantVotesOf(record: TripRecord, variantId: string, meId: string) {
+  const votes = record.votes.filter(
+    (v) => v.targetType === 'variant' && v.targetId === variantId,
+  );
+  return {
+    up: votes.filter((v) => v.value > 0).length,
+    down: votes.filter((v) => v.value < 0).length,
+    mine: (votes.find((v) => v.memberId === meId)?.value ?? 0) as -1 | 0 | 1,
+  };
+}
+
+function variantOut(record: TripRecord, v: VariantRecord, meId: string): PlanVariant {
+  return {
+    id: v.id,
+    label: v.label,
+    keyDecision: v.keyDecision,
+    summary: v.summary,
+    source: v.source,
+    createdBy: v.createdBy,
+    createdAt: v.createdAt,
+    fromDayIndex: v.fromDayIndex,
+    pros: [...v.pros],
+    cons: [...v.cons],
+    metrics: variantMetricsOf(v.days, record.wishlist, record.trip.fxRate),
+    votes: variantVotesOf(record, v.id, meId),
+    days: clone(v.days),
+  };
+}
+
+/** A frozen plan does not move — the same rule the API enforces (A6.4). */
+function assertUnfrozen(record: TripRecord) {
+  if (record.trip.status === 'ready') {
+    throw new Error('แพลนถูกสรุปแล้ว — เจ้าของทริปต้องปลดล็อกก่อนถึงจะแก้ได้');
+  }
+}
+
+/** Drafts one candidate per flavour by pacing the canned itinerary. */
+function startVariantsJob(record: TripRecord, job: AiJob, count: number) {
+  let tick = 0;
+  const timer = setInterval(() => {
+    tick += 1;
+    const current = runningJobs.get(job.id);
+    if (!current) return;
+
+    if (tick >= AI_STEPS.length + 1) {
+      clearInterval(timer);
+      jobTimers.delete(job.id);
+
+      mutate((db) => {
+        const fresh = tripRecord(db, record.trip.id);
+        for (const flavour of VARIANT_FLAVOURS.slice(0, count)) {
+          const days = draftFor(fresh).map((day) => ({
+            ...day,
+            items: day.items.slice(0, flavour.itemsPerDay),
+          }));
+          fresh.variants.push({
+            id: mockId('var'),
+            label: flavour.label,
+            keyDecision: flavour.key,
+            summary: '',
+            source: 'ai',
+            createdBy: db.user.id,
+            createdAt: nowIso(),
+            fromDayIndex: 0,
+            pros: [...flavour.pros],
+            cons: [...flavour.cons],
+            days,
+          });
+        }
+        log(fresh, db.user.id, `AI ร่างแพลน ${count} แบบมาเทียบกันแล้ว`);
+      });
+
+      emit({
+        ...current,
+        status: 'done',
+        progress: 1,
+        step: `ได้ ${count} แบบ`,
+        finishedAt: nowIso(),
+      });
+      return;
+    }
+
+    emit({
+      ...current,
+      status: 'running',
+      progress: tick / (AI_STEPS.length + 1),
+      step: `กำลังร่างหลายแบบ — ${AI_STEPS[Math.min(tick - 1, AI_STEPS.length - 1)]!}`,
+    });
+  }, 700);
+
+  jobTimers.set(job.id, timer);
 }
 
 function startJob(record: TripRecord, job: AiJob) {
@@ -361,6 +715,7 @@ export const mockRepo: RoveRepo = {
           trip: {
             id,
             title: input.title,
+            country: input.country ?? 'JP',
             cities: cities.length > 0 ? cities : (input.cities ?? []),
             startDate: start,
             endDate: end,
@@ -401,7 +756,9 @@ export const mockRepo: RoveRepo = {
           destinationId: null,
           flights: legs,
           wishlist: [],
+          profiles: {},
           days: [],
+          variants: [],
           budgetLines: [],
           itemsWithoutCost: 0,
           expenses: [],
@@ -410,6 +767,11 @@ export const mockRepo: RoveRepo = {
           prepNote: '',
           versions: [],
           bookings: [],
+          photos: [],
+          documents: [],
+          polls: [],
+          reviews: [],
+          leads: [],
           comments: [],
           votes: [],
           activity: [],
@@ -460,9 +822,15 @@ export const mockRepo: RoveRepo = {
           const source = tripRecord(db, tripId);
           const copy = clone(source);
           copy.trip = { ...copy.trip, id: mockId('trip'), title: `${copy.trip.title} (คัดลอก)` };
+          copy.flights = [];
           copy.expenses = [];
           copy.comments = [];
           copy.activity = [];
+          // Someone else's memories and someone else's tickets do not travel
+          // with a copied plan (M18/M19).
+          copy.photos = [];
+          copy.documents = [];
+          copy.polls = [];
           copy.share = { ...copy.share, shareToken: null, shareUrl: null, visibility: 'private' };
           source.share.cloneCount += 1;
           log(copy, db.user.id, `คัดลอกทริปจาก "${source.trip.title}"`);
@@ -603,6 +971,24 @@ export const mockRepo: RoveRepo = {
       });
     },
 
+    async preview() {
+      // No real token lookup in mock mode — the landing page always previews
+      // the one demo trip a token could plausibly point at.
+      return delay(
+        mutate((db) => {
+          const record = db.trips[0]!;
+          const expires = new Date();
+          expires.setDate(expires.getDate() + 7);
+          return {
+            tripId: record.trip.id,
+            title: record.trip.title,
+            role: 'editor' as const,
+            expiresAt: expires.toISOString(),
+          };
+        }),
+      );
+    },
+
     async join(token) {
       // Mock mode has nobody to authenticate, so joining adds a new seat to the
       // trip the token points at (falling back to the demo trip).
@@ -640,9 +1026,47 @@ export const mockRepo: RoveRepo = {
       mutate((db) => {
         const record = tripRecord(db, tripId);
         record.members = record.members.filter((m) => m.id !== memberId);
+        delete record.profiles[memberId];
         record.trip.partySize = record.members.length;
       });
       return delay(undefined);
+    },
+
+    /* -------------------------------------------- member profiles (A3.1) */
+
+    async myProfile(tripId) {
+      const db = loadDb();
+      const record = tripRecord(db, tripId);
+      const saved = record.profiles[db.user.id];
+      if (saved) return delay(clone(saved));
+      return delay({
+        userId: db.user.id,
+        visitedBefore: false,
+        pace: 'balanced' as const,
+        walkLevel: 2 as const,
+        canDrive: false,
+        hasIdp: false,
+        budgetMinThb: 0,
+        budgetMaxThb: 0,
+        dietary: [],
+        notes: '',
+        filled: false,
+      });
+    },
+
+    async saveProfile(tripId, input) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          const profile = { ...input, userId: db.user.id, filled: true };
+          record.profiles[db.user.id] = profile;
+          return clone(profile);
+        }),
+      );
+    },
+
+    async profiles(tripId) {
+      return delay(mutate((db) => clone(Object.values(tripRecord(db, tripId).profiles))));
     },
   },
 
@@ -823,6 +1247,7 @@ export const mockRepo: RoveRepo = {
       return delay(
         mutate((db) => {
           const record = tripRecord(db, tripId);
+          assertUnfrozen(record);
           const { dayId, index, ...rest } = input;
           const day = record.days.find((d) => d.id === dayId) ?? record.days[0];
           if (!day) throw new Error('ยังไม่มีวันในแพลนนี้');
@@ -840,6 +1265,7 @@ export const mockRepo: RoveRepo = {
       return delay(
         mutate((db) => {
           const record = tripRecord(db, tripId);
+          assertUnfrozen(record);
           snapshot(record, db.user.id, itemId, 'update');
           let updated: PlanItem | null = null;
           for (const day of record.days) {
@@ -860,6 +1286,7 @@ export const mockRepo: RoveRepo = {
       return delay(
         mutate((db) => {
           const record = tripRecord(db, tripId);
+          assertUnfrozen(record);
           snapshot(record, db.user.id, input.itemId, 'move');
           let moved: PlanItem | null = null;
           for (const day of record.days) {
@@ -882,6 +1309,7 @@ export const mockRepo: RoveRepo = {
     async removeItem(tripId, itemId) {
       mutate((db) => {
         const record = tripRecord(db, tripId);
+        assertUnfrozen(record);
         snapshot(record, db.user.id, itemId, 'delete');
         for (const day of record.days) {
           day.items = day.items.filter((i) => i.id !== itemId);
@@ -896,6 +1324,7 @@ export const mockRepo: RoveRepo = {
       return delay(
         mutate((db) => {
           const record = tripRecord(db, tripId);
+          assertUnfrozen(record);
           const version = record.versions.pop();
           if (!version) throw new Error('ไม่มีอะไรให้ย้อนกลับ');
 
@@ -943,6 +1372,161 @@ export const mockRepo: RoveRepo = {
           return clone(record.days);
         }),
         280,
+      );
+    },
+
+    /* ------------------------------------------- variants & compare (M6) */
+
+    async variants(tripId) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          return {
+            current: variantMetricsOf(record.days, record.wishlist, record.trip.fxRate),
+            frozen: record.trip.status === 'ready',
+            variants: record.variants.map((v) => variantOut(record, v, db.user.id)),
+          };
+        }),
+      );
+    },
+
+    async forkVariant(tripId, input) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          if (record.days.length === 0) {
+            throw new Error('ยังไม่มีแพลนให้แตกตัวเลือก — ร่างแพลนก่อน');
+          }
+          const variant: VariantRecord = {
+            id: mockId('var'),
+            label: input.label || 'ตัวเลือกใหม่',
+            keyDecision: input.keyDecision ?? '',
+            summary: '',
+            source: 'fork',
+            createdBy: db.user.id,
+            createdAt: nowIso(),
+            fromDayIndex: 0,
+            pros: [],
+            cons: [],
+            days: clone(record.days),
+          };
+          record.variants.push(variant);
+          log(record, db.user.id, `เก็บแพลนปัจจุบันเป็นตัวเลือก "${variant.label}"`);
+          return variantOut(record, variant, db.user.id);
+        }),
+      );
+    },
+
+    async generateVariants(tripId, input) {
+      const job = mutate((db) => {
+        const record = tripRecord(db, tripId);
+        assertUnfrozen(record);
+        const quota = record.ai.included + record.ai.extra;
+        if (record.ai.used + input.count > quota) {
+          throw new Error(
+            `ร่าง ${input.count} แบบใช้ ${input.count} สิทธิ์ แต่โควตาเหลือไม่พอ — ซื้อเพิ่มก่อน`,
+          );
+        }
+        record.ai.used += input.count;
+        log(record, db.user.id, `ให้ AI ร่างแพลน ${input.count} แบบมาเทียบกัน`);
+
+        const created: AiJob = {
+          id: mockId('job'),
+          tripId,
+          kind: 'variants',
+          status: 'queued',
+          progress: 0,
+          step: 'เข้าคิว',
+          createdAt: nowIso(),
+        };
+        runningJobs.set(created.id, created);
+        queueMicrotask(() => startVariantsJob(record, created, input.count));
+        return clone(created);
+      });
+      return delay(job, 200);
+    },
+
+    async voteVariant(tripId, variantId, value) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          record.votes = record.votes.filter(
+            (v) =>
+              !(v.targetType === 'variant' && v.targetId === variantId && v.memberId === db.user.id),
+          );
+          if (value !== 0) {
+            record.votes.push({
+              targetType: 'variant',
+              targetId: variantId,
+              memberId: db.user.id,
+              value,
+            });
+          }
+          return variantVotesOf(record, variantId, db.user.id);
+        }),
+      );
+    },
+
+    async adoptVariant(tripId, variantId) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          assertUnfrozen(record);
+          const variant = record.variants.find((v) => v.id === variantId);
+          if (!variant) throw new Error('ไม่พบตัวเลือกนี้');
+
+          record.days = validateDays(clone(variant.days));
+          record.wishlist = recomputeCoverage(record.wishlist, record.days);
+          record.budgetLines = budgetFromPlan(record.days, record.trip.partySize, record.budgetLines);
+          record.itemsWithoutCost = record.days
+            .flatMap((d) => d.items)
+            .filter((i) => !i.costJpy).length;
+          log(record, db.user.id, `สลับมาใช้แพลน "${variant.label}"`);
+          return clone(record.days);
+        }),
+        260,
+      );
+    },
+
+    async removeVariant(tripId, variantId) {
+      mutate((db) => {
+        const record = tripRecord(db, tripId);
+        record.variants = record.variants.filter((v) => v.id !== variantId);
+      });
+      return delay(undefined);
+    },
+
+    async freeze(tripId) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          record.trip.status = 'ready';
+          log(record, db.user.id, 'สรุปแพลนแล้ว — ตกลงตามนี้ 🎉');
+          return clone(record.trip);
+        }),
+      );
+    },
+
+    async unfreeze(tripId) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          record.trip.status = 'planning';
+          log(record, db.user.id, 'ปลดล็อกแพลนกลับมาแก้ต่อ');
+          return clone(record.trip);
+        }),
+      );
+    },
+
+    async conflicts(tripId) {
+      const db = loadDb();
+      const record = tripRecord(db, tripId);
+      const nameOf = (id: string) => record.members.find((m) => m.id === id)?.name ?? 'สมาชิก';
+      return delay(
+        detectConflicts(
+          Object.values(record.profiles).map((p) => ({ ...p, name: nameOf(p.userId) })),
+          record.wishlist.map((w) => ({ ...w, ownerName: nameOf(w.memberId) })),
+        ),
       );
     },
   },
@@ -1098,11 +1682,12 @@ export const mockRepo: RoveRepo = {
         mutate((db) => {
           const record = tripRecord(db, tripId);
           const existing = new Set(record.prep.map((p) => p.title));
-          for (const template of PREP_TEMPLATE) {
+          // The checklist follows the destination, like the API's (M23).
+          for (const template of prepTemplateFor(record.trip.country)) {
             if (existing.has(template.title)) continue;
             record.prep.push({ ...template, id: mockId('p'), done: false });
           }
-          log(record, db.user.id, 'ดึงเช็กลิสต์เตรียมตัวสำหรับญี่ปุ่นมาใช้');
+          log(record, db.user.id, 'ดึงเช็กลิสต์เตรียมตัวมาใช้');
           return clone(record.prep);
         }),
         260,
@@ -1310,6 +1895,7 @@ export const mockRepo: RoveRepo = {
       return delay(
         mutate((db) => {
           const record = tripRecord(db, tripId);
+          assertUnfrozen(record);
           record.days = validateDays(job.result!.days);
           record.wishlist = recomputeCoverage(record.wishlist, record.days);
           record.budgetLines = budgetFromPlan(record.days, record.trip.partySize, record.budgetLines);
@@ -1336,7 +1922,9 @@ export const mockRepo: RoveRepo = {
 
           const record = tripRecord(db, tripId);
           record.ai.extra += quantity;
-          db.user.points -= points;
+          if (points > 0) {
+            addPoints(db, -points, 'ai_draft', `ร่างแพลนด้วย AI เพิ่ม ${quantity} ครั้ง`, tripId);
+          }
 
           const order = buildOrder(
             mockId('ord'),
@@ -1501,18 +2089,726 @@ export const mockRepo: RoveRepo = {
       return delay(
         mutate((db) => {
           const record =
-            db.trips.find(
-              (t) => t.share.shareToken === tokenOrSlug || t.share.publicSlug === tokenOrSlug,
-            ) ?? db.trips[0];
+            findPublished(db, tokenOrSlug) ?? db.trips[0];
           if (!record) return null;
           record.share.viewCount += 1;
           return {
             trip: clone(record.trip),
             days: clone(record.days),
             members: clone(record.members),
+            creator: creatorOf(db, record),
+            viewCount: record.share.viewCount,
+            cloneCount: record.share.cloneCount,
+            reviews: summariseReviews(record.reviews),
+            reviewEntries: clone(record.reviews),
           };
         }),
       );
+    },
+
+    /* --------------------------------------------- public model (M11) -- */
+
+    async explore(filters) {
+      const db = loadDb();
+      let records = [...db.publicTrips, ...db.trips.filter((t) => t.share.visibility === 'public')];
+
+      if (filters.country) {
+        // Seeded records carry no country code; match on the cities instead.
+        const q = filters.country.toLowerCase();
+        records = records.filter(
+          (r) =>
+            r.trip.cities.some((c) => c.toLowerCase().includes(q)) ||
+            r.trip.title.toLowerCase().includes(q),
+        );
+      }
+      if (filters.q) {
+        const q = filters.q.toLowerCase();
+        records = records.filter(
+          (r) =>
+            r.trip.title.toLowerCase().includes(q) ||
+            r.trip.cities.some((c) => c.toLowerCase().includes(q)),
+        );
+      }
+
+      const offset = filters.offset ?? 0;
+      const limit = filters.limit ?? 12;
+
+      // Ranked against one of my own trips (A11.3). The API scores a window of
+      // the catalogue in Go for the same reason: the score is not a column.
+      if (filters.match) {
+        const mine = db.trips.find((t) => t.trip.id === filters.match);
+        if (!mine) throw new Error('ไม่พบทริปที่ใช้เทียบ');
+
+        const want = matchProfileOf(mine, true);
+        const scored = records
+          .filter((r) => r.trip.id !== mine.trip.id)
+          .map((r) => ({ record: r, match: scoreMatch(want, matchProfileOf(r)) }))
+          .filter((row) => row.match.score > 0)
+          .sort(
+            (a, b) =>
+              b.match.score - a.match.score ||
+              b.record.share.viewCount +
+                b.record.share.cloneCount * 5 -
+                (a.record.share.viewCount + a.record.share.cloneCount * 5),
+          );
+
+        return delay({
+          items: scored
+            .slice(offset, offset + limit)
+            .map((row) => ({ ...exploreOf(db, row.record), match: row.match })),
+          total: scored.length,
+        });
+      }
+
+      records.sort((a, b) =>
+        filters.sort === 'new'
+          ? b.trip.startDate.localeCompare(a.trip.startDate)
+          : b.share.viewCount +
+            b.share.cloneCount * 5 -
+            (a.share.viewCount + a.share.cloneCount * 5),
+      );
+
+      return delay({
+        items: records.slice(offset, offset + limit).map((r) => exploreOf(db, r)),
+        total: records.length,
+      });
+    },
+
+    async creator(handle) {
+      const db = loadDb();
+      const mine = db.user.handle === handle;
+      const records = mine
+        ? db.trips.filter((t) => t.share.visibility === 'public')
+        : db.publicTrips.filter((t) => t.creator?.handle === handle);
+      if (!mine && records.length === 0) return delay(null);
+
+      const first = records[0];
+      const identity = mine
+        ? { name: db.user.name, handle, characterId: db.user.characterId }
+        : (first?.creator ?? { name: 'นักเดินทาง', handle, characterId: 'shiba' });
+
+      return delay({
+        ...identity,
+        publicTrips: records.length,
+        totalViews: records.reduce((sum, r) => sum + r.share.viewCount, 0),
+        totalClones: records.reduce((sum, r) => sum + r.share.cloneCount, 0),
+        pointsEarned: mine ? db.user.points : records.length * 500,
+        trips: records.map((r) => exploreOf(db, r)),
+      });
+    },
+
+    async cloneFromPublic(tokenOrSlug) {
+      return delay(
+        mutate((db) => {
+          const source = findPublished(db, tokenOrSlug);
+          if (!source) throw new Error('ไม่พบแพลนนี้');
+
+          const copy = clone(source);
+          copy.trip = {
+            ...copy.trip,
+            id: mockId('trip'),
+            title: `${copy.trip.title} (ตามรอย)`,
+            status: 'planning',
+          };
+          copy.role = 'owner';
+          copy.members = [
+            {
+              id: db.user.id,
+              name: db.user.name,
+              role: 'owner',
+              characterId: db.user.characterId,
+              hasWishlist: false,
+            },
+          ];
+          copy.creator = undefined;
+          // The API copies days and items, never the legs: you have copied
+          // someone's itinerary, you have not booked their flights. The frame
+          // keeps its dates; the route starts empty for this group to fill in.
+          copy.flights = [];
+          copy.expenses = [];
+          copy.settled = [];
+          copy.comments = [];
+          copy.activity = [];
+          copy.votes = [];
+          copy.variants = [];
+          copy.versions = [];
+          copy.bookings = [];
+          copy.photos = [];
+          copy.documents = [];
+          copy.polls = [];
+          copy.profiles = {};
+          copy.ai = { used: 0, included: 2, extra: 0 };
+          copy.share = {
+            visibility: 'private',
+            shareToken: null,
+            shareUrl: null,
+            publicSlug: null,
+            viewCount: 0,
+            cloneCount: 0,
+          };
+          source.share.cloneCount += 1;
+          log(copy, db.user.id, `เที่ยวตามแพลน "${source.trip.title}"`);
+          db.trips.unshift(copy);
+          return clone(copy.trip);
+        }),
+        320,
+      );
+    },
+
+    async adaptPreview(tokenOrSlug, input) {
+      const db = loadDb();
+      const source = findPublished(db, tokenOrSlug);
+      if (!source) throw new Error('ไม่พบแพลนนี้');
+
+      return delay(adaptDiffOf(source, input));
+    },
+
+    async cloneAdapted(tokenOrSlug, input) {
+      const trip = await this.cloneFromPublic(tokenOrSlug);
+
+      return delay(
+        mutate((db) => {
+          const source = findPublished(db, tokenOrSlug);
+          const copy = db.trips.find((t) => t.trip.id === trip.id);
+          if (!source || !copy) throw new Error('ไม่พบแพลนนี้');
+
+          const outcome = adaptPlan(copy.days, adaptRequestOf(source, input));
+          const start = input.startDate || copy.trip.startDate;
+
+          copy.days = outcome.days.map((day, i) => ({
+            ...day,
+            id: day.id.startsWith('adapt-blank') ? mockId('day') : day.id,
+            date: addDays(start, i),
+          }));
+          copy.trip = {
+            ...copy.trip,
+            startDate: start,
+            endDate: addDays(start, Math.max(0, copy.days.length - 1)),
+            nights: Math.max(0, copy.days.length - 1),
+            partySize: input.partySize || copy.trip.partySize,
+            budgetPerPersonThb: input.budgetPerPersonThb || copy.trip.budgetPerPersonThb,
+          };
+
+          return {
+            trip: clone(copy.trip),
+            diff: diffOf(outcome, source.trip.destCurrency),
+          };
+        }),
+        320,
+      );
+    },
+
+    /* ------------------------------------ platform social proof (M24) -- */
+
+    async platformStats() {
+      const db = loadDb();
+      const published = [
+        ...db.publicTrips,
+        ...db.trips.filter((t) => t.share.visibility === 'public'),
+      ];
+      const reviews = [...db.trips, ...db.publicTrips].flatMap((t) => t.reviews);
+
+      // Counted off the seeded catalogue rather than invented: mock mode's
+      // numbers are small, and the landing section is supposed to hide itself
+      // on numbers this small (W24.1). Pretending otherwise here would make
+      // that rule untestable.
+      return delay({
+        planners: new Set(published.map((r) => r.creator?.handle ?? db.user.handle)).size,
+        publicTrips: published.length,
+        clones: published.reduce((sum, r) => sum + r.share.cloneCount, 0),
+        reviews: reviews.length,
+        averageRating:
+          reviews.length === 0
+            ? 0
+            : Math.round((reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length) * 10) / 10,
+        computedAt: nowIso(),
+      });
+    },
+
+    async recentReviews() {
+      const db = loadDb();
+      const published = [
+        ...db.publicTrips,
+        ...db.trips.filter((t) => t.share.visibility === 'public'),
+      ];
+
+      return delay(
+        published
+          .flatMap((record) =>
+            // A rating with no words is counted by the summary and never
+            // quoted — printing it would be putting words in someone's mouth.
+            record.reviews
+              .filter((review) => review.body.trim() !== '')
+              .map((review) => ({
+                tripId: record.trip.id,
+                tripTitle: record.trip.title,
+                tripSlug: record.share.publicSlug ?? '',
+                country: '',
+                rating: review.rating,
+                body: review.body,
+                actualBudgetPerPerson: review.actualBudgetPerPerson,
+                name: review.name,
+                characterId: review.characterId,
+                createdAt: review.createdAt,
+              })),
+          )
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          .slice(0, 12),
+      );
+    },
+  },
+
+  /* ----------------------------- points out, money owed (M22) -- */
+  rewards: {
+    async redemptions() {
+      const db = loadDb();
+      return delay({
+        balance: db.user.points,
+        tiers: REDEMPTION_OPEN
+          ? REDEMPTION_TIERS.map((amountThb) => ({
+              amountThb,
+              points: amountThb * POINTS_PER_BAHT,
+              afford: db.user.points >= amountThb * POINTS_PER_BAHT,
+            }))
+          : [],
+        codes: clone(db.discountCodes),
+      });
+    },
+
+    async redeem(amountThb) {
+      return delay(
+        mutate((db) => {
+          if (!REDEMPTION_OPEN) throw new Error('ระบบแลกแต้มเป็นโค้ดส่วนลดปิดปรับปรุงชั่วคราว');
+          if (!REDEMPTION_TIERS.includes(amountThb)) throw new Error('เลือกได้เฉพาะมูลค่าที่กำหนดไว้');
+          const cost = amountThb * POINTS_PER_BAHT;
+          if (db.user.points < cost) throw new Error('แต้มไม่พอ');
+
+          // Points are burned on issue, exactly like the API: a code that
+          // exists has already been paid for — and the burn is a ledger row,
+          // not a subtraction (A23.1).
+          addPoints(db, -cost, 'redeem', `แลกเป็นโค้ดส่วนลด ฿${amountThb.toLocaleString('th-TH')}`, null);
+          const code: DiscountCode = {
+            code: mockDiscountCode(),
+            scope: 'ai_credits',
+            amountThb,
+            pointsSpent: cost,
+            expiresAt: addDays(toIsoDate(new Date()), 180),
+            usedAt: null,
+            usable: true,
+          };
+          db.discountCodes.unshift(code);
+          return clone(code);
+        }),
+        220,
+      );
+    },
+
+    async earnings() {
+      const db = loadDb();
+      return delay(clone(db.earnings));
+    },
+
+    /* ------------------------------- where the points came from (M23) -- */
+
+    async pointsHistory(cursor) {
+      const db = loadDb();
+      // The same page size and the same cursor shape as the API, so the "ดู
+      // เพิ่ม" button is exercised in mock mode instead of only in live.
+      //
+      // A cursor that matches nothing ends the walk rather than restarting it:
+      // `findIndex` returns -1, and treating that as "start from the top"
+      // would hand the first page back forever while the infinite query kept
+      // appending it.
+      const at = cursor ? db.pointsLedger.findIndex((row) => row.id === cursor) : -1;
+      const start = at + 1;
+      // Totals are over the whole ledger, not over the page — the same two
+      // figures the API returns with every page.
+      const totals = {
+        balance: db.pointsLedger.reduce((sum, row) => sum + row.delta, 0),
+        earned: db.pointsLedger.reduce((sum, row) => sum + Math.max(0, row.delta), 0),
+      };
+
+      if (cursor && at < 0) {
+        return delay({ ...totals, entries: [], nextCursor: '' });
+      }
+
+      const page = db.pointsLedger.slice(start, start + POINTS_PAGE_SIZE);
+      const next = db.pointsLedger[start + POINTS_PAGE_SIZE];
+
+      return delay({
+        ...totals,
+        entries: clone(page),
+        nextCursor: next ? (page[page.length - 1]?.id ?? '') : '',
+      });
+    },
+
+    async audience() {
+      const db = loadDb();
+      const published = db.trips.filter((t) => t.share.visibility === 'public');
+
+      // What each published plan earned, read back out of the ledger rather
+      // than kept as a second counter.
+      const earnedBy = (tripId: string) =>
+        db.pointsLedger.filter((row) => row.reason === 'trip_cloned' && row.tripId === tripId);
+
+      const trips = published
+        .map((record) => {
+          const awards = earnedBy(record.trip.id);
+          return {
+            tripId: record.trip.id,
+            title: record.trip.title,
+            slug: record.share.publicSlug ?? '',
+            views: record.share.viewCount,
+            clones: record.share.cloneCount,
+            awardedClones: awards.length,
+            pointsEarned: awards.reduce((sum, row) => sum + row.delta, 0),
+          };
+        })
+        .sort((a, b) => b.clones - a.clones || b.views - a.views);
+
+      return delay({
+        totalViews: trips.reduce((sum, t) => sum + t.views, 0),
+        totalClones: trips.reduce((sum, t) => sum + t.clones, 0),
+        pointsEarned: trips.reduce((sum, t) => sum + t.pointsEarned, 0),
+        publicTrips: trips.length,
+        topTripId: trips[0]?.tripId ?? '',
+        trips,
+      });
+    },
+  },
+
+  leads: {
+    async list(tripId) {
+      return delay(mutate((db) => clone(tripRecord(db, tripId).leads)));
+    },
+
+    async create(tripId, input) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          if (!input.contactPhone && !input.contactLine) {
+            throw new Error('ใส่เบอร์โทรหรือ LINE ID อย่างน้อยหนึ่งอย่าง');
+          }
+
+          const lead: AgentLead = {
+            id: mockId('lead'),
+            partner: 'ROVE Agent',
+            contactName: input.contactName,
+            contactPhone: input.contactPhone ?? '',
+            contactLine: input.contactLine ?? '',
+            note: input.note ?? '',
+            status: 'new',
+            sentAt: null,
+            createdAt: nowIso(),
+            // Mock mode has no agent inbox to send to, and says so rather than
+            // pretending somebody was messaged.
+            simulated: true,
+          };
+          record.leads.unshift(lead);
+          log(record, db.user.id, 'ขอให้เอเจนต์ช่วยจัดทริปนี้');
+          return clone(lead);
+        }),
+        260,
+      );
+    },
+  },
+
+  /* ----------------------------------------------- reviews (M21) -- */
+  reviews: {
+    async list(tripId) {
+      return delay(mutate((db) => reviewBoardOf(db, tripRecord(db, tripId))));
+    },
+
+    async save(tripId, input) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          if (!tripIsOver(record)) throw new Error('รีวิวได้หลังทริปจบแล้วเท่านั้น');
+          if (input.rating < 1 || input.rating > 5) throw new Error('ให้ดาว 1–5 ดวง');
+
+          const mine: TripReview = {
+            userId: db.user.id,
+            name: db.user.name,
+            characterId: db.user.characterId,
+            rating: input.rating,
+            actualBudgetPerPerson: input.actualBudgetPerPerson ?? 0,
+            body: input.body ?? '',
+            createdAt: nowIso(),
+          };
+          // Upsert, like the unique index on the API side: saving again
+          // replaces my review rather than adding a second opinion.
+          record.reviews = [mine, ...record.reviews.filter((r) => r.userId !== db.user.id)];
+
+          return reviewBoardOf(db, record);
+        }),
+        200,
+      );
+    },
+
+    async remove(tripId) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          record.reviews = record.reviews.filter((r) => r.userId !== db.user.id);
+        }),
+      );
+    },
+  },
+
+  /* ------------------------------------------------ photos (M18) -- */
+  photos: {
+    async list(tripId, filter) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          return record.photos
+            .filter(
+              (p) =>
+                (!filter?.dayId || p.dayId === filter.dayId) &&
+                (!filter?.itemId || p.itemId === filter.itemId) &&
+                (!filter?.userId || p.userId === filter.userId),
+            )
+            .map((p) => clone(p));
+        }),
+      );
+    },
+
+    async upload(tripId, input) {
+      // No bucket in mock mode: the resized file becomes an object URL that
+      // lives as long as the tab does. Reloading loses the picture but keeps
+      // the row, which is exactly what the empty state is for.
+      const url = typeof URL === 'undefined' ? '' : URL.createObjectURL(input.file);
+
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          const photo: TripPhoto = {
+            id: mockId('ph'),
+            tripId,
+            dayId: input.dayId ?? null,
+            itemId: input.itemId ?? null,
+            userId: db.user.id,
+            url,
+            caption: input.caption ?? '',
+            takenAt: null,
+            createdAt: nowIso(),
+          };
+          // An item pins the photo to its day too, same as the API does.
+          if (input.itemId) {
+            const day = record.days.find((d) => d.items.some((i) => i.id === input.itemId));
+            if (day) photo.dayId = day.id;
+          }
+          record.photos.push(photo);
+          log(record, db.user.id, 'อัปโหลดรูปใหม่');
+          return clone(photo);
+        }),
+        400,
+      );
+    },
+
+    async remove(tripId, photoId) {
+      mutate((db) => {
+        const record = tripRecord(db, tripId);
+        const photo = record.photos.find((p) => p.id === photoId);
+        if (photo && photo.userId !== db.user.id && record.role !== 'owner') {
+          throw new Error('ลบได้เฉพาะรูปของตัวเอง');
+        }
+        if (photo?.url.startsWith('blob:') && typeof URL !== 'undefined') {
+          URL.revokeObjectURL(photo.url);
+        }
+        record.photos = record.photos.filter((p) => p.id !== photoId);
+      });
+      return delay(undefined);
+    },
+
+    async photoBookThemes() {
+      // The same three the API ships, so the picker looks identical in both
+      // modes. Mirrors pkg/domain/photobook.go.
+      return delay([
+        { id: 'paper', name: 'กระดาษ', paper: '#FFFFFF', ink: '#3D2B24', muted: '#6B5B4E', accent: '#D9714E' },
+        { id: 'ink', name: 'หมึกเข้ม', paper: '#1C1714', ink: '#F5EFE9', muted: '#A2938A', accent: '#E49A81' },
+        { id: 'film', name: 'ฟิล์ม', paper: '#F3EEE5', ink: '#2E2A24', muted: '#7A7266', accent: '#8BA07A' },
+      ]);
+    },
+
+    photoBookUrl(tripId, options) {
+      // Mock mode has no server to render it; the screen turns this into the
+      // browser's own print dialog instead. The options ride along so the
+      // print view can honour them.
+      const params = new URLSearchParams({ print: '1' });
+      if (options?.theme) params.set('theme', options.theme);
+      if (options?.coverPhotoId) params.set('cover', options.coverPhotoId);
+      return `/t/${tripId}/photos?${params.toString()}`;
+    },
+  },
+
+  /* --------------------------------------------- documents (M19) -- */
+  documents: {
+    async list(tripId) {
+      return delay(mutate((db) => tripRecord(db, tripId).documents.map((d) => clone(d))));
+    },
+
+    async upload(tripId, input) {
+      const url = typeof URL === 'undefined' ? '' : URL.createObjectURL(input.file);
+
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          const doc: TripDocument = {
+            id: mockId('doc'),
+            tripId,
+            userId: db.user.id,
+            name: input.name || input.file.name,
+            category: input.category,
+            url,
+            contentType: input.file.type,
+            sizeBytes: input.file.size,
+            createdAt: nowIso(),
+          };
+          record.documents.unshift(doc);
+          log(record, db.user.id, `เพิ่มเอกสาร "${doc.name}"`);
+          return clone(doc);
+        }),
+        400,
+      );
+    },
+
+    async remove(tripId, documentId) {
+      mutate((db) => {
+        const record = tripRecord(db, tripId);
+        const doc = record.documents.find((d) => d.id === documentId);
+        if (doc && doc.userId !== db.user.id && record.role !== 'owner') {
+          throw new Error('ลบได้เฉพาะเอกสารที่ตัวเองอัปโหลด');
+        }
+        if (doc?.url.startsWith('blob:') && typeof URL !== 'undefined') {
+          URL.revokeObjectURL(doc.url);
+        }
+        record.documents = record.documents.filter((d) => d.id !== documentId);
+      });
+      return delay(undefined);
+    },
+  },
+
+  /* --------------------------------------------- community (M9) -- */
+  community: {
+    async inbox() {
+      const db = loadDb();
+      const items = [...db.notifications].reverse();
+      return delay({
+        unread: items.filter((n) => !n.read).length,
+        items: items.map((n) => clone(n)),
+      });
+    },
+
+    async markRead(notificationId) {
+      return delay(
+        mutate((db) => {
+          for (const n of db.notifications) {
+            if (!notificationId || n.id === notificationId) n.read = true;
+          }
+          const items = [...db.notifications].reverse();
+          return {
+            unread: items.filter((n) => !n.read).length,
+            items: items.map((n) => clone(n)),
+          };
+        }),
+      );
+    },
+
+    async polls(tripId) {
+      return delay(
+        mutate((db) => tripRecord(db, tripId).polls.map((p) => pollWithTally(db, p))),
+      );
+    },
+
+    async createPoll(tripId, input) {
+      const options = input.options.map((o) => o.trim()).filter(Boolean);
+      if (options.length < 2) throw new Error('ใส่ตัวเลือกอย่างน้อย 2 อย่าง');
+      if (options.length > 6) throw new Error('ตัวเลือกเยอะเกินไป — เอาไม่เกิน 6 อย่าง');
+
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          const poll: Poll = {
+            id: mockId('poll'),
+            question: input.question.trim(),
+            itemId: input.itemId ?? null,
+            options: options.map((label, index) => ({ index, label, votes: 0, who: [] })),
+            closed: false,
+            closesAt: null,
+            createdBy: db.user.id,
+            createdAt: nowIso(),
+            myAnswer: -1,
+            answered: 0,
+          };
+          record.polls.unshift(poll);
+          log(record, db.user.id, `เปิดโพล "${poll.question}"`);
+          return pollWithTally(db, poll);
+        }),
+      );
+    },
+
+    async answerPoll(tripId, pollId, option) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          const poll = record.polls.find((p) => p.id === pollId);
+          if (!poll) throw new Error('ไม่พบโพลนี้');
+          if (poll.closed) throw new Error('โพลนี้ปิดไปแล้ว');
+          if (option < -1 || option >= poll.options.length) throw new Error('ไม่มีตัวเลือกนี้');
+
+          // Answers live in the votes list, exactly as they do in the API.
+          record.votes = record.votes.filter(
+            (v) => !(v.targetType === 'poll' && v.targetId === pollId && v.memberId === db.user.id),
+          );
+          if (option >= 0) {
+            record.votes.push({
+              targetType: 'poll',
+              targetId: pollId,
+              memberId: db.user.id,
+              // The option index rides in `value`, same as the API.
+              value: option,
+            });
+          }
+          return pollWithTally(db, poll);
+        }),
+      );
+    },
+
+    async closePoll(tripId, pollId) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          const poll = record.polls.find((p) => p.id === pollId);
+          if (!poll) throw new Error('ไม่พบโพลนี้');
+          if (poll.createdBy !== db.user.id && record.role !== 'owner') {
+            throw new Error('ปิดโพลได้เฉพาะคนที่เปิดหรือเจ้าของทริป');
+          }
+          poll.closed = true;
+          log(record, db.user.id, `ปิดโพล "${poll.question}"`);
+          return pollWithTally(db, poll);
+        }),
+      );
+    },
+
+    async removePoll(tripId, pollId) {
+      mutate((db) => {
+        const record = tripRecord(db, tripId);
+        const poll = record.polls.find((p) => p.id === pollId);
+        if (poll && poll.createdBy !== db.user.id && record.role !== 'owner') {
+          throw new Error('ลบโพลได้เฉพาะคนที่เปิดหรือเจ้าของทริป');
+        }
+        record.polls = record.polls.filter((p) => p.id !== pollId);
+        record.votes = record.votes.filter(
+          (v) => !(v.targetType === 'poll' && v.targetId === pollId),
+        );
+      });
+      return delay(undefined);
+    },
+
+    async ping() {
+      // Nobody else is looking in mock mode, so there is nothing to announce.
+      return Promise.resolve();
     },
   },
 
@@ -1551,8 +2847,23 @@ export const mockRepo: RoveRepo = {
         aiCostTodayUsd: 0,
         aiCostCapUsd: 5,
         clicksToday: 0,
-        mockMode: true,
+        stubProviders: true,
+        stubbed: [...MOCK_STUBBED],
         commit: 'local',
+      });
+    },
+  },
+
+  /* -------------------------------------------------------------- meta -- */
+  meta: {
+    async mode() {
+      // Mock mode does not ask anything: by definition none of it is real and
+      // none of it leaves the browser.
+      return delay({
+        live: false,
+        stubbed: [...MOCK_STUBBED],
+        devLogin: true,
+        env: 'mock',
       });
     },
   },
@@ -1759,8 +3070,52 @@ function recapOfArchive(db: MockDb, past: PastTrip): TripRecap {
  * reward the nudge promised actually shows up.
  */
 function awardPublishPoints(db: MockDb, title: string, record?: TripRecord) {
-  db.user.points += POINTS_PER_PUBLISH;
+  addPoints(
+    db,
+    POINTS_PER_PUBLISH,
+    'trip_published',
+    `เปิดทริป "${title}" เป็นสาธารณะ`,
+    record?.trip.id ?? null,
+  );
   if (record) log(record, db.user.id, `เปิดทริป "${title}" เป็นสาธารณะ +${POINTS_PER_PUBLISH} แต้ม`);
+}
+
+/**
+ * The one place mock mode moves points (M23 — A23.1).
+ *
+ * Writes the ledger row first and then re-derives the balance from it, so the
+ * two can never disagree — the same property the API gets from `SUM(delta)`.
+ * A screen that shows a balance without a row behind it is exactly what this
+ * feature exists to make impossible.
+ */
+function addPoints(
+  db: MockDb,
+  delta: number,
+  reason: PointsEntry['reason'],
+  note: string,
+  tripId: string | null,
+): PointsEntry {
+  const entry: PointsEntry = {
+    id: mockId('pt'),
+    delta,
+    reason,
+    note,
+    tripId,
+    tripTitle: tripId ? (findTripTitle(db, tripId) ?? '') : '',
+    occurredAt: nowIso(),
+  };
+  db.pointsLedger.unshift(entry);
+  db.user.points = db.pointsLedger.reduce((sum, row) => sum + row.delta, 0);
+  return entry;
+}
+
+/** A ledger row names its trip, and keeps the name if the trip goes away. */
+function findTripTitle(db: MockDb, tripId: string): string | undefined {
+  return (
+    db.trips.find((t) => t.trip.id === tripId)?.trip.title ??
+    db.publicTrips.find((t) => t.trip.id === tripId)?.trip.title ??
+    db.past.find((t) => t.id === tripId)?.title
+  );
 }
 
 /** An archived card carries its own share state — there is no room to ask. */

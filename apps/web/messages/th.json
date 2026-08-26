@@ -11,12 +11,16 @@
   },
   "trip": {
     "overview": "ภาพรวม",
+    "dates": "วันเดินทาง",
     "wishlist": "ที่อยากไป",
     "plan": "แพลน",
     "budget": "งบ",
+    "expense": "ค่าใช้จ่าย",
     "prep": "เตรียมตัว",
     "bookings": "การจอง",
-    "discussion": "คุยกัน"
+    "discussion": "คุยกัน",
+    "photos": "รูปภาพ",
+    "documents": "เอกสาร"
   },
   "wishlist": {
     "must": "ต้องไป",

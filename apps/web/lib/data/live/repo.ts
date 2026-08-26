@@ -2,10 +2,28 @@ import { api, type Paginated } from '@/lib/api-client';
 import { env } from '@/lib/env';
 
 import type { RoveRepo } from '../repo';
-import type { AiJob, Airport, CurrentUser, Member } from '../types';
+import type {
+  AdaptInput,
+  AdminStats,
+  AiJob,
+  Airport,
+  CurrentUser,
+  Member,
+  PhotoBookTheme,
+  ProviderMode,
+  TripConflict,
+} from '../types';
 import type {
   ActivityDto,
+  AdaptCloneDto,
+  DiscountCodeDto,
+  EarningsDto,
+  LeadDto,
+  RedemptionListDto,
+  ReviewListDto,
+  AdaptDiffDto,
   AdminStatsDto,
+  ModeDto,
   AirportDto,
   AiCreditsDto,
   AiJobDto,
@@ -22,12 +40,28 @@ import type {
   ExpenseEntryDto,
   ExpenseSummaryDto,
   InviteDto,
+  InvitePreviewDto,
   LockedDatesDto,
   MeDto,
   MemberDto,
+  CreatorProfileDto,
+  DocumentDto,
+  ExploreTripDto,
+  InboxDto,
+  PollDto,
+  PhotoDto,
+  MemberProfileDto,
   OrderDto,
+  PublicTripDto,
+  VariantDto,
+  VariantListDto,
+  VariantVotesDto,
   ParsedTicketDto,
   PastTripDto,
+  AudienceDto,
+  PlatformStatsDto,
+  PointsLedgerDto,
+  PublicReviewDto,
   PlanDayDto,
   PlanItemDto,
   PlanVersionDto,
@@ -46,6 +80,18 @@ import type {
 } from './dto';
 import {
   fromBooking,
+  toAdaptDiff,
+  toAudienceSummary,
+  toDiscountCode,
+  toPlatformStats,
+  toPointsLedger,
+  toPublicReview,
+  toEarningsStatement,
+  toLead,
+  toRedemptionBoard,
+  toReview,
+  toReviewBoard,
+  toReviewSummary,
   fromExpense,
   fromFlightLeg,
   fromPlanItem,
@@ -67,9 +113,20 @@ import {
   toExpense,
   toExpenseSummary,
   toInvite,
+  toInvitePreview,
   toLocked,
   toMember,
+  toCreatorProfile,
+  toDocument,
+  toExploreTrip,
+  toInbox,
+  toPoll,
+  toPhoto,
+  toMemberProfile,
   toOrder,
+  toPublicCreator,
+  toVariant,
+  toVariantList,
   toParsedTicket,
   toPastTrip,
   toPlanDay,
@@ -90,7 +147,7 @@ import {
   toWindow,
   toYearStats,
 } from './mappers';
-import { CHARACTERS } from '@/lib/mock/characters';
+import { CHARACTERS } from '@/lib/catalog/characters';
 
 /**
  * The live repository — every call reaches the Go API and lands in MySQL.
@@ -267,6 +324,9 @@ export const liveRepo: RoveRepo = {
     async invite(tripId, role) {
       return toInvite(await api.post<InviteDto>(`/trips/${tripId}/invites`, { role }));
     },
+    async preview(token) {
+      return toInvitePreview(await api.get<InvitePreviewDto>(`/invites/${token}`));
+    },
     async join(token) {
       return api.post<{ tripId: string }>(`/invites/${token}/join`).then((r) => r);
     },
@@ -275,6 +335,29 @@ export const liveRepo: RoveRepo = {
     },
     async remove(tripId, memberId) {
       await api.delete<void>(`/trips/${tripId}/members/${memberId}`);
+    },
+
+    async myProfile(tripId) {
+      return toMemberProfile(await api.get<MemberProfileDto>(`/trips/${tripId}/profile/me`));
+    },
+    async saveProfile(tripId, input) {
+      return toMemberProfile(
+        await api.put<MemberProfileDto>(`/trips/${tripId}/profile/me`, {
+          visited_before: input.visitedBefore,
+          pace: input.pace,
+          walk_level: input.walkLevel,
+          can_drive: input.canDrive,
+          has_idp: input.hasIdp,
+          budget_min_thb: input.budgetMinThb,
+          budget_max_thb: input.budgetMaxThb,
+          dietary: input.dietary,
+          notes: input.notes,
+        }),
+      );
+    },
+    async profiles(tripId) {
+      const dto = await api.get<MemberProfileDto[]>(`/trips/${tripId}/profiles`);
+      return dto.map(toMemberProfile);
     },
   },
 
@@ -392,6 +475,50 @@ export const liveRepo: RoveRepo = {
     async versions(tripId) {
       const dto = await api.get<PlanVersionDto[]>(`/trips/${tripId}/plan/versions`);
       return dto.map(toPlanVersion);
+    },
+
+    /* ------------------------------------------- variants & compare (M6) */
+
+    async variants(tripId) {
+      return toVariantList(await api.get<VariantListDto>(`/trips/${tripId}/variants`));
+    },
+    async forkVariant(tripId, input) {
+      return toVariant(
+        await api.post<VariantDto>(`/trips/${tripId}/variants`, {
+          label: input.label,
+          key_decision: input.keyDecision,
+        }),
+      );
+    },
+    async generateVariants(tripId, input) {
+      return toAiJob(
+        await api.post<AiJobDto>(`/trips/${tripId}/variants/generate`, {
+          count: input.count,
+          brief: input.brief,
+        }),
+      );
+    },
+    async voteVariant(tripId, variantId, value) {
+      const dto = await api.post<VariantVotesDto>(`/trips/${tripId}/variants/${variantId}/vote`, {
+        value,
+      });
+      return { up: dto.up, down: dto.down, mine: dto.mine > 0 ? 1 : dto.mine < 0 ? -1 : 0 };
+    },
+    async adoptVariant(tripId, variantId) {
+      const dto = await api.post<PlanDayDto[]>(`/trips/${tripId}/variants/${variantId}/adopt`);
+      return dto.map(toPlanDay);
+    },
+    async removeVariant(tripId, variantId) {
+      await api.delete<void>(`/trips/${tripId}/variants/${variantId}`);
+    },
+    async freeze(tripId) {
+      return toTrip(await api.post<TripDto>(`/trips/${tripId}/plan/freeze`));
+    },
+    async unfreeze(tripId) {
+      return toTrip(await api.delete<TripDto>(`/trips/${tripId}/plan/freeze`));
+    },
+    async conflicts(tripId) {
+      return api.get<TripConflict[]>(`/trips/${tripId}/conflicts`);
     },
   },
 
@@ -596,7 +723,12 @@ export const liveRepo: RoveRepo = {
     async buyCredits(tripId, input) {
       const dto = await api.post<AiCreditsDto & { simulated: boolean; order?: OrderDto }>(
         `/trips/${tripId}/ai/credits/purchase`,
-        { quantity: input.quantity, method: input.method, channel: input.channel },
+        {
+          quantity: input.quantity,
+          method: input.method,
+          channel: input.channel,
+          discount_code: input.discountCode ?? '',
+        },
       );
       // The drafts are granted even if filing the receipt failed, and the API
       // says so by omitting it. Failing the purchase here would be a lie about
@@ -664,16 +796,253 @@ export const liveRepo: RoveRepo = {
     },
     async publicTrip(tokenOrSlug) {
       try {
-        const dto = await api.get<{ trip: TripDto; days: PlanDayDto[]; members: MemberDto[] }>(
-          `/public/trips/${tokenOrSlug}`,
-        );
+        const dto = await api.get<PublicTripDto>(`/public/trips/${tokenOrSlug}`);
         return {
           trip: toTrip(dto.trip),
           days: (dto.days ?? []).map(toPlanDay),
           members: (dto.members ?? []).map(toMember),
+          creator: toPublicCreator(dto.creator),
+          viewCount: dto.view_count,
+          cloneCount: dto.clone_count,
+          reviews: toReviewSummary(dto.reviews),
+          reviewEntries: (dto.review_entries ?? []).map(toReview),
         };
       } catch {
         return null;
+      }
+    },
+
+    /* --------------------------------------------- public model (M11) -- */
+
+    async explore(filters) {
+      const dto = await api.get<{ items: ExploreTripDto[]; total: number }>('/public/explore', {
+        searchParams: {
+          q: filters.q,
+          country: filters.country,
+          sort: filters.sort,
+          match: filters.match,
+          limit: filters.limit != null ? String(filters.limit) : undefined,
+          offset: filters.offset != null ? String(filters.offset) : undefined,
+        },
+      });
+      return { items: (dto.items ?? []).map(toExploreTrip), total: dto.total };
+    },
+
+    async creator(handle) {
+      try {
+        return toCreatorProfile(await api.get<CreatorProfileDto>(`/public/creators/${handle}`));
+      } catch {
+        return null;
+      }
+    },
+
+    async cloneFromPublic(tokenOrSlug) {
+      return toTrip(await api.post<TripDto>(`/public/trips/${tokenOrSlug}/clone`));
+    },
+
+    async adaptPreview(tokenOrSlug, input) {
+      return toAdaptDiff(
+        await api.post<AdaptDiffDto>(
+          `/public/trips/${tokenOrSlug}/adapt/preview`,
+          adaptBody(input),
+        ),
+      );
+    },
+
+    async cloneAdapted(tokenOrSlug, input) {
+      const dto = await api.post<AdaptCloneDto>(
+        `/public/trips/${tokenOrSlug}/adapt`,
+        adaptBody(input),
+      );
+      return { trip: toTrip(dto.trip), diff: toAdaptDiff(dto.diff) };
+    },
+
+    /* ------------------------------------ platform social proof (M24) -- */
+
+    async platformStats() {
+      return toPlatformStats(await api.get<PlatformStatsDto>('/public/stats'));
+    },
+
+    async recentReviews() {
+      const dto = await api.get<{ items: PublicReviewDto[] }>('/public/reviews/recent');
+      return (dto.items ?? []).map(toPublicReview);
+    },
+  },
+
+  /* ----------------------------- points out, money owed (M22) -- */
+  rewards: {
+    async redemptions() {
+      return toRedemptionBoard(await api.get<RedemptionListDto>('/users/me/points/redemptions'));
+    },
+
+    async redeem(amountThb) {
+      return toDiscountCode(
+        await api.post<DiscountCodeDto>('/users/me/points/redeem', { amount_thb: amountThb }),
+      );
+    },
+
+    async earnings() {
+      return toEarningsStatement(await api.get<EarningsDto>('/users/me/earnings'));
+    },
+
+    /* ------------------------------- where the points came from (M23) -- */
+
+    async pointsHistory(cursor) {
+      return toPointsLedger(
+        await api.get<PointsLedgerDto>('/users/me/points', {
+          searchParams: { cursor: cursor || undefined },
+        }),
+      );
+    },
+
+    async audience() {
+      return toAudienceSummary(await api.get<AudienceDto>('/users/me/audience'));
+    },
+  },
+
+  leads: {
+    async list(tripId) {
+      const dto = await api.get<LeadDto[]>(`/trips/${tripId}/leads`);
+      return dto.map(toLead);
+    },
+
+    async create(tripId, input) {
+      return toLead(
+        await api.post<LeadDto>(`/trips/${tripId}/leads`, {
+          contact_name: input.contactName,
+          contact_phone: input.contactPhone ?? '',
+          contact_line: input.contactLine ?? '',
+          note: input.note ?? '',
+        }),
+      );
+    },
+  },
+
+  /* ----------------------------------------------- reviews (M21) -- */
+  reviews: {
+    async list(tripId) {
+      return toReviewBoard(await api.get<ReviewListDto>(`/trips/${tripId}/reviews`));
+    },
+
+    async save(tripId, input) {
+      return toReviewBoard(
+        await api.put<ReviewListDto>(`/trips/${tripId}/reviews/me`, {
+          rating: input.rating,
+          actual_budget_per_person: input.actualBudgetPerPerson ?? 0,
+          body: input.body ?? '',
+        }),
+      );
+    },
+
+    async remove(tripId) {
+      await api.delete<void>(`/trips/${tripId}/reviews/me`);
+    },
+  },
+
+  /* ------------------------------------------------ photos (M18) -- */
+  photos: {
+    async list(tripId, filter) {
+      const dto = await api.get<PhotoDto[]>(`/trips/${tripId}/photos`, {
+        searchParams: {
+          day_id: filter?.dayId,
+          item_id: filter?.itemId,
+          user_id: filter?.userId,
+        },
+      });
+      return dto.map(toPhoto);
+    },
+
+    async upload(tripId, input) {
+      const form = new FormData();
+      form.append('image', input.file);
+      if (input.dayId) form.append('day_id', input.dayId);
+      if (input.itemId) form.append('item_id', input.itemId);
+      if (input.caption) form.append('caption', input.caption);
+      return toPhoto(await api.upload<PhotoDto>(`/trips/${tripId}/photos`, form));
+    },
+
+    async remove(tripId, photoId) {
+      await api.delete<void>(`/trips/${tripId}/photos/${photoId}`);
+    },
+
+    async photoBookThemes(tripId) {
+      return api.get<PhotoBookTheme[]>(`/trips/${tripId}/photobook/themes`);
+    },
+
+    photoBookUrl(tripId, options) {
+      // Rendered server-side as a self-contained page the user prints —
+      // opened in a tab, not fetched, so it is a URL and not a request.
+      const url = new URL(`/api/v1/trips/${tripId}/photobook`, env.apiUrl);
+      if (options?.theme) url.searchParams.set('theme', options.theme);
+      if (options?.coverPhotoId) url.searchParams.set('cover', options.coverPhotoId);
+      return url.toString();
+    },
+  },
+
+  /* --------------------------------------------- documents (M19) -- */
+  documents: {
+    async list(tripId) {
+      return (await api.get<DocumentDto[]>(`/trips/${tripId}/documents`)).map(toDocument);
+    },
+
+    async upload(tripId, input) {
+      const form = new FormData();
+      form.append('file', input.file);
+      form.append('name', input.name);
+      form.append('category', input.category);
+      return toDocument(await api.upload<DocumentDto>(`/trips/${tripId}/documents`, form));
+    },
+
+    async remove(tripId, documentId) {
+      await api.delete<void>(`/trips/${tripId}/documents/${documentId}`);
+    },
+  },
+
+  /* --------------------------------------------- community (M9) -- */
+  community: {
+    async inbox() {
+      return toInbox(await api.get<InboxDto>('/users/me/notifications'));
+    },
+    async markRead(notificationId) {
+      return toInbox(
+        await api.post<InboxDto>('/users/me/notifications/read', {
+          notification_id: notificationId ?? '',
+        }),
+      );
+    },
+
+    async polls(tripId) {
+      return (await api.get<PollDto[]>(`/trips/${tripId}/polls`)).map(toPoll);
+    },
+    async createPoll(tripId, input) {
+      return toPoll(
+        await api.post<PollDto>(`/trips/${tripId}/polls`, {
+          question: input.question,
+          options: input.options,
+          item_id: input.itemId,
+        }),
+      );
+    },
+    async answerPoll(tripId, pollId, option) {
+      return toPoll(await api.post<PollDto>(`/trips/${tripId}/polls/${pollId}/answer`, { option }));
+    },
+    async closePoll(tripId, pollId) {
+      return toPoll(await api.post<PollDto>(`/trips/${tripId}/polls/${pollId}/close`));
+    },
+    async removePoll(tripId, pollId) {
+      await api.delete<void>(`/trips/${tripId}/polls/${pollId}`);
+    },
+
+    async ping(tripId, state) {
+      // Fire and forget: a dropped heartbeat costs nothing, and a failed one
+      // must never surface as an error over the thing the user was doing.
+      try {
+        await api.post<void>(`/trips/${tripId}/presence`, {
+          typing: state.typing,
+          tab: state.tab,
+        });
+      } catch {
+        // Ignored on purpose.
       }
     },
   },
@@ -705,8 +1074,22 @@ export const liveRepo: RoveRepo = {
         aiCostTodayUsd: dto.ai_cost_today_usd,
         aiCostCapUsd: dto.ai_cost_cap_usd,
         clicksToday: dto.clicks_today,
-        mockMode: dto.mock_mode,
+        stubProviders: dto.stub_providers,
+        stubbed: (dto.stubbed ?? []) as AdminStats['stubbed'],
         commit: dto.commit,
+      };
+    },
+  },
+
+  /* -------------------------------------------------------------- meta -- */
+  meta: {
+    async mode() {
+      const dto = await api.get<ModeDto>('/meta/mode');
+      return {
+        live: dto.live,
+        stubbed: (dto.stubbed ?? []) as ProviderMode['stubbed'],
+        devLogin: dto.dev_login,
+        env: dto.env,
       };
     },
   },
@@ -737,3 +1120,16 @@ export const liveRepo: RoveRepo = {
     },
   },
 };
+
+/**
+ * A zero on the wire means "keep what the source had", so unset fields are
+ * omitted rather than sent as 0 — which the API would read as an instruction.
+ */
+function adaptBody(input: AdaptInput) {
+  return {
+    days: input.days,
+    party_size: input.partySize,
+    budget_per_person_thb: input.budgetPerPersonThb,
+    start_date: input.startDate,
+  };
+}

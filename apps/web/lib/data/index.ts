@@ -19,5 +19,13 @@ export { resetDb as resetMockData } from './mock/db';
 export type * from './types';
 export type { RoveRepo } from './repo';
 
-/** Shown by the UAT banner so a tester always knows what they are looking at. */
-export const dataModeLabel = DATA_MODE === 'mock' ? 'โหมดทดลอง (Mock)' : 'ต่อระบบจริง (Live)';
+/**
+ * Shown by the UAT banner so a tester always knows what they are looking at.
+ *
+ * This names one axis only — where the data lives. Whether the third parties
+ * behind a live API are real is a separate question with a separate answer
+ * (`features/meta/queries`), and running them together under one word is what
+ * made "โหมดทดลอง" mean two different things on the same screen.
+ */
+export const dataModeLabel =
+  DATA_MODE === 'mock' ? 'โหมดทดลอง — เก็บในเบราว์เซอร์นี้' : 'ต่อระบบจริง (Live)';

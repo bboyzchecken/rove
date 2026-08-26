@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"net/http"
 	"time"
 
@@ -181,7 +182,7 @@ func (s *Server) handleUpdateBooking(c echo.Context) error {
 	}
 
 	if !wasBooked && booking.Status == models.BookingBooked {
-		s.awardBookingPoints(ctx, tripID)
+		s.awardBookingPoints(ctx, tripID, *booking)
 	}
 
 	s.track(c, tripID, "", events.TypeBookingChanged, "booking", booking.ID)
@@ -258,8 +259,85 @@ func (s *Server) handleAffiliateRedirect(c echo.Context) error {
 	return c.Redirect(http.StatusFound, url)
 }
 
+/* --------------------------------------------------- partner postback ---- */
+
+type affiliateWebhookRequest struct {
+	TrackingID string `json:"tracking_id" validate:"required"`
+	Status     string `json:"status"`
+	// What the booking was worth and what it paid us, when the partner says
+	// so (A12.11). A pointer, not a float: zero commission reported is a fact,
+	// and a missing field is not the same fact.
+	AmountTHB     float64  `json:"amount_thb"`
+	CommissionTHB *float64 `json:"commission_thb"`
+}
+
+// handleAffiliateWebhook is the confirmation side of A12.6: a partner tells us
+// a tracked click converted, the click is marked confirmed once, and the
+// source creator earns their points. Guarded by a shared secret; without one
+// configured the route answers 404 — an unconfigured webhook must not exist.
+//
+// Note: the manual "จองแล้ว" path (handleUpdateBooking) also awards points as a
+// stand-in while no partner posts back. When real postbacks go live per
+// partner (A12.9), that stand-in should be reviewed so a booking is not paid
+// twice.
+func (s *Server) handleAffiliateWebhook(c echo.Context) error {
+	secret := s.cfg.AffiliateWebhookSecret
+	if secret == "" {
+		return request.NotFound(c, "ยังไม่เปิดใช้งาน")
+	}
+	if subtle.ConstantTimeCompare([]byte(c.Request().Header.Get("X-Rove-Signature")), []byte(secret)) != 1 {
+		return request.Error(c, http.StatusUnauthorized, "ลายเซ็นไม่ถูกต้อง")
+	}
+
+	var req affiliateWebhookRequest
+	if err := request.BindAndValidate(c, &req); err != nil {
+		return err
+	}
+	if req.Status != "" && req.Status != "confirmed" {
+		// Cancellations and pendings are acknowledged but change nothing yet.
+		return c.NoContent(http.StatusAccepted)
+	}
+
+	ctx := c.Request().Context()
+	click, err := s.bookings.GetClick(ctx, req.TrackingID)
+	if err != nil {
+		return request.NotFound(c, "ไม่พบ tracking id นี้")
+	}
+	if click.ConfirmedAt != nil {
+		// Partners retry webhooks; a second confirm must not pay twice.
+		return c.NoContent(http.StatusOK)
+	}
+
+	if err := s.bookings.ConfirmClick(ctx, click.ID, time.Now().UTC()); err != nil {
+		return request.Internal(c, "บันทึกไม่สำเร็จ")
+	}
+
+	if click.SourceCreatorID != nil && *click.SourceCreatorID != "" {
+		_ = s.points.Add(ctx, &models.UserPoints{
+			UserID: *click.SourceCreatorID,
+			Delta:  domain.PointsPerBooking,
+			Reason: models.PointsReasonBooking,
+			Note:   "มีคนจองสำเร็จจากทริปที่คุณเปิดสาธารณะ (" + click.Partner + ")",
+			TripID: &click.TripID,
+		})
+
+		// Points are the loyalty score; this is the money (A12.11). The click
+		// id is unique on the ledger, so a retried webhook cannot accrue twice.
+		commission := 0.0
+		if req.CommissionTHB != nil {
+			commission = *req.CommissionTHB
+		}
+		s.recordCreatorEarning(
+			ctx, *click.SourceCreatorID, click.TripID, click.Partner, &click.ID,
+			req.AmountTHB, commission, req.CommissionTHB != nil,
+		)
+	}
+
+	return c.NoContent(http.StatusOK)
+}
+
 // awardBookingPoints credits the creator of the trip this one was copied from.
-func (s *Server) awardBookingPoints(ctx contextT, tripID string) {
+func (s *Server) awardBookingPoints(ctx contextT, tripID string, booking models.Booking) {
 	trip, err := s.trips.GetByID(ctx, tripID)
 	if err != nil || trip.SourceCreatorID == nil {
 		return
@@ -271,6 +349,18 @@ func (s *Server) awardBookingPoints(ctx contextT, tripID string) {
 		Note:   "มีคนจองจากทริปที่คุณเปิดสาธารณะ",
 		TripID: &tripID,
 	})
+
+	// The revenue-share line for the same event (A12.11). Nobody reported a
+	// commission here — the group ticked a box in the app — so it is accrued
+	// from the partner rate and flagged as the estimate it is. What the group
+	// typed as a per-person price is the only booking value we have.
+	value := 0.0
+	if booking.PricePerPersonTHB != nil {
+		value = *booking.PricePerPersonTHB * float64(trip.PartySize)
+	}
+	s.recordCreatorEarning(
+		ctx, *trip.SourceCreatorID, tripID, booking.Partner, nil, value, 0, false,
+	)
 }
 
 func partnerName(key string) string {

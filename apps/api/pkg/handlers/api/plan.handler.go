@@ -20,7 +20,7 @@ func (s *Server) registerPlanRoutes(g *echo.Group) {
 	g.GET("/:tripId/plan/days", s.handlePlanDays, view)
 	g.POST("/:tripId/plan/revalidate", s.handleRevalidatePlan, edit)
 	g.GET("/:tripId/plan/versions", s.handlePlanVersions, view)
-	g.POST("/:tripId/plan/undo", s.handleUndo, edit)
+	g.POST("/:tripId/plan/undo", s.handleUndo, edit, s.PlanUnfrozen)
 }
 
 func (s *Server) handlePlanDays(c echo.Context) error {

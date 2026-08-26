@@ -8,8 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input, fieldClass } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
+import { useIsStubbed } from '@/features/meta/queries';
 import { useInviteMember } from '@/features/trip/queries';
-import { mockSkips } from '@/lib/data';
 import { cn } from '@/lib/utils';
 
 /**
@@ -28,6 +28,7 @@ export function InviteDialog({
   onClose: () => void;
 }) {
   const invite = useInviteMember(tripId);
+  const lineIsStubbed = useIsStubbed('notifications');
   const [role, setRole] = useState<'editor' | 'viewer'>('editor');
   const [copied, setCopied] = useState(false);
   const link = invite.data?.url ?? '';
@@ -103,9 +104,9 @@ export function InviteDialog({
           <Badge tone="sky">
             <Link2 className="size-3" /> ใครมีลิงก์ก็เข้าได้
           </Badge>
-          {mockSkips.notifications ? (
+          {lineIsStubbed ? (
             <Badge tone="sun">
-              <MessageCircle className="size-3" /> โหมดทดลอง: ยังไม่ส่งแจ้งเตือนเข้า LINE
+              <MessageCircle className="size-3" /> ยังไม่ส่งแจ้งเตือนเข้า LINE — ส่งลิงก์เอง
             </Badge>
           ) : null}
         </div>

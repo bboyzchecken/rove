@@ -25,21 +25,29 @@ import (
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/ai"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/airports"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/email"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/notify"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/places"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/storage"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/weather"
 	aijobstore "github.com/bboyzchecken/rove/apps/api/pkg/store/aijob"
 	billingstore "github.com/bboyzchecken/rove/apps/api/pkg/store/billing"
 	bookingstore "github.com/bboyzchecken/rove/apps/api/pkg/store/booking"
 	characterstore "github.com/bboyzchecken/rove/apps/api/pkg/store/character"
 	collabstore "github.com/bboyzchecken/rove/apps/api/pkg/store/collab"
+	communitystore "github.com/bboyzchecken/rove/apps/api/pkg/store/community"
 	datestore "github.com/bboyzchecken/rove/apps/api/pkg/store/dates"
 	expensestore "github.com/bboyzchecken/rove/apps/api/pkg/store/expense"
 	flightstore "github.com/bboyzchecken/rove/apps/api/pkg/store/flight"
 	invitestore "github.com/bboyzchecken/rove/apps/api/pkg/store/invite"
+	mediastore "github.com/bboyzchecken/rove/apps/api/pkg/store/media"
 	memberstore "github.com/bboyzchecken/rove/apps/api/pkg/store/member"
 	planstore "github.com/bboyzchecken/rove/apps/api/pkg/store/plan"
 	poistore "github.com/bboyzchecken/rove/apps/api/pkg/store/poi"
 	pointsstore "github.com/bboyzchecken/rove/apps/api/pkg/store/points"
+	leadstore "github.com/bboyzchecken/rove/apps/api/pkg/store/lead"
+	reviewstore "github.com/bboyzchecken/rove/apps/api/pkg/store/review"
+	rewardstore "github.com/bboyzchecken/rove/apps/api/pkg/store/reward"
 	prepstore "github.com/bboyzchecken/rove/apps/api/pkg/store/prep"
 	tripstore "github.com/bboyzchecken/rove/apps/api/pkg/store/trip"
 	userstore "github.com/bboyzchecken/rove/apps/api/pkg/store/user"
@@ -58,11 +66,17 @@ var allModels = []any{
 	&models.PrepTask{}, &models.PrepNote{}, &models.Booking{}, &models.BookingClick{},
 	&models.Comment{}, &models.Vote{}, &models.Activity{},
 	&models.AIJob{}, &models.AICredit{}, &models.TripFlight{},
-	&models.Order{}, &models.Subscription{},
+	&models.Order{}, &models.Subscription{}, &models.MemberProfile{},
+	&models.PlanVariant{}, &models.TripPhoto{}, &models.TripDocument{},
+	&models.Notification{}, &models.Poll{}, &models.TripReview{},
+	&models.DiscountCode{}, &models.CreatorEarning{}, &models.Payout{}, &models.AgentLead{},
 }
 
 // allTables is the drop order — children before parents.
 var allTables = []string{
+	"agent_leads", "payouts", "creator_earnings", "discount_codes",
+	"trip_reviews", "polls", "notifications", "trip_documents", "trip_photos",
+	"plan_variants", "member_profiles",
 	"orders", "subscriptions",
 	"ai_credits", "ai_jobs", "activity_logs", "votes", "comments",
 	"booking_clicks", "bookings", "trip_flights", "prep_notes", "prep_tasks",
@@ -83,24 +97,33 @@ func newParams(cfg core.Config, db *gorm.DB) handlers.ServerParams {
 		// Redis, so these tests take exactly the path a dev machine takes.
 		Redis: nil,
 
-		Users:      userstore.New(db),
-		Trips:      tripstore.New(db),
-		Members:    memberstore.New(db),
-		POIs:       poistore.New(db),
-		Characters: characterstore.New(db),
-		Points:     pointsstore.New(db),
-		Invites:    invitestore.New(db),
-		Dreams:     invitestore.NewDreamStore(db),
-		Dates:      datestore.New(db),
-		Wishlist:   wishliststore.New(db),
-		Plans:      planstore.New(db),
-		Expenses:   expensestore.New(db),
-		Prep:       prepstore.New(db),
-		Bookings:   bookingstore.New(db),
-		Flights:    flightstore.New(db),
-		Collab:     collabstore.New(db),
-		AIJobs:     aijobstore.New(db),
-		Billing:    billingstore.New(db),
+		Users:         userstore.New(db),
+		Trips:         tripstore.New(db),
+		Members:       memberstore.New(db),
+		POIs:          poistore.New(db),
+		Characters:    characterstore.New(db),
+		Points:        pointsstore.New(db),
+		Invites:       invitestore.New(db),
+		Dreams:        invitestore.NewDreamStore(db),
+		Dates:         datestore.New(db),
+		Wishlist:      wishliststore.New(db),
+		Plans:         planstore.New(db),
+		Expenses:      expensestore.New(db),
+		Prep:          prepstore.New(db),
+		Bookings:      bookingstore.New(db),
+		Flights:       flightstore.New(db),
+		Collab:        collabstore.New(db),
+		AIJobs:        aijobstore.New(db),
+		Billing:       billingstore.New(db),
+		Photos:        mediastore.NewPhotoStore(db),
+		Documents:     mediastore.NewDocumentStore(db),
+		Notifications: communitystore.NewNotificationStore(db),
+		Polls:         communitystore.NewPollStore(db),
+		Reviews:       reviewstore.New(db),
+		Discounts:     rewardstore.NewDiscountStore(db),
+		Earnings:      rewardstore.NewEarningStore(db),
+		Payouts:       rewardstore.NewPayoutStore(db),
+		Leads:         leadstore.New(db),
 
 		Hub: stubHub{},
 		// The airport index is embedded data with no I/O — the real one is the
@@ -112,6 +135,12 @@ func newParams(cfg core.Config, db *gorm.DB) handlers.ServerParams {
 		Places:    stubPlaces{},
 		Pipeline:  stubPipeline{},
 		AIRunner:  stubRunner{},
+		Storage:   storage.New(cfg),
+		// No token in tests: pushes are skipped, the inbox row is still written.
+		Notify: notify.New(cfg),
+		// The stub logs what it would have sent, which is the production
+		// behaviour until a transport is configured.
+		Email: email.New(cfg),
 	}
 }
 
@@ -169,4 +198,5 @@ func (stubPipeline) ParseTicket(context.Context, string) (*ai.ParsedTicket, erro
 
 type stubRunner struct{}
 
-func (stubRunner) Enqueue(models.AIJob, ai.GenerateInput) {}
+func (stubRunner) Enqueue(models.AIJob, ai.GenerateInput)              {}
+func (stubRunner) EnqueueVariants(models.AIJob, ai.GenerateInput, int) {}

@@ -20,7 +20,7 @@ import type {
   Settlement,
   Trip,
   TripStatus,
-} from '@/lib/mock/types';
+} from './model';
 
 export type {
   Airport,
@@ -52,7 +52,7 @@ export type {
   WishKind,
   WishlistItem,
   YearStats,
-} from '@/lib/mock/types';
+} from './model';
 
 /* ------------------------------------------------------------------ auth -- */
 
@@ -140,6 +140,31 @@ export interface DestinationSuggestion {
   recommended: boolean;
   flightHours: number;
   weather: { high: number; low: number; text: string };
+}
+
+/* ------------------------------------------------- member profile (A3.1) -- */
+
+export type TripPace = 'relaxed' | 'balanced' | 'packed';
+
+/**
+ * What one member wants out of THIS trip — distinct from their account
+ * profile, because the same person is a temple-hopper on one trip and a beach
+ * potato on the next. The AI frame and the conflict check (A6.5) read these.
+ */
+export interface MemberProfile {
+  userId: string;
+  visitedBefore: boolean;
+  pace: TripPace;
+  /** 1 = as little as possible, 2 = normal, 3 = happy to hike. */
+  walkLevel: 1 | 2 | 3;
+  canDrive: boolean;
+  hasIdp: boolean;
+  budgetMinThb: number;
+  budgetMaxThb: number;
+  dietary: string[];
+  notes: string;
+  /** False when this is the default the API synthesised — the tab nudges. */
+  filled: boolean;
 }
 
 /* -------------------------------------------------------------- coverage -- */
@@ -238,13 +263,18 @@ export interface Comment {
   resolved: boolean;
 }
 
-export type VoteTarget = 'item' | 'wish' | 'window' | 'destination';
+export type VoteTarget = 'item' | 'wish' | 'window' | 'destination' | 'variant' | 'poll';
 
 export interface Vote {
   targetType: VoteTarget;
   targetId: string;
   memberId: string;
-  value: 1 | -1;
+  /**
+   * ±1 for a thumb on an item or a variant; for a poll it is the chosen
+   * option's index. One member's one answer about one thing is the same shape
+   * either way, which is why polls do not get a second table (M9 — A9.3).
+   */
+  value: number;
 }
 
 export interface ActivityEvent {
@@ -259,7 +289,7 @@ export interface ActivityEvent {
 
 /* -------------------------------------------------------------------- ai -- */
 
-export type AiJobKind = 'draft' | 'refine' | 'rebalance' | 'suggest_destination';
+export type AiJobKind = 'draft' | 'variants' | 'refine' | 'rebalance' | 'suggest_destination';
 export type AiJobStatus = 'queued' | 'running' | 'done' | 'failed';
 
 export interface AiJob {
@@ -311,6 +341,63 @@ export interface AiGenerateInput {
   focus?: string[];
 }
 
+/* ------------------------------------------------------- variants (M6) -- */
+
+/** The row of numbers the compare table renders per candidate. */
+export interface VariantMetrics {
+  dayCount: number;
+  itemCount: number;
+  totalCostJpy: number;
+  perPersonThb: number;
+  travelMinutes: number;
+  coveragePercent: number;
+  mustCovered: number;
+  mustTotal: number;
+  warningCount: number;
+}
+
+export interface VariantVotes {
+  up: number;
+  down: number;
+  /** This member's standing vote; 0 = none. */
+  mine: -1 | 0 | 1;
+}
+
+/**
+ * One candidate itinerary (M6). Read-only by design: compared, voted on and
+ * adopted — never edited in place. Adopting replaces the live plan.
+ */
+export interface PlanVariant {
+  id: string;
+  label: string;
+  keyDecision: string;
+  summary: string;
+  source: 'ai' | 'fork';
+  createdBy: string;
+  createdAt: string;
+  fromDayIndex: number;
+  pros: string[];
+  cons: string[];
+  metrics: VariantMetrics;
+  votes: VariantVotes;
+  days: PlanDay[];
+}
+
+export interface VariantList {
+  /** The live plan's numbers — the baseline column. */
+  current: VariantMetrics;
+  /** True once the owner froze the plan (A6.4). */
+  frozen: boolean;
+  variants: PlanVariant[];
+}
+
+/** What the pre-generate conflict check found (A6.5). */
+export interface TripConflict {
+  kind: 'pace' | 'budget' | 'wish';
+  severity: 'error' | 'warning';
+  message: string;
+}
+
 /* ----------------------------------------------------------------- recap -- */
 
 /**
@@ -344,9 +431,309 @@ export interface TripRecap {
   canPublish: boolean;
 }
 
+/* ------------------------------------------------- community (M9) ------- */
+
+export type NotificationKind = 'mention' | 'assigned' | 'poll_opened' | 'plan_ready' | 'points';
+
+/**
+ * One thing that happened *to you*. Distinct from an ActivityEvent, which is
+ * what happened in a room: this one has a recipient, can be unread, and is
+ * what a badge counts.
+ */
+export interface Notification {
+  id: string;
+  kind: NotificationKind;
+  title: string;
+  body: string;
+  /** Where tapping it lands, as an app path. */
+  link: string;
+  tripId: string | null;
+  actorId: string;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface Inbox {
+  unread: number;
+  items: Notification[];
+}
+
+export interface PollOption {
+  index: number;
+  label: string;
+  votes: number;
+  /** Member ids, so the card can show faces rather than a bare count. */
+  who: string[];
+}
+
+/** A question with fixed options — the decisions that are not a whole plan. */
+export interface Poll {
+  id: string;
+  question: string;
+  itemId: string | null;
+  options: PollOption[];
+  closed: boolean;
+  closesAt: string | null;
+  createdBy: string;
+  createdAt: string;
+  /** -1 when this member has not answered. */
+  myAnswer: number;
+  answered: number;
+}
+
+export interface CreatePollInput {
+  question: string;
+  options: string[];
+  itemId?: string;
+}
+
+/** Who is in the room right now (W9.3) — held in memory, never persisted. */
+export interface PresenceMember {
+  memberId: string;
+  typing: boolean;
+  tab: string;
+  /** Epoch ms of the last ping; stale entries are dropped by the hook. */
+  at: number;
+}
+
+/* --------------------------------------------- photos & documents (M18/19) */
+
+/**
+ * One picture taken on the trip. `url` is minted per read by the API — the
+ * row itself stores a storage key — so it is never persisted client-side.
+ */
+export interface TripPhoto {
+  id: string;
+  tripId: string;
+  dayId: string | null;
+  itemId: string | null;
+  /** Who took it; only they (or the owner) may delete it. */
+  userId: string;
+  url: string;
+  caption: string;
+  takenAt: string | null;
+  createdAt: string;
+}
+
+/**
+ * A palette the photo book knows how to print (Photo Book V2).
+ *
+ * The catalogue comes from the API rather than the client so the picker can
+ * only ever offer what the renderer supports.
+ */
+export interface PhotoBookTheme {
+  id: string;
+  name: string;
+  paper: string;
+  ink: string;
+  muted: string;
+  accent: string;
+}
+
+/** How to print the book: which palette, and which photo leads the cover. */
+export interface PhotoBookOptions {
+  theme?: string;
+  coverPhotoId?: string;
+}
+
+export interface UploadPhotoInput {
+  /** Already resized in the browser (lib/image.ts `photoFromFile`). */
+  file: File;
+  dayId?: string;
+  itemId?: string;
+  caption?: string;
+}
+
+export type DocumentCategory = 'ticket' | 'hotel' | 'transport' | 'insurance' | 'other';
+
+/** One file the group needs on the road — a ticket, voucher, insurance paper. */
+export interface TripDocument {
+  id: string;
+  tripId: string;
+  userId: string;
+  name: string;
+  category: DocumentCategory;
+  url: string;
+  contentType: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+export interface UploadDocumentInput {
+  file: File;
+  name: string;
+  category: DocumentCategory;
+}
+
 /* ----------------------------------------------------------------- share -- */
 
 export type TripVisibility = 'private' | 'link' | 'public';
+
+/** The public face of whoever published a trip. */
+export interface PublicCreator {
+  name: string;
+  handle: string | null;
+  characterId: string;
+}
+
+/** What /s/:token and /p/:slug render. Never contains expenses (W16.5). */
+export interface PublicTripPayload {
+  trip: Trip;
+  days: PlanDay[];
+  members: Member[];
+  creator: PublicCreator;
+  viewCount: number;
+  cloneCount: number;
+  /** How it actually went, from the people who went (A11.5). */
+  reviews: ReviewSummary;
+  reviewEntries: TripReview[];
+}
+
+/* ------------------------------------------------- reviews (M21 — A11.5) - */
+
+/**
+ * One traveller's verdict on a finished trip.
+ *
+ * `actualBudgetPerPerson` is a figure the reviewer chose to publish about
+ * their own trip — it is NOT the group's expense ledger, which never leaves
+ * the room at any visibility (W16.5). Zero means they would rather not say.
+ */
+export interface TripReview {
+  userId: string;
+  name: string;
+  characterId: string;
+  /** 1–5. */
+  rating: number;
+  actualBudgetPerPerson: number;
+  body: string;
+  createdAt: string;
+}
+
+export interface ReviewSummary {
+  count: number;
+  averageRating: number;
+  /** Averaged over `budgetSaid` people, never over everybody. */
+  actualBudgetPerPerson: number;
+  budgetSaid: number;
+}
+
+export interface ReviewBoard {
+  summary: ReviewSummary;
+  entries: TripReview[];
+  /** My own review, so the form opens filled in. */
+  mine: TripReview | null;
+  /** False until the trip is over — nobody reviews a holiday they are packing for. */
+  canReview: boolean;
+}
+
+export interface SaveReviewInput {
+  rating: number;
+  actualBudgetPerPerson?: number;
+  body?: string;
+}
+
+/* ------------------------------------------------------ explore (M11) --- */
+
+export interface ExploreTrip {
+  slug: string;
+  title: string;
+  cover: string;
+  cities: string[];
+  country: string;
+  days: number;
+  budgetPerPersonThb: number;
+  viewCount: number;
+  cloneCount: number;
+  creator: PublicCreator;
+  updatedAt: string;
+  /** Only present when the feed was asked to rank against one of my trips. */
+  match?: MatchResult | null;
+  /** Zero until somebody who went says otherwise (A11.5). */
+  reviews: ReviewSummary;
+}
+
+export interface ExploreFilters {
+  q?: string;
+  country?: string;
+  sort?: 'popular' | 'new';
+  limit?: number;
+  offset?: number;
+  /**
+   * Rank against this trip of mine instead of by popularity (A11.3). Requires
+   * sign-in and membership of the trip — the feed itself stays public.
+   */
+  match?: string;
+}
+
+/**
+ * How well a published plan fits the trip I am already planning (A11.3).
+ *
+ * The reasons are the point. A percentage with nothing next to it is a number
+ * nobody trusts, so the API only sends lines for components that genuinely
+ * agree, and the card shows them verbatim.
+ */
+export interface MatchResult {
+  /** 0–100. Zero means "different country" — not a weak match, no match. */
+  score: number;
+  reasons: string[];
+}
+
+/* ---------------------------------------------- adapting a copy (A11.4) -- */
+
+/** The frame a copied plan should be reshaped to. Omitted fields are kept. */
+export interface AdaptInput {
+  days?: number;
+  partySize?: number;
+  budgetPerPersonThb?: number;
+  startDate?: string;
+}
+
+export type AdaptChangeKind = 'day_added' | 'day_removed' | 'item_removed' | 'item_moved';
+
+export interface AdaptChange {
+  kind: AdaptChangeKind;
+  dayLabel: string;
+  itemTitle: string;
+  reason: string;
+  /** Signed, in the destination currency — the same unit as the plan. */
+  costDeltaDest: number;
+}
+
+export interface AdaptTotals {
+  days: number;
+  items: number;
+  costPerPersonDest: number;
+}
+
+/**
+ * What copying this plan into my frame would change. Shown before anything is
+ * written, and returned again with the copy so the two can be compared.
+ */
+export interface AdaptDiff {
+  changes: AdaptChange[];
+  before: AdaptTotals;
+  after: AdaptTotals;
+  /** What the reshaping could not do — said plainly, not hidden. */
+  warnings: string[];
+  currency: string;
+}
+
+export interface ExploreResult {
+  items: ExploreTrip[];
+  total: number;
+}
+
+/** The public creator page (W11.2). */
+export interface CreatorProfile {
+  name: string;
+  handle: string;
+  characterId: string;
+  publicTrips: number;
+  totalViews: number;
+  totalClones: number;
+  pointsEarned: number;
+  trips: ExploreTrip[];
+}
 
 export interface ShareState {
   visibility: TripVisibility;
@@ -419,6 +806,8 @@ export interface CreateTripInput {
    */
   entryType: 'route' | 'date' | 'clone';
   title: string;
+  /** ISO country of the destination; the route decides it when there is one. */
+  country?: string;
   cities?: string[];
   /** The booked route. When present it decides the dates and the destinations. */
   flights?: FlightLegInput[];
@@ -467,6 +856,14 @@ export interface InviteLink {
   role: 'editor' | 'viewer';
 }
 
+/** What the invite landing page can show before anyone signs in. */
+export interface InvitePreview {
+  tripId: string;
+  title: string;
+  role: 'editor' | 'viewer';
+  expiresAt: string;
+}
+
 /* ------------------------------------------------------------------ plan -- */
 
 export interface MoveItemInput {
@@ -487,8 +884,39 @@ export interface AdminStats {
   aiCostTodayUsd: number;
   aiCostCapUsd: number;
   clicksToday: number;
-  mockMode: boolean;
+  /** Third parties currently answered by a stand-in — never "the data is fake". */
+  stubProviders: boolean;
+  stubbed: StubbedProvider[];
   commit: string;
+}
+
+/**
+ * A third party the backend is standing in for.
+ *
+ * Named rather than boolean because "บางอย่างเป็นของจำลอง" is not something a
+ * UAT tester can act on, and because a missing API key and STUB_PROVIDERS=true
+ * produce the same fact from outside.
+ */
+export type StubbedProvider =
+  | 'ai'
+  | 'places'
+  | 'weather'
+  | 'fx'
+  | 'storage'
+  | 'notifications'
+  | 'affiliate';
+
+/**
+ * What is real behind this screen (see `lib/data/mode.ts` for the other axis).
+ *
+ * `live: false` here does not mean mock mode — it means the API is real and
+ * some of the providers behind it are not.
+ */
+export interface ProviderMode {
+  live: boolean;
+  stubbed: StubbedProvider[];
+  devLogin: boolean;
+  env: string;
 }
 
 /** One entry of the undo trail (W5.7). */
@@ -617,4 +1045,202 @@ export interface BuyCreditsInput {
   method: PaymentMethod;
   /** The label the user actually tapped — kept for the receipt. */
   channel: string;
+  /** A code redeemed from points (A12.10). Ignored when paying with points. */
+  discountCode?: string;
+}
+
+/* ------------------------------------ points out, money owed (M22) ------- */
+
+/**
+ * Points turned into money off (A12.10).
+ *
+ * Issuing one burns the points there and then, so a code that exists is
+ * already paid for. It is single-use and it expires.
+ */
+export interface DiscountCode {
+  code: string;
+  scope: 'ai_credits' | 'booking';
+  amountThb: number;
+  pointsSpent: number;
+  expiresAt: string;
+  usedAt: string | null;
+  usable: boolean;
+}
+
+export interface RedemptionTier {
+  amountThb: number;
+  points: number;
+  afford: boolean;
+}
+
+export interface RedemptionBoard {
+  balance: number;
+  tiers: RedemptionTier[];
+  codes: DiscountCode[];
+}
+
+/**
+ * One line of what a published plan earned its creator (A12.11).
+ *
+ * Not points: this is money a partner owes, in baht. `estimated` means the
+ * commission was derived from a rate table rather than reported.
+ */
+export interface CreatorEarning {
+  tripId: string;
+  partner: string;
+  bookingValueThb: number;
+  commissionThb: number;
+  sharePercent: number;
+  amountThb: number;
+  estimated: boolean;
+  status: 'pending' | 'payable' | 'paid';
+  occurredAt: string;
+}
+
+export interface CreatorPayout {
+  periodStart: string;
+  periodEnd: string;
+  amountThb: number;
+  earningCount: number;
+  status: 'draft' | 'paid';
+  paidAt: string | null;
+}
+
+export interface EarningsStatement {
+  totals: {
+    pendingThb: number;
+    payableThb: number;
+    paidThb: number;
+    count: number;
+  };
+  sharePercent: number;
+  minimumPayoutThb: number;
+  entries: CreatorEarning[];
+  payouts: CreatorPayout[];
+}
+
+/* --------------------------------------- agent lead handoff (A12.12) ----- */
+
+export type LeadStatus = 'new' | 'sent' | 'contacted' | 'won' | 'lost';
+
+/** A group asking a human to take the booking from here. */
+export interface AgentLead {
+  id: string;
+  partner: string;
+  contactName: string;
+  contactPhone: string;
+  contactLine: string;
+  note: string;
+  status: LeadStatus;
+  sentAt: string | null;
+  createdAt: string;
+  /** True when no agent channel is configured — saved, but nobody was messaged. */
+  simulated: boolean;
+}
+
+export interface CreateLeadInput {
+  contactName: string;
+  contactPhone?: string;
+  contactLine?: string;
+  note?: string;
+}
+
+/* ------------------------------------------- where points came from (M23) - */
+
+/**
+ * Why the ledger exists at all: points buy discount codes at a published rate
+ * (A12.10), so a balance is a figure with a price on it. "Why do I have 1,240
+ * points?" has to be answerable line by line, and by the person it belongs to.
+ */
+export type PointsReason =
+  | 'referral'
+  | 'booking_confirmed'
+  | 'trip_cloned'
+  | 'trip_published'
+  | 'ai_draft'
+  | 'adjustment'
+  | 'redeem';
+
+export interface PointsEntry {
+  id: string;
+  /** Signed: positive earned it, negative spent it. */
+  delta: number;
+  reason: PointsReason | string;
+  note: string;
+  tripId: string | null;
+  /** Resolved by the API. Empty when the trip is gone — the row still stands. */
+  tripTitle: string;
+  occurredAt: string;
+}
+
+export interface PointsLedger {
+  balance: number;
+  /** Everything ever awarded, ignoring what has since been spent. */
+  earned: number;
+  entries: PointsEntry[];
+  /** Empty when this was the last page. */
+  nextCursor: string;
+}
+
+/** One published plan's reach, from its owner's side (A23.2). */
+export interface AudienceTrip {
+  tripId: string;
+  title: string;
+  slug: string;
+  views: number;
+  clones: number;
+  /** Copies that actually paid out — copying your own trip earns nothing. */
+  awardedClones: number;
+  pointsEarned: number;
+}
+
+/**
+ * "คนตามรอยฉัน" — the numbers `/u/[handle]` has always shown to strangers,
+ * finally shown to the person they belong to (A23.2).
+ */
+export interface AudienceSummary {
+  totalViews: number;
+  totalClones: number;
+  pointsEarned: number;
+  publicTrips: number;
+  /** The plan doing the work, so a card can lead with it. */
+  topTripId: string;
+  trips: AudienceTrip[];
+}
+
+/* ------------------------------------------- platform social proof (M24) - */
+
+/**
+ * What the whole platform has to show for itself (A24.1).
+ *
+ * Real numbers only. A young install returns small ones and the landing page
+ * is expected to hide the section rather than round up — same rule that makes
+ * `CreatorEarningsCard` render nothing until there is something to report.
+ */
+export interface PlatformStats {
+  /** People who started a trip. Signing up is not planning. */
+  planners: number;
+  publicTrips: number;
+  /** Copies of somebody else's plan that still exist. */
+  clones: number;
+  reviews: number;
+  averageRating: number;
+  /** When the API computed these — they are cached, not live. */
+  computedAt: string;
+}
+
+/** A review quoted outside the trip it belongs to (A24.2). */
+export interface PublicReview {
+  tripId: string;
+  tripTitle: string;
+  /** Empty if the trip has since been unpublished; the card then has no link. */
+  tripSlug: string;
+  country: string;
+  rating: number;
+  body: string;
+  /** THB per person. 0 means the reviewer would rather not say. */
+  actualBudgetPerPerson: number;
+  name: string;
+  characterId: string;
+  createdAt: string;
 }

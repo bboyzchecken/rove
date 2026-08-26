@@ -9,6 +9,7 @@ import (
 
 	"github.com/bboyzchecken/rove/apps/api/pkg/core"
 	handlers "github.com/bboyzchecken/rove/apps/api/pkg/handlers/api"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/ai"
 )
 
 // The dependency graph has to be complete before anything is deployed: a
@@ -20,9 +21,9 @@ import (
 func TestFXGraphIsComplete(t *testing.T) {
 	err := fx.ValidateApp(
 		fx.Supply(core.Config{
-			Environment: "test",
-			MockMode:    true,
-			Port:        "5000",
+			Environment:   "test",
+			StubProviders: true,
+			Port:          "5000",
 		}),
 		// The two infrastructure clients are the only things stubbed: they open
 		// real connections, and everything downstream only needs the type.
@@ -43,3 +44,24 @@ func TestFXGraphIsComplete(t *testing.T) {
 // already handles a nil one — that is what lets a developer without Docker run
 // the API — so this exercises the same path.
 func newTestRedis() *redis.Client { return nil }
+
+// The worker graph has to stand on its own: it shares every store and service
+// with the API and differs only in not serving HTTP (Phase 3 — INFRA).
+func TestWorkerGraphIsComplete(t *testing.T) {
+	err := fx.ValidateApp(
+		fx.Supply(core.Config{
+			Environment:   "test",
+			StubProviders: true,
+			Role:          ai.RoleWorker,
+		}),
+		fx.Provide(func() *gorm.DB { return nil }),
+		fx.Provide(newTestRedis),
+		storeModules(),
+		serviceModules(),
+		fx.Invoke(func(ai.Consumer) {}),
+		fx.NopLogger,
+	)
+	if err != nil {
+		t.Fatalf("worker graph is incomplete: %v", err)
+	}
+}

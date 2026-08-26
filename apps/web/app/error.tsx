@@ -47,14 +47,9 @@ export default function AppError({
       title="ระบบหลังบ้านไม่ตอบ"
       hint="ตอนนี้ต่อกับเซิร์ฟเวอร์ของ ROVE ไม่ได้ ไม่ใช่ที่เครื่องคุณ — แพลนที่บันทึกไว้ยังอยู่ครบ รอสักครู่แล้วลองใหม่ได้เลย"
       actions={
-        <>
-          <Button size="lg" block onClick={reset}>
-            ลองใหม่อีกครั้ง
-          </Button>
-          <ButtonLink href="/" variant="outline" size="lg" block>
-            กลับหน้าแรก
-          </ButtonLink>
-        </>
+        <Button size="lg" block onClick={reset}>
+          ลองใหม่อีกครั้ง
+        </Button>
       }
       detail={
         <>
@@ -77,7 +72,7 @@ export default function AppError({
             โหลดหน้านี้ใหม่
           </Button>
           <ButtonLink href="/home" variant="outline" size="lg" block>
-            กลับหน้าแรก
+            ไปหน้าสรุปของฉัน
           </ButtonLink>
         </>
       }

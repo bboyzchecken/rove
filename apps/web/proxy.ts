@@ -32,12 +32,26 @@ const GUARDED = [
   '/recap',
   '/dreams',
   '/profile',
+  '/points',
   '/billing',
   '/new',
   '/admin',
 ];
 
+/**
+ * Doors that sit *inside* a guarded prefix but must stay open — otherwise the
+ * wall swallows the very screen you use to get past it.
+ *
+ * `/admin/login` is the staff sign-in door (§16). It lives under `/admin` so
+ * the two are read as one thing, and that is exactly what made it unreachable:
+ * an anonymous visitor was bounced to `/login`, which is the *user* door, so
+ * "admins sign in separately" was true in the file tree and false in the
+ * browser.
+ */
+const OPEN = ['/admin/login'];
+
 function isGuarded(pathname: string) {
+  if (OPEN.some((base) => pathname === base || pathname.startsWith(`${base}/`))) return false;
   return GUARDED.some((base) => pathname === base || pathname.startsWith(`${base}/`));
 }
 

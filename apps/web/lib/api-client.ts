@@ -76,6 +76,35 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   return payload as T;
 }
 
+/**
+ * Multipart upload (M18/M19). Deliberately not folded into `apiFetch`: a
+ * FormData body must NOT carry a Content-Type header, because the browser has
+ * to set one that includes the multipart boundary it generated. Setting it by
+ * hand is the classic way to get a 400 nobody can explain.
+ */
+export async function apiUpload<T>(path: string, form: FormData): Promise<T> {
+  const res = await fetch(new URL(`/api/v1${path}`, baseUrl()), {
+    method: 'POST',
+    credentials: isServer ? 'omit' : 'include',
+    body: form,
+  });
+
+  if (res.status === 204) return undefined as T;
+
+  const text = await res.text();
+  const payload = text ? (JSON.parse(text) as unknown) : null;
+
+  if (!res.ok) {
+    const message =
+      payload && typeof payload === 'object' && 'error' in payload
+        ? String((payload as { error: unknown }).error)
+        : `upload failed with ${res.status}`;
+    throw new ApiError(res.status, message);
+  }
+
+  return payload as T;
+}
+
 export const api = {
   get: <T>(path: string, options?: RequestOptions) =>
     apiFetch<T>(path, { ...options, method: 'GET' }),
@@ -87,6 +116,7 @@ export const api = {
     apiFetch<T>(path, { ...options, method: 'PUT', body }),
   delete: <T>(path: string, options?: RequestOptions) =>
     apiFetch<T>(path, { ...options, method: 'DELETE' }),
+  upload: apiUpload,
 };
 
 /** Paginated envelope returned by every list endpoint. */

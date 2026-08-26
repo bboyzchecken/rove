@@ -1,4 +1,4 @@
-import { AI_CREDITS } from '@/lib/mock/trip';
+import { AI_CREDITS } from './seed/trip';
 
 import type {
   Order,

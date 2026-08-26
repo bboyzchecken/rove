@@ -6,6 +6,9 @@
 # go
 apps/api/bin/
 apps/api/tmp/
+# local-disk storage backend (dev only — production uses R2)
+apps/api/uploads/
+uploads/
 *.test
 *.out
 
@@ -35,3 +38,13 @@ docker/volumes/
 
 # raw FLUX output — only the optimised copies in apps/web/public are committed
 .assets-raw/
+
+# terraform  (.terraform.lock.hcl is committed on purpose — it pins provider versions)
+deploy/terraform/.terraform/
+deploy/terraform/*.tfstate
+deploy/terraform/*.tfstate.*
+deploy/terraform/*.tfvars
+!deploy/terraform/*.tfvars.example
+deploy/terraform/backend.hcl
+deploy/terraform/crash.log
+deploy/terraform/tfplan
