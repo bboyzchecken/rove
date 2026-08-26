@@ -7,7 +7,6 @@ import { ChevronRight, Pencil, Sparkles } from 'lucide-react';
 import { ModeLine } from '@/components/common/mode-banner';
 import { AudienceCard } from '@/components/profile/audience-card';
 import { CreatorEarningsCard } from '@/components/profile/creator-earnings';
-import { PointsRedeemCard } from '@/components/profile/points-redeem';
 import { SectionHeader, Stat } from '@/components/common/section';
 import { CharacterPicker } from '@/components/profile/character-picker';
 import { ProfileEditSheet } from '@/components/profile/profile-edit-sheet';
@@ -61,7 +60,7 @@ export function ProfileScreen() {
               {(me?.points ?? 0).toLocaleString('th-TH')}
             </p>
             <p className="text-muted mt-1 text-xs">
-              ใช้ร่างแพลนด้วย AI เพิ่ม ({POINTS_PER_RUN} แต้ม/ครั้ง) หรือแลกเป็นโค้ดส่วนลดก็ได้
+              ใช้ร่างแพลนด้วย AI เพิ่ม ({POINTS_PER_RUN} แต้ม/ครั้ง)
             </p>
             <Link
               href="/points"
@@ -74,8 +73,13 @@ export function ProfileScreen() {
         </div>
       </Card>
 
-      {/* redeeming and earning (M22 — A12.10 / A12.11) ------------------ */}
-      <PointsRedeemCard />
+      {/*
+        แลกแต้มเป็นโค้ดส่วนลด (A12.10) ปิดไว้ตั้งแต่ 26 ส.ค. 2569 รอ Phase 6 —
+        โค้ดส่วนลดกำลังย้ายไปหน้า "สิทธิพิเศษ" ของตัวเอง และอัตรา 8 แต้ม = ฿1
+        มาจากราคาภายในราคาเดียว ไม่ได้มาจากต้นทุนจริงของแต้ม
+        (docs/phase-6-points-economy.md) — คอมโพเนนต์ยังอยู่ที่
+        components/profile/points-redeem.tsx ไม่ได้ลบทิ้ง
+      */}
       <CreatorEarningsCard />
 
       {/*

@@ -66,9 +66,18 @@ func (s *Server) handleListRedemptions(c echo.Context) error {
 		return request.Internal(c, "โหลดโค้ดส่วนลดไม่สำเร็จ")
 	}
 
+	// While the mint is closed the tiers are empty rather than absent: the
+	// list still answers "what codes do I hold", which is the half of this
+	// endpoint that Phase 6 keeps (คูปองของฉัน). Advertising a price nobody
+	// can pay would be the one thing worse than showing nothing.
+	tiers := []redemptionTier{}
+	if domain.RedemptionOpen {
+		tiers = redemptionTiers(balance)
+	}
+
 	return c.JSON(http.StatusOK, redemptionListDTO{
 		Balance: balance,
-		Tiers:   redemptionTiers(balance),
+		Tiers:   tiers,
 		Codes:   discountDTOs(codes),
 	})
 }
@@ -80,6 +89,13 @@ func (s *Server) handleListRedemptions(c echo.Context) error {
 // the two failure modes the recoverable one is "my points went but no code
 // appeared" — which is a support ticket with a ledger row behind it.
 func (s *Server) handleRedeemPoints(c echo.Context) error {
+	if !domain.RedemptionOpen {
+		// Refused at the handler, not hidden in the client: an old tab, a
+		// replayed request or a curl is exactly as able to mint a liability as
+		// the button was, and the button is the only thing that went away.
+		return request.Forbidden(c, "ระบบแลกแต้มเป็นโค้ดส่วนลดปิดปรับปรุงชั่วคราว")
+	}
+
 	ctx := c.Request().Context()
 	userID := request.UserID(c)
 

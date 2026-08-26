@@ -8,7 +8,7 @@ import { RoveMark } from '@/components/brand/rove-mark';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { FieldLabel, Input, Textarea, fieldClass } from '@/components/ui/field';
+import { FieldLabel, Textarea, fieldClass } from '@/components/ui/field';
 import { useMe } from '@/features/auth/queries';
 import { useAiCredits, useAiDraft, useBuyAiCredits } from '@/features/ai/queries';
 import { useIsStubbed } from '@/features/meta/queries';
@@ -70,9 +70,11 @@ export function AiGenerateDialog({
   // Preselect whichever option the user can actually complete right now, but
   // let an explicit tap win — derived, so it never fights a re-render.
   const [chosen, setChosen] = useState<'points' | 'purchase' | null>(null);
-  // A code redeemed from points (A12.10). Only a cash purchase can take one —
-  // paying with points already zeroes the bill.
-  const [discountCode, setDiscountCode] = useState('');
+  // ช่องกรอกโค้ดส่วนลด (A12.10) ปิดไว้ตั้งแต่ 26 ส.ค. 2569 รอ Phase 6:
+  // โค้ดกำลังย้ายไปหน้า "สิทธิพิเศษ/คูปองของฉัน" ของตัวเอง และจะเลิกเป็นของ
+  // ROVE-only (เช่นโค้ดพาร์ตเนอร์) — วิธีใช้โค้ดจึงต้องออกแบบใหม่ทั้งอัน
+  // ไม่ใช่ช่องพิมพ์มือข้างปุ่มจ่ายเงิน (docs/phase-6-points-economy.md)
+  // "ใช้แต้ม ROVE" ด้านล่างไม่ได้ปิด — นั่นคือขาที่แต้มถูกใช้ในราคาของตัวเอง
   const choice = chosen ?? (canUsePoints ? 'points' : 'purchase');
   const setChoice = setChosen;
 
@@ -113,7 +115,6 @@ export function AiGenerateDialog({
       quantity: 1,
       method: usingPoints ? 'points' : (channel?.id ?? 'card'),
       channel: label,
-      discountCode: usingPoints ? undefined : discountCode.trim().toUpperCase(),
     });
 
     setReceipt(result.order);
@@ -304,23 +305,6 @@ export function AiGenerateDialog({
                   ))}
                 </div>
               </div>
-            ) : null}
-
-            {choice === 'purchase' ? (
-              <label className="mt-2.5 block">
-                <FieldLabel>โค้ดส่วนลด (ถ้ามี)</FieldLabel>
-                <Input
-                  value={discountCode}
-                  onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
-                  placeholder="ROVE-XXXXXX"
-                  autoCapitalize="characters"
-                  spellCheck={false}
-                  className="nums tracking-wide"
-                />
-                <span className="text-muted mt-1 block text-[11px]">
-                  แลกจากแต้มได้ที่หน้าโปรไฟล์ · ใช้ได้ครั้งเดียวต่อโค้ด
-                </span>
-              </label>
             ) : null}
 
             {buyCredits.isError ? (

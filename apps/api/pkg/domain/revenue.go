@@ -12,6 +12,19 @@ import (
 
 /* ------------------------------------------------- redemption (A12.10) --- */
 
+// RedemptionOpen is the switch on minting new discount codes (Phase 6).
+//
+// Closed 26 ส.ค. 2569. The rate below was derived from exactly one internal
+// price and never from what a point costs to award, so every code minted at it
+// is a liability nobody has measured. Codes are also about to stop being
+// ROVE-only — a partner voucher priced at a guessed rate cannot be repriced
+// after it is in someone's hand. See docs/phase-6-points-economy.md.
+//
+// Closing the mint is not defaulting on what was already issued: codes that
+// exist stay valid and stay redeemable, which is why resolveDiscount is
+// untouched below.
+const RedemptionOpen = false
+
 // PointsPerBahtRedeemed is the exchange rate out of the points economy.
 //
 // It is set from the one price the product already has: an extra AI draft is

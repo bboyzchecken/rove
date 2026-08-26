@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bboyzchecken/rove/apps/api/pkg/domain"
 	"github.com/bboyzchecken/rove/apps/api/pkg/models"
 	"github.com/bboyzchecken/rove/apps/api/pkg/testsupport"
 )
@@ -24,13 +25,6 @@ type redemptionResponse struct {
 		AmountTHB float64 `json:"amount_thb"`
 		Usable    bool    `json:"usable"`
 	} `json:"codes"`
-}
-
-type discountResponse struct {
-	Code        string  `json:"code"`
-	AmountTHB   float64 `json:"amount_thb"`
-	PointsSpent int     `json:"points_spent"`
-	Usable      bool    `json:"usable"`
 }
 
 type creditsResponse struct {
@@ -70,65 +64,83 @@ func givePoints(h *testsupport.Harness, userID string, delta int) {
 
 /* ------------------------------------------------- redemption (A12.10) --- */
 
-func TestRedeemBurnsPointsAndIssuesOneCode(t *testing.T) {
+// issueCode writes a discount code the way the mint used to, without going
+// through the closed endpoint. Everything downstream of issuing — spending,
+// single use, ownership — still has to work for the codes already out there.
+func issueCode(h *testsupport.Harness, userID string, amountTHB float64) *models.DiscountCode {
+	h.T.Helper()
+	code := &models.DiscountCode{
+		UserID:      userID,
+		Code:        domain.NewDiscountCode(),
+		Scope:       models.DiscountScopeAICredits,
+		AmountTHB:   amountTHB,
+		PointsSpent: int(amountTHB) * domain.PointsPerBahtRedeemed,
+		ExpiresAt:   time.Now().UTC().Add(domain.DiscountValidity),
+	}
+	if err := h.DB.Create(code).Error; err != nil {
+		h.T.Fatalf("issue code: %v", err)
+	}
+	return code
+}
+
+// The mint is closed pending Phase 6 (domain.RedemptionOpen). A closed mint is
+// only actually closed if the endpoint says no — the button going away stops
+// nobody with an old tab or a curl.
+func TestRedeemIsClosedWhileTheRateIsBeingRepriced(t *testing.T) {
 	h := testsupport.New(t)
 	user, token := h.User("saver")
-	givePoints(h, user.ID, 1000)
+	givePoints(h, user.ID, 10_000)
 
-	var code discountResponse
 	h.Request(http.MethodPost, "/api/v1/users/me/points/redeem", token,
-		map[string]any{"amount_thb": 100}).
-		ExpectStatus(http.StatusCreated).Decode(&code)
-
-	if code.AmountTHB != 100 || code.PointsSpent != 800 || !code.Usable {
-		t.Fatalf("code = %+v, want ฿100 for 800 points, usable", code)
-	}
+		map[string]any{"amount_thb": 100}).ExpectStatus(http.StatusForbidden)
 
 	var list redemptionResponse
 	h.Request(http.MethodGet, "/api/v1/users/me/points/redemptions", token, nil).
 		ExpectStatus(http.StatusOK).Decode(&list)
 
-	if list.Balance != 200 {
-		t.Errorf("balance = %d, want 200 left", list.Balance)
+	// Refused, not silently swallowed: the points are all still there.
+	if list.Balance != 10_000 {
+		t.Errorf("balance = %d, want 10,000 — a refused redemption must not burn", list.Balance)
 	}
-	if len(list.Codes) != 1 || list.Codes[0].Code != code.Code {
-		t.Errorf("codes = %+v, want the one just issued", list.Codes)
-	}
-	for _, tier := range list.Tiers {
-		if tier.AmountTHB == 100 && tier.Afford {
-			t.Error("a ฿100 tier is affordable on 200 points")
-		}
+	// And nothing advertises a price that cannot be paid.
+	if len(list.Tiers) != 0 {
+		t.Errorf("tiers = %+v, want none while the mint is closed", list.Tiers)
 	}
 }
 
-func TestRedeemRefusesWhatItCannotIssue(t *testing.T) {
+// Closing the mint is not defaulting on codes already issued.
+func TestCodesIssuedBeforeTheCloseStillSpend(t *testing.T) {
 	h := testsupport.New(t)
 	user, token := h.User("saver")
-	givePoints(h, user.ID, 10_000)
+	trip := h.Trip(user, "โตเกียว")
+	code := issueCode(h, user.ID, 100)
 
-	// Not a published tier.
-	h.Request(http.MethodPost, "/api/v1/users/me/points/redeem", token,
-		map[string]any{"amount_thb": 77}).ExpectStatus(http.StatusBadRequest)
+	var list redemptionResponse
+	h.Request(http.MethodGet, "/api/v1/users/me/points/redemptions", token, nil).
+		ExpectStatus(http.StatusOK).Decode(&list)
+	if len(list.Codes) != 1 || !list.Codes[0].Usable {
+		t.Fatalf("codes = %+v, want the existing one still usable", list.Codes)
+	}
 
-	// Not enough points.
-	_, pauperToken := h.User("pauper")
-	h.Request(http.MethodPost, "/api/v1/users/me/points/redeem", pauperToken,
-		map[string]any{"amount_thb": 50}).ExpectStatus(http.StatusBadRequest)
+	var order creditsResponse
+	h.Request(http.MethodPost, "/api/v1/trips/"+trip.ID+"/ai/credits/purchase", token,
+		map[string]any{"quantity": 1, "method": "promptpay", "discount_code": code.Code}).
+		ExpectStatus(http.StatusOK).Decode(&order)
+
+	if order.Order == nil || order.Order.TotalTHB != 0 {
+		t.Fatalf("order = %+v, want the ฿39 draft cleared by the existing code", order.Order)
+	}
 }
 
 func TestDiscountCodeIsSingleUseAndOnlyMine(t *testing.T) {
 	h := testsupport.New(t)
 	user, token := h.User("saver")
 	_, otherToken := h.User("other")
-	givePoints(h, user.ID, 1000)
 
 	trip := h.Trip(user, "โตเกียว")
 	other := h.Trip(mustUser(h, "other"), "โอซาก้า")
 
-	var code discountResponse
-	h.Request(http.MethodPost, "/api/v1/users/me/points/redeem", token,
-		map[string]any{"amount_thb": 100}).
-		ExpectStatus(http.StatusCreated).Decode(&code)
+	code := issueCode(h, user.ID, 100)
 
 	// Somebody else's code does not exist as far as they are concerned.
 	h.Request(http.MethodPost, "/api/v1/trips/"+other.ID+"/ai/credits/purchase", otherToken,
