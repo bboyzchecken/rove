@@ -10,7 +10,7 @@ import {
   TRIP,
   WISHLIST,
 } from './seed/trip';
-import { CURRENT_USER, DREAMS, PAST_TRIPS, UPCOMING, YEAR_STATS } from './seed/user';
+import { CURRENT_USER, DREAMS, PAST_TRIPS, POINTS_LEDGER, UPCOMING, YEAR_STATS } from './seed/user';
 import { DEMO_PUBLIC_SLUG } from '@/lib/demo-trip';
 
 import { AI_PAY_CHANNELS, FREE_SUBSCRIPTION, seedOrders } from './billing';
@@ -36,6 +36,7 @@ import type {
   PlanDay,
   PlanItem,
   Poll,
+  PointsEntry,
   PrepTask,
   ShareState,
   Subscription,
@@ -58,11 +59,12 @@ import type {
  * Never imported outside lib/data/mock.
  */
 
-// v9 adds `reviews` and `leads` to every trip record (A11.5 / A12.12) and the
-// redemption and earnings ledgers to the root (A12.10 / A12.11). Bumped rather
-// than back-filled: a stored older blob has no such arrays, and a UAT session
-// that half-loads is worse than one that starts clean.
-const STORAGE_KEY = 'rove.mock.v9';
+// v10 adds the points ledger (M23 — A23.1): the balance stops being a number
+// on the user record and becomes a SUM of rows, the same way the API has
+// always held it. Bumped rather than back-filled: a stored older blob has no
+// such array, and a UAT session that half-loads is worse than one that starts
+// clean.
+const STORAGE_KEY = 'rove.mock.v10';
 
 /** One candidate itinerary (M6) — metrics and votes are computed at read. */
 export interface VariantRecord {
@@ -155,6 +157,14 @@ export interface MockDb {
   notifications: Notification[];
   /** Points turned into money off (M22 — A12.10), newest first. */
   discountCodes: DiscountCode[];
+  /**
+   * Every point ever earned or spent, newest first (M23 — A23.1).
+   *
+   * `user.points` is kept as the running total of this array and never written
+   * on its own — the same rule the API keeps, where a balance is a SUM and
+   * never a column.
+   */
+  pointsLedger: PointsEntry[];
   /** What this user's published plans have earned them (M22 — A12.11). */
   earnings: EarningsStatement;
   /** Trips the user finished — the profile timeline reads these as-is. */
@@ -520,7 +530,7 @@ function seedPublicTrips(): TripRecord[] {
 
 export function seedDb(): MockDb {
   return {
-    version: 8,
+    version: 9,
     user: {
       id: CURRENT_USER.id,
       name: CURRENT_USER.name,
@@ -538,6 +548,7 @@ export function seedDb(): MockDb {
     subscription: structuredClone(FREE_SUBSCRIPTION),
     notifications: [],
     discountCodes: [],
+    pointsLedger: structuredClone(POINTS_LEDGER),
     // Seeded with one settled month and one still owing, so the creator
     // statement has something to be a statement of.
     earnings: seedEarnings(),
@@ -645,7 +656,7 @@ export function loadDb(): MockDb {
         const parsed = JSON.parse(raw) as MockDb;
         // A seed change bumps the version; an old blob is thrown away rather
         // than migrated — this is demo data, not anyone's real trip.
-        if (parsed.version === 8) {
+        if (parsed.version === 9) {
           memory = parsed;
           return memory;
         }

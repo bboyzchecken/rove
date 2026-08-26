@@ -9,6 +9,7 @@ import {
   LogOut,
   Pencil,
   ReceiptText,
+  ScrollText,
   ShieldCheck,
   Sparkles,
   type LucideIcon,
@@ -61,6 +62,22 @@ export function ProfileMenu({ onEditProfile }: { onEditProfile: () => void }) {
         label="ที่อยากไปสักวัน"
         hint={countLabel(dreams.length, 'รายการ')}
         href="/dreams"
+      />
+      {/*
+        Points are the other ledger this account carries (M23 — W23.1), and
+        they sit next to the receipts on purpose: both answer "what happened to
+        something of mine", and both are records rather than screens you browse.
+
+        The hint here IS the balance, unlike the row below it — points are the
+        product's own score, already shown in full at the top of this page, and
+        a row that led somewhere without saying how many would be a row nobody
+        taps.
+      */}
+      <MenuRow
+        icon={ScrollText}
+        label="ประวัติแต้ม"
+        hint={countLabel(me?.points ?? 0, 'แต้ม')}
+        href="/points"
       />
       {/* The hint is the receipt count, not the amount: a number of baht on a
           menu row is money the user did not ask to be reminded of. */}

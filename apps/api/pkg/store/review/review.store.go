@@ -4,6 +4,8 @@ package review
 
 import (
 	"context"
+	"math"
+	"time"
 
 	"go.uber.org/fx"
 	"gorm.io/gorm"
@@ -53,6 +55,105 @@ func (s *store) Delete(ctx context.Context, tripID, userID string) error {
 	return s.db.WithContext(ctx).
 		Where("trip_id = ? AND user_id = ?", tripID, userID).
 		Delete(&models.TripReview{}).Error
+}
+
+/* --------------------------------------------- platform social proof (M24) */
+
+// Platform is the whole catalogue in one row (A24.1). No filter by visibility:
+// the number being reported is "how many people reviewed a trip they took",
+// and a private trip's review is still that.
+func (s *store) Platform(ctx context.Context) (models.PlatformReviews, error) {
+	var row struct {
+		Count     int64
+		RatingSum int64
+	}
+	err := s.db.WithContext(ctx).
+		Model(&models.TripReview{}).
+		Select("COUNT(*) AS count", "COALESCE(SUM(rating), 0) AS rating_sum").
+		Scan(&row).Error
+	if err != nil {
+		return models.PlatformReviews{}, err
+	}
+
+	out := models.PlatformReviews{Count: row.Count}
+	if row.Count > 0 {
+		out.AverageRating = math.Round(float64(row.RatingSum)/float64(row.Count)*10) / 10
+	}
+	return out, nil
+}
+
+// ListRecentPublic joins the three tables a quotable review needs (A24.2).
+//
+// Two filters carry the whole rule: the trip must be published, and the review
+// must actually say something. A five-star rating with an empty body is a
+// number the summary already counts — printing it as a testimonial would be
+// putting words in somebody's mouth.
+func (s *store) ListRecentPublic(ctx context.Context, limit int) ([]models.PublicReview, error) {
+	if limit <= 0 || limit > 50 {
+		limit = 12
+	}
+
+	var rows []struct {
+		TripID                string
+		TripTitle             string
+		TripSlug              *string
+		Country               string
+		Rating                int
+		Body                  string
+		ActualBudgetPerPerson float64
+		Name                  string
+		CharacterID           *string
+		CreatedAt             time.Time
+	}
+
+	err := s.db.WithContext(ctx).
+		Model(&models.TripReview{}).
+		Select(
+			"trip_reviews.trip_id AS trip_id",
+			"trips.title AS trip_title",
+			"trips.slug AS trip_slug",
+			"trips.destination_country AS country",
+			"trip_reviews.rating AS rating",
+			"trip_reviews.body AS body",
+			"trip_reviews.actual_budget_per_person AS actual_budget_per_person",
+			"users.display_name AS name",
+			"users.character_id AS character_id",
+			"trip_reviews.created_at AS created_at",
+		).
+		Joins("JOIN trips ON trips.id = trip_reviews.trip_id").
+		Joins("JOIN users ON users.id = trip_reviews.user_id").
+		Where("trips.visibility = ?", models.VisibilityPublic).
+		Where("trip_reviews.body <> ''").
+		Where("users.status = ?", models.UserStatusActive).
+		Order("trip_reviews.created_at DESC").
+		Limit(limit).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]models.PublicReview, 0, len(rows))
+	for _, row := range rows {
+		review := models.PublicReview{
+			TripID:                row.TripID,
+			TripTitle:             row.TripTitle,
+			Country:               row.Country,
+			Rating:                row.Rating,
+			Body:                  row.Body,
+			ActualBudgetPerPerson: row.ActualBudgetPerPerson,
+			Name:                  row.Name,
+			CharacterID:           "shiba",
+			CreatedAt:             row.CreatedAt.UTC().Format(time.RFC3339),
+		}
+		if row.TripSlug != nil {
+			review.TripSlug = *row.TripSlug
+		}
+		if row.CharacterID != nil && *row.CharacterID != "" {
+			review.CharacterID = *row.CharacterID
+		}
+		out = append(out, review)
+	}
+	return out, nil
 }
 
 // SummaryByTrips rolls up a whole page of explore cards in one query.

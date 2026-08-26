@@ -48,12 +48,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // A trip room lives under /t/:id and a finished one under /recap/:id — both
   // belong to the "ทริปของฉัน" tab.
+  //
+  // Browsing works the same way: a published plan (/p/:slug) and a creator
+  // profile (/u/:handle) are where สำรวจ leads, so the tab stays lit while the
+  // reader is down there. Without this, tapping a card put out the only light
+  // saying where they were.
   const isActive = (href: string) => {
     if (href === '/trips') {
       return (
         pathname.startsWith('/trips') ||
         pathname.startsWith('/t/') ||
         pathname.startsWith('/recap/')
+      );
+    }
+    if (href === '/explore') {
+      return (
+        pathname.startsWith('/explore') || pathname.startsWith('/p/') || pathname.startsWith('/u/')
       );
     }
     return pathname === href || pathname.startsWith(`${href}/`);

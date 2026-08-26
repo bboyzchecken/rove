@@ -20,7 +20,9 @@ func (s *Server) registerUserRoutes(g *echo.Group) {
 	me := g.Group("/users/me", s.JwtMiddleware)
 	me.PATCH("", s.handleUpdateMe)
 	me.GET("/stats", s.handleMyStats)
-	me.GET("/points", s.handleMyPoints)
+	// Where points came from, and who followed the plans that earned them
+	// (A23.1 / A23.2).
+	s.registerPointsRoutes(me)
 	// Points out and money owed (A12.10 / A12.11) — both belong to a person.
 	s.registerRewardRoutes(me)
 	s.registerInboxRoutes(me) // A9.2 — the inbox belongs to a person, not a trip
@@ -94,20 +96,6 @@ func (s *Server) handleUpdateMe(c echo.Context) error {
 
 	balance, _ := s.points.Balance(ctx, user.ID)
 	return c.JSON(http.StatusOK, toMeDTO(*user, balance))
-}
-
-func (s *Server) handleMyPoints(c echo.Context) error {
-	ctx := c.Request().Context()
-	entries, err := s.points.List(ctx, request.UserID(c), 30)
-	if err != nil {
-		return request.Internal(c, "โหลดประวัติแต้มไม่สำเร็จ")
-	}
-	balance, _ := s.points.Balance(ctx, request.UserID(c))
-
-	return c.JSON(http.StatusOK, map[string]any{
-		"balance": balance,
-		"entries": entries,
-	})
 }
 
 /* ----------------------------------------------------------------- trips -- */

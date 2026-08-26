@@ -225,6 +225,18 @@ func Migrate(db *gorm.DB) error {
 				return dropIndexes(tx, hotPathIndexes)
 			},
 		},
+		{
+			// M23 — the points ledger became something a person pages through
+			// (A23.1), which turns `user_points` into a keyset-paginated read
+			// with the same shape as the activity feed above.
+			ID: "202608260000_points_ledger_index",
+			Migrate: func(tx *gorm.DB) error {
+				return createIndexes(tx, ledgerIndexes)
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return dropIndexes(tx, ledgerIndexes)
+			},
+		},
 	})
 
 	return m.Migrate()
@@ -274,6 +286,26 @@ var hotPathIndexes = []hotPathIndex{
 	{
 		name: "idx_wishlist_order", table: "wishlist_items", columns: "(trip_id, sort_order)",
 		why: "wishlist and coverage read",
+	},
+}
+
+// ledgerIndexes serve M23 — reading a person's own points history rather than
+// summing it.
+var ledgerIndexes = []hotPathIndex{
+	{
+		name: "idx_points_ledger", table: "user_points", columns: "(user_id, occurred_at, id)",
+		// ListPage: WHERE user_id ORDER BY (occurred_at, id) DESC. `user_id`
+		// alone was indexed, so every page of a long ledger sorted the whole
+		// account's history to hand back thirty rows. The id is in the index
+		// because it is in the ORDER BY — it is what makes the cursor stable
+		// when two awards land in the same second.
+		why: "points ledger, keyset-paginated",
+	},
+	{
+		name: "idx_points_by_trip", table: "user_points", columns: "(user_id, reason, trip_id)",
+		// EarnedByTrip: WHERE user_id AND reason GROUP BY trip_id — the
+		// audience card's one query (A23.2).
+		why: "audience card, points per published trip",
 	},
 }
 

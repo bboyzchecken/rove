@@ -253,6 +253,7 @@ func (s *Server) registerRoutes() {
 	s.registerAuthRoutes(v1)     // A0.4 / A0.5
 	s.registerUserRoutes(v1)     // A3.1 / A14 / A15 / A17
 	s.registerPublicRoutes(v1)   // A10.1 — shared + public trips
+	s.registerStatsRoutes(v1)    // A24.1 / A24.2 — platform social proof
 	s.registerPOIRoutes(v1)      // A4.2
 	s.registerAirportRoutes(v1)  // A1.3 — worldwide airport search
 	s.registerAIPublicRoutes(v1) // A1.2 — reading a ticket happens before a trip

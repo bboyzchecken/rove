@@ -18,6 +18,31 @@ export function useExplore(filters: ExploreFilters) {
   });
 }
 
+/**
+ * What the platform has to show for itself (M24 — A24.1 / A24.2).
+ *
+ * Cached hard on purpose: these are the same numbers for every visitor, the
+ * API already caches them for ten minutes, and the landing page is the most
+ * requested screen in the product.
+ */
+const SOCIAL_PROOF_STALE_MS = 5 * 60 * 1000;
+
+export function usePlatformStats() {
+  return useQuery({
+    queryKey: queryKeys.platformStats(),
+    queryFn: () => repo.share.platformStats(),
+    staleTime: SOCIAL_PROOF_STALE_MS,
+  });
+}
+
+export function useRecentReviews() {
+  return useQuery({
+    queryKey: queryKeys.recentReviews(),
+    queryFn: () => repo.share.recentReviews(),
+    staleTime: SOCIAL_PROOF_STALE_MS,
+  });
+}
+
 export function useCreator(handle: string) {
   return useQuery({
     queryKey: queryKeys.creator(handle),

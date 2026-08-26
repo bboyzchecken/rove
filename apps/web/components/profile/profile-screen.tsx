@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Pencil, Sparkles } from 'lucide-react';
+import Link from 'next/link';
+import { ChevronRight, Pencil, Sparkles } from 'lucide-react';
 
 import { ModeLine } from '@/components/common/mode-banner';
+import { AudienceCard } from '@/components/profile/audience-card';
 import { CreatorEarningsCard } from '@/components/profile/creator-earnings';
 import { PointsRedeemCard } from '@/components/profile/points-redeem';
 import { SectionHeader, Stat } from '@/components/common/section';
@@ -61,6 +63,12 @@ export function ProfileScreen() {
             <p className="text-muted mt-1 text-xs">
               ใช้ร่างแพลนด้วย AI เพิ่ม ({POINTS_PER_RUN} แต้ม/ครั้ง) หรือแลกเป็นโค้ดส่วนลดก็ได้
             </p>
+            <Link
+              href="/points"
+              className="text-espresso mt-2 inline-flex items-center gap-1 text-xs font-semibold hover:underline"
+            >
+              ดูประวัติแต้ม <ChevronRight className="size-3.5" />
+            </Link>
           </div>
           <Sparkles className="text-primary size-8" />
         </div>
@@ -69,6 +77,14 @@ export function ProfileScreen() {
       {/* redeeming and earning (M22 — A12.10 / A12.11) ------------------ */}
       <PointsRedeemCard />
       <CreatorEarningsCard />
+
+      {/*
+        Who followed the plans that earned the points (M23 — W23.2). The
+        ledger itself is a page of its own at /points, reached from the menu
+        below — it is a record you go looking for, not one you scroll past.
+        This card renders nothing until something has been published.
+      */}
+      <AudienceCard />
 
       {/* stats --------------------------------------------------------- */}
       <section>

@@ -4,6 +4,8 @@ import { ArrowRight, CalendarDays, CalendarSearch, Plane } from 'lucide-react';
 
 import { RoveMark } from '@/components/brand/rove-mark';
 import { PublicShell, SHELL_SECTION } from '@/components/common/public-shell';
+import { PlatformStatsSection } from '@/components/public/platform-stats';
+import { TravellerReviewsSection } from '@/components/public/traveller-reviews';
 import { SectionHeader } from '@/components/common/section';
 import { ButtonLink } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -227,6 +229,17 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/*
+        ---------------------------------------------------- social proof
+        Between the steps and the features, per W24.1: the reader has just been
+        told how it works and the next question is "does anyone actually use
+        it". Both sections render nothing at all until the real numbers are
+        worth saying — the page is expected to close back up around them, and
+        no placeholder is left behind.
+      */}
+      <PlatformStatsSection className={`${SHELL_SECTION} pt-14`} />
+      <TravellerReviewsSection className={`${SHELL_SECTION} pt-14`} />
 
       {/* -------------------------------------------------------- features */}
       <section className={`${SHELL_SECTION} py-14`}>

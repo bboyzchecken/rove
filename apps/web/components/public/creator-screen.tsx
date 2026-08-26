@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Copy, Eye, Sparkles } from 'lucide-react';
 
-import { PublicShell } from '@/components/common/public-shell';
+import { BrowseShell } from '@/components/common/browse-shell';
 import { SectionHeader, Stat } from '@/components/common/section';
 import { TripCover } from '@/components/trip/trip-cover';
 import { ButtonLink } from '@/components/ui/button';
@@ -16,23 +16,23 @@ import { useCreator } from '@/features/public/queries';
  * worth following. Only published trips and their public numbers appear here —
  * the balance, history and everything unpublished stay behind sign-in.
  */
-export function CreatorScreen({ handle }: { handle: string }) {
+export function CreatorScreen({ handle, signedIn }: { handle: string; signedIn: boolean }) {
   const { data: creator, isLoading } = useCreator(handle);
 
   if (isLoading) {
     return (
-      <PublicShell width="wide">
+      <BrowseShell signedIn={signedIn} width="wide">
         <div className="space-y-3 py-8">
           <div className="rounded-brand bg-surface h-32 animate-pulse" />
           <div className="rounded-brand bg-surface h-64 animate-pulse" />
         </div>
-      </PublicShell>
+      </BrowseShell>
     );
   }
 
   if (!creator) {
     return (
-      <PublicShell width="focused" center>
+      <BrowseShell signedIn={signedIn} width="focused" center>
         <div className="py-16 text-center">
           <h1 className="font-display text-espresso text-xl font-extrabold">ไม่พบโปรไฟล์นี้</h1>
           <p className="text-muted mt-2 text-sm">อาจพิมพ์ชื่อผิด หรือเจ้าของยังไม่ได้เปิดโปรไฟล์</p>
@@ -40,12 +40,13 @@ export function CreatorScreen({ handle }: { handle: string }) {
             ไปหน้าสำรวจ
           </ButtonLink>
         </div>
-      </PublicShell>
+      </BrowseShell>
     );
   }
 
   return (
-    <PublicShell
+    <BrowseShell
+      signedIn={signedIn}
       width="wide"
       actions={
         <ButtonLink href="/explore" size="sm" variant="soft">
@@ -123,6 +124,6 @@ export function CreatorScreen({ handle }: { handle: string }) {
           เริ่มทริปของฉัน
         </ButtonLink>
       </Card>
-    </PublicShell>
+    </BrowseShell>
   );
 }

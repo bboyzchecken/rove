@@ -50,6 +50,7 @@ import type {
   PlanItem,
   PlanVariant,
   Poll,
+  PointsEntry,
   PrepTask,
   RecapDecision,
   ReviewBoard,
@@ -283,7 +284,16 @@ function reviewBoardOf(db: MockDb, record: TripRecord): ReviewBoard {
  * a draft is 300 points or ฿39.
  */
 const POINTS_PER_BAHT = 8;
+/** One page of the points ledger — matches `pointsPageSize` on the API. */
+const POINTS_PAGE_SIZE = 30;
 const REDEMPTION_TIERS = [50, 100, 300];
+/**
+ * Minting discount codes from points is closed pending Phase 6, exactly as it
+ * is on the API (`domain.RedemptionOpen`). Mock mode has to show the same shut
+ * door, or the demo sells something the real product refuses.
+ * See docs/phase-6-points-economy.md.
+ */
+const REDEMPTION_OPEN = false;
 
 /** Same shape as the API's — readable off a screen, typable on a phone. */
 function mockDiscountCode() {
@@ -1912,7 +1922,9 @@ export const mockRepo: RoveRepo = {
 
           const record = tripRecord(db, tripId);
           record.ai.extra += quantity;
-          db.user.points -= points;
+          if (points > 0) {
+            addPoints(db, -points, 'ai_draft', `ร่างแพลนด้วย AI เพิ่ม ${quantity} ครั้ง`, tripId);
+          }
 
           const order = buildOrder(
             mockId('ord'),
@@ -2285,6 +2297,65 @@ export const mockRepo: RoveRepo = {
         320,
       );
     },
+
+    /* ------------------------------------ platform social proof (M24) -- */
+
+    async platformStats() {
+      const db = loadDb();
+      const published = [
+        ...db.publicTrips,
+        ...db.trips.filter((t) => t.share.visibility === 'public'),
+      ];
+      const reviews = [...db.trips, ...db.publicTrips].flatMap((t) => t.reviews);
+
+      // Counted off the seeded catalogue rather than invented: mock mode's
+      // numbers are small, and the landing section is supposed to hide itself
+      // on numbers this small (W24.1). Pretending otherwise here would make
+      // that rule untestable.
+      return delay({
+        planners: new Set(published.map((r) => r.creator?.handle ?? db.user.handle)).size,
+        publicTrips: published.length,
+        clones: published.reduce((sum, r) => sum + r.share.cloneCount, 0),
+        reviews: reviews.length,
+        averageRating:
+          reviews.length === 0
+            ? 0
+            : Math.round((reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length) * 10) / 10,
+        computedAt: nowIso(),
+      });
+    },
+
+    async recentReviews() {
+      const db = loadDb();
+      const published = [
+        ...db.publicTrips,
+        ...db.trips.filter((t) => t.share.visibility === 'public'),
+      ];
+
+      return delay(
+        published
+          .flatMap((record) =>
+            // A rating with no words is counted by the summary and never
+            // quoted — printing it would be putting words in someone's mouth.
+            record.reviews
+              .filter((review) => review.body.trim() !== '')
+              .map((review) => ({
+                tripId: record.trip.id,
+                tripTitle: record.trip.title,
+                tripSlug: record.share.publicSlug ?? '',
+                country: '',
+                rating: review.rating,
+                body: review.body,
+                actualBudgetPerPerson: review.actualBudgetPerPerson,
+                name: review.name,
+                characterId: review.characterId,
+                createdAt: review.createdAt,
+              })),
+          )
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          .slice(0, 12),
+      );
+    },
   },
 
   /* ----------------------------- points out, money owed (M22) -- */
@@ -2293,11 +2364,13 @@ export const mockRepo: RoveRepo = {
       const db = loadDb();
       return delay({
         balance: db.user.points,
-        tiers: REDEMPTION_TIERS.map((amountThb) => ({
-          amountThb,
-          points: amountThb * POINTS_PER_BAHT,
-          afford: db.user.points >= amountThb * POINTS_PER_BAHT,
-        })),
+        tiers: REDEMPTION_OPEN
+          ? REDEMPTION_TIERS.map((amountThb) => ({
+              amountThb,
+              points: amountThb * POINTS_PER_BAHT,
+              afford: db.user.points >= amountThb * POINTS_PER_BAHT,
+            }))
+          : [],
         codes: clone(db.discountCodes),
       });
     },
@@ -2305,13 +2378,15 @@ export const mockRepo: RoveRepo = {
     async redeem(amountThb) {
       return delay(
         mutate((db) => {
+          if (!REDEMPTION_OPEN) throw new Error('ระบบแลกแต้มเป็นโค้ดส่วนลดปิดปรับปรุงชั่วคราว');
           if (!REDEMPTION_TIERS.includes(amountThb)) throw new Error('เลือกได้เฉพาะมูลค่าที่กำหนดไว้');
           const cost = amountThb * POINTS_PER_BAHT;
           if (db.user.points < cost) throw new Error('แต้มไม่พอ');
 
           // Points are burned on issue, exactly like the API: a code that
-          // exists has already been paid for.
-          db.user.points -= cost;
+          // exists has already been paid for — and the burn is a ledger row,
+          // not a subtraction (A23.1).
+          addPoints(db, -cost, 'redeem', `แลกเป็นโค้ดส่วนลด ฿${amountThb.toLocaleString('th-TH')}`, null);
           const code: DiscountCode = {
             code: mockDiscountCode(),
             scope: 'ai_credits',
@@ -2331,6 +2406,74 @@ export const mockRepo: RoveRepo = {
     async earnings() {
       const db = loadDb();
       return delay(clone(db.earnings));
+    },
+
+    /* ------------------------------- where the points came from (M23) -- */
+
+    async pointsHistory(cursor) {
+      const db = loadDb();
+      // The same page size and the same cursor shape as the API, so the "ดู
+      // เพิ่ม" button is exercised in mock mode instead of only in live.
+      //
+      // A cursor that matches nothing ends the walk rather than restarting it:
+      // `findIndex` returns -1, and treating that as "start from the top"
+      // would hand the first page back forever while the infinite query kept
+      // appending it.
+      const at = cursor ? db.pointsLedger.findIndex((row) => row.id === cursor) : -1;
+      const start = at + 1;
+      // Totals are over the whole ledger, not over the page — the same two
+      // figures the API returns with every page.
+      const totals = {
+        balance: db.pointsLedger.reduce((sum, row) => sum + row.delta, 0),
+        earned: db.pointsLedger.reduce((sum, row) => sum + Math.max(0, row.delta), 0),
+      };
+
+      if (cursor && at < 0) {
+        return delay({ ...totals, entries: [], nextCursor: '' });
+      }
+
+      const page = db.pointsLedger.slice(start, start + POINTS_PAGE_SIZE);
+      const next = db.pointsLedger[start + POINTS_PAGE_SIZE];
+
+      return delay({
+        ...totals,
+        entries: clone(page),
+        nextCursor: next ? (page[page.length - 1]?.id ?? '') : '',
+      });
+    },
+
+    async audience() {
+      const db = loadDb();
+      const published = db.trips.filter((t) => t.share.visibility === 'public');
+
+      // What each published plan earned, read back out of the ledger rather
+      // than kept as a second counter.
+      const earnedBy = (tripId: string) =>
+        db.pointsLedger.filter((row) => row.reason === 'trip_cloned' && row.tripId === tripId);
+
+      const trips = published
+        .map((record) => {
+          const awards = earnedBy(record.trip.id);
+          return {
+            tripId: record.trip.id,
+            title: record.trip.title,
+            slug: record.share.publicSlug ?? '',
+            views: record.share.viewCount,
+            clones: record.share.cloneCount,
+            awardedClones: awards.length,
+            pointsEarned: awards.reduce((sum, row) => sum + row.delta, 0),
+          };
+        })
+        .sort((a, b) => b.clones - a.clones || b.views - a.views);
+
+      return delay({
+        totalViews: trips.reduce((sum, t) => sum + t.views, 0),
+        totalClones: trips.reduce((sum, t) => sum + t.clones, 0),
+        pointsEarned: trips.reduce((sum, t) => sum + t.pointsEarned, 0),
+        publicTrips: trips.length,
+        topTripId: trips[0]?.tripId ?? '',
+        trips,
+      });
     },
   },
 
@@ -2927,8 +3070,52 @@ function recapOfArchive(db: MockDb, past: PastTrip): TripRecap {
  * reward the nudge promised actually shows up.
  */
 function awardPublishPoints(db: MockDb, title: string, record?: TripRecord) {
-  db.user.points += POINTS_PER_PUBLISH;
+  addPoints(
+    db,
+    POINTS_PER_PUBLISH,
+    'trip_published',
+    `เปิดทริป "${title}" เป็นสาธารณะ`,
+    record?.trip.id ?? null,
+  );
   if (record) log(record, db.user.id, `เปิดทริป "${title}" เป็นสาธารณะ +${POINTS_PER_PUBLISH} แต้ม`);
+}
+
+/**
+ * The one place mock mode moves points (M23 — A23.1).
+ *
+ * Writes the ledger row first and then re-derives the balance from it, so the
+ * two can never disagree — the same property the API gets from `SUM(delta)`.
+ * A screen that shows a balance without a row behind it is exactly what this
+ * feature exists to make impossible.
+ */
+function addPoints(
+  db: MockDb,
+  delta: number,
+  reason: PointsEntry['reason'],
+  note: string,
+  tripId: string | null,
+): PointsEntry {
+  const entry: PointsEntry = {
+    id: mockId('pt'),
+    delta,
+    reason,
+    note,
+    tripId,
+    tripTitle: tripId ? (findTripTitle(db, tripId) ?? '') : '',
+    occurredAt: nowIso(),
+  };
+  db.pointsLedger.unshift(entry);
+  db.user.points = db.pointsLedger.reduce((sum, row) => sum + row.delta, 0);
+  return entry;
+}
+
+/** A ledger row names its trip, and keeps the name if the trip goes away. */
+function findTripTitle(db: MockDb, tripId: string): string | undefined {
+  return (
+    db.trips.find((t) => t.trip.id === tripId)?.trip.title ??
+    db.publicTrips.find((t) => t.trip.id === tripId)?.trip.title ??
+    db.past.find((t) => t.id === tripId)?.title
+  );
 }
 
 /** An archived card carries its own share state — there is no room to ask. */

@@ -4,8 +4,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Copy, Eye, Search, Sparkles } from 'lucide-react';
 
-import { PublicShell } from '@/components/common/public-shell';
+import { BrowseShell } from '@/components/common/browse-shell';
 import { MatchBadge } from '@/components/public/match-badge';
+import { TravellerReviewsSection } from '@/components/public/traveller-reviews';
 import { Stars } from '@/components/trip/trip-review';
 import { TripCover } from '@/components/trip/trip-cover';
 import { Button, ButtonLink } from '@/components/ui/button';
@@ -33,7 +34,7 @@ const QUICK_FILTERS = [
   { id: 'seoul', label: 'โซล' },
 ];
 
-export function ExploreScreen() {
+export function ExploreScreen({ signedIn }: { signedIn: boolean }) {
   const [query, setQuery] = useState('');
   const [quick, setQuick] = useState('');
   const [sort, setSort] = useState<'popular' | 'new'>('popular');
@@ -58,8 +59,11 @@ export function ExploreScreen() {
   const matching = Boolean(matchTripId);
 
   return (
-    <PublicShell
+    <BrowseShell
+      signedIn={signedIn}
       width="wide"
+      // Anonymous only: a signed-in reader already has "สร้างทริป" in the
+      // middle of the bottom bar and in the desktop nav.
       actions={
         <ButtonLink href="/new" size="sm" variant="soft">
           เริ่มทริปของฉัน
@@ -197,7 +201,14 @@ export function ExploreScreen() {
           </Button>
         </div>
       ) : null}
-    </PublicShell>
+
+      {/*
+        W24.2 — under the feed rather than above it. Somebody who scrolled this
+        far is deciding whether following a plan is worth it, and a review is
+        the only thing on this page written by someone who actually went.
+      */}
+      <TravellerReviewsSection className="mt-14" limit={3} label="คนที่เที่ยวตามบอกว่า" />
+    </BrowseShell>
   );
 }
 

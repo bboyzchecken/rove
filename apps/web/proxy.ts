@@ -32,6 +32,7 @@ const GUARDED = [
   '/recap',
   '/dreams',
   '/profile',
+  '/points',
   '/billing',
   '/new',
   '/admin',

@@ -19,7 +19,7 @@ export function CreatorEarningsCard() {
 
   if (isLoading) {
     return (
-      <section className="px-4">
+      <section>
         <SectionHeader label="รายได้จากแพลนสาธารณะ" />
         <div className="rounded-brand bg-surface h-32 animate-pulse" />
       </section>
@@ -33,7 +33,7 @@ export function CreatorEarningsCard() {
   const belowMinimum = totals.payableThb > 0 && totals.payableThb < statement.minimumPayoutThb;
 
   return (
-    <section className="px-4">
+    <section>
       <SectionHeader label="รายได้จากแพลนสาธารณะ" />
 
       <Card accent="matcha" className="p-4">

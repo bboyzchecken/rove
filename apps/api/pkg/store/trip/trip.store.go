@@ -88,6 +88,65 @@ func (s *store) Count(ctx context.Context) (int64, error) {
 	return n, err
 }
 
+// TitlesByIDs hydrates a ledger page's trip names in one query (A23.1). Only
+// two columns leave the database: this is called on rows the caller has no
+// membership check for, and a title is the most a ledger line needs.
+func (s *store) TitlesByIDs(ctx context.Context, ids []string) (map[string]string, error) {
+	out := make(map[string]string, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+
+	var rows []struct {
+		ID    string
+		Title string
+	}
+	err := s.db.WithContext(ctx).
+		Model(&models.Trip{}).
+		Select("id", "title").
+		Where("id IN ?", ids).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.ID] = row.Title
+	}
+	return out, nil
+}
+
+/* ---------------------------------------------- platform totals (A24.1) -- */
+
+func (s *store) CountPlanners(ctx context.Context) (int64, error) {
+	var n int64
+	err := s.db.WithContext(ctx).
+		Model(&models.Trip{}).
+		Distinct("owner_id").
+		Count(&n).Error
+	return n, err
+}
+
+func (s *store) CountPublic(ctx context.Context) (int64, error) {
+	var n int64
+	err := s.db.WithContext(ctx).
+		Model(&models.Trip{}).
+		Where("visibility = ?", models.VisibilityPublic).
+		Count(&n).Error
+	return n, err
+}
+
+// CountClones counts the copies themselves rather than summing `clone_count`.
+// The counter is a display number that a deleted copy never gives back; a row
+// with a source is a copy that still exists.
+func (s *store) CountClones(ctx context.Context) (int64, error) {
+	var n int64
+	err := s.db.WithContext(ctx).
+		Model(&models.Trip{}).
+		Where("source_trip_id IS NOT NULL").
+		Count(&n).Error
+	return n, err
+}
+
 /* ------------------------------------------------- public explore (M11) -- */
 
 // ListPublic returns only trips their owners chose to publish. Sorting is a

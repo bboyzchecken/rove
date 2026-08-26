@@ -36,6 +36,33 @@ type ReviewSummary struct {
 	BudgetSaid            int     `json:"budget_said"`
 }
 
+// PlatformReviews is every review on the platform rolled into one line
+// (A24.1): how many people reviewed, and how they rated it on average.
+type PlatformReviews struct {
+	Count         int64   `json:"count"`
+	AverageRating float64 `json:"average_rating"`
+}
+
+// PublicReview is a review shown outside the trip it belongs to (A24.2): on
+// the landing page and in explore, where the reader has no idea which trip
+// this is unless the row carries it.
+//
+// It is assembled from a join rather than stored: `trip_reviews` holds the
+// opinion, `trips` holds what it is about, `users` holds who said it.
+type PublicReview struct {
+	TripID    string  `json:"trip_id"`
+	TripTitle string  `json:"trip_title"`
+	TripSlug  string  `json:"trip_slug"`
+	Country   string  `json:"country"`
+	Rating    int     `json:"rating"`
+	Body      string  `json:"body"`
+	// THB per person, 0 when the reviewer did not want to say.
+	ActualBudgetPerPerson float64 `json:"actual_budget_per_person"`
+	Name        string `json:"name"`
+	CharacterID string `json:"character_id"`
+	CreatedAt   string `json:"created_at"`
+}
+
 type ReviewStore interface {
 	// Upsert writes this member's review, replacing their previous one.
 	Upsert(ctx context.Context, r *TripReview) error
@@ -45,4 +72,10 @@ type ReviewStore interface {
 	// SummaryByTrips feeds the explore feed and the creator page without one
 	// query per card.
 	SummaryByTrips(ctx context.Context, tripIDs []string) (map[string]ReviewSummary, error)
+	// Platform rolls every review into one line for /public/stats (A24.1).
+	Platform(ctx context.Context) (PlatformReviews, error)
+	// ListRecentPublic returns reviews with something written in them, from
+	// trips their owners published (A24.2). A review of a private trip is not
+	// social proof — it is somebody's diary.
+	ListRecentPublic(ctx context.Context, limit int) ([]PublicReview, error)
 }

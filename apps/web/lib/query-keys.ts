@@ -75,6 +75,16 @@ export const queryKeys = {
   /** Points out and money owed (M22). Both belong to a person, not a trip. */
   redemptions: () => ['me', 'redemptions'] as const,
   earnings: () => ['me', 'earnings'] as const,
+  /**
+   * Where the points came from, and who followed the plans that earned them
+   * (M23). Under ['me'] with the rest: a ledger belongs to a person, and a
+   * redemption invalidates it along with the balance.
+   */
+  pointsHistory: () => ['me', 'points', 'history'] as const,
+  audience: () => ['me', 'audience'] as const,
+  /** Platform social proof (M24) — public, and the same for every visitor. */
+  platformStats: () => ['public', 'stats'] as const,
+  recentReviews: () => ['public', 'reviews', 'recent'] as const,
   leads: (tripId: string) => ['trip', tripId, 'leads'] as const,
   photoBookThemes: (tripId: string) => ['trip', tripId, 'photobook', 'themes'] as const,
   explore: (filters: string) => ['explore', filters] as const,

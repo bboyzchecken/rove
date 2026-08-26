@@ -7,12 +7,64 @@ import type {
   RecapSpend,
   YearStats,
 } from '../../model';
+import type { PointsEntry } from '../../types';
 
 /**
  * What opening a trip to the public pays (DEV_SPEC §6.5). The API awards the
  * same 500 from `domain.PointsPerPublish`; mock mode has to say it itself.
  */
 export const POINTS_PER_PUBLISH = 500;
+/** What someone copying your published plan pays (`domain.PointsPerClone`). */
+export const POINTS_PER_CLONE = 260;
+/** What a confirmed booking from your plan pays (`domain.PointsPerBooking`). */
+export const POINTS_PER_BOOKING = 480;
+/** What an invited friend joining their first trip pays. */
+export const POINTS_PER_REFERRAL = 150;
+/** What one extra AI draft costs (`domain.PointsPerAIDraft`). */
+export const POINTS_PER_AI_DRAFT = 300;
+
+/**
+ * The seeded points ledger (M23 — A23.1).
+ *
+ * Written out row by row rather than as a starting balance, because that is
+ * what the feature is: points redeem for money off, so "why do I have 1,240?"
+ * has to have thirteen answers, not one. Newest first, like the API returns.
+ */
+export const POINTS_LEDGER: PointsEntry[] = [
+  entry('rd-1', -400, 'redeem', 'แลกเป็นโค้ดส่วนลด ฿50', null, '2026-08-18T10:12:00.000Z'),
+  entry('pt-1', POINTS_PER_CLONE, 'trip_cloned', 'มีคนคัดลอกทริป', 'demo', '2026-08-14T21:40:00.000Z'),
+  entry('pt-2', POINTS_PER_BOOKING, 'booking_confirmed', 'มีคนจองที่พักจากทริปนี้', 'demo', '2026-08-12T09:22:00.000Z'),
+  entry('pt-3', POINTS_PER_CLONE, 'trip_cloned', 'มีคนคัดลอกทริป', 'demo', '2026-08-09T18:05:00.000Z'),
+  entry('ai-1', -POINTS_PER_AI_DRAFT, 'ai_draft', 'ร่างแพลนด้วย AI เพิ่ม 1 ครั้ง', 'demo', '2026-08-07T14:31:00.000Z'),
+  entry('pt-4', POINTS_PER_CLONE, 'trip_cloned', 'มีคนคัดลอกทริป', 'demo', '2026-08-02T11:58:00.000Z'),
+  entry('rf-1', POINTS_PER_REFERRAL, 'referral', 'มายด์เข้าร่วมทริปแรกจากลิงก์ชวนของคุณ', null, '2026-07-28T08:15:00.000Z'),
+  entry('pt-5', POINTS_PER_CLONE, 'trip_cloned', 'มีคนคัดลอกทริป', 'demo', '2026-07-21T16:44:00.000Z'),
+  entry('pb-1', POINTS_PER_PUBLISH, 'trip_published', 'เปิดทริป "ญี่ปุ่นใบไม้เปลี่ยนสี 2569" เป็นสาธารณะ', 'demo', '2026-07-19T12:00:00.000Z'),
+];
+
+function entry(
+  id: string,
+  delta: number,
+  reason: PointsEntry['reason'],
+  note: string,
+  tripId: string | null,
+  occurredAt: string,
+): PointsEntry {
+  return {
+    id,
+    delta,
+    reason,
+    note,
+    tripId,
+    // The API resolves this from the trip row; the seed knows it outright.
+    tripTitle: tripId === 'demo' ? 'ญี่ปุ่นใบไม้เปลี่ยนสี 2569' : '',
+    occurredAt,
+  };
+}
+
+/** A balance is a SUM of the ledger here for the same reason it is on the API
+ * side: two numbers that must agree are one number too many. */
+export const POINTS_BALANCE = POINTS_LEDGER.reduce((sum, row) => sum + row.delta, 0);
 
 /** The signed-in user of the prototype — ตอง, owner of the demo trip. */
 export const CURRENT_USER = {
@@ -20,8 +72,8 @@ export const CURRENT_USER = {
   name: 'ตอง',
   handle: '@tong',
   characterId: 'shiba',
-  /** ROVE points earned when someone books from a trip they made public. */
-  points: 1_240,
+  /** Earned from published trips, referrals and bookings — see POINTS_LEDGER. */
+  points: POINTS_BALANCE,
   memberSince: '2568',
 };
 

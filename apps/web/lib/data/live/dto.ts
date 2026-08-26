@@ -887,3 +887,65 @@ export interface InvitePreviewDto {
   role: 'editor' | 'viewer';
   expires_at: string;
 }
+
+/* ------------------------------------------- where points came from (M23) - */
+
+export interface PointsEntryDto {
+  id: string;
+  delta: number;
+  reason: string;
+  note: string;
+  trip_id: string | null;
+  trip_title: string;
+  occurred_at: string;
+}
+
+export interface PointsLedgerDto {
+  balance: number;
+  earned: number;
+  entries: PointsEntryDto[];
+  next_cursor: string;
+}
+
+export interface AudienceTripDto {
+  trip_id: string;
+  title: string;
+  slug: string;
+  views: number;
+  clones: number;
+  awarded_clones: number;
+  points_earned: number;
+}
+
+export interface AudienceDto {
+  total_views: number;
+  total_clones: number;
+  points_earned: number;
+  public_trips: number;
+  top_trip_id: string;
+  trips: AudienceTripDto[];
+}
+
+/* ------------------------------------------- platform social proof (M24) - */
+
+export interface PlatformStatsDto {
+  planners: number;
+  public_trips: number;
+  clones: number;
+  reviews: number;
+  average_rating: number;
+  computed_at: string;
+}
+
+export interface PublicReviewDto {
+  trip_id: string;
+  trip_title: string;
+  trip_slug: string;
+  country: string;
+  rating: number;
+  body: string;
+  actual_budget_per_person: number;
+  name: string;
+  character_id: string;
+  created_at: string;
+}

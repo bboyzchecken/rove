@@ -1,27 +1,38 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, FlaskConical, Search } from 'lucide-react';
+import { AlertTriangle, EyeOff, Megaphone, Search } from 'lucide-react';
 import { useState } from 'react';
 
+import { DataTable, type Column } from '@/components/admin/ui/data-table';
+import { StatusPill } from '@/components/admin/ui/status-pill';
 import { SectionHeader, Stat } from '@/components/common/section';
-import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/field';
 import { Progress } from '@/components/ui/progress';
-import { useMe } from '@/features/auth/queries';
+import { usePlatformStats } from '@/features/public/queries';
 import { usePoiSearch } from '@/features/plan/queries';
 import { repo } from '@/lib/data';
+import type { Poi } from '@/lib/data';
+import { missingForPlatformStats, showsPlatformStats } from '@/lib/social-proof';
 
 /**
- * Admin (M13 — W13.1).
+ * The admin overview (M13 — W13.1; rehoused by Phase 5 — W25.4).
  *
- * Four numbers and a POI search, because those are what someone actually opens
- * this page for: is it running, what is the model costing today, and why is
- * that one place wrong. Anything more elaborate is a dashboard nobody reads.
+ * Same questions as before the move — is it running, what is the model costing
+ * today, and why is that one place wrong — rendered on the console's own
+ * surface instead of inside the traveller app's chrome. The POI list is now a
+ * `DataTable` rather than a stack of divs, which is the first user of the
+ * primitive the rest of Phase 5 is built on.
+ *
+ * One section is new, and it is here because Phase 4 put it there: the landing
+ * page's social proof hides itself when the real numbers are too small
+ * (W24.1). That is the correct behaviour and a confusing one to meet from the
+ * outside — "the statistics disappeared from the front page" is a support
+ * ticket unless somebody can see the four numbers and the threshold side by
+ * side. This is that screen.
  */
 export function AdminScreen() {
-  const { data: me } = useMe();
   const { data: stats, isLoading } = useQuery({
     queryKey: ['admin', 'stats'],
     queryFn: () => repo.admin.stats(),
@@ -31,31 +42,19 @@ export function AdminScreen() {
   const [query, setQuery] = useState('');
   const { data: pois = [] } = usePoiSearch(query);
 
-  if (me && !me.isAdmin) {
-    return (
-      // A div, not a <main>: AppShell already opened one around this screen.
-      <div className="px-4 py-16 text-center">
-        <h1 className="font-display text-espresso text-xl font-extrabold">หน้านี้สำหรับแอดมิน</h1>
-        <p className="text-muted mt-2 text-sm">บัญชีนี้ไม่มีสิทธิ์เข้าถึง</p>
-      </div>
-    );
-  }
-
   const costRatio = stats && stats.aiCostCapUsd > 0 ? stats.aiCostTodayUsd / stats.aiCostCapUsd : 0;
 
   return (
-    <div className="space-y-7 px-4 py-5">
+    <div className="space-y-8">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight">
-            แอดมิน
+            ภาพรวมระบบ
           </h1>
-          <p className="text-muted mt-1 text-sm">ตัวเลขรวมของระบบ · รีเฟรชอัตโนมัติทุกนาที</p>
+          <p className="text-muted mt-1 text-sm">รีเฟรชอัตโนมัติทุกนาที</p>
         </div>
-        {stats?.stubbed?.length ? (
-          <Badge tone="sun" size="md" title={stats.stubbed.join(', ')}>
-            <FlaskConical className="size-3.5" /> จำลอง {stats.stubbed.length} บริการ
-          </Badge>
+        {stats?.commit ? (
+          <StatusPill tone="plain">เวอร์ชัน {stats.commit}</StatusPill>
         ) : null}
       </div>
 
@@ -64,26 +63,29 @@ export function AdminScreen() {
       ) : (
         <>
           <section>
-            <SectionHeader label="ภาพรวม" />
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-              <Card accent="sky" className="p-4">
-                <Stat value={stats.users} label="ผู้ใช้" />
+            <SectionHeader label="ตัวเลขรวม" />
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <Card className="p-4">
+                <Stat value={stats.users.toLocaleString('th-TH')} label="ผู้ใช้" />
               </Card>
-              <Card accent="matcha" className="p-4">
-                <Stat value={stats.trips} label="ทริป" />
+              <Card className="p-4">
+                <Stat value={stats.trips.toLocaleString('th-TH')} label="ทริป" />
               </Card>
-              <Card accent="joyfull" className="p-4">
-                <Stat value={stats.pois} label="สถานที่ในฐานข้อมูล" />
+              <Card className="p-4">
+                <Stat value={stats.pois.toLocaleString('th-TH')} label="สถานที่ในฐานข้อมูล" />
               </Card>
-              <Card accent="sun" className="p-4">
-                <Stat value={stats.clicksToday} label="คลิกไปพาร์ตเนอร์วันนี้" />
+              <Card className="p-4">
+                <Stat
+                  value={stats.clicksToday.toLocaleString('th-TH')}
+                  label="คลิกไปพาร์ตเนอร์วันนี้"
+                />
               </Card>
             </div>
           </section>
 
           <section>
             <SectionHeader label="ค่า AI วันนี้" />
-            <Card accent={costRatio >= 0.8 ? 'primary' : 'none'} className="p-4">
+            <Card className="p-4">
               <div className="flex items-end justify-between gap-4">
                 <div>
                   <p className="font-display text-espresso nums text-2xl font-extrabold">
@@ -110,9 +112,11 @@ export function AdminScreen() {
             </Card>
           </section>
 
+          <LandingProofSection />
+
           <section>
             <SectionHeader label="ค้นหาสถานที่" />
-            <label className="mb-2 flex items-center gap-2">
+            <label className="mb-3 flex max-w-md items-center gap-2">
               <Search className="text-muted size-4" />
               <Input
                 value={query}
@@ -121,33 +125,109 @@ export function AdminScreen() {
               />
             </label>
 
-            {pois.length > 0 ? (
-              <Card className="divide-border divide-y">
-                {pois.map((poi) => (
-                  <div key={poi.id} className="flex items-center gap-3 p-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-espresso truncate text-sm font-semibold">{poi.name}</p>
-                      <p className="text-muted text-[11px]">
-                        {poi.city}
-                        {poi.area ? ` · ${poi.area}` : ''} · {poi.category}
-                      </p>
-                    </div>
-                    <span className="text-muted nums shrink-0 text-[11px]">
-                      {poi.lat.toFixed(3)}, {poi.lng.toFixed(3)}
-                    </span>
-                  </div>
-                ))}
-              </Card>
-            ) : query ? (
-              <p className="text-muted text-sm">ไม่พบสถานที่ที่ตรงกับคำค้นนี้</p>
-            ) : null}
+            {query ? (
+              <DataTable
+                rows={pois}
+                columns={POI_COLUMNS}
+                rowKey={(poi) => poi.id}
+                caption="สถานที่ที่ตรงกับคำค้น"
+                empty="ไม่พบสถานที่ที่ตรงกับคำค้นนี้"
+              />
+            ) : (
+              <p className="text-muted text-sm">
+                พิมพ์เพื่อค้นหา — หน้านี้ยังแก้ไขไม่ได้ ฟอร์มแก้ POI มาใน M27
+              </p>
+            )}
           </section>
-
-          <p className="text-muted text-[11px]">
-            เวอร์ชัน <span className="nums">{stats.commit || 'local'}</span>
-          </p>
         </>
       )}
     </div>
+  );
+}
+
+const POI_COLUMNS: Column<Poi>[] = [
+  {
+    key: 'name',
+    header: 'ชื่อ',
+    cell: (poi) => <span className="font-semibold">{poi.name}</span>,
+    sortBy: (poi) => poi.name,
+  },
+  {
+    key: 'city',
+    header: 'เมือง / ย่าน',
+    cell: (poi) => (
+      <span className="text-muted">
+        {poi.city}
+        {poi.area ? ` · ${poi.area}` : ''}
+      </span>
+    ),
+    sortBy: (poi) => `${poi.city} ${poi.area}`,
+  },
+  {
+    key: 'category',
+    header: 'หมวด',
+    cell: (poi) => <StatusPill tone="info">{poi.category}</StatusPill>,
+    sortBy: (poi) => poi.category,
+  },
+  {
+    key: 'coords',
+    header: 'พิกัด',
+    align: 'right',
+    cell: (poi) => (
+      <span className="text-muted text-[11px]">
+        {poi.lat.toFixed(3)}, {poi.lng.toFixed(3)}
+      </span>
+    ),
+  },
+];
+
+/**
+ * Whether the landing page is currently showing its statistics (Phase 4 —
+ * W24.1), and if not, what it is waiting for.
+ *
+ * The rule is that too-small numbers are hidden rather than padded. Read from
+ * the outside that is indistinguishable from a bug, so the console names the
+ * threshold and the gap instead of leaving somebody to guess.
+ */
+function LandingProofSection() {
+  const { data: proof } = usePlatformStats();
+  if (!proof) return null;
+
+  const showing = showsPlatformStats(proof);
+  const missing = missingForPlatformStats(proof);
+
+  return (
+    <section>
+      <SectionHeader label="หลักฐานทางสังคมบนหน้าแรก" />
+      <Card className="p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-espresso flex items-center gap-2 text-sm font-semibold">
+            {showing ? <Megaphone className="size-4" /> : <EyeOff className="size-4" />}
+            {showing ? 'กำลังแสดงบนหน้าแรก' : 'ยังไม่แสดงบนหน้าแรก'}
+          </p>
+          <StatusPill tone={showing ? 'ok' : 'wait'}>
+            {showing ? 'เปิดอยู่' : 'ซ่อนอยู่'}
+          </StatusPill>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <Stat value={proof.planners.toLocaleString('th-TH')} label="คนวางแพลน" />
+          <Stat value={proof.publicTrips.toLocaleString('th-TH')} label="แพลนสาธารณะ" />
+          <Stat value={proof.clones.toLocaleString('th-TH')} label="ครั้งที่ถูกก๊อป" />
+          <Stat
+            value={proof.reviews.toLocaleString('th-TH')}
+            label="รีวิว"
+            hint={proof.averageRating > 0 ? `เฉลี่ย ${proof.averageRating.toFixed(1)} ดาว` : undefined}
+          />
+        </div>
+
+        {missing.length > 0 ? (
+          <p className="text-muted mt-4 text-[11px] leading-relaxed">
+            ต้องมีอีก {missing.join(' และ ')} ถึงจะขึ้นหน้าแรก — ตั้งใจให้ซ่อนไว้จนกว่าตัวเลขจะจริงพอ
+            ไม่ใช่บั๊ก
+          </p>
+        ) : null}
+      </Card>
+    </section>
   );
 }

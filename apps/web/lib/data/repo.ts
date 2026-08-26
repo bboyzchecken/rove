@@ -49,6 +49,10 @@ import type {
   Order,
   ParsedTicket,
   PastTrip,
+  PlatformStats,
+  PointsLedger,
+  PublicReview,
+  AudienceSummary,
   PhotoBookOptions,
   PhotoBookTheme,
   PlanDay,
@@ -357,6 +361,16 @@ export interface ShareRepo {
   adaptPreview(tokenOrSlug: string, input: AdaptInput): Promise<AdaptDiff>;
   /** The same copy with those changes applied. Requires sign-in. */
   cloneAdapted(tokenOrSlug: string, input: AdaptInput): Promise<{ trip: Trip; diff: AdaptDiff }>;
+
+  /**
+   * What the platform has to show for itself (M24 — A24.1 / A24.2).
+   *
+   * Public, and read by the landing page before anybody signs in. Both are
+   * "real numbers or nothing": the caller hides its section rather than
+   * padding a young install's figures.
+   */
+  platformStats(): Promise<PlatformStats>;
+  recentReviews(): Promise<PublicReview[]>;
 }
 
 /**
@@ -432,6 +446,23 @@ export interface RewardRepo {
   redeem(amountThb: number): Promise<DiscountCode>;
   /** What my public plans have earned me, and what has been paid (A12.11). */
   earnings(): Promise<EarningsStatement>;
+
+  /**
+   * Where my points came from and what they went on (M23 — A23.1).
+   *
+   * Paged rather than capped: thirty rows is a screenful, not a history, and
+   * points redeem for money off — a ledger you cannot read to the end is not
+   * a ledger. Pass the previous page's `nextCursor` to continue.
+   */
+  pointsHistory(cursor?: string): Promise<PointsLedger>;
+
+  /**
+   * Who followed my published plans, and what that paid (M23 — A23.2).
+   *
+   * The same views and clones `/u/[handle]` shows to strangers — but per trip,
+   * joined to the points each one earned, and shown to their owner.
+   */
+  audience(): Promise<AudienceSummary>;
 }
 
 /** Handing a trip to a partner agent (A12.12). */

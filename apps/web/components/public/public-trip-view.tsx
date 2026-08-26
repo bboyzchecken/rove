@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bus, Car, Copy, Eye, EyeOff, Footprints, TrainFront, Wand2 } from 'lucide-react';
 
-import { PublicShell } from '@/components/common/public-shell';
+import { BrowseShell } from '@/components/common/browse-shell';
 import { AdaptDialog } from '@/components/public/adapt-dialog';
 import { ReviewLine, ReviewSummaryLine } from '@/components/trip/trip-review';
 import { SectionHeader } from '@/components/common/section';
@@ -29,7 +29,16 @@ import { formatMoney } from '@/lib/format';
  */
 const TRAVEL_ICON = { train: TrainFront, walk: Footprints, bus: Bus, car: Car };
 
-export function PublicTripView({ tokenOrSlug }: { tokenOrSlug: string }) {
+export function PublicTripView({
+  tokenOrSlug,
+  // Defaults to the public frame: `/s/[shareToken]` is an unlisted link that
+  // is usually opened by somebody outside the app, and `/p/[slug]` passes the
+  // real answer.
+  signedIn = false,
+}: {
+  tokenOrSlug: string;
+  signedIn?: boolean;
+}) {
   const { data, isLoading } = usePublicTrip(tokenOrSlug);
   const { data: me } = useMe();
   const cloneTrip = useCloneFromPublic();
@@ -38,18 +47,18 @@ export function PublicTripView({ tokenOrSlug }: { tokenOrSlug: string }) {
 
   if (isLoading) {
     return (
-      <PublicShell>
+      <BrowseShell signedIn={signedIn}>
         <div className="space-y-3 py-8">
           <div className="rounded-brand bg-surface h-40 animate-pulse" />
           <div className="rounded-brand bg-surface h-64 animate-pulse" />
         </div>
-      </PublicShell>
+      </BrowseShell>
     );
   }
 
   if (!data) {
     return (
-      <PublicShell width="focused" center>
+      <BrowseShell signedIn={signedIn} width="focused" center>
         <div className="py-16 text-center">
           <h1 className="font-display text-espresso text-xl font-extrabold">ไม่พบแพลนนี้</h1>
           <p className="text-muted mt-2 text-sm">ลิงก์อาจถูกปิดหรือสร้างใหม่ไปแล้ว</p>
@@ -57,7 +66,7 @@ export function PublicTripView({ tokenOrSlug }: { tokenOrSlug: string }) {
             ไปหน้าสำรวจ
           </ButtonLink>
         </div>
-      </PublicShell>
+      </BrowseShell>
     );
   }
 
@@ -73,7 +82,8 @@ export function PublicTripView({ tokenOrSlug }: { tokenOrSlug: string }) {
   };
 
   return (
-    <PublicShell
+    <BrowseShell
+      signedIn={signedIn}
       actions={
         <>
           <ButtonLink href="/explore" size="sm" variant="ghost">
@@ -246,6 +256,6 @@ export function PublicTripView({ tokenOrSlug }: { tokenOrSlug: string }) {
         tokenOrSlug={tokenOrSlug}
         source={trip}
       />
-    </PublicShell>
+    </BrowseShell>
   );
 }

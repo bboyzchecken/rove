@@ -100,6 +100,23 @@ type TripStore interface {
 	BumpViewCount(ctx context.Context, tripID string) error
 	BumpCloneCount(ctx context.Context, tripID string) error
 	Count(ctx context.Context) (int64, error)
+	// TitlesByIDs resolves a set of trip ids to their titles in one query, so a
+	// points ledger can name its rows instead of printing UUIDs (A23.1).
+	TitlesByIDs(ctx context.Context, ids []string) (map[string]string, error)
+
+	// --- platform totals (A24.1) --------------------------------------------
+	// Four counts behind one cached endpoint. They are separate methods rather
+	// than one struct because each is a different table's question, and the
+	// caller caches the answer anyway.
+
+	// CountPlanners counts people who have actually started a trip — the honest
+	// reading of "คนที่วางแพลนกับ ROVE". Signing up is not planning.
+	CountPlanners(ctx context.Context) (int64, error)
+	// CountPublic counts published plans.
+	CountPublic(ctx context.Context) (int64, error)
+	// CountClones counts trips that were copied from somebody else's, which is
+	// a row that exists rather than a counter that was bumped.
+	CountClones(ctx context.Context) (int64, error)
 
 	// ListPublic feeds /public/explore (A11.2): public trips only, no auth.
 	ListPublic(ctx context.Context, f ExploreFilter) ([]Trip, int64, error)

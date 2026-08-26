@@ -1144,3 +1144,103 @@ export interface CreateLeadInput {
   contactLine?: string;
   note?: string;
 }
+
+/* ------------------------------------------- where points came from (M23) - */
+
+/**
+ * Why the ledger exists at all: points buy discount codes at a published rate
+ * (A12.10), so a balance is a figure with a price on it. "Why do I have 1,240
+ * points?" has to be answerable line by line, and by the person it belongs to.
+ */
+export type PointsReason =
+  | 'referral'
+  | 'booking_confirmed'
+  | 'trip_cloned'
+  | 'trip_published'
+  | 'ai_draft'
+  | 'adjustment'
+  | 'redeem';
+
+export interface PointsEntry {
+  id: string;
+  /** Signed: positive earned it, negative spent it. */
+  delta: number;
+  reason: PointsReason | string;
+  note: string;
+  tripId: string | null;
+  /** Resolved by the API. Empty when the trip is gone — the row still stands. */
+  tripTitle: string;
+  occurredAt: string;
+}
+
+export interface PointsLedger {
+  balance: number;
+  /** Everything ever awarded, ignoring what has since been spent. */
+  earned: number;
+  entries: PointsEntry[];
+  /** Empty when this was the last page. */
+  nextCursor: string;
+}
+
+/** One published plan's reach, from its owner's side (A23.2). */
+export interface AudienceTrip {
+  tripId: string;
+  title: string;
+  slug: string;
+  views: number;
+  clones: number;
+  /** Copies that actually paid out — copying your own trip earns nothing. */
+  awardedClones: number;
+  pointsEarned: number;
+}
+
+/**
+ * "คนตามรอยฉัน" — the numbers `/u/[handle]` has always shown to strangers,
+ * finally shown to the person they belong to (A23.2).
+ */
+export interface AudienceSummary {
+  totalViews: number;
+  totalClones: number;
+  pointsEarned: number;
+  publicTrips: number;
+  /** The plan doing the work, so a card can lead with it. */
+  topTripId: string;
+  trips: AudienceTrip[];
+}
+
+/* ------------------------------------------- platform social proof (M24) - */
+
+/**
+ * What the whole platform has to show for itself (A24.1).
+ *
+ * Real numbers only. A young install returns small ones and the landing page
+ * is expected to hide the section rather than round up — same rule that makes
+ * `CreatorEarningsCard` render nothing until there is something to report.
+ */
+export interface PlatformStats {
+  /** People who started a trip. Signing up is not planning. */
+  planners: number;
+  publicTrips: number;
+  /** Copies of somebody else's plan that still exist. */
+  clones: number;
+  reviews: number;
+  averageRating: number;
+  /** When the API computed these — they are cached, not live. */
+  computedAt: string;
+}
+
+/** A review quoted outside the trip it belongs to (A24.2). */
+export interface PublicReview {
+  tripId: string;
+  tripTitle: string;
+  /** Empty if the trip has since been unpublished; the card then has no link. */
+  tripSlug: string;
+  country: string;
+  rating: number;
+  body: string;
+  /** THB per person. 0 means the reviewer would rather not say. */
+  actualBudgetPerPerson: number;
+  name: string;
+  characterId: string;
+  createdAt: string;
+}

@@ -58,6 +58,10 @@ import type {
   VariantVotesDto,
   ParsedTicketDto,
   PastTripDto,
+  AudienceDto,
+  PlatformStatsDto,
+  PointsLedgerDto,
+  PublicReviewDto,
   PlanDayDto,
   PlanItemDto,
   PlanVersionDto,
@@ -77,7 +81,11 @@ import type {
 import {
   fromBooking,
   toAdaptDiff,
+  toAudienceSummary,
   toDiscountCode,
+  toPlatformStats,
+  toPointsLedger,
+  toPublicReview,
   toEarningsStatement,
   toLead,
   toRedemptionBoard,
@@ -848,6 +856,17 @@ export const liveRepo: RoveRepo = {
       );
       return { trip: toTrip(dto.trip), diff: toAdaptDiff(dto.diff) };
     },
+
+    /* ------------------------------------ platform social proof (M24) -- */
+
+    async platformStats() {
+      return toPlatformStats(await api.get<PlatformStatsDto>('/public/stats'));
+    },
+
+    async recentReviews() {
+      const dto = await api.get<{ items: PublicReviewDto[] }>('/public/reviews/recent');
+      return (dto.items ?? []).map(toPublicReview);
+    },
   },
 
   /* ----------------------------- points out, money owed (M22) -- */
@@ -864,6 +883,20 @@ export const liveRepo: RoveRepo = {
 
     async earnings() {
       return toEarningsStatement(await api.get<EarningsDto>('/users/me/earnings'));
+    },
+
+    /* ------------------------------- where the points came from (M23) -- */
+
+    async pointsHistory(cursor) {
+      return toPointsLedger(
+        await api.get<PointsLedgerDto>('/users/me/points', {
+          searchParams: { cursor: cursor || undefined },
+        }),
+      );
+    },
+
+    async audience() {
+      return toAudienceSummary(await api.get<AudienceDto>('/users/me/audience'));
     },
   },
 

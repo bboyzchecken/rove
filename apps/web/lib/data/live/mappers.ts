@@ -48,6 +48,10 @@ import type {
   Order,
   ParsedTicket,
   PastTrip,
+  AudienceSummary,
+  PlatformStats,
+  PointsLedger,
+  PublicReview,
   PlanDay,
   PlanItem,
   PlanVersion,
@@ -116,6 +120,10 @@ import type {
   OrderDto,
   ParsedTicketDto,
   PastTripDto,
+  AudienceDto,
+  PlatformStatsDto,
+  PointsLedgerDto,
+  PublicReviewDto,
   PlanDayDto,
   RouteDto,
   PlanItemDto,
@@ -1216,4 +1224,70 @@ export function toInvite(dto: InviteDto): InviteLink {
 
 export function toInvitePreview(dto: InvitePreviewDto): InvitePreview {
   return { tripId: dto.trip_id, title: dto.title, role: dto.role, expiresAt: dto.expires_at };
+}
+
+/* ------------------------------------------- where points came from (M23) - */
+
+export function toPointsLedger(dto: PointsLedgerDto): PointsLedger {
+  return {
+    balance: dto.balance ?? 0,
+    earned: dto.earned ?? 0,
+    entries: (dto.entries ?? []).map((entry) => ({
+      id: entry.id,
+      delta: entry.delta,
+      reason: entry.reason,
+      note: entry.note,
+      tripId: entry.trip_id,
+      tripTitle: entry.trip_title ?? '',
+      occurredAt: entry.occurred_at,
+    })),
+    nextCursor: dto.next_cursor ?? '',
+  };
+}
+
+export function toAudienceSummary(dto: AudienceDto): AudienceSummary {
+  return {
+    totalViews: dto.total_views ?? 0,
+    totalClones: dto.total_clones ?? 0,
+    pointsEarned: dto.points_earned ?? 0,
+    publicTrips: dto.public_trips ?? 0,
+    topTripId: dto.top_trip_id ?? '',
+    trips: (dto.trips ?? []).map((trip) => ({
+      tripId: trip.trip_id,
+      title: trip.title,
+      slug: trip.slug ?? '',
+      views: trip.views ?? 0,
+      clones: trip.clones ?? 0,
+      awardedClones: trip.awarded_clones ?? 0,
+      pointsEarned: trip.points_earned ?? 0,
+    })),
+  };
+}
+
+/* ------------------------------------------- platform social proof (M24) - */
+
+export function toPlatformStats(dto: PlatformStatsDto): PlatformStats {
+  return {
+    planners: dto.planners ?? 0,
+    publicTrips: dto.public_trips ?? 0,
+    clones: dto.clones ?? 0,
+    reviews: dto.reviews ?? 0,
+    averageRating: dto.average_rating ?? 0,
+    computedAt: dto.computed_at ?? '',
+  };
+}
+
+export function toPublicReview(dto: PublicReviewDto): PublicReview {
+  return {
+    tripId: dto.trip_id,
+    tripTitle: dto.trip_title,
+    tripSlug: dto.trip_slug ?? '',
+    country: dto.country ?? '',
+    rating: dto.rating,
+    body: dto.body,
+    actualBudgetPerPerson: dto.actual_budget_per_person ?? 0,
+    name: dto.name,
+    characterId: dto.character_id || 'shiba',
+    createdAt: dto.created_at,
+  };
 }
