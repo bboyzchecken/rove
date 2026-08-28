@@ -128,7 +128,7 @@ function MenuRow({
   const body = (
     <>
       <Icon className="text-muted size-4 shrink-0" strokeWidth={2.5} aria-hidden="true" />
-      <span className="text-espresso flex-1 text-sm font-semibold">{label}</span>
+      <span className="text-ink flex-1 text-sm font-medium">{label}</span>
       {hint ? <span className="text-muted nums text-xs">{hint}</span> : null}
       <ChevronRight className="text-muted/60 size-4 shrink-0" />
     </>
@@ -175,7 +175,7 @@ function SignOutRow() {
       className={cn(ROW, 'text-danger disabled:opacity-50')}
     >
       <LogOut className="size-4 shrink-0" strokeWidth={2.5} aria-hidden="true" />
-      <span className="flex-1 text-sm font-semibold">
+      <span className="flex-1 text-sm font-medium">
         {logout.isPending ? 'กำลังออกจากระบบ…' : 'ออกจากระบบ'}
       </span>
     </button>

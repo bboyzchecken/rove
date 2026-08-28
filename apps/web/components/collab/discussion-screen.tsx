@@ -82,13 +82,13 @@ export function DiscussionScreen({ tripId }: { tripId: string }) {
                   <CharacterAvatar characterId={who?.characterId ?? 'shiba'} size="sm" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                      <p className="text-espresso text-sm font-semibold">{who?.name ?? 'สมาชิก'}</p>
+                      <p className="text-ink text-sm font-medium">{who?.name ?? 'สมาชิก'}</p>
                       <span className="text-muted text-[11px]">
                         {new Date(comment.createdAt).toLocaleDateString('th-TH')}
                       </span>
-                      {comment.resolved ? <Badge tone="matcha">จบแล้ว</Badge> : null}
+                      {comment.resolved ? <Badge tone="green">จบแล้ว</Badge> : null}
                     </div>
-                    <p className="text-espresso mt-1 text-sm leading-relaxed">{comment.body}</p>
+                    <p className="text-ink mt-1 text-sm leading-relaxed">{comment.body}</p>
                   </div>
                   <button
                     aria-label={comment.resolved ? 'เปิดใหม่' : 'ทำเครื่องหมายว่าจบแล้ว'}
@@ -117,8 +117,8 @@ export function DiscussionScreen({ tripId }: { tripId: string }) {
             return (
               <div key={entry.id} className="flex items-center gap-3 p-3.5">
                 <CharacterAvatar characterId={who?.characterId ?? 'shiba'} size="sm" />
-                <p className="text-espresso min-w-0 flex-1 text-sm">
-                  <span className="font-semibold">{who?.name ?? 'ROVE'}</span>{' '}
+                <p className="text-ink min-w-0 flex-1 text-sm">
+                  <span className="font-medium">{who?.name ?? 'ROVE'}</span>{' '}
                   <span className="text-muted">{entry.text}</span>
                 </p>
                 <span className="text-muted shrink-0 text-[11px]">

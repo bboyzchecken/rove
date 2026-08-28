@@ -36,7 +36,7 @@ export function ProfileScreen() {
       <div className="flex items-center gap-4">
         <CharacterAvatar characterId={me?.characterId ?? 'shiba'} size="xl" />
         <div className="min-w-0 flex-1">
-          <h1 className="font-display text-espresso truncate text-2xl font-extrabold tracking-tight">
+          <h1 className="font-display text-ink truncate text-2xl font-bold tracking-tight">
             {me?.name ?? '—'}
           </h1>
           <p className="text-muted truncate text-sm">{subtitleOf(me)}</p>
@@ -52,11 +52,11 @@ export function ProfileScreen() {
       </div>
 
       {/* points -------------------------------------------------------- */}
-      <Card accent="sun" className="p-4">
+      <Card accent="yellow" className="p-4">
         <div className="flex items-center justify-between">
           <div>
             <p className="section-label">แต้ม ROVE</p>
-            <p className="font-display text-espresso nums mt-1 text-3xl font-extrabold">
+            <p className="font-display text-ink nums mt-1 text-3xl font-bold">
               {(me?.points ?? 0).toLocaleString('th-TH')}
             </p>
             <p className="text-muted mt-1 text-xs">
@@ -64,7 +64,7 @@ export function ProfileScreen() {
             </p>
             <Link
               href="/points"
-              className="text-espresso mt-2 inline-flex items-center gap-1 text-xs font-semibold hover:underline"
+              className="text-ink mt-2 inline-flex items-center gap-1 text-xs font-medium hover:underline"
             >
               ดูประวัติแต้ม <ChevronRight className="size-3.5" />
             </Link>
@@ -112,14 +112,14 @@ export function ProfileScreen() {
       {/* dreams -------------------------------------------------------- */}
       <section>
         <SectionHeader label="ที่อยากไปสักวัน" />
-        <Card accent="joyfull" className="flex flex-wrap items-center justify-between gap-3 p-4">
+        <Card accent="pink" className="flex flex-wrap items-center justify-between gap-3 p-4">
           <div>
-            <p className="font-display text-espresso font-bold">
+            <p className="font-display text-ink font-bold">
               เก็บไว้แล้ว {dreams.length} อย่าง
             </p>
             <p className="text-muted mt-0.5 text-xs">รายการส่วนตัว เพื่อนในทริปไม่เห็น</p>
           </div>
-          <ButtonLink href="/dreams" size="sm" variant="espresso">
+          <ButtonLink href="/dreams" size="sm" variant="ink">
             เปิดรายการ
           </ButtonLink>
         </Card>
@@ -133,7 +133,7 @@ export function ProfileScreen() {
 
       {/* footer -------------------------------------------------------- */}
       <footer className="text-muted/70 pb-2 text-center text-[11px]">
-        <p className="font-semibold">{env.brandName}</p>
+        <p className="font-medium">{env.brandName}</p>
         <ModeLine />
       </footer>
 

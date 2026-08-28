@@ -91,8 +91,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'font-display rounded-full px-3.5 py-1.5 text-sm font-semibold transition',
-                  isActive(item.href) ? 'bg-espresso text-bg' : 'text-muted hover:bg-surface',
+                  'font-display rounded-full px-3.5 py-1.5 text-sm font-medium transition',
+                  isActive(item.href) ? 'bg-ink text-bg' : 'text-muted hover:bg-surface',
                 )}
               >
                 {item.label}
@@ -127,7 +127,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   className="flex flex-col items-center gap-1 px-2"
                   aria-label={item.label}
                 >
-                  <span className="bg-primary text-primary-fg shadow-warm flex size-9 items-center justify-center rounded-full">
+                  <span className="bg-primary text-primary-fg shadow-float flex size-9 items-center justify-center rounded-full">
                     <Icon className="size-5" strokeWidth={2.5} />
                   </span>
                   <span className="text-muted text-[10px] font-medium">{item.label}</span>

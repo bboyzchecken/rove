@@ -72,7 +72,7 @@ export function TripHeader({ tripId }: { tripId: string }) {
           <button
             type="button"
             onClick={() => setPicking(true)}
-            className="bg-bg/90 text-espresso shadow-warm-sm absolute right-2 bottom-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold"
+            className="bg-bg/90 text-ink shadow-float-sm absolute right-2 bottom-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium"
           >
             <ImageUp className="size-3.5" /> เปลี่ยนรูปปก
           </button>
@@ -86,7 +86,7 @@ export function TripHeader({ tripId }: { tripId: string }) {
               {STATUS_LABEL[trip.status] ?? 'กำลังวางแพลน'}
             </Badge>
             {hasDates ? (
-              <Badge tone="sun" size="md">
+              <Badge tone="yellow" size="md">
                 {trip.nights + 1} วัน {trip.nights} คืน
               </Badge>
             ) : (
@@ -95,7 +95,7 @@ export function TripHeader({ tripId }: { tripId: string }) {
               </Badge>
             )}
           </div>
-          <h1 className="font-display text-espresso text-xl font-extrabold tracking-tight sm:text-2xl">
+          <h1 className="font-display text-ink text-xl font-bold tracking-tight sm:text-2xl">
             {canEdit ? (
               <button
                 type="button"

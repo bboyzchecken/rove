@@ -62,7 +62,7 @@ export function CompareScreen({ tripId }: { tripId: string }) {
       <div className="flex items-center justify-between gap-3">
         <Link
           href={`/t/${tripId}/plan` as never}
-          className="text-muted hover:text-espresso flex items-center gap-1.5 text-sm font-semibold"
+          className="text-muted hover:text-ink flex items-center gap-1.5 text-sm font-medium"
         >
           <ArrowLeft className="size-4" />
           กลับไปที่แพลน
@@ -70,7 +70,7 @@ export function CompareScreen({ tripId }: { tripId: string }) {
 
         {isOwner ? (
           <Button
-            variant={frozen ? 'soft' : 'espresso'}
+            variant={frozen ? 'soft' : 'ink'}
             size="sm"
             onClick={() => freeze.mutate(!frozen)}
             disabled={freeze.isPending}
@@ -82,9 +82,9 @@ export function CompareScreen({ tripId }: { tripId: string }) {
       </div>
 
       {frozen ? (
-        <Card accent="sun" className="flex items-center gap-3 p-4">
-          <Lock className="text-espresso size-4 shrink-0" />
-          <p className="text-espresso text-sm">
+        <Card accent="yellow" className="flex items-center gap-3 p-4">
+          <Lock className="text-ink size-4 shrink-0" />
+          <p className="text-ink text-sm">
             แพลนถูกสรุปแล้ว — แก้ไทม์ไลน์และสลับแพลนไม่ได้จนกว่าเจ้าของทริปจะปลดล็อก
           </p>
         </Card>
@@ -97,11 +97,11 @@ export function CompareScreen({ tripId }: { tripId: string }) {
             {conflicts.map((conflict, i) => (
               <Card
                 key={`${conflict.kind}-${i}`}
-                accent={conflict.severity === 'error' ? 'primary' : 'sun'}
+                accent={conflict.severity === 'error' ? 'primary' : 'yellow'}
                 className="flex items-start gap-3 p-3.5"
               >
-                <AlertTriangle className="text-espresso mt-0.5 size-4 shrink-0" />
-                <p className="text-espresso text-xs leading-relaxed">{conflict.message}</p>
+                <AlertTriangle className="text-ink mt-0.5 size-4 shrink-0" />
+                <p className="text-ink text-xs leading-relaxed">{conflict.message}</p>
               </Card>
             ))}
           </div>
@@ -146,13 +146,13 @@ export function CompareScreen({ tripId }: { tripId: string }) {
 
         {generation.isRunning && generation.job ? (
           <Card className="mt-3 p-4">
-            <p className="text-espresso text-sm font-semibold">{generation.job.step}</p>
-            <Progress value={generation.job.progress} tone="espresso" className="mt-2" />
+            <p className="text-ink text-sm font-medium">{generation.job.step}</p>
+            <Progress value={generation.job.progress} tone="ink" className="mt-2" />
           </Card>
         ) : null}
         {generation.error ? (
           <Card accent="primary" className="mt-3 p-3.5">
-            <p className="text-espresso text-xs">{generation.error}</p>
+            <p className="text-ink text-xs">{generation.error}</p>
           </Card>
         ) : null}
       </section>
@@ -166,7 +166,7 @@ export function CompareScreen({ tripId }: { tripId: string }) {
 
       {variants.length === 0 && !generation.isRunning ? (
         <Card className="p-6 text-center">
-          <p className="text-espresso text-sm font-semibold">ยังไม่มีตัวเลือกให้เทียบ</p>
+          <p className="text-ink text-sm font-medium">ยังไม่มีตัวเลือกให้เทียบ</p>
           <p className="text-muted mt-1 text-xs leading-relaxed">
             ให้ AI ร่าง 2–3 แบบตามจังหวะต่างกัน แล้วชวนเพื่อนมาโหวตว่าไปทางไหนดี
           </p>
@@ -221,11 +221,11 @@ function CompareTable({
       <table className="w-full min-w-[480px] text-left text-xs">
         <thead>
           <tr className="border-border border-b">
-            <th className="text-muted p-3 font-semibold">ตัวชี้วัด</th>
+            <th className="text-muted p-3 font-medium">ตัวชี้วัด</th>
             {columns.map((col, i) => (
               <th
                 key={col.id}
-                className={cn('text-espresso p-3 font-bold', i === 0 && 'text-muted')}
+                className={cn('text-ink p-3 font-bold', i === 0 && 'text-muted')}
               >
                 {col.label}
               </th>
@@ -237,7 +237,7 @@ function CompareTable({
             <tr key={row.key} className="border-border border-b last:border-0">
               <td className="text-muted p-3">{row.label}</td>
               {columns.map((col) => (
-                <td key={col.id} className="text-espresso nums p-3 font-medium">
+                <td key={col.id} className="text-ink nums p-3 font-medium">
                   {row.render(col.metrics)}
                 </td>
               ))}
@@ -276,13 +276,13 @@ function VariantCard({
   };
 
   return (
-    <Card accent={variant.source === 'ai' ? 'sky' : 'joyfull'} className="p-4">
+    <Card accent={variant.source === 'ai' ? 'blue' : 'pink'} className="p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-espresso text-sm font-extrabold">
+          <p className="text-ink text-sm font-bold">
             {variant.label}
             {variant.source === 'fork' ? (
-              <span className="text-muted ml-2 text-[10px] font-semibold">เก็บไว้จากแพลนจริง</span>
+              <span className="text-muted ml-2 text-[10px] font-medium">เก็บไว้จากแพลนจริง</span>
             ) : null}
           </p>
           {variant.keyDecision ? (
@@ -297,8 +297,8 @@ function VariantCard({
             className={cn(
               'flex h-8 items-center gap-1 rounded-full px-2.5 text-xs font-bold transition',
               variant.votes.mine === 1
-                ? 'bg-espresso text-bg'
-                : 'bg-bg/70 text-espresso hover:bg-bg',
+                ? 'bg-ink text-bg'
+                : 'bg-bg/70 text-ink hover:bg-bg',
             )}
           >
             <ThumbsUp className="size-3.5" />
@@ -310,8 +310,8 @@ function VariantCard({
             className={cn(
               'flex h-8 items-center gap-1 rounded-full px-2.5 text-xs font-bold transition',
               variant.votes.mine === -1
-                ? 'bg-espresso text-bg'
-                : 'bg-bg/70 text-espresso hover:bg-bg',
+                ? 'bg-ink text-bg'
+                : 'bg-bg/70 text-ink hover:bg-bg',
             )}
           >
             <ThumbsDown className="size-3.5" />
@@ -325,7 +325,7 @@ function VariantCard({
           {variant.pros.length > 0 ? (
             <ul className="space-y-1">
               {variant.pros.map((pro) => (
-                <li key={pro} className="text-espresso flex items-start gap-1.5 text-xs">
+                <li key={pro} className="text-ink flex items-start gap-1.5 text-xs">
                   <Check className="text-success mt-0.5 size-3 shrink-0" strokeWidth={3} />
                   {pro}
                 </li>
@@ -347,7 +347,7 @@ function VariantCard({
 
       <button
         onClick={() => setShowDays((s) => !s)}
-        className="text-muted hover:text-espresso mt-3 flex items-center gap-1 text-xs font-semibold"
+        className="text-muted hover:text-ink mt-3 flex items-center gap-1 text-xs font-medium"
       >
         {showDays ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
         {showDays ? 'ซ่อนไทม์ไลน์' : `ดูไทม์ไลน์ (${variant.metrics.dayCount} วัน)`}
@@ -357,12 +357,12 @@ function VariantCard({
         <div className="mt-2 space-y-3">
           {variant.days.map((day) => (
             <div key={day.id} className="bg-bg/70 rounded-2xl p-3">
-              <p className="text-espresso text-xs font-bold">
+              <p className="text-ink text-xs font-bold">
                 {day.label} · {day.city}
               </p>
               <ul className="mt-1.5 space-y-1">
                 {day.items.map((item) => (
-                  <li key={item.id} className="text-espresso flex gap-2 text-xs">
+                  <li key={item.id} className="text-ink flex gap-2 text-xs">
                     <span className="text-muted nums w-10 shrink-0">{item.start}</span>
                     {item.title}
                   </li>
@@ -377,7 +377,7 @@ function VariantCard({
         <button
           onClick={() => remove.mutate(variant.id)}
           aria-label="ลบตัวเลือกนี้"
-          className="text-muted hover:text-espresso flex items-center gap-1 text-xs"
+          className="text-muted hover:text-ink flex items-center gap-1 text-xs"
         >
           <Trash2 className="size-3.5" />
           ลบ

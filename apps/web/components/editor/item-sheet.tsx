@@ -140,7 +140,7 @@ function ItemForm({
       <div className="space-y-3.5">
         {!item ? (
           <div>
-            <label className="text-muted mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold">
+            <label className="text-muted mb-1.5 flex items-center gap-1.5 text-[11px] font-medium">
               <Search className="size-3" /> ค้นหาสถานที่
             </label>
             <Input
@@ -161,7 +161,7 @@ function ItemForm({
                       }}
                       className="bg-surface hover:bg-border w-full rounded-2xl p-2.5 text-left"
                     >
-                      <p className="text-espresso text-sm font-semibold">{poi.name}</p>
+                      <p className="text-ink text-sm font-medium">{poi.name}</p>
                       <p className="text-muted text-[11px]">
                         {poi.city}
                         {poi.area ? ` · ${poi.area}` : ''}
@@ -193,8 +193,8 @@ function ItemForm({
                 key={option.key}
                 onClick={() => setType(option.key)}
                 className={cn(
-                  'rounded-full px-3 py-1.5 text-xs font-semibold transition',
-                  type === option.key ? 'bg-espresso text-bg' : 'bg-surface text-muted',
+                  'rounded-full px-3 py-1.5 text-xs font-medium transition',
+                  type === option.key ? 'bg-ink text-bg' : 'bg-surface text-muted',
                 )}
               >
                 {option.label}

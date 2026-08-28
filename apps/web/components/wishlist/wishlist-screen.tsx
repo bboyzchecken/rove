@@ -24,7 +24,7 @@ export function WishlistScreen({ tripId }: { tripId: string }) {
 
       <section>
         <SectionHeader label="สรุปว่าของใครเข้าแพลนแล้วบ้าง" />
-        <Card accent="matcha" className="p-4">
+        <Card accent="green" className="p-4">
           <div className="grid grid-cols-3 gap-4">
             <Stat value={`${coverage?.percent ?? 0}%`} label="เข้าแพลนแล้ว" />
             <Stat
@@ -33,12 +33,12 @@ export function WishlistScreen({ tripId }: { tripId: string }) {
             />
             <Stat value={coverage?.uncovered ?? 0} label="ยังไม่ได้ใส่" />
           </div>
-          <Progress value={(coverage?.percent ?? 0) / 100} tone="espresso" className="mt-4" />
+          <Progress value={(coverage?.percent ?? 0) / 100} tone="ink" className="mt-4" />
 
           {uncovered.length > 0 ? (
             <ul className="mt-3 space-y-1.5">
               {uncovered.map((item) => (
-                <li key={item.id} className="text-espresso flex items-center gap-2 text-xs">
+                <li key={item.id} className="text-ink flex items-center gap-2 text-xs">
                   <CharacterAvatar
                     characterId={
                       members.find((m) => m.id === item.memberId)?.characterId ?? 'shiba'
@@ -56,10 +56,10 @@ export function WishlistScreen({ tripId }: { tripId: string }) {
         </Card>
 
         {pending.length > 0 ? (
-          <Card accent="sun" className="mt-3 flex items-center gap-3 p-3.5">
+          <Card accent="yellow" className="mt-3 flex items-center gap-3 p-3.5">
             <CharacterAvatar characterId={pending[0]!.characterId} size="sm" />
-            <p className="text-espresso flex-1 text-xs leading-relaxed">
-              <span className="font-semibold">{pending.map((m) => m.name).join(', ')}</span>{' '}
+            <p className="text-ink flex-1 text-xs leading-relaxed">
+              <span className="font-medium">{pending.map((m) => m.name).join(', ')}</span>{' '}
               ยังไม่ได้ใส่ที่อยากไป — แพลนอาจไม่มีของเขาเลยสักอย่าง
             </p>
           </Card>

@@ -69,8 +69,8 @@ export function InviteDialog({
               key={option.key}
               onClick={() => setRole(option.key)}
               className={cn(
-                'font-display flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition',
-                role === option.key ? 'bg-espresso text-bg' : 'text-muted',
+                'font-display flex-1 rounded-full px-3 py-1.5 text-xs font-medium transition',
+                role === option.key ? 'bg-ink text-bg' : 'text-muted',
               )}
             >
               {option.label}
@@ -101,18 +101,18 @@ export function InviteDialog({
         </Card>
 
         <div className="flex flex-wrap gap-1.5">
-          <Badge tone="sky">
+          <Badge tone="blue">
             <Link2 className="size-3" /> ใครมีลิงก์ก็เข้าได้
           </Badge>
           {lineIsStubbed ? (
-            <Badge tone="sun">
+            <Badge tone="yellow">
               <MessageCircle className="size-3" /> ยังไม่ส่งแจ้งเตือนเข้า LINE — ส่งลิงก์เอง
             </Badge>
           ) : null}
         </div>
 
         <p className="text-muted text-xs leading-relaxed">
-          พอเพื่อนเข้ามาแล้ว ให้เขาไปแท็บ <strong className="text-espresso">วันเดินทาง</strong>{' '}
+          พอเพื่อนเข้ามาแล้ว ให้เขาไปแท็บ <strong className="text-ink">วันเดินทาง</strong>{' '}
           แล้วแตะวันที่ตัวเองว่าง — ระบบจะหาช่วงที่ทุกคนตรงกันให้เอง
         </p>
       </div>

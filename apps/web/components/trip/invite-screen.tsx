@@ -57,7 +57,7 @@ export function InviteScreen({ token }: { token: string }) {
     return (
       <PublicShell width="focused" center>
         <div className="py-16 text-center">
-          <h1 className="font-display text-espresso text-xl font-extrabold">
+          <h1 className="font-display text-ink text-xl font-bold">
             {previewError instanceof ApiError ? previewError.message : 'ลิงก์เชิญนี้ใช้ไม่ได้แล้ว'}
           </h1>
           <p className="text-muted mt-2 text-sm">ขอลิงก์เชิญใหม่จากเพื่อนที่ชวนมาอีกครั้ง</p>
@@ -81,18 +81,18 @@ export function InviteScreen({ token }: { token: string }) {
 
   return (
     <PublicShell>
-      <h1 className="font-display text-espresso mt-8 text-2xl font-extrabold tracking-tight">
+      <h1 className="font-display text-ink mt-8 text-2xl font-bold tracking-tight">
         เพื่อนชวนคุณเข้าทริป{preview ? ` — ${preview.title}` : ''}
       </h1>
       <p className="text-muted mt-1 text-sm">
         กดเข้าร่วมแล้วใส่วันว่างของตัวเอง — เดี๋ยว ROVE หาวันที่ทุกคนตรงกันให้เอง
       </p>
 
-      <Card accent="sky" className="mt-5 space-y-2.5 p-4">
-        <p className="text-espresso flex items-center gap-2 text-sm">
+      <Card accent="blue" className="mt-5 space-y-2.5 p-4">
+        <p className="text-ink flex items-center gap-2 text-sm">
           <Users className="size-4 shrink-0" /> เข้าห้องเดียวกับเพื่อนที่ชวนมา
         </p>
-        <p className="text-espresso flex items-center gap-2 text-sm">
+        <p className="text-ink flex items-center gap-2 text-sm">
           <CalendarCheck className="size-4 shrink-0" /> ขั้นแรกคือแตะวันที่คุณว่าง
         </p>
       </Card>
@@ -106,7 +106,7 @@ export function InviteScreen({ token }: { token: string }) {
               onClick={() => setCharacter(c.id)}
               className={cn(
                 'rounded-2xl p-1.5 transition',
-                picked === c.id ? 'bg-espresso' : 'bg-surface',
+                picked === c.id ? 'bg-ink' : 'bg-surface',
               )}
               title={c.name}
             >

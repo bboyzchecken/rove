@@ -44,16 +44,16 @@ export function RouteCard({ tripId, editable }: { tripId: string; editable: bool
       <div className="mb-2 flex items-center justify-between">
         <p className="section-label">เส้นทาง</p>
         {editable ? (
-          <button onClick={() => setEditing(true)} className="text-primary text-xs font-semibold">
+          <button onClick={() => setEditing(true)} className="text-primary text-xs font-medium">
             {flights.length > 0 ? 'แก้เที่ยวบิน' : 'ใส่เที่ยวบิน'}
           </button>
         ) : null}
       </div>
 
       {flights.length === 0 ? (
-        <Card accent="sky" className="flex flex-wrap items-center justify-between gap-3 p-4">
+        <Card accent="blue" className="flex flex-wrap items-center justify-between gap-3 p-4">
           <div>
-            <p className="font-display text-espresso font-bold">ยังไม่ได้ใส่เที่ยวบิน</p>
+            <p className="font-display text-ink font-bold">ยังไม่ได้ใส่เที่ยวบิน</p>
             <p className="text-muted mt-0.5 text-xs">
               ใส่สนามบินกับวันบิน แล้ววันเดินทาง จำนวนคืน และประเทศจะถูกตั้งให้อัตโนมัติ
             </p>
@@ -99,12 +99,12 @@ function LegRow({ leg }: { leg: FlightLeg }) {
 
   return (
     <div className="flex items-center gap-3 p-3.5">
-      <span className="bg-surface text-espresso flex size-9 shrink-0 items-center justify-center rounded-2xl">
+      <span className="bg-surface text-ink flex size-9 shrink-0 items-center justify-center rounded-2xl">
         {leg.mode === 'ground' ? <Bus className="size-4" /> : <Plane className="size-4" />}
       </span>
 
       <div className="min-w-0 flex-1">
-        <p className="text-espresso nums flex items-center gap-1.5 text-sm font-bold">
+        <p className="text-ink nums flex items-center gap-1.5 text-sm font-bold">
           {leg.from} <ArrowRight className="text-muted size-3" /> {leg.to}
           {leg.flightNo ? (
             <span className="text-muted text-[11px] font-normal">{leg.flightNo}</span>
@@ -191,7 +191,7 @@ function RouteEditor({
         {route.countries.length > 1 ? (
           <div className="flex flex-wrap gap-1.5">
             {route.countries.map((country) => (
-              <Badge key={country.code} tone="sky">
+              <Badge key={country.code} tone="blue">
                 {flagOf(country.code)} {country.name}
               </Badge>
             ))}

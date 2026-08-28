@@ -22,15 +22,18 @@ export default function OpengraphImage() {
           flexDirection: 'column',
           justifyContent: 'center',
           padding: '72px',
-          background: '#ffffff',
-          color: '#3D2B24',
+          background: '#FFFCF1',
+          color: '#101010',
           fontFamily: 'sans-serif',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 44, fontWeight: 800 }}>
-          <span>R</span>
-          <span style={{ color: '#D9714E' }}>✳</span>
-          <span>VE</span>
+        {/* The wordmark, lowercase with the period in cobalt (§5 Nav). Satori
+            has no access to the app's fonts or CSS variables, so this is the
+            one file where the palette is typed out — keep it in step with
+            styles/brand.css. */}
+        <div style={{ display: 'flex', fontSize: 44, fontWeight: 700, letterSpacing: '-1.3px' }}>
+          <span>rove</span>
+          <span style={{ color: '#3D86C8' }}>.</span>
         </div>
 
         <div
@@ -39,7 +42,7 @@ export default function OpengraphImage() {
             flexDirection: 'column',
             marginTop: 28,
             fontSize: 62,
-            fontWeight: 800,
+            fontWeight: 700,
             lineHeight: 1.15,
             letterSpacing: '-2px',
           }}
@@ -48,13 +51,15 @@ export default function OpengraphImage() {
           <span>โดยไม่ต้องแย่งกันคุมแชท</span>
         </div>
 
-        <div style={{ display: 'flex', marginTop: 26, fontSize: 28, color: '#6B5B4E' }}>
+        <div style={{ display: 'flex', marginTop: 26, fontSize: 28, color: '#5F5E5A' }}>
           หาวันที่ทุกคนว่าง · ให้ AI ร่างแพลน · หารเงินกันจบในที่เดียว
         </div>
 
+        {/* Four bars, one per colour, in the §2.4 order: plan, act, money,
+            people — the product's own sequence, not a swatch row. */}
         <div style={{ display: 'flex', gap: 12, marginTop: 40 }}>
-          {['#D9714E', '#8BC99A', '#A8D4F0', '#F0E06B', '#C4B8E8'].map((color) => (
-            <div key={color} style={{ width: 96, height: 14, borderRadius: 999, background: color }} />
+          {['#F0C045', '#3D86C8', '#54B73C', '#EF91C0'].map((color) => (
+            <div key={color} style={{ width: 110, height: 14, borderRadius: 999, background: color }} />
           ))}
         </div>
       </div>

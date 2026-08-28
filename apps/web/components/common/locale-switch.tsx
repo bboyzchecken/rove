@@ -30,7 +30,7 @@ export function LocaleSwitch() {
 
   return (
     <div>
-      <p className="text-muted mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold">
+      <p className="text-muted mb-1.5 flex items-center gap-1.5 text-[11px] font-medium">
         <Languages className="size-3.5" />
         ภาษา / Language
       </p>
@@ -41,8 +41,8 @@ export function LocaleSwitch() {
             onClick={() => startTransition(() => setLocale(option))}
             disabled={pending || option === locale}
             className={cn(
-              'rounded-full px-3.5 py-1.5 text-xs font-semibold transition',
-              option === locale ? 'bg-espresso text-bg' : 'bg-surface text-muted hover:bg-border',
+              'rounded-full px-3.5 py-1.5 text-xs font-medium transition',
+              option === locale ? 'bg-ink text-bg' : 'bg-surface text-muted hover:bg-border',
             )}
           >
             {LABEL[option] ?? option}
@@ -84,7 +84,7 @@ export function LocaleSwitchCompact({ className }: { className?: string }) {
           aria-current={option === locale}
           className={cn(
             'rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide transition',
-            option === locale ? 'bg-espresso text-bg' : 'text-muted hover:text-espresso',
+            option === locale ? 'bg-ink text-bg' : 'text-muted hover:text-ink',
           )}
         >
           {SHORT[option] ?? option.toUpperCase()}

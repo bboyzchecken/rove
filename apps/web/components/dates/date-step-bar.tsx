@@ -29,9 +29,9 @@ export function DateStepBar({ current }: { current: DateStep }) {
             >
               <span
                 className={cn(
-                  'flex size-5 items-center justify-center rounded-full text-[10px] font-extrabold',
+                  'flex size-5 items-center justify-center rounded-full text-[10px] font-bold',
                   done
-                    ? 'bg-espresso text-bg'
+                    ? 'bg-ink text-bg'
                     : active
                       ? 'bg-primary text-primary-fg'
                       : 'bg-surface text-muted',
@@ -41,7 +41,7 @@ export function DateStepBar({ current }: { current: DateStep }) {
               </span>
               <span
                 className={cn(
-                  'text-[11px] font-semibold whitespace-nowrap',
+                  'text-[11px] font-medium whitespace-nowrap',
                   active ? 'text-primary' : done ? 'text-muted' : 'text-muted/60',
                 )}
               >

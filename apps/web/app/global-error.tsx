@@ -18,14 +18,14 @@ export default function GlobalError({
     <html lang="th">
       <body className="min-h-dvh antialiased">
         <main className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-4 px-4 text-center">
-          <h1 className="text-espresso text-2xl font-extrabold tracking-tight">แอปโหลดไม่ขึ้น</h1>
+          <h1 className="text-ink text-2xl font-bold tracking-tight">แอปโหลดไม่ขึ้น</h1>
           <p className="text-muted text-sm leading-relaxed">
             เกิดข้อผิดพลาดตั้งแต่ตอนเริ่มโหลดหน้า ลองรีเฟรชอีกครั้ง
             ถ้ายังไม่ได้ให้ปิดแท็บแล้วเปิดใหม่
           </p>
           <button
             onClick={reset}
-            className="bg-primary text-primary-fg h-11 rounded-full px-6 text-sm font-semibold"
+            className="bg-primary text-primary-fg h-11 rounded-full px-6 text-sm font-medium"
           >
             ลองใหม่
           </button>

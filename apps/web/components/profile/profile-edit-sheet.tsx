@@ -138,9 +138,9 @@ function EditForm({ me, onDone }: { me: CurrentUser; onDone: () => void }) {
               onClick={() => setCurrency(c.code)}
               aria-pressed={currency === c.code}
               className={cn(
-                'rounded-full px-3 py-1.5 text-xs font-semibold transition',
+                'rounded-full px-3 py-1.5 text-xs font-medium transition',
                 currency === c.code
-                  ? 'bg-espresso text-bg'
+                  ? 'bg-ink text-bg'
                   : 'bg-surface text-muted hover:bg-border',
               )}
             >
@@ -155,7 +155,7 @@ function EditForm({ me, onDone }: { me: CurrentUser; onDone: () => void }) {
       </div>
 
       {updateMe.isError ? (
-        <p className="text-danger text-xs font-semibold" role="alert">
+        <p className="text-danger text-xs font-medium" role="alert">
           {updateMe.error instanceof Error
             ? updateMe.error.message
             : 'บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง'}

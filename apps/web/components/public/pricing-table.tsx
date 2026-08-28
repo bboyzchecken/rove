@@ -32,13 +32,13 @@ export function PricingTable() {
             accent={highlighted ? 'primary' : undefined}
             className={cn(
               'flex h-full flex-col p-5',
-              highlighted && 'shadow-warm-lg sm:scale-[1.04] sm:py-7',
+              highlighted && 'shadow-float-lg sm:scale-[1.04] sm:py-7',
             )}
           >
             <div className="flex items-start justify-between gap-2">
-              <p className="font-display text-espresso text-lg font-extrabold">{plan.name}</p>
+              <p className="font-display text-ink text-lg font-bold">{plan.name}</p>
               {highlighted ? (
-                <Badge tone="matcha" size="md">
+                <Badge tone="green" size="md">
                   ที่คนส่วนใหญ่ใช้
                 </Badge>
               ) : plan.available ? null : (
@@ -48,7 +48,7 @@ export function PricingTable() {
               )}
             </div>
 
-            <p className="font-display text-espresso nums mt-2 text-3xl font-extrabold">
+            <p className="font-display text-ink nums mt-2 text-3xl font-bold">
               {planPriceLabel(plan)}
             </p>
             <p className="text-muted mt-1.5 text-xs leading-relaxed">{plan.tagline}</p>
@@ -68,7 +68,7 @@ export function PricingTable() {
                 condition of the sale (W26.3). */}
             {plan.refundableOnBooking ? (
               <div className="border-border mt-4 border-t pt-3.5">
-                <p className="text-espresso flex items-start gap-2 text-xs leading-relaxed font-semibold">
+                <p className="text-ink flex items-start gap-2 text-xs leading-relaxed font-medium">
                   <RotateCcw className="text-primary mt-px size-3.5 shrink-0" aria-hidden="true" />
                   <span>จองผ่าน ROVE แล้วคืนให้เต็มจำนวน — เท่ากับไม่ได้จ่ายค่าวางแผนเลย</span>
                 </p>

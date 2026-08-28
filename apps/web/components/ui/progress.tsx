@@ -2,11 +2,11 @@ import { cn } from '@/lib/utils';
 
 const FILL = {
   primary: 'bg-primary',
-  matcha: 'bg-matcha',
-  sky: 'bg-sky',
-  sun: 'bg-sun',
-  joyfull: 'bg-joyfull',
-  espresso: 'bg-espresso',
+  green: 'bg-green',
+  blue: 'bg-blue',
+  yellow: 'bg-yellow',
+  pink: 'bg-pink',
+  ink: 'bg-ink',
 } as const;
 
 /** Coverage %, budget used, packing progress — one bar, used everywhere. */

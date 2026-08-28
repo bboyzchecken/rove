@@ -442,7 +442,7 @@ export interface DestinationDto {
   cities: string[];
   subtitle: string;
   pill: string;
-  accent: 'primary' | 'matcha' | 'sky' | 'sun' | 'joyfull';
+  accent: 'primary' | 'green' | 'blue' | 'yellow' | 'pink';
   budget_min_thb: number;
   budget_max_thb: number;
   reason: string;
@@ -509,7 +509,7 @@ export interface PlanVersionDto {
 export interface BudgetLineDto {
   category: string;
   icon: string;
-  accent: 'primary' | 'matcha' | 'sky' | 'sun' | 'joyfull';
+  accent: 'primary' | 'green' | 'blue' | 'yellow' | 'pink';
   total_jpy: number;
   per_person_jpy: number;
   prepaid: boolean;
@@ -744,7 +744,7 @@ export interface DreamDto {
   destination: string;
   note: string | null;
   url: string | null;
-  accent: 'primary' | 'matcha' | 'sky' | 'sun' | 'joyfull';
+  accent: 'primary' | 'green' | 'blue' | 'yellow' | 'pink';
 }
 
 export interface CoverageDto {

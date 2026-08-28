@@ -53,7 +53,7 @@ const DECISION_ICON: Record<RecapDecisionKind, typeof CalendarCheck> = {
   vote: ThumbsUp,
 };
 
-const SPEND_ACCENT = ['bg-primary', 'bg-matcha', 'bg-sky', 'bg-sun', 'bg-joyfull'] as const;
+const SPEND_ACCENT = ['bg-primary', 'bg-green', 'bg-blue', 'bg-yellow', 'bg-pink'] as const;
 
 export function TripRecapScreen({ tripId }: { tripId: string }) {
   const { data: recap, isLoading } = useTripRecap(tripId);
@@ -103,7 +103,7 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
       <TripCover src={recap.cover} frame="banner" priority>
         <Link
           href="/trips"
-          className="bg-bg/90 text-espresso absolute top-4 left-4 flex size-9 items-center justify-center rounded-full"
+          className="bg-bg/90 text-ink absolute top-4 left-4 flex size-9 items-center justify-center rounded-full"
           aria-label="กลับไปหน้าทริปของฉัน"
         >
           <ChevronLeft className="size-5" />
@@ -115,12 +115,12 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
           <div className="mb-1.5 flex flex-wrap items-center gap-2">
             <Badge tone="neutral">จบทริปแล้ว</Badge>
             {isPublic ? (
-              <Badge tone="matcha">
+              <Badge tone="green">
                 <Globe className="size-3" /> เปิดสาธารณะ
               </Badge>
             ) : null}
           </div>
-          <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight">
+          <h1 className="font-display text-ink text-2xl font-bold tracking-tight">
             {recap.title}
           </h1>
           <p className="text-muted mt-1 text-sm">
@@ -147,8 +147,8 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
       {/* ------------------------------------------------------ publish */}
       <section className="px-4">
         {isPublic ? (
-          <Card accent="matcha" className="p-4">
-            <p className="font-display text-espresso font-bold">ทริปนี้เปิดสาธารณะอยู่</p>
+          <Card accent="green" className="p-4">
+            <p className="font-display text-ink font-bold">ทริปนี้เปิดสาธารณะอยู่</p>
             <p className="text-muted mt-1 text-xs">
               ทุกครั้งที่มีคนก๊อปแพลนนี้ไปแล้วจองตาม คุณได้แต้มเพิ่ม —
               เอาไปเป็นส่วนลดตอนจองทริปหน้าได้
@@ -172,13 +172,13 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
             </p>
           </Card>
         ) : recap.canPublish ? (
-          <Card accent="sun" className="p-4">
+          <Card accent="yellow" className="p-4">
             <div className="flex items-start gap-3">
               <span className="bg-bg text-primary flex size-9 shrink-0 items-center justify-center rounded-2xl">
                 <Sparkles className="size-4" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="font-display text-espresso font-bold">
+                <p className="font-display text-ink font-bold">
                   เปิดทริปนี้เป็นสาธารณะ รับ {recap.pointsPerPublish.toLocaleString('th-TH')} แต้ม
                 </p>
                 <p className="text-muted mt-1 text-xs">
@@ -217,8 +217,8 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
                     <Icon className="size-4" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-espresso text-xs font-bold">{decision.title}</p>
-                    <p className="text-espresso/90 mt-0.5 text-sm">{decision.detail}</p>
+                    <p className="text-ink text-xs font-bold">{decision.title}</p>
+                    <p className="text-ink/90 mt-0.5 text-sm">{decision.detail}</p>
                     {who ? <p className="text-muted mt-1 text-[11px]">โดย {who.name}</p> : null}
                   </div>
                 </div>
@@ -236,7 +236,7 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
             {recap.itinerary.map((day) => (
               <Card key={day.id} className="p-3.5">
                 <div className="flex items-baseline justify-between gap-3">
-                  <p className="text-espresso text-sm font-bold">{day.label}</p>
+                  <p className="text-ink text-sm font-bold">{day.label}</p>
                   <span className="text-muted text-[11px]">{day.city}</span>
                 </div>
                 <ul className="mt-2 space-y-1.5">
@@ -245,7 +245,7 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
                       <span className="text-muted nums w-10 shrink-0 text-[11px]">
                         {item.start}
                       </span>
-                      <span className="text-espresso min-w-0 flex-1 text-sm">{item.title}</span>
+                      <span className="text-ink min-w-0 flex-1 text-sm">{item.title}</span>
                       {item.area ? (
                         <span className="text-muted shrink-0 text-[11px]">{item.area}</span>
                       ) : null}
@@ -267,8 +267,8 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
               {recap.spending.map((line, i) => (
                 <li key={line.category}>
                   <div className="flex items-baseline justify-between gap-3">
-                    <span className="text-espresso text-sm">{line.category}</span>
-                    <span className="text-espresso nums text-sm font-semibold">
+                    <span className="text-ink text-sm">{line.category}</span>
+                    <span className="text-ink nums text-sm font-medium">
                       {formatMoney(line.amountThb, 'THB')}
                     </span>
                   </div>
@@ -304,8 +304,8 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
             {recap.activity.slice(0, 12).map((event) => {
               const who = recap.members.find((m) => m.id === event.memberId);
               return (
-                <p key={event.id} className="text-espresso p-3 text-xs">
-                  <span className="font-semibold">{who?.name ?? 'สมาชิก'}</span>{' '}
+                <p key={event.id} className="text-ink p-3 text-xs">
+                  <span className="font-medium">{who?.name ?? 'สมาชิก'}</span>{' '}
                   <span className="text-muted">{event.text}</span>
                 </p>
               );

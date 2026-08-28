@@ -1,5 +1,6 @@
 import Image from 'next/image';
 
+import { Spiral } from '@/components/brand/doodle';
 import { BackHome, PublicShell } from '@/components/common/public-shell';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -22,7 +23,7 @@ export function StatusPage({
   image: string;
   /** HTTP-ish code shown as a chip — omit for states that have no code. */
   code?: string;
-  tone?: 'neutral' | 'primary' | 'sun';
+  tone?: 'neutral' | 'primary' | 'yellow';
   title: string;
   hint: React.ReactNode;
   actions?: React.ReactNode;
@@ -31,7 +32,7 @@ export function StatusPage({
 }) {
   return (
     <PublicShell width="focused" center actions={<BackHome />}>
-      <div className="flex flex-col items-center py-10 text-center">
+      <div className="relative flex flex-col items-center py-10 text-center">
         <Image
           src={image}
           alt=""
@@ -40,6 +41,10 @@ export function StatusPage({
           priority
           className="mb-4 size-52 object-contain"
         />
+        {/* One mark, and a spiral because a dead end is the one screen where
+            "still going" is the wrong message and "you have wandered off" is
+            the right one (§4.2). */}
+        <Spiral className="text-border absolute top-16 right-6 hidden size-12 sm:block" />
 
         {code ? (
           <Badge tone={tone} size="md" className="nums mb-3">
@@ -47,10 +52,8 @@ export function StatusPage({
           </Badge>
         ) : null}
 
-        <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight text-balance">
-          {title}
-        </h1>
-        <p className="text-muted mt-2 text-sm leading-relaxed">{hint}</p>
+        <h1 className="t-h2 text-ink text-balance">{title}</h1>
+        <p className="text-muted t-small mt-2">{hint}</p>
 
         {actions ? <div className={cn('mt-6 flex w-full flex-col gap-2')}>{actions}</div> : null}
 

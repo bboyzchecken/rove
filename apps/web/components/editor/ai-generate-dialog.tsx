@@ -141,19 +141,19 @@ export function AiGenerateDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
       <button
-        className="bg-espresso/40 absolute inset-0 backdrop-blur-[2px]"
+        className="bg-ink/40 absolute inset-0 backdrop-blur-[2px]"
         onClick={onClose}
         aria-label="ปิด"
       />
 
-      <div className="bg-bg rounded-t-brand-lg sm:rounded-brand-lg shadow-warm-lg animate-rove-rise relative z-10 max-h-[90dvh] w-full max-w-lg overflow-y-auto p-5 pb-8 sm:pb-5">
+      <div className="bg-bg rounded-t-brand-lg sm:rounded-brand-lg shadow-float-lg animate-rove-rise relative z-10 max-h-[90dvh] w-full max-w-lg overflow-y-auto p-5 pb-8 sm:pb-5">
         <div className="mb-4 flex items-start justify-between">
           <div className="flex items-center gap-2.5">
             <RoveMark
               className={cn('text-primary size-6', draft.isRunning && 'animate-rove-spin')}
             />
             <div>
-              <p className="font-display text-espresso font-bold">
+              <p className="font-display text-ink font-bold">
                 {draft.isDone
                   ? 'ร่างแพลนเสร็จแล้ว'
                   : draft.isRunning
@@ -186,12 +186,12 @@ export function AiGenerateDialog({
             unmounted by the event it is confirming — and the receipt would be
             gone before anyone read its number. */}
         {purchaseNote && !job ? (
-          <Card accent="matcha" className="mb-4 p-3.5">
-            <p className="text-espresso text-xs leading-relaxed">{purchaseNote}</p>
+          <Card accent="green" className="mb-4 p-3.5">
+            <p className="text-ink text-xs leading-relaxed">{purchaseNote}</p>
             {receipt ? (
               <Link
                 href={`/billing/${receipt.id}`}
-                className="text-primary mt-1.5 inline-flex items-center gap-1.5 text-[11px] font-semibold"
+                className="text-primary mt-1.5 inline-flex items-center gap-1.5 text-[11px] font-medium"
               >
                 <ReceiptText className="size-3.5" />
                 ดูใบเสร็จ {receipt.number}
@@ -217,8 +217,8 @@ export function AiGenerateDialog({
                     key={option.key}
                     onClick={() => setPace(option.key)}
                     className={cn(
-                      'flex-1 rounded-full px-3 py-2 text-xs font-semibold transition',
-                      pace === option.key ? 'bg-espresso text-bg' : 'bg-surface text-muted',
+                      'flex-1 rounded-full px-3 py-2 text-xs font-medium transition',
+                      pace === option.key ? 'bg-ink text-bg' : 'bg-surface text-muted',
                     )}
                   >
                     {option.label}
@@ -239,7 +239,7 @@ export function AiGenerateDialog({
             </label>
 
             {aiIsStubbed ? (
-              <Badge tone="sun" size="md">
+              <Badge tone="yellow" size="md">
                 ตอนนี้ใช้ร่างตัวอย่าง ยังไม่ได้เรียกโมเดลจริง
               </Badge>
             ) : null}
@@ -263,22 +263,22 @@ export function AiGenerateDialog({
                 that decides it (W26.2 / W26.3). */}
             <Card accent="primary" className="p-4">
               <div className="flex items-baseline justify-between gap-3">
-                <p className="font-display text-espresso text-lg font-extrabold">Trip Pass</p>
-                <p className="font-display text-espresso nums text-2xl font-extrabold">
+                <p className="font-display text-ink text-lg font-bold">Trip Pass</p>
+                <p className="font-display text-ink nums text-2xl font-bold">
                   {formatMoney(passPrice, 'THB')}
                 </p>
               </div>
 
               <ul className="mt-3 space-y-2">
                 <PassPoint icon={<Sparkles className="size-4" />}>
-                  ให้ AI ร่างและปรับแพลนได้ <strong className="text-espresso">ไม่จำกัด</strong> ในทริปนี้
+                  ให้ AI ร่างและปรับแพลนได้ <strong className="text-ink">ไม่จำกัด</strong> ในทริปนี้
                 </PassPoint>
                 <PassPoint icon={<Users className="size-4" />}>
-                  ปลดล็อกให้ <strong className="text-espresso">ทั้งห้อง</strong> — หารกันแล้วคนละ{' '}
+                  ปลดล็อกให้ <strong className="text-ink">ทั้งห้อง</strong> — หารกันแล้วคนละ{' '}
                   <span className="nums">{formatMoney(perPerson, 'THB')}</span>
                 </PassPoint>
                 <PassPoint icon={<RotateCcw className="size-4" />}>
-                  จองผ่าน ROVE แล้ว <strong className="text-espresso">คืนให้เต็มจำนวน</strong> —
+                  จองผ่าน ROVE แล้ว <strong className="text-ink">คืนให้เต็มจำนวน</strong> —
                   เท่ากับไม่ได้จ่ายค่าวางแผนเลย
                 </PassPoint>
               </ul>
@@ -289,7 +289,7 @@ export function AiGenerateDialog({
                 be accepted is the failure this row prevents. */}
             {channels.length > 0 ? (
               <div className="mt-2.5" role="radiogroup" aria-label="ช่องทางชำระเงิน">
-                <p className="text-muted mb-1.5 text-[11px] font-semibold">ช่องทางชำระเงิน</p>
+                <p className="text-muted mb-1.5 text-[11px] font-medium">ช่องทางชำระเงิน</p>
                 <div className="flex flex-wrap gap-1.5">
                   {channels.map((option) => (
                     <button
@@ -299,9 +299,9 @@ export function AiGenerateDialog({
                       aria-checked={option.id === channel?.id}
                       onClick={() => setChannelId(option.id)}
                       className={cn(
-                        'rounded-full px-3 py-1.5 text-[11px] font-semibold transition',
+                        'rounded-full px-3 py-1.5 text-[11px] font-medium transition',
                         option.id === channel?.id
-                          ? 'bg-espresso text-bg'
+                          ? 'bg-ink text-bg'
                           : 'bg-surface text-muted hover:bg-border/60',
                       )}
                     >
@@ -339,11 +339,11 @@ export function AiGenerateDialog({
               คืนเป็นเครดิตเต็มจำนวนเมื่อมีการจองผ่าน ROVE จากทริปนี้ · คืนหนึ่งครั้งต่อทริป
             </p>
 
-            <Card accent="matcha" className="mt-3 p-4">
+            <Card accent="green" className="mt-3 p-4">
               <div className="flex items-start gap-3">
-                <Gift className="text-espresso mt-0.5 size-5 shrink-0" />
+                <Gift className="text-ink mt-0.5 size-5 shrink-0" />
                 <div>
-                  <p className="text-espresso text-sm font-semibold">สะสมแต้มไว้ลดค่า Trip Pass</p>
+                  <p className="text-ink text-sm font-medium">สะสมแต้มไว้ลดค่า Trip Pass</p>
                   <p className="text-muted mt-1 text-xs leading-relaxed">
                     ชวนเพื่อนมาใช้ ROVE ได้ {POINTS_PER_REFERRAL} แต้มต่อคน
                     และได้อีกทุกครั้งที่มีคนจองตามทริปที่คุณเปิดสาธารณะไว้ ·
@@ -358,7 +358,7 @@ export function AiGenerateDialog({
         {/* ----------------------------------------------------- progress */}
         {job && !draft.isDone ? (
           <>
-            <Badge tone={(freeAtStart ?? 0) > 0 ? 'matcha' : 'primary'} size="md" className="mb-3">
+            <Badge tone={(freeAtStart ?? 0) > 0 ? 'green' : 'primary'} size="md" className="mb-3">
               {(freeAtStart ?? 0) > 0
                 ? `ร่างรอบนี้ใช้สิทธิ์ฟรี · เหลืออีก ${freeLeft} ครั้ง`
                 : 'ร่างรอบนี้ใช้สิทธิ์ที่ซื้อไว้'}
@@ -370,7 +370,7 @@ export function AiGenerateDialog({
                 style={{ width: `${steps}%` }}
               />
             </div>
-            <p className="text-espresso mt-3 flex items-center gap-2 text-sm font-medium">
+            <p className="text-ink mt-3 flex items-center gap-2 text-sm font-medium">
               <span className="bg-primary text-primary-fg flex size-6 items-center justify-center rounded-full text-[10px] font-bold">
                 {Math.max(1, Math.round(job.progress * 5))}
               </span>
@@ -383,7 +383,7 @@ export function AiGenerateDialog({
         {/* --------------------------------------------------------- done */}
         {draft.isDone && job?.result ? (
           <div className="animate-rove-rise mt-1">
-            <Badge tone="matcha" size="md" className="mb-3">
+            <Badge tone="green" size="md" className="mb-3">
               <Check className="size-3.5" /> ร่างเสร็จแล้ว
             </Badge>
 
@@ -393,7 +393,7 @@ export function AiGenerateDialog({
             <ul className="space-y-2">
               {job.result.openQuestions.map((question) => (
                 <li key={question} className="bg-surface rounded-brand-sm p-3">
-                  <p className="text-espresso text-xs leading-relaxed">{question}</p>
+                  <p className="text-ink text-xs leading-relaxed">{question}</p>
                 </li>
               ))}
             </ul>

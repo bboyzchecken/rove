@@ -56,8 +56,8 @@ export function ExpenseBoard({ tripId, fxRate }: { tripId: string; fxRate: numbe
             key={key}
             onClick={() => setScope(key)}
             className={cn(
-              'rounded-full px-3.5 py-1.5 text-xs font-semibold transition',
-              scope === key ? 'bg-espresso text-bg' : 'bg-surface text-muted',
+              'rounded-full px-3.5 py-1.5 text-xs font-medium transition',
+              scope === key ? 'bg-ink text-bg' : 'bg-surface text-muted',
             )}
           >
             {label}
@@ -81,8 +81,8 @@ export function ExpenseBoard({ tripId, fxRate }: { tripId: string; fxRate: numbe
 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <p className="text-espresso truncate text-sm font-semibold">{entry.title}</p>
-                    {entry.scope === 'personal' ? <Badge tone="joyfull">ส่วนตัว</Badge> : null}
+                    <p className="text-ink truncate text-sm font-medium">{entry.title}</p>
+                    {entry.scope === 'personal' ? <Badge tone="pink">ส่วนตัว</Badge> : null}
                   </div>
                   <p className="text-muted mt-0.5 text-[11px]">
                     {nameOf(entry.paidBy)} จ่าย · {formatThaiDate(entry.date, { year: undefined })}{' '}
@@ -102,7 +102,7 @@ export function ExpenseBoard({ tripId, fxRate }: { tripId: string; fxRate: numbe
                 </div>
 
                 <div className="shrink-0 text-right">
-                  <p className="text-espresso nums text-sm font-bold">{formatMoney(thb, 'THB')}</p>
+                  <p className="text-ink nums text-sm font-bold">{formatMoney(thb, 'THB')}</p>
                   {entry.currency === 'JPY' ? (
                     <p className="text-muted nums text-[10px]">
                       ¥{entry.amount.toLocaleString('en-US')}
@@ -229,8 +229,8 @@ function AddExpenseForm({
                   key={option}
                   onClick={() => setCurrency(option)}
                   className={cn(
-                    'rounded-full px-3 py-1.5 text-xs font-semibold transition',
-                    currency === option ? 'bg-espresso text-bg' : 'text-muted',
+                    'rounded-full px-3 py-1.5 text-xs font-medium transition',
+                    currency === option ? 'bg-ink text-bg' : 'text-muted',
                   )}
                 >
                   {option}
@@ -268,8 +268,8 @@ function AddExpenseForm({
                 key={key}
                 onClick={() => setScope(key)}
                 className={cn(
-                  'flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition',
-                  scope === key ? 'bg-espresso text-bg' : 'text-muted',
+                  'flex-1 rounded-full px-3 py-1.5 text-xs font-medium transition',
+                  scope === key ? 'bg-ink text-bg' : 'text-muted',
                 )}
               >
                 {label}
@@ -286,8 +286,8 @@ function AddExpenseForm({
                 key={member.id}
                 onClick={() => setPaidBy(member.id)}
                 className={cn(
-                  'flex items-center gap-1.5 rounded-full py-1 pr-3 pl-1 text-xs font-semibold transition',
-                  paidBy === member.id ? 'bg-espresso text-bg' : 'bg-surface text-muted',
+                  'flex items-center gap-1.5 rounded-full py-1 pr-3 pl-1 text-xs font-medium transition',
+                  paidBy === member.id ? 'bg-ink text-bg' : 'bg-surface text-muted',
                 )}
               >
                 <CharacterAvatar characterId={member.characterId} size="xs" />
@@ -314,7 +314,7 @@ function AddExpenseForm({
                       )
                     }
                     className={cn(
-                      'flex items-center gap-1.5 rounded-full py-1 pr-3 pl-1 text-xs font-semibold transition',
+                      'flex items-center gap-1.5 rounded-full py-1 pr-3 pl-1 text-xs font-medium transition',
                       on ? 'bg-primary/12 text-primary' : 'bg-surface text-muted opacity-60',
                     )}
                   >

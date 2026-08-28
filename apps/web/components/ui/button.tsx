@@ -3,21 +3,34 @@ import { cva, type VariantProps } from 'class-variance-authority';
 
 import { cn } from '@/lib/utils';
 
+/**
+ * ROVE_BRAND_SPEC §5 Buttons. Always fully round, never a rounded rectangle.
+ *
+ *   primary  blue fill, white type — the action, per §2.4's colour lock
+ *   ink      ink fill, cream type — the nav CTA, and nothing else
+ *   outline  transparent with a 1.5px ink line, the secondary next to primary
+ *   soft     a quiet control inside an already-busy card
+ *   ghost    a control that should not look like one until you reach for it
+ *
+ * White on blue is the one place §2.5 permits white type on colour, and only
+ * because a button's label is bold and never below 14px.
+ */
 const button = cva(
-  'font-display inline-flex items-center justify-center gap-2 rounded-full font-semibold transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50',
+  'font-display inline-flex items-center justify-center gap-2 rounded-full font-medium transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
-        primary: 'bg-primary text-primary-fg hover:bg-primary/90',
-        espresso: 'bg-espresso text-bg hover:bg-espresso/90',
-        soft: 'bg-surface text-espresso hover:bg-border',
-        outline: 'border-border text-espresso hover:bg-surface border bg-transparent',
-        ghost: 'text-muted hover:bg-surface',
+        primary: 'bg-primary text-primary-fg hover:bg-blue-mid',
+        ink: 'bg-ink text-bg hover:bg-ink/90',
+        soft: 'bg-surface border-border text-ink hover:bg-border/50 border',
+        outline: 'text-ink border-ink hover:bg-ink/5 border-[1.5px] bg-transparent',
+        ghost: 'text-muted hover:bg-ink/5',
       },
       size: {
         sm: 'h-9 px-4 text-sm',
-        md: 'h-11 px-5 text-sm',
-        lg: 'h-13 px-7 text-base',
+        /** §5's 12px/24px. */
+        md: 'h-11 px-6 text-sm',
+        lg: 'h-13 px-8 text-base',
       },
       block: { true: 'w-full', false: '' },
     },

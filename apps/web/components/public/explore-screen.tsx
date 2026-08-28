@@ -70,7 +70,7 @@ export function ExploreScreen({ signedIn }: { signedIn: boolean }) {
         </ButtonLink>
       }
     >
-      <h1 className="font-display text-espresso mt-6 text-2xl font-extrabold tracking-tight">
+      <h1 className="font-display text-ink mt-6 text-2xl font-bold tracking-tight">
         ตามรอยทริปที่คนไปมาแล้วจริงๆ
       </h1>
       <p className="text-muted mt-1 text-sm">
@@ -101,10 +101,10 @@ export function ExploreScreen({ signedIn }: { signedIn: boolean }) {
                 setPages(1);
               }}
               className={cn(
-                'font-display rounded-full px-3.5 py-1.5 text-sm font-semibold whitespace-nowrap transition',
+                'font-display rounded-full px-3.5 py-1.5 text-sm font-medium whitespace-nowrap transition',
                 quick === filter.id && !query
-                  ? 'bg-espresso text-bg'
-                  : 'bg-surface text-espresso hover:bg-border',
+                  ? 'bg-ink text-bg'
+                  : 'bg-surface text-ink hover:bg-border',
               )}
             >
               {filter.label}
@@ -122,7 +122,7 @@ export function ExploreScreen({ signedIn }: { signedIn: boolean }) {
                 setPages(1);
               }}
               className={cn(
-                'rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition',
+                'rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition',
                 sort === mode && !matching
                   ? 'bg-primary/12 text-primary'
                   : 'text-muted hover:bg-surface',
@@ -141,7 +141,7 @@ export function ExploreScreen({ signedIn }: { signedIn: boolean }) {
             เรียงตามที่เข้ากับทริปของฉัน
           </span>
           <select
-            className="bg-surface text-espresso rounded-full px-3 py-1.5 text-xs font-semibold outline-none"
+            className="bg-surface text-ink rounded-full px-3 py-1.5 text-xs font-medium outline-none"
             value={matchTripId}
             onChange={(e) => {
               setMatchTripId(e.target.value);
@@ -166,7 +166,7 @@ export function ExploreScreen({ signedIn }: { signedIn: boolean }) {
 
       {isError && matching ? (
         <Card className="mt-4 p-4">
-          <p className="text-espresso text-sm font-semibold">เทียบกับทริปนี้ไม่ได้</p>
+          <p className="text-ink text-sm font-medium">เทียบกับทริปนี้ไม่ได้</p>
           <p className="text-muted mt-1 text-xs">
             ทริปอาจถูกลบไปแล้ว — เลือกทริปอื่นหรือกลับไปเรียงตามปกติ
           </p>
@@ -183,7 +183,7 @@ export function ExploreScreen({ signedIn }: { signedIn: boolean }) {
 
       {!isLoading && items.length === 0 ? (
         <Card className="mt-6 p-8 text-center">
-          <p className="text-espresso text-sm font-semibold">ยังไม่เจอแพลนที่ตรงกับที่ค้นหา</p>
+          <p className="text-ink text-sm font-medium">ยังไม่เจอแพลนที่ตรงกับที่ค้นหา</p>
           <p className="text-muted mt-1 text-xs">ลองคำอื่น หรือเป็นคนแรกที่เปิดทริปแนวนี้ให้คนอื่นตามรอย</p>
         </Card>
       ) : null}
@@ -222,7 +222,7 @@ function ExploreCard({ trip }: { trip: ExploreTrip }) {
         <TripCover src={trip.cover} frame="card" />
         <div className="p-3.5">
           {trip.match ? <MatchBadge match={trip.match} className="mb-2" /> : null}
-          <p className="text-espresso line-clamp-1 text-sm font-extrabold">{trip.title}</p>
+          <p className="text-ink line-clamp-1 text-sm font-bold">{trip.title}</p>
           <p className="text-muted mt-0.5 line-clamp-1 text-xs">
             {trip.days} วัน · {trip.cities.join(' · ')}
             {trip.budgetPerPersonThb > 0

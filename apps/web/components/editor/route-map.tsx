@@ -53,12 +53,12 @@ export function RouteMap({ items, city }: { items: PlanItem[]; city: string }) {
         role="img"
         aria-label={`เส้นทางวันนี้ใน${city}`}
       >
-        <rect width="660" height="220" className="fill-matcha/12" />
+        <rect width="660" height="220" className="fill-green/12" />
 
         {/* soft blocks standing in for districts and water */}
-        <rect x="30" y="20" width="180" height="80" rx="16" className="fill-matcha/25" />
-        <rect x="420" y="130" width="210" height="70" rx="16" className="fill-sky/35" />
-        <rect x="240" y="150" width="120" height="50" rx="14" className="fill-sun/25" />
+        <rect x="30" y="20" width="180" height="80" rx="16" className="fill-green/25" />
+        <rect x="420" y="130" width="210" height="70" rx="16" className="fill-blue/35" />
+        <rect x="240" y="150" width="120" height="50" rx="14" className="fill-yellow/25" />
 
         <path
           d={path}
@@ -89,7 +89,7 @@ export function RouteMap({ items, city }: { items: PlanItem[]; city: string }) {
             <span className="bg-primary/12 text-primary flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold">
               {i + 1}
             </span>
-            <span className="text-espresso min-w-0 flex-1 truncate text-xs font-medium">
+            <span className="text-ink min-w-0 flex-1 truncate text-xs font-medium">
               {p.item.title}
             </span>
             {p.item.travel ? (

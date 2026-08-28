@@ -53,7 +53,7 @@ export function LoginScreen() {
       <div className="flex flex-col gap-7 py-10">
         <div className="text-center">
           <div>
-            <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight">
+            <h1 className="font-display text-ink text-2xl font-bold tracking-tight">
               เข้าสู่ระบบเพื่อเริ่มวางแพลน
             </h1>
             <p className="text-muted mt-2 text-sm leading-relaxed">
@@ -64,7 +64,7 @@ export function LoginScreen() {
 
         {reason ? (
           <Card accent="primary" className="p-4" role="alert">
-            <p className="text-espresso text-sm font-semibold">{reason}</p>
+            <p className="text-ink text-sm font-medium">{reason}</p>
           </Card>
         ) : null}
 
@@ -72,11 +72,11 @@ export function LoginScreen() {
 
         <p className="text-muted text-center text-xs leading-relaxed">
           การเข้าสู่ระบบถือว่าคุณยอมรับ{' '}
-          <a href="/terms" className="text-espresso font-semibold underline underline-offset-2">
+          <a href="/terms" className="text-ink font-medium underline underline-offset-2">
             เงื่อนไขการใช้งาน
           </a>{' '}
           และ{' '}
-          <a href="/privacy" className="text-espresso font-semibold underline underline-offset-2">
+          <a href="/privacy" className="text-ink font-medium underline underline-offset-2">
             นโยบายความเป็นส่วนตัว
           </a>
         </p>

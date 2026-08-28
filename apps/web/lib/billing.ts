@@ -28,10 +28,10 @@ export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
 
 export const ORDER_STATUS: Record<
   Order['status'],
-  { label: string; tone: 'matcha' | 'sun' | 'danger' | 'neutral' }
+  { label: string; tone: 'green' | 'yellow' | 'danger' | 'neutral' }
 > = {
-  paid: { label: 'ชำระแล้ว', tone: 'matcha' },
-  pending: { label: 'รอชำระ', tone: 'sun' },
+  paid: { label: 'ชำระแล้ว', tone: 'green' },
+  pending: { label: 'รอชำระ', tone: 'yellow' },
   failed: { label: 'ไม่สำเร็จ', tone: 'danger' },
   refunded: { label: 'คืนเงินแล้ว', tone: 'neutral' },
 };

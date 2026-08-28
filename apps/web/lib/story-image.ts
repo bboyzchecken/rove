@@ -43,21 +43,24 @@ export function drawStoryImage(input: StoryInput): HTMLCanvasElement {
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('เบราว์เซอร์นี้สร้างรูปสรุปทริปไม่ได้');
 
-  const primary = token('--brand-primary', 'hsl(15 65% 58%)');
-  const espresso = token('--brand-espresso', 'hsl(17 26% 19%)');
-  const muted = token('--brand-muted', 'hsl(22 18% 43%)');
-  const surface = token('--brand-surface', 'hsl(30 10% 96%)');
-  const bg = token('--brand-bg', 'hsl(0 0% 100%)');
+  const primary = token('--brand-primary', 'hsl(208 56% 51%)');
+  const ink = token('--brand-ink', 'hsl(0 0% 6%)');
+  const muted = token('--brand-muted', 'hsl(48 3% 36%)');
+  const surface = token('--brand-surface', 'hsl(0 0% 100%)');
+  const bg = token('--brand-bg', 'hsl(47 100% 97%)');
 
+  // Canvas cannot use the `--font-*` variables — those are class names on the
+  // document, not families. The families are named here and only here, and
+  // must track `app/layout.tsx`.
   const font = (size: number, weight = 400) =>
-    `${weight} ${size}px "Noto Sans Thai", Inter, system-ui, sans-serif`;
+    `${weight} ${size}px "IBM Plex Sans Thai", "Space Grotesk", Inter, system-ui, sans-serif`;
 
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, STORY_SIZE, STORY_SIZE);
 
-  // A terracotta band down the left edge instead of a background photo: the
-  // covers are light illustrations and text over them needs a scrim heavy
-  // enough to hide the artwork it is sitting on.
+  // A blue band down the left edge instead of a background photo: the covers
+  // are light illustrations and text over them needs a scrim heavy enough to
+  // hide the artwork it is sitting on.
   ctx.fillStyle = primary;
   ctx.fillRect(0, 0, 24, STORY_SIZE);
 
@@ -65,12 +68,12 @@ export function drawStoryImage(input: StoryInput): HTMLCanvasElement {
   let y = 180;
 
   ctx.fillStyle = muted;
-  ctx.font = font(34, 600);
+  ctx.font = font(34, 500);
   ctx.fillText(input.dateLabel, pad, y);
 
   y += 92;
-  ctx.fillStyle = espresso;
-  y = wrapText(ctx, input.title, pad, y, STORY_SIZE - pad * 2, 84, font(76, 800));
+  ctx.fillStyle = ink;
+  y = wrapText(ctx, input.title, pad, y, STORY_SIZE - pad * 2, 84, font(76, 700));
 
   y += 20;
   ctx.fillStyle = muted;
@@ -90,8 +93,8 @@ export function drawStoryImage(input: StoryInput): HTMLCanvasElement {
     ctx.arc(pad + 10, y - 12, 10, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = espresso;
-    ctx.font = font(40, 600);
+    ctx.fillStyle = ink;
+    ctx.font = font(40, 500);
     ctx.fillText(ellipsis(ctx, highlight, STORY_SIZE - pad * 2 - 48), pad + 44, y);
     y += 74;
   }
@@ -106,8 +109,8 @@ export function drawStoryImage(input: StoryInput): HTMLCanvasElement {
     ctx.font = font(30, 500);
     ctx.fillText('โดยประมาณต่อคน', pad + 40, boxTop + 52);
 
-    ctx.fillStyle = espresso;
-    ctx.font = font(56, 800);
+    ctx.fillStyle = ink;
+    ctx.font = font(56, 700);
     ctx.fillText(`฿${input.perPersonThb.toLocaleString('th-TH')}`, pad + 40, boxTop + 108);
   }
 
@@ -115,7 +118,7 @@ export function drawStoryImage(input: StoryInput): HTMLCanvasElement {
   // compass rose made of four lines.
   drawMark(ctx, pad, STORY_SIZE - 128, 44, primary);
   ctx.fillStyle = muted;
-  ctx.font = font(30, 600);
+  ctx.font = font(30, 500);
   ctx.fillText(input.brandName, pad + 64, STORY_SIZE - 116);
 
   return canvas;

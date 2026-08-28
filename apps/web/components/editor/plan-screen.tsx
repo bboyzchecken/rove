@@ -32,9 +32,9 @@ export function PlanScreen({ tripId }: { tripId: string }) {
   return (
     <div className="space-y-6">
       {frozen ? (
-        <Card accent="sun" className="flex items-center gap-3 p-3.5">
-          <Lock className="text-espresso size-4 shrink-0" />
-          <p className="text-espresso flex-1 text-xs leading-relaxed">
+        <Card accent="yellow" className="flex items-center gap-3 p-3.5">
+          <Lock className="text-ink size-4 shrink-0" />
+          <p className="text-ink flex-1 text-xs leading-relaxed">
             แพลนถูกสรุปแล้ว — ไทม์ไลน์ล็อกอยู่จนกว่าเจ้าของทริปจะปลดล็อกที่หน้าเทียบแพลน
           </p>
         </Card>
@@ -44,7 +44,7 @@ export function PlanScreen({ tripId }: { tripId: string }) {
         <div className="flex justify-end">
           <Link
             href={`/t/${tripId}/plan/compare` as never}
-            className="bg-surface text-espresso hover:bg-border font-display flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition"
+            className="bg-surface text-ink hover:bg-border font-display flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition"
           >
             <GitCompareArrows className="size-4" />
             เทียบแพลน{variantCount > 0 ? ` (${variantCount})` : ''}

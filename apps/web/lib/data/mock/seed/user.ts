@@ -548,20 +548,20 @@ export const DREAMS: DreamItem[] = [
     destination: 'ฟินแลนด์ · โรวาเนียมิ',
     note: 'ช่วงที่ดีที่สุดคือ ก.ย.–มี.ค.',
     url: 'https://example.com/glass-igloo',
-    accent: 'sky',
+    accent: 'blue',
   },
   {
     id: 'dr2',
     title: 'เดินเส้น Nakasendo แบบ 2 วัน',
     destination: 'ญี่ปุ่น · สึมาโกะ–มาโกเมะ',
     note: 'ต่อจากทริปนี้ได้ถ้าเพิ่ม 2 วัน',
-    accent: 'matcha',
+    accent: 'green',
   },
   {
     id: 'dr3',
     title: 'ล่องเรือฮาลองเบย์ค้างคืน',
     destination: 'เวียดนาม · ฮาลอง',
-    accent: 'joyfull',
+    accent: 'pink',
   },
   {
     id: 'dr4',
@@ -575,6 +575,6 @@ export const DREAMS: DreamItem[] = [
     title: 'ดูซากุระบานที่ปราสาทฮิเมจิ',
     destination: 'ญี่ปุ่น · ฮิเมจิ',
     url: 'https://example.com/himeji-sakura',
-    accent: 'sun',
+    accent: 'yellow',
   },
 ];

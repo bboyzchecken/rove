@@ -30,12 +30,12 @@ func (s *Server) registerBudgetRoutes(g *echo.Group) {
 // and accent live here rather than in the client so the export, the API and the
 // web app label the same money the same way.
 var categoryMeta = map[string]struct{ label, icon, accent string }{
-	models.ItemStay:      {"ที่พัก", "🏠", "joyfull"},
-	models.ItemTransport: {"เดินทาง", "🚄", "sky"},
-	models.ItemFlight:    {"เดินทาง", "🚄", "sky"},
+	models.ItemStay:      {"ที่พัก", "🏠", "pink"},
+	models.ItemTransport: {"เดินทาง", "🚄", "blue"},
+	models.ItemFlight:    {"เดินทาง", "🚄", "blue"},
 	models.ItemMeal:      {"อาหาร", "🍜", "primary"},
-	models.ItemPOI:       {"ตั๋ว/กิจกรรม", "🎟️", "matcha"},
-	models.ItemFree:      {"อื่นๆ", "✨", "joyfull"},
+	models.ItemPOI:       {"ตั๋ว/กิจกรรม", "🎟️", "green"},
+	models.ItemFree:      {"อื่นๆ", "✨", "pink"},
 }
 
 func (s *Server) handleGetBudget(c echo.Context) error {
@@ -82,7 +82,7 @@ func (s *Server) budgetOf(trip models.Trip, items []models.PlanItem) budgetDTO {
 
 	lines := make([]budgetLineDTO, 0, len(summary.Lines))
 	for _, line := range summary.Lines {
-		icon, accent := "✨", "joyfull"
+		icon, accent := "✨", "pink"
 		for _, meta := range categoryMeta {
 			if meta.label == line.Category {
 				icon, accent = meta.icon, meta.accent

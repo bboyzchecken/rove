@@ -22,10 +22,10 @@ import { formatMoney } from '@/lib/format';
  * trips in flight, "ทริปนี้" is a guess. The list names them, and the room is
  * one tap deeper.
  */
-const STATUS: Record<string, { label: string; tone: 'solid' | 'matcha' | 'sun' | 'neutral' }> = {
+const STATUS: Record<string, { label: string; tone: 'solid' | 'green' | 'yellow' | 'neutral' }> = {
   planning: { label: 'กำลังวางแพลน', tone: 'solid' },
-  ready: { label: 'พร้อมเดินทาง', tone: 'matcha' },
-  ongoing: { label: 'กำลังเที่ยว', tone: 'sun' },
+  ready: { label: 'พร้อมเดินทาง', tone: 'green' },
+  ongoing: { label: 'กำลังเที่ยว', tone: 'yellow' },
   done: { label: 'จบทริปแล้ว', tone: 'neutral' },
 };
 
@@ -47,7 +47,7 @@ export function TripList() {
     <div className="space-y-7 px-4 py-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight">
+          <h1 className="font-display text-ink text-2xl font-bold tracking-tight">
             ทริปของฉัน
           </h1>
           <p className="text-muted mt-1 text-sm">
@@ -94,7 +94,7 @@ export function TripList() {
                               <Badge tone={status.tone}>{status.label}</Badge>
                               {trip.role === 'owner' ? <Badge tone="outline">เจ้าของ</Badge> : null}
                             </div>
-                            <p className="font-display text-espresso truncate font-bold">
+                            <p className="font-display text-ink truncate font-bold">
                               {trip.title}
                             </p>
                             <p className="text-muted mt-0.5 truncate text-xs">
@@ -111,12 +111,12 @@ export function TripList() {
                           <CharacterStack characterIds={trip.characterIds} size="xs" max={4} />
                           {hasDates ? (
                             trip.daysUntil > 0 ? (
-                              <span className="text-primary nums text-[11px] font-semibold">
+                              <span className="text-primary nums text-[11px] font-medium">
                                 อีก {trip.daysUntil} วัน
                               </span>
                             ) : null
                           ) : (
-                            <span className="text-primary flex items-center gap-1 text-[11px] font-semibold">
+                            <span className="text-primary flex items-center gap-1 text-[11px] font-medium">
                               <CalendarSearch className="size-3" /> ไปหาวันที่ตรงกัน
                             </span>
                           )}
@@ -146,12 +146,12 @@ export function TripList() {
               >
                 <TripCover src={trip.cover} frame="mini" className="rounded-brand-sm" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-espresso truncate text-sm font-semibold">{trip.title}</p>
+                  <p className="text-ink truncate text-sm font-medium">{trip.title}</p>
                   <p className="text-muted mt-0.5 text-[11px]">
                     {trip.dateLabel} · {trip.days} วัน · {trip.places} ที่
                   </p>
                 </div>
-                <span className="text-espresso nums shrink-0 text-xs font-semibold">
+                <span className="text-ink nums shrink-0 text-xs font-medium">
                   {formatMoney(trip.spentThb, 'THB')}
                 </span>
                 <ChevronRight className="text-muted size-4 shrink-0" />

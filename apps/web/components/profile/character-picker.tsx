@@ -26,7 +26,7 @@ export function CharacterPicker() {
       <div className="mb-4 flex items-center gap-3">
         <CharacterAvatar characterId={selected} size="xl" />
         <div>
-          <p className="font-display text-espresso text-lg font-extrabold">
+          <p className="font-display text-ink text-lg font-bold">
             {current?.name ?? '—'}
           </p>
           <p className="text-muted text-xs">ตัวนี้จะไปกับคุณทุกทริป ทุกคอมเมนต์ ทุกบิลที่หารกัน</p>
@@ -40,7 +40,7 @@ export function CharacterPicker() {
             onClick={() => updateMe.mutate({ characterId: c.id })}
             className={cn(
               'relative rounded-2xl p-1 transition',
-              selected === c.id ? 'bg-espresso' : 'bg-bg hover:bg-surface',
+              selected === c.id ? 'bg-ink' : 'bg-bg hover:bg-surface',
             )}
             title={c.name}
             aria-pressed={selected === c.id}

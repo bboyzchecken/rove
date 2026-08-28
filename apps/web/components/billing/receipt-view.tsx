@@ -45,9 +45,9 @@ export function ReceiptView({ orderId }: { orderId: string }) {
   if (!order) {
     return (
       <div className="px-4 py-12 text-center">
-        <p className="font-display text-espresso text-lg font-extrabold">ไม่พบใบเสร็จนี้</p>
+        <p className="font-display text-ink text-lg font-bold">ไม่พบใบเสร็จนี้</p>
         <p className="text-muted mt-1 text-sm">ลิงก์อาจเก่าไป หรือเป็นใบเสร็จของบัญชีอื่น</p>
-        <ButtonLink href="/billing" size="sm" variant="espresso" className="mt-4">
+        <ButtonLink href="/billing" size="sm" variant="ink" className="mt-4">
           กลับไปหน้าบิล
         </ButtonLink>
       </div>
@@ -63,7 +63,7 @@ export function ReceiptView({ orderId }: { orderId: string }) {
       <div className="flex items-center justify-between print:hidden">
         <Link
           href="/billing"
-          className="text-muted hover:text-espresso inline-flex items-center gap-1.5 text-sm font-semibold"
+          className="text-muted hover:text-ink inline-flex items-center gap-1.5 text-sm font-medium"
         >
           <ArrowLeft className="size-4" />
           บิลและการชำระเงิน
@@ -78,13 +78,13 @@ export function ReceiptView({ orderId }: { orderId: string }) {
         {/* head -------------------------------------------------------- */}
         <div className="border-border flex flex-wrap items-start justify-between gap-3 border-b p-5">
           <div>
-            <p className="font-display text-espresso text-lg font-extrabold tracking-tight">
+            <p className="font-display text-ink text-lg font-bold tracking-tight">
               {env.brandName}
             </p>
             <p className="text-muted mt-0.5 text-[11px]">ใบเสร็จรับเงิน / Receipt</p>
           </div>
           <div className="text-right">
-            <p className="text-espresso nums text-sm font-bold">{order.number}</p>
+            <p className="text-ink nums text-sm font-bold">{order.number}</p>
             <p className="text-muted nums mt-0.5 text-[11px]">
               ออกเมื่อ {formatThaiDate(order.issuedAt)}
             </p>
@@ -97,12 +97,12 @@ export function ReceiptView({ orderId }: { orderId: string }) {
         {/* buyer ------------------------------------------------------- */}
         <div className="border-border grid gap-4 border-b p-5 sm:grid-cols-2">
           <Field label="ผู้ซื้อ">
-            <p className="text-espresso text-sm font-semibold">{me?.name ?? '—'}</p>
+            <p className="text-ink text-sm font-medium">{me?.name ?? '—'}</p>
             {me?.email ? <p className="text-muted text-[11px]">{me.email}</p> : null}
             {me?.handle ? <p className="text-muted text-[11px]">{me.handle}</p> : null}
           </Field>
           <Field label="ชำระโดย">
-            <p className="text-espresso text-sm font-semibold">
+            <p className="text-ink text-sm font-medium">
               {order.methodLabel || PAYMENT_METHOD_LABEL[order.method]}
             </p>
             {order.paidAt ? (
@@ -125,12 +125,12 @@ export function ReceiptView({ orderId }: { orderId: string }) {
                 className="flex items-start justify-between gap-3"
               >
                 <div className="min-w-0">
-                  <p className="text-espresso text-sm">{line.label}</p>
+                  <p className="text-ink text-sm">{line.label}</p>
                   <p className="text-muted nums text-[11px]">
                     {line.quantity} × {formatMoney(line.unitAmountThb, order.currency)}
                   </p>
                 </div>
-                <p className="text-espresso nums shrink-0 text-sm">
+                <p className="text-ink nums shrink-0 text-sm">
                   {formatMoney(line.amountThb, order.currency)}
                 </p>
               </div>
@@ -146,8 +146,8 @@ export function ReceiptView({ orderId }: { orderId: string }) {
               />
             ) : null}
             <div className="flex items-baseline justify-between pt-1.5">
-              <p className="text-espresso text-sm font-bold">ยอดที่ชำระ</p>
-              <p className="font-display text-espresso nums text-xl font-extrabold">
+              <p className="text-ink text-sm font-bold">ยอดที่ชำระ</p>
+              <p className="font-display text-ink nums text-xl font-bold">
                 {formatMoney(order.totalThb, order.currency)}
               </p>
             </div>
@@ -162,11 +162,11 @@ export function ReceiptView({ orderId }: { orderId: string }) {
         {/* context ----------------------------------------------------- */}
         <div className="bg-surface space-y-1 px-5 py-4 text-[11px] print:bg-transparent">
           <p className="text-muted">
-            ประเภท: <span className="text-espresso">{ORDER_KIND_LABEL[order.kind]}</span>
+            ประเภท: <span className="text-ink">{ORDER_KIND_LABEL[order.kind]}</span>
           </p>
           {order.tripTitle ? (
             <p className="text-muted">
-              ใช้กับทริป: <span className="text-espresso">{order.tripTitle}</span>
+              ใช้กับทริป: <span className="text-ink">{order.tripTitle}</span>
             </p>
           ) : null}
           {order.periodStart && order.periodEnd ? (
@@ -179,8 +179,8 @@ export function ReceiptView({ orderId }: { orderId: string }) {
       </Card>
 
       {order.simulated ? (
-        <Card accent="sun" className="p-4">
-          <p className="text-espresso text-xs leading-relaxed">
+        <Card accent="yellow" className="p-4">
+          <p className="text-ink text-xs leading-relaxed">
             รายการนี้ยังไม่มีการตัดเงินจริง — ROVE ยังไม่ได้เปิดระบบชำระเงิน
             บันทึกไว้เป็นประวัติเพื่อให้เห็นสิทธิ์ที่ได้รับเท่านั้น
           </p>
@@ -217,7 +217,7 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between">
       <p className="text-muted text-xs">{label}</p>
-      <p className="text-espresso nums text-xs">{value}</p>
+      <p className="text-ink nums text-xs">{value}</p>
     </div>
   );
 }

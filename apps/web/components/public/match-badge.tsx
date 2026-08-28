@@ -21,7 +21,7 @@ export function MatchBadge({
 }) {
   const tone =
     match.score >= 80
-      ? 'bg-matcha/15 text-matcha'
+      ? 'bg-green/15 text-green'
       : match.score >= 60
         ? 'bg-primary/12 text-primary'
         : 'bg-surface text-muted';

@@ -57,7 +57,7 @@ var destinationSeeds = []destinationSeed{
 		Destination: Destination{
 			ID: "korea", Country: "KR", Flag: "🇰🇷", Name: "เกาหลีใต้",
 			Cities: []string{"โซล", "นัมซาน"}, Subtitle: "โซล · นัมซาน",
-			Accent: "sky", BudgetMinTHB: 28000, BudgetMaxTHB: 40000, FlightHours: 5.5,
+			Accent: "blue", BudgetMinTHB: 28000, BudgetMaxTHB: 40000, FlightHours: 5.5,
 			WeatherHigh: 6, WeatherLow: -2, WeatherText: "มีโอกาสเจอหิมะแรกของปี",
 		},
 		idealMin: 3, idealMax: 6, bestMonths: []int{4, 5, 10, 11, 12},
@@ -68,7 +68,7 @@ var destinationSeeds = []destinationSeed{
 		Destination: Destination{
 			ID: "taiwan", Country: "TW", Flag: "🇹🇼", Name: "ไต้หวัน",
 			Cities: []string{"ไทเป", "จิ่วเฟิ่น"}, Subtitle: "ไทเป · จิ่วเฟิ่น",
-			Accent: "matcha", BudgetMinTHB: 18000, BudgetMaxTHB: 28000, FlightHours: 3.75,
+			Accent: "green", BudgetMinTHB: 18000, BudgetMaxTHB: 28000, FlightHours: 3.75,
 			WeatherHigh: 20, WeatherLow: 14, WeatherText: "เย็นสบาย ไม่หนาวจัด",
 		},
 		idealMin: 3, idealMax: 5, bestMonths: []int{10, 11, 12, 1, 2, 3},
@@ -79,7 +79,7 @@ var destinationSeeds = []destinationSeed{
 		Destination: Destination{
 			ID: "vietnam", Country: "VN", Flag: "🇻🇳", Name: "เวียดนาม",
 			Cities: []string{"ฮานอย", "ซาปา"}, Subtitle: "ฮานอย · ซาปา",
-			Accent: "sun", BudgetMinTHB: 12000, BudgetMaxTHB: 20000, FlightHours: 1.75,
+			Accent: "yellow", BudgetMinTHB: 12000, BudgetMaxTHB: 20000, FlightHours: 1.75,
 			WeatherHigh: 19, WeatherLow: 13, WeatherText: "เย็นชื้น หมอกลงที่ซาปา",
 		},
 		idealMin: 3, idealMax: 5, bestMonths: []int{11, 12, 1, 2, 3},
@@ -90,7 +90,7 @@ var destinationSeeds = []destinationSeed{
 		Destination: Destination{
 			ID: "hongkong", Country: "HK", Flag: "🇭🇰", Name: "ฮ่องกง",
 			Cities: []string{"ฮ่องกง", "มาเก๊า"}, Subtitle: "ฮ่องกง · มาเก๊า",
-			Accent: "joyfull", BudgetMinTHB: 20000, BudgetMaxTHB: 32000, FlightHours: 2.75,
+			Accent: "pink", BudgetMinTHB: 20000, BudgetMaxTHB: 32000, FlightHours: 2.75,
 			WeatherHigh: 21, WeatherLow: 16, WeatherText: "อากาศดีที่สุดของปี",
 		},
 		idealMin: 3, idealMax: 4, bestMonths: []int{10, 11, 12, 1},

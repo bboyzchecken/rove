@@ -114,7 +114,7 @@ export function ShareDialog({
                   <option.icon className="size-4" />
                 </span>
                 <span className="flex-1">
-                  <span className="text-espresso block text-sm font-semibold">{option.label}</span>
+                  <span className="text-ink block text-sm font-medium">{option.label}</span>
                   <span className="text-muted block text-[11px]">{option.hint}</span>
                 </span>
                 {active ? <Check className="text-primary size-4" strokeWidth={3} /> : null}
@@ -162,7 +162,7 @@ export function ShareDialog({
                 className="rounded-brand bg-surface hover:bg-border p-3 text-center transition disabled:opacity-50"
               >
                 <Download className="text-muted mx-auto size-4" />
-                <span className="text-espresso mt-1.5 block text-xs font-semibold">
+                <span className="text-ink mt-1.5 block text-xs font-medium">
                   {format.label}
                 </span>
                 <span className="text-muted block text-[10px]">{format.hint}</span>
@@ -177,7 +177,7 @@ export function ShareDialog({
           </div>
         </div>
 
-        <Badge tone="sky">ค่าใช้จ่ายและยอดหารกันไม่เคยอยู่ในลิงก์ที่แชร์</Badge>
+        <Badge tone="blue">ค่าใช้จ่ายและยอดหารกันไม่เคยอยู่ในลิงก์ที่แชร์</Badge>
       </div>
     </Sheet>
   );

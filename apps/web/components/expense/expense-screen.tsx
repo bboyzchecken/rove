@@ -60,7 +60,7 @@ export function ExpenseScreen({ tripId }: { tripId: string }) {
               <CharacterAvatar characterId={row.member.characterId} size="md" />
 
               <div className="min-w-0 flex-1">
-                <p className="text-espresso text-sm font-semibold">{row.member.name}</p>
+                <p className="text-ink text-sm font-medium">{row.member.name}</p>
                 <p className="text-muted mt-0.5 text-[11px]">
                   จ่ายไป {formatMoney(row.paidThb, 'THB')} · ส่วนที่ต้องรับผิดชอบ{' '}
                   {formatMoney(row.shareThb, 'THB')}
@@ -96,9 +96,9 @@ export function ExpenseScreen({ tripId }: { tripId: string }) {
 
       <section>
         <SectionHeader label="น้องหารสรุปให้" />
-        <Card accent="matcha" className="p-4">
+        <Card accent="green" className="p-4">
           {summary.settlements.length === 0 ? (
-            <p className="text-espresso text-sm">ตอนนี้ไม่มีใครติดใคร — เคลียร์กันหมดแล้ว 🎉</p>
+            <p className="text-ink text-sm">ตอนนี้ไม่มีใครติดใคร — เคลียร์กันหมดแล้ว 🎉</p>
           ) : (
             <>
               <ul className="space-y-2.5">
@@ -108,15 +108,15 @@ export function ExpenseScreen({ tripId }: { tripId: string }) {
                     className="flex flex-wrap items-center gap-2.5"
                   >
                     <CharacterAvatar characterId={characterOf(s.fromMemberId)} size="sm" />
-                    <span className="text-espresso text-sm font-semibold">
+                    <span className="text-ink text-sm font-medium">
                       {nameOf(s.fromMemberId)}
                     </span>
                     <ArrowRight className="text-muted size-4" />
                     <CharacterAvatar characterId={characterOf(s.toMemberId)} size="sm" />
-                    <span className="text-espresso text-sm font-semibold">
+                    <span className="text-ink text-sm font-medium">
                       {nameOf(s.toMemberId)}
                     </span>
-                    <span className="text-espresso nums ml-auto text-sm font-bold">
+                    <span className="text-ink nums ml-auto text-sm font-bold">
                       {formatMoney(s.amountThb, 'THB')}
                     </span>
                     <Button

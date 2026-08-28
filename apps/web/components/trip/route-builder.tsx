@@ -151,7 +151,7 @@ export function RouteBuilder({
               ) : (
                 <Plane className="text-muted size-3.5" />
               )}
-              <span className="text-muted text-[11px] font-semibold">
+              <span className="text-muted text-[11px] font-medium">
                 {DIRECTION_LABEL[leg.direction]}
               </span>
             </div>
@@ -163,7 +163,7 @@ export function RouteBuilder({
                   onClick={() =>
                     patch(leg.key, { mode: leg.mode === 'ground' ? 'flight' : 'ground' })
                   }
-                  className="text-primary text-[11px] font-semibold"
+                  className="text-primary text-[11px] font-medium"
                 >
                   {leg.mode === 'ground' ? 'เปลี่ยนเป็นเที่ยวบิน' : 'ไปเอง (รถไฟ/รถ)'}
                 </button>
@@ -278,15 +278,15 @@ export function RouteBuilder({
       {warnings.map((warning) => (
         <Card
           key={warning.id}
-          accent={warning.level === 'warn' ? 'sun' : 'sky'}
+          accent={warning.level === 'warn' ? 'yellow' : 'blue'}
           className="flex items-start gap-2 p-3.5"
         >
           {warning.level === 'warn' ? (
-            <TriangleAlert className="text-espresso mt-0.5 size-3.5 shrink-0" />
+            <TriangleAlert className="text-ink mt-0.5 size-3.5 shrink-0" />
           ) : (
-            <Info className="text-espresso mt-0.5 size-3.5 shrink-0" />
+            <Info className="text-ink mt-0.5 size-3.5 shrink-0" />
           )}
-          <p className="text-espresso text-xs leading-relaxed">{warning.text}</p>
+          <p className="text-ink text-xs leading-relaxed">{warning.text}</p>
         </Card>
       ))}
     </div>
@@ -301,10 +301,10 @@ export function RouteSummary({ route, className }: { route: TripRoute; className
   if (route.stops.length === 0) return null;
 
   return (
-    <Card accent="matcha" className={cn('p-4', className)}>
+    <Card accent="green" className={cn('p-4', className)}>
       <div className="mb-2 flex items-center justify-between">
         <p className="section-label">ทริปนี้จะเป็นแบบนี้</p>
-        <span className="text-espresso nums text-xs font-bold">
+        <span className="text-ink nums text-xs font-bold">
           {route.days} วัน {route.nights} คืน
         </span>
       </div>
@@ -316,13 +316,13 @@ export function RouteSummary({ route, className }: { route: TripRoute; className
             className="flex items-center gap-2 text-xs"
           >
             <span className="leading-none">{flagOf(stop.countryCode)}</span>
-            <span className="text-espresso font-semibold">{stop.city}</span>
+            <span className="text-ink font-medium">{stop.city}</span>
             <span className="text-muted nums">
               {thaiDate(stop.arriveDate)}
               {stop.arriveTime ? ` ${stop.arriveTime} น.` : ''}
               {stop.departDate ? ` – ${thaiDate(stop.departDate)}` : ''}
             </span>
-            <span className="text-espresso nums ml-auto shrink-0 font-bold">
+            <span className="text-ink nums ml-auto shrink-0 font-bold">
               {stop.open ? 'ยังไม่มีขากลับ' : `${stop.nights} คืน`}
             </span>
           </li>
@@ -332,7 +332,7 @@ export function RouteSummary({ route, className }: { route: TripRoute; className
       {route.countries.length > 1 ? (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {route.countries.map((country) => (
-            <Badge key={country.code} tone="sky">
+            <Badge key={country.code} tone="blue">
               {flagOf(country.code)} {country.name} {country.nights} คืน
             </Badge>
           ))}

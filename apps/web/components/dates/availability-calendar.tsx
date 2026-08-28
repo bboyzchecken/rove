@@ -28,13 +28,13 @@ export interface DaySelection {
 
 /** Free-member ratio → colour block. Nobody free stays neutral. */
 function heatClass(free: number, total: number, selected: boolean) {
-  if (selected) return 'bg-sky/70 text-espresso';
+  if (selected) return 'bg-blue/70 text-ink';
   if (total === 0 || free === 0) return 'bg-surface text-muted';
   const ratio = free / total;
   if (ratio === 1) return 'bg-primary text-primary-fg';
-  if (ratio >= 0.66) return 'bg-primary/45 text-espresso';
-  if (ratio >= 0.34) return 'bg-primary/25 text-espresso';
-  return 'bg-primary/12 text-espresso';
+  if (ratio >= 0.66) return 'bg-primary/45 text-ink';
+  if (ratio >= 0.34) return 'bg-primary/25 text-ink';
+  return 'bg-primary/12 text-ink';
 }
 
 export function AvailabilityCalendar({
@@ -132,10 +132,10 @@ export function AvailabilityCalendar({
               className={cn(
                 'relative flex min-h-16 flex-col items-center gap-1 rounded-[0.75rem] px-0.5 py-1.5 transition',
                 heatClass(row.free.length, total, selected),
-                isEdge && 'ring-espresso ring-2',
-                inLocked(date) && !selected && 'ring-espresso/40 ring-2',
-                mode === 'mine' && mine === 'free' && 'ring-espresso ring-2',
-                mode === 'mine' && mine === 'maybe' && 'ring-sun ring-dashed ring-2',
+                isEdge && 'ring-ink ring-2',
+                inLocked(date) && !selected && 'ring-ink/40 ring-2',
+                mode === 'mine' && mine === 'free' && 'ring-ink ring-2',
+                mode === 'mine' && mine === 'maybe' && 'ring-yellow ring-dashed ring-2',
                 'active:scale-[0.97]',
               )}
             >

@@ -387,12 +387,12 @@ export function budgetFromPlan(
   manual: BudgetLine[],
 ): BudgetLine[] {
   const CATEGORY: Record<string, { category: string; icon: string; accent: BudgetLine['accent'] }> = {
-    stay: { category: 'ที่พัก', icon: '🏠', accent: 'joyfull' },
-    transport: { category: 'เดินทาง', icon: '🚄', accent: 'sky' },
-    flight: { category: 'เดินทาง', icon: '🚄', accent: 'sky' },
+    stay: { category: 'ที่พัก', icon: '🏠', accent: 'pink' },
+    transport: { category: 'เดินทาง', icon: '🚄', accent: 'blue' },
+    flight: { category: 'เดินทาง', icon: '🚄', accent: 'blue' },
     meal: { category: 'อาหาร', icon: '🍜', accent: 'primary' },
-    poi: { category: 'ตั๋ว/กิจกรรม', icon: '🎟️', accent: 'matcha' },
-    free: { category: 'อื่นๆ', icon: '✨', accent: 'joyfull' },
+    poi: { category: 'ตั๋ว/กิจกรรม', icon: '🎟️', accent: 'green' },
+    free: { category: 'อื่นๆ', icon: '✨', accent: 'pink' },
   };
 
   const fromItems = new Map<string, BudgetLine>();

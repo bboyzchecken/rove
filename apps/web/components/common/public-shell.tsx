@@ -60,19 +60,30 @@ export function PublicShell({
    * sections so they still line up with the header.
    */
   bleed = false,
+  /**
+   * `canvas` floats the header over a full-bleed hero instead of sitting above
+   * it (ROVE_BRAND_SPEC §7 Nav: transparent over the canvas, white wordmark).
+   * The page underneath must leave `HEADER_HEIGHT` of room at the top of its
+   * first section — `HERO_TOP` is that measurement, exported so the two cannot
+   * drift apart.
+   */
+  chrome = 'default',
   actions,
   children,
 }: {
   width?: ShellWidth;
   center?: boolean;
   bleed?: boolean;
+  chrome?: 'default' | 'canvas';
   /** The page's own call to action, right of the language switch. */
   actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const onCanvas = chrome === 'canvas';
+
   return (
-    <div className="flex min-h-dvh flex-col">
-      <SiteHeader actions={actions} />
+    <div className={cn('flex min-h-dvh flex-col', onCanvas && 'relative')}>
+      <SiteHeader actions={actions} onCanvas={onCanvas} />
 
       <main
         className={cn(
@@ -92,7 +103,14 @@ export function PublicShell({
 /** The landing page's sections, lined up with the header above them. */
 export const SHELL_SECTION = `mx-auto ${WIDTH.wide} ${GUTTER}`;
 
-function SiteHeader({ actions }: { actions?: React.ReactNode }) {
+/**
+ * The room a `chrome="canvas"` hero must leave for the floating header.
+ * Exported rather than written as a literal on the page, so the clearance and
+ * `HEADER_HEIGHT` cannot drift apart.
+ */
+export const HERO_TOP = 'pt-14';
+
+function SiteHeader({ actions, onCanvas }: { actions?: React.ReactNode; onCanvas?: boolean }) {
   return (
     <header
       className={cn(
@@ -100,10 +118,14 @@ function SiteHeader({ actions }: { actions?: React.ReactNode }) {
         HEADER_HEIGHT,
         WIDTH.wide,
         GUTTER,
+        // Over a hero canvas the header does not take a row of its own — it
+        // floats on the colour, which is what makes the canvas read as
+        // full-bleed rather than as a band below a cream strip.
+        onCanvas && 'absolute inset-x-0 top-0 z-30',
       )}
     >
       <Link href="/" aria-label={`${env.brandName} — หน้าแรกของเว็บ`}>
-        <RoveLogo size="sm" />
+        <RoveLogo size="sm" tone={onCanvas ? 'canvas' : 'light'} />
       </Link>
 
       <div className="flex items-center gap-2">
@@ -127,13 +149,13 @@ function SiteFooter() {
       >
         <RoveLogo size="sm" tone="mono" />
         <nav className="flex flex-wrap items-center gap-4">
-          <Link href="/pricing" className="hover:text-espresso">
+          <Link href="/pricing" className="hover:text-ink">
             ราคา
           </Link>
-          <Link href="/terms" className="hover:text-espresso">
+          <Link href="/terms" className="hover:text-ink">
             เงื่อนไขการใช้งาน
           </Link>
-          <Link href="/privacy" className="hover:text-espresso">
+          <Link href="/privacy" className="hover:text-ink">
             นโยบายความเป็นส่วนตัว
           </Link>
         </nav>

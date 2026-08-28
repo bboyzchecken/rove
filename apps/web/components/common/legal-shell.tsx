@@ -45,7 +45,7 @@ export function LegalPage({
           className="size-20 shrink-0 object-contain"
         />
         <div>
-          <h1 className="font-display text-espresso text-3xl font-extrabold tracking-tight">
+          <h1 className="font-display text-ink text-3xl font-bold tracking-tight">
             {title}
           </h1>
           <p className="text-muted mt-1 text-xs">อัปเดตล่าสุด {updated}</p>
@@ -53,10 +53,10 @@ export function LegalPage({
       </div>
 
       {/* This is the part a reader must not miss, so it is not a footnote. */}
-      <Card accent="sun" className="mt-5 p-4">
+      <Card accent="yellow" className="mt-5 p-4">
         <div className="flex items-start gap-2.5">
-          <TriangleAlert className="text-espresso mt-0.5 size-4 shrink-0" />
-          <p className="text-espresso text-xs leading-relaxed">
+          <TriangleAlert className="text-ink mt-0.5 size-4 shrink-0" />
+          <p className="text-ink text-xs leading-relaxed">
             <span className="font-bold">ฉบับร่างสำหรับต้นแบบ</span> — เอกสารนี้เขียนไว้ให้เห็นโครง
             ยังไม่ผ่านการตรวจโดยที่ปรึกษากฎหมาย และยังไม่มีผลผูกพันทางกฎหมาย
             ข้อความในวงเล็บเหลี่ยมคือช่องที่ต้องเติมเมื่อจดทะเบียนนิติบุคคลเรียบร้อย
@@ -69,7 +69,7 @@ export function LegalPage({
       <div className="mt-8 space-y-7">
         {sections.map((section, i) => (
           <section key={section.heading}>
-            <h2 className="font-display text-espresso text-base font-bold">
+            <h2 className="font-display text-ink text-base font-bold">
               <span className="text-primary nums mr-2">{i + 1}.</span>
               {section.heading}
             </h2>
@@ -97,7 +97,7 @@ export function LegalPage({
       </div>
 
       <Card className="mt-10 p-5">
-        <p className="font-display text-espresso font-bold">ติดต่อเรา</p>
+        <p className="font-display text-ink font-bold">ติดต่อเรา</p>
         <div className="text-muted mt-2 space-y-1 text-sm leading-relaxed">{contact}</div>
       </Card>
     </PublicShell>

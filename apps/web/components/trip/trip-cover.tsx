@@ -47,7 +47,7 @@ export function TripCover({
   children?: React.ReactNode;
 }) {
   return (
-    <div className={cn('bg-sky/25 relative overflow-hidden', FRAME[frame], className)}>
+    <div className={cn('bg-blue/25 relative overflow-hidden', FRAME[frame], className)}>
       <Image
         src={src}
         alt=""

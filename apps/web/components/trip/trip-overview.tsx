@@ -64,14 +64,14 @@ export function TripOverview({ tripId }: { tripId: string }) {
   return (
     <div className="space-y-7 pt-1">
       {/* ---------------------------------------------------- checklist */}
-      <Card accent="sun" className="p-4">
+      <Card accent="yellow" className="p-4">
         <div className="mb-3 flex items-center justify-between">
-          <p className="font-display text-espresso font-bold">เตรียมห้องทริปให้พร้อม</p>
-          <span className="text-muted nums text-xs font-semibold">
+          <p className="font-display text-ink font-bold">เตรียมห้องทริปให้พร้อม</p>
+          <span className="text-muted nums text-xs font-medium">
             {doneSteps}/{checklist.length}
           </span>
         </div>
-        <Progress value={doneSteps / checklist.length} tone="espresso" />
+        <Progress value={doneSteps / checklist.length} tone="ink" />
         <ul className="mt-3 space-y-2">
           {checklist.map((step) => {
             const href = STEP_HREF[step.key];
@@ -80,14 +80,14 @@ export function TripOverview({ tripId }: { tripId: string }) {
                 <span
                   className={
                     step.done
-                      ? 'bg-espresso text-bg flex size-5 shrink-0 items-center justify-center rounded-full'
+                      ? 'bg-ink text-bg flex size-5 shrink-0 items-center justify-center rounded-full'
                       : 'border-muted/30 flex size-5 shrink-0 rounded-full border-2 border-dashed'
                   }
                 >
                   {step.done ? <Check className="size-3" strokeWidth={3} /> : null}
                 </span>
                 <span
-                  className={step.done ? 'text-muted line-through' : 'text-espresso font-medium'}
+                  className={step.done ? 'text-muted line-through' : 'text-ink font-medium'}
                 >
                   {step.label}
                 </span>
@@ -119,7 +119,7 @@ export function TripOverview({ tripId }: { tripId: string }) {
       {!hasDates && !locked ? (
         <Card accent="primary" className="flex flex-wrap items-center justify-between gap-3 p-4">
           <div>
-            <p className="font-display text-espresso font-bold">ยังไม่มีวันเดินทาง</p>
+            <p className="font-display text-ink font-bold">ยังไม่มีวันเดินทาง</p>
             <p className="text-muted mt-0.5 text-xs">
               ให้ทุกคนแตะวันที่ตัวเองว่าง แล้ว ROVE จะหาช่วงที่ตรงกันให้
             </p>
@@ -135,13 +135,13 @@ export function TripOverview({ tripId }: { tripId: string }) {
         <SectionHeader
           label="กรอบทริป"
           action={
-            <button onClick={() => setEditing(true)} className="text-primary text-xs font-semibold">
+            <button onClick={() => setEditing(true)} className="text-primary text-xs font-medium">
               แก้ไข
             </button>
           }
         />
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          <Card accent="sky" className="p-4">
+          <Card accent="blue" className="p-4">
             <Stat
               value={hasDates ? `${trip.nights + 1} วัน` : '—'}
               label={
@@ -153,10 +153,10 @@ export function TripOverview({ tripId }: { tripId: string }) {
               }
             />
           </Card>
-          <Card accent="joyfull" className="p-4">
+          <Card accent="pink" className="p-4">
             <Stat value={`${trip.partySize} คน`} label="เดินทางด้วยกัน" />
           </Card>
-          <Card accent="matcha" className="p-4">
+          <Card accent="green" className="p-4">
             {/* Countries, not cities: on a two-country route that is the number
                 that changes how the plan is drafted (M1 — A1.3). */}
             <Stat
@@ -171,7 +171,7 @@ export function TripOverview({ tripId }: { tripId: string }) {
               }
             />
           </Card>
-          <Card accent="sun" className="p-4">
+          <Card accent="yellow" className="p-4">
             <Stat
               value={formatMoney(trip.budgetPerPersonThb, 'THB')}
               label="งบต่อคนที่ตั้งไว้"
@@ -191,7 +191,7 @@ export function TripOverview({ tripId }: { tripId: string }) {
           action={
             <button
               onClick={() => setInviting(true)}
-              className="text-primary inline-flex items-center gap-1 text-xs font-semibold"
+              className="text-primary inline-flex items-center gap-1 text-xs font-medium"
             >
               <UserPlus className="size-3.5" /> ชวนเพิ่ม
             </button>
@@ -202,7 +202,7 @@ export function TripOverview({ tripId }: { tripId: string }) {
             <div key={member.id} className="flex items-center gap-3 p-3.5">
               <CharacterAvatar characterId={member.characterId} size="md" />
               <div className="min-w-0 flex-1">
-                <p className="text-espresso text-sm font-semibold">
+                <p className="text-ink text-sm font-medium">
                   {member.name}
                   {member.role === 'owner' ? (
                     <span className="text-muted ml-1.5 text-[11px] font-normal">เจ้าของทริป</span>
@@ -213,7 +213,7 @@ export function TripOverview({ tripId }: { tripId: string }) {
                 </p>
               </div>
               {member.hasWishlist ? (
-                <Badge tone="matcha">พร้อม</Badge>
+                <Badge tone="green">พร้อม</Badge>
               ) : (
                 <Badge tone="outline">รออยู่</Badge>
               )}
@@ -233,15 +233,15 @@ export function TripOverview({ tripId }: { tripId: string }) {
         <SectionHeader label="สถานะตอนนี้" />
         <div className="grid gap-3 sm:grid-cols-2">
           <Link href={`/t/${tripId}/wishlist`}>
-            <Card accent="matcha" className="h-full p-4">
+            <Card accent="green" className="h-full p-4">
               <div className="flex items-center justify-between">
-                <p className="font-display text-espresso font-bold">ที่อยากไปเข้าแพลนแล้ว</p>
+                <p className="font-display text-ink font-bold">ที่อยากไปเข้าแพลนแล้ว</p>
                 <ChevronRight className="text-muted size-4" />
               </div>
-              <p className="font-display text-espresso nums mt-2 text-3xl font-extrabold">
+              <p className="font-display text-ink nums mt-2 text-3xl font-bold">
                 {coverage.percent}%
               </p>
-              <Progress value={coverage.percent / 100} tone="espresso" className="mt-2" />
+              <Progress value={coverage.percent / 100} tone="ink" className="mt-2" />
               <p className="text-muted mt-2 text-xs">
                 ต้องไป {coverage.mustCovered}/{coverage.mustTotal} · ยังไม่เข้าแพลน{' '}
                 {coverage.uncovered} อย่าง
@@ -252,13 +252,13 @@ export function TripOverview({ tripId }: { tripId: string }) {
           <Link href={`/t/${tripId}/budget`}>
             <Card accent="primary" className="h-full p-4">
               <div className="flex items-center justify-between">
-                <p className="font-display text-espresso font-bold">งบประมาณการต่อคน</p>
+                <p className="font-display text-ink font-bold">งบประมาณการต่อคน</p>
                 <ChevronRight className="text-muted size-4" />
               </div>
-              <p className="font-display text-espresso nums mt-2 text-3xl font-extrabold">
+              <p className="font-display text-ink nums mt-2 text-3xl font-bold">
                 {formatMoney(budget?.perPersonThb ?? 0, 'THB')}
               </p>
-              <Progress value={budget?.budgetUsed ?? 0} tone="espresso" className="mt-2" />
+              <Progress value={budget?.budgetUsed ?? 0} tone="ink" className="mt-2" />
               <p className="text-muted mt-2 text-xs">
                 {budget && budget.remainingThb >= 0
                   ? `เหลืออีก ${formatMoney(budget.remainingThb, 'THB')} จากงบที่ตั้งไว้`
@@ -304,8 +304,8 @@ export function TripOverview({ tripId }: { tripId: string }) {
               return (
                 <div key={entry.id} className="flex items-center gap-3 p-3.5">
                   <CharacterAvatar characterId={who?.characterId ?? 'shiba'} size="sm" />
-                  <p className="text-espresso min-w-0 flex-1 text-sm">
-                    <span className="font-semibold">{who?.name ?? 'ROVE'}</span>{' '}
+                  <p className="text-ink min-w-0 flex-1 text-sm">
+                    <span className="font-medium">{who?.name ?? 'ROVE'}</span>{' '}
                     <span className="text-muted">{entry.text}</span>
                   </p>
                   <span className="text-muted shrink-0 text-[11px]">

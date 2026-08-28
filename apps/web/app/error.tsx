@@ -43,7 +43,7 @@ export default function AppError({
     <StatusPage
       image="/brand/status/status-maintenance.webp"
       code="503"
-      tone="sun"
+      tone="yellow"
       title="ระบบหลังบ้านไม่ตอบ"
       hint="ตอนนี้ต่อกับเซิร์ฟเวอร์ของ ROVE ไม่ได้ ไม่ใช่ที่เครื่องคุณ — แพลนที่บันทึกไว้ยังอยู่ครบ รอสักครู่แล้วลองใหม่ได้เลย"
       actions={

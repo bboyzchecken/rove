@@ -1,127 +1,181 @@
 /* ============================================================================
- * BRAND TOKENS — ROVE (DEV_SPEC §15)
+ * BRAND TOKENS — ROVE (ROVE_BRAND_SPEC.md §2, §3, §5)
  *
  * This file is the ONLY place a brand colour, radius or font family is written
  * down. Nothing else in the app may hardcode one. Change the brand → change
  * this file, nothing else.
  *
- * Values are hsl channels, consumed as `hsl(var(--brand-primary))`.
+ * Values are hsl channels, consumed as `hsl(var(--brand-primary))`, so every
+ * token still takes Tailwind's `/opacity` modifier.
  * ==========================================================================*/
 
 :root {
-  /* --- Primary: cha thai terracotta — actions and highlights only --------- */
-  --brand-primary: 15 65% 58%; /* #D9714E */
-  --brand-primary-light: 15 65% 70%; /* #E49A81 */
-  --brand-primary-fg: 0 0% 100%; /* white on terracotta */
+  /* --- Core palette (§2.1) ------------------------------------------------
+   * Four colours plus cream and ink. The meaning of each is locked in §2.4 and
+   * must not be shuffled per section:
+   *
+   *   yellow  planning, dates, the trip itself
+   *   blue    action, booking, primary CTA
+   *   green   money, budget, split, confirmed
+   *   pink    people, friends, community, sharing
+   */
+  --brand-yellow: 43 85% 61%; /* #F0C045 mustard */
+  --brand-blue: 208 56% 51%; /* #3D86C8 cobalt */
+  --brand-pink: 330 75% 75%; /* #EF91C0 */
+  --brand-green: 108 51% 48%; /* #54B73C */
+  --brand-cream: 47 100% 97%; /* #FFFCF1 */
+  --brand-ink: 0 0% 6%; /* #101010 */
+  --brand-white: 0 0% 100%;
 
-  /* --- Base -------------------------------------------------------------- */
-  --brand-espresso: 17 26% 19%; /* #3D2B24 — ALL type is this colour */
-  --brand-bg: 0 0% 100%; /* white page */
-  --brand-surface: 30 10% 96%; /* neutral card on white */
-  --brand-muted: 22 18% 43%; /* #6B5B4E secondary text */
-  --brand-border: 30 8% 90%;
+  /* --- The canvas (§2.2) --------------------------------------------------
+   * The ONLY colour besides ink that may be a full-bleed background carrying
+   * white type. This is a hard contrast rule, not a preference: white on
+   * #2B6BA8 is 5.57:1 and passes; on the lighter `--brand-blue` it is 3.86
+   * and passes for display type only; on yellow, pink or green it is under
+   * 2.6 and fails outright. Those three live at tag and doodle scale with ink
+   * on them, which is what keeps them accents rather than wallpaper. */
+  --brand-canvas: 209.3 59.3% 41.4%; /* #2B6BA8 deep cobalt */
+
+  /* --- Text on colour blocks (§2.2, §2.5) ---------------------------------
+   * A colour block never takes pure black or white type. It takes its own
+   * darkened hue, which is what keeps a yellow card and a blue card reading as
+   * the same family rather than as two unrelated swatches.
+   *
+   *   -deep  body and headings on that block
+   *   -mid   secondary text on that block
+   */
+  --brand-yellow-deep: 32 94% 13%; /* #412402 */
+  --brand-yellow-mid: 32 89% 21%; /* #633806 */
+  --brand-blue-deep: 210 91% 17%; /* #042C53 */
+  --brand-blue-mid: 210 82% 27%; /* #0C447C */
+  --brand-pink-deep: 339 56% 19%; /* #4B1528 */
+  --brand-pink-mid: 340 52% 29%; /* #72243E */
+  --brand-green-deep: 96 85% 11%; /* #173404 */
+  --brand-green-mid: 95 78% 18%; /* #27500A */
+
+  /* --- Surfaces ----------------------------------------------------------
+   * Cream is the page, white is the card that lifts off it. §5 alternates
+   * cream → white → cream down a page, so both are surfaces in their own
+   * right — `--brand-surface` is not "slightly grey page", it is the other
+   * half of that rhythm. */
+  --brand-bg: 47 100% 97%; /* cream */
+  --brand-surface: 0 0% 100%; /* white */
+  --brand-border: 43 32% 87%; /* #E8E2D2 hairline on cream */
+  --brand-muted: 48 3% 36%; /* #5F5E5A body copy on cream/white */
 
   /* --- Form fields --------------------------------------------------------
    * A field is the one thing on the page you are meant to reach into, so it
    * never borrows the colour of what it sits on: always white, always with a
-   * line around it. That holds on a white sheet and on a surface card alike —
-   * without it a field on `--brand-surface` disappears into the card. */
+   * line around it. That holds on cream and on a colour block alike — without
+   * it a field on a card disappears into the card. */
   --brand-field: 0 0% 100%;
-  --brand-field-border: 26 14% 82%; /* #D8D0C9 — visible on white and on surface */
+  --brand-field-border: 43 22% 80%; /* visible on cream, white and colour */
 
-  /* --- Accent palette ----------------------------------------------------
-   * The colour blocks. Components tint these over white rather than using a
-   * second set of pastel hexes, so there is exactly one value per colour. */
-  --brand-matcha: 137 36% 65%; /* #8BC99A success / nature */
-  --brand-sky: 207 68% 81%; /* #A8D4F0 info / calm */
-  --brand-sun: 52 82% 68%; /* #F0E06B warning / happy */
-  --brand-joyfull: 260 37% 80%; /* #C4B8E8 playful / secondary */
+  /* --- Semantic ----------------------------------------------------------
+   * `primary` is blue, because §2.4 locks blue to action. It is an alias, not
+   * a sixth colour: `bg-primary` and `bg-blue` are the same paint. The alias
+   * exists so a button says what it is for rather than what colour it is. */
+  --brand-primary: 208 56% 51%; /* = blue */
+  --brand-primary-fg: 0 0% 100%; /* white — §2.5 allows it at 16px+ bold */
 
-  /* --- Semantic ----------------------------------------------------------- */
-  --brand-success: 137 40% 36%;
-  --brand-warning: 32 78% 42%;
-  --brand-danger: 4 68% 50%;
+  --brand-success: 108 51% 48%; /* = green, money confirmed */
+  --brand-warning: 32 89% 21%; /* yellow-mid — yellow itself fails on cream */
+  --brand-danger: 4 68% 46%;
 
-  /* --- Shape & type ------------------------------------------------------- */
-  --brand-radius: 1.5rem; /* 24px — chunky friendly blocks */
-  --brand-radius-sm: 0.875rem;
-  --brand-radius-lg: 2rem;
+  /* --- Shape (§5) ---------------------------------------------------------
+   * Cards 14–16px, pills fully round. The old 24px was a different brand: on
+   * a flat colour block that big a radius reads as a sticker, and the doodle
+   * linework is what carries the playfulness now. */
+  --brand-radius: 1rem; /* 16px */
+  --brand-radius-sm: 0.75rem; /* 12px */
+  --brand-radius-lg: 1.25rem; /* 20px */
 
-  /* Inter for everything. It carries no Thai glyphs, so Thai text falls
-   * through to Noto Sans Thai — matched for x-height and weight. */
-  --brand-font-sans: var(--font-inter), var(--font-noto-thai), system-ui, sans-serif;
-  --brand-font-display: var(--brand-font-sans);
+  /* --- Type (§3) ----------------------------------------------------------
+   * Display and body are the same grotesk; the difference between them is
+   * size and tracking, not family. Thai must be paired explicitly — left to
+   * fall back, it lands on a system serif and the page stops being the brand
+   * mid-sentence. */
+  --brand-font-sans: var(--font-body), var(--font-thai), system-ui, sans-serif;
+  --brand-font-display: var(--font-grotesk), var(--font-thai), system-ui, sans-serif;
   --brand-font-mono: var(--brand-font-sans);
 
   /* --- Elevation ----------------------------------------------------------
-   * Flat by default: separation comes from colour blocks, not shadow. Only
-   * things that float above the page (dialogs, sheets) get a real shadow. */
-  --brand-shadow-sm: 0 1px 2px rgba(61, 43, 36, 0.05);
-  --brand-shadow: 0 6px 20px rgba(61, 43, 36, 0.1);
-  --brand-shadow-lg: 0 16px 40px rgba(61, 43, 36, 0.16);
+   * §5: cards have no shadow. Separation on the page comes from cream against
+   * white and from flat colour, full stop. What remains here is for things
+   * that genuinely float *above* the page — a sheet, a dialog, a dropdown —
+   * where the shadow is saying "this is in front", not "this is a card". */
+  --brand-shadow-sm: 0 1px 2px rgb(16 16 16 / 0.06);
+  --brand-shadow: 0 6px 20px rgb(16 16 16 / 0.1);
+  --brand-shadow-lg: 0 16px 40px rgb(16 16 16 / 0.16);
 }
 
 /* ============================================================================
- * ADMIN SURFACE (Phase 5 — W25.1)
+ * ADMIN SURFACE
  *
  * A scope in this file, not a second colour file: brand.css is the only place
  * a brand colour is written down, and an admin palette that lived elsewhere
- * would drift the first time terracotta changed.
+ * would drift the first time the palette changed.
  *
  * Nothing in globals.css needs to know about this. Every Tailwind utility
  * already reads `hsl(var(--brand-*))`, so re-declaring the variables under
  * `[data-surface='admin']` re-themes every component underneath it — the same
  * `Card`, the same `Button`, the same everything.
  *
- * This is NOT the dark theme the note below rules out. It is one surface, for
- * one audience, and the reason it is dark is that it inverts the brand's own
- * espresso rather than reaching for a neutral grey — an admin console that
- * looks like every other dashboard would have been the easier thing to build
- * and the wrong one.
+ * This is NOT a dark theme for the product. It is one surface, for one
+ * audience, and it is dark because it inverts the brand's own ink rather than
+ * reaching for a neutral grey.
  * ==========================================================================*/
 
 [data-surface='admin'] {
-  /* Espresso is the brand's type colour. Turned into the page, it gives a
-   * dark surface that is still made of ROVE's own hue. */
-  --brand-bg: 17 26% 11%;
-  --brand-surface: 17 20% 16%;
+  /* Ink is the brand's type colour. Turned into the page, it gives a dark
+   * surface still made of ROVE's own value rather than a stock charcoal. */
+  --brand-bg: 0 0% 7%;
+  --brand-surface: 0 0% 12%;
   /* Cards lift off the page with lightness, not shadow — the flat principle
-   * survives the inversion (§15 Visual Direction). */
-  --brand-espresso: 30 20% 92%; /* now the type colour ON the dark page */
-  --brand-muted: 24 12% 62%; /* 4.5:1 on the new background */
-  --brand-border: 17 14% 24%;
+   * survives the inversion. */
+  --brand-ink: 44 30% 93%; /* now the type colour ON the dark page */
+  --brand-muted: 44 8% 64%; /* 4.5:1 on the new background */
+  --brand-border: 0 0% 20%;
 
   /* A field is still the one thing you reach into, so it still separates
    * itself from what it sits on — by going darker here instead of white. */
-  --brand-field: 17 22% 9%;
-  --brand-field-border: 17 14% 30%;
+  --brand-field: 0 0% 4%;
+  --brand-field-border: 0 0% 26%;
 
-  /* Terracotta is unchanged: primary actions and the active nav item, and
-   * nothing else. On this background it carries further than it did on white. */
+  /* The palette stops being decoration and becomes status: green = done,
+   * yellow = waiting, blue = information, danger = careful. Desaturated and
+   * darkened so a table of them reads as data rather than as bunting. */
+  --brand-yellow: 43 45% 42%;
+  --brand-blue: 208 34% 42%;
+  --brand-pink: 330 26% 46%;
+  --brand-green: 108 26% 36%;
 
-  /* The accents stop being decoration and become status (§4.2): matcha =
-   * done, sun = waiting, joyfull = information, danger = careful. Desaturated
-   * and darkened so a table of them reads as data rather than as bunting —
-   * this, not the background colour, is where "เลิกการ์ตูน" actually happens. */
-  --brand-matcha: 137 24% 38%;
-  --brand-sky: 207 30% 40%;
-  --brand-sun: 44 42% 40%;
-  --brand-joyfull: 260 20% 44%;
+  /* On a dark block the readable type is the light end of the hue, not the
+   * deep end — so `-deep` and `-mid` swap roles here. */
+  --brand-yellow-deep: 43 70% 88%;
+  --brand-yellow-mid: 43 40% 76%;
+  --brand-blue-deep: 208 70% 88%;
+  --brand-blue-mid: 208 40% 76%;
+  --brand-pink-deep: 330 60% 90%;
+  --brand-pink-mid: 330 34% 78%;
+  --brand-green-deep: 108 50% 86%;
+  --brand-green-mid: 108 30% 74%;
 
-  --brand-success: 137 42% 62%;
-  --brand-warning: 38 76% 62%;
+  --brand-primary: 208 48% 56%;
+  --brand-success: 108 42% 62%;
+  --brand-warning: 43 70% 62%;
   --brand-danger: 4 72% 66%;
 
-  /* 24px corners on a data table are unreadable — the eye loses the column. */
+  /* 16px corners on a data table are unreadable — the eye loses the column. */
   --brand-radius: 0.625rem; /* 10px */
   --brand-radius-sm: 0.375rem; /* 6px */
   --brand-radius-lg: 0.875rem;
 
-  /* Shadow on a dark page has to be black. Espresso-tinted shadow is lighter
+  /* Shadow on a dark page has to be black. An ink-tinted shadow is lighter
    * than the surface under it, which reads as a glow. */
-  --brand-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --brand-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
-  --brand-shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
+  --brand-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --brand-shadow: 0 6px 20px rgb(0 0 0 / 0.45);
+  --brand-shadow-lg: 0 16px 40px rgb(0 0 0 / 0.55);
 }
 
 /* Admin work is reading columns of figures, so tabular numerals are the
@@ -129,8 +183,3 @@
 [data-surface='admin'] table {
   font-variant-numeric: tabular-nums;
 }
-
-/* A dark theme is a Phase 2 decision (§16) — the product is a white canvas
- * with colour blocks on it, and inverting that is a redesign, not a token
- * swap. The admin scope above is that redesign, done once, for one surface
- * that no signed-in traveller ever sees. */

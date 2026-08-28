@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
  * blocks alike, and the focus ring is the terracotta.
  */
 export const fieldClass = [
-  'bg-field text-espresso border-field-border w-full rounded-2xl border px-3.5 py-2.5 text-sm',
+  'bg-field text-ink border-field-border w-full rounded-2xl border px-3.5 py-2.5 text-sm',
   'placeholder:text-muted/60 transition-colors outline-none',
   'hover:border-muted/45 focus:border-primary focus:ring-2 focus:ring-primary/25',
   'disabled:cursor-not-allowed disabled:opacity-60',
@@ -27,14 +27,14 @@ export const fieldClass = [
  * these files as text: a class name built at runtime is never generated.
  */
 export const fieldShellClass = [
-  'bg-field text-espresso border-field-border flex w-full items-center rounded-2xl border px-3.5 text-sm',
+  'bg-field text-ink border-field-border flex w-full items-center rounded-2xl border px-3.5 text-sm',
   'transition-colors hover:border-muted/45',
   'focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/25',
 ].join(' ');
 
 /** The input inside a `fieldShellClass` shell — the shell already is the box. */
 export const bareInputClass =
-  'text-espresso min-w-0 flex-1 bg-transparent py-2.5 text-sm outline-none';
+  'text-ink min-w-0 flex-1 bg-transparent py-2.5 text-sm outline-none';
 
 export function Input({ className, ...props }: React.ComponentProps<'input'>) {
   return <input className={cn(fieldClass, className)} {...props} />;
@@ -53,7 +53,7 @@ export function Select({ className, ...props }: React.ComponentProps<'select'>) 
 export function FieldLabel({ className, ...props }: React.ComponentProps<'span'>) {
   return (
     <span
-      className={cn('text-muted mb-1.5 block text-[11px] font-semibold', className)}
+      className={cn('text-muted mb-1.5 block text-[11px] font-medium', className)}
       {...props}
     />
   );

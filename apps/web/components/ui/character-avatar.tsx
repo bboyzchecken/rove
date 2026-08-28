@@ -78,7 +78,7 @@ export function CharacterStack({
         <CharacterAvatar key={`${id}-${i}`} characterId={id} size={size} ring />
       ))}
       {rest > 0 ? (
-        <span className="bg-surface text-muted ring-bg inline-flex size-9 items-center justify-center rounded-full text-[11px] font-semibold ring-2">
+        <span className="bg-surface text-muted ring-bg inline-flex size-9 items-center justify-center rounded-full text-[11px] font-medium ring-2">
           +{rest}
         </span>
       ) : null}

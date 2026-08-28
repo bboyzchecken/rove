@@ -103,7 +103,7 @@ export function DataTable<Row>({
                   sort?.key === column.key ? (sort.desc ? 'descending' : 'ascending') : 'none'
                 }
                 className={cn(
-                  'text-muted px-4 py-3 text-[11px] font-bold tracking-wide uppercase',
+                  'text-muted px-4 py-3 text-[11px] font-medium tracking-[0.08em]',
                   column.align === 'right' ? 'text-right' : 'text-left',
                 )}
               >
@@ -112,7 +112,7 @@ export function DataTable<Row>({
                     type="button"
                     onClick={() => toggle(column.key)}
                     className={cn(
-                      'hover:text-espresso inline-flex items-center gap-1 transition',
+                      'hover:text-ink inline-flex items-center gap-1 transition',
                       column.align === 'right' && 'flex-row-reverse',
                     )}
                   >
@@ -141,7 +141,7 @@ export function DataTable<Row>({
                 <td
                   key={column.key}
                   className={cn(
-                    'text-espresso px-4 py-3',
+                    'text-ink px-4 py-3',
                     column.align === 'right' && 'nums text-right',
                     column.className,
                   )}

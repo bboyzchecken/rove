@@ -56,7 +56,7 @@ export default function PricingPage() {
     >
       <div className="py-8 sm:py-12">
         <header className="mx-auto max-w-2xl text-center">
-          <h1 className="font-display text-espresso text-3xl font-extrabold tracking-tight sm:text-4xl">
+          <h1 className="font-display text-ink text-3xl font-bold tracking-tight sm:text-4xl">
             จ่ายตอนที่ทริปคุ้มที่จะจ่าย
           </h1>
           <p className="text-muted mt-3 text-sm leading-relaxed sm:text-base">
@@ -78,13 +78,13 @@ export default function PricingPage() {
 
         {/* ------------------------------------------------------------ faq */}
         <section className="mx-auto mt-14 max-w-2xl">
-          <h2 className="font-display text-espresso text-xl font-extrabold tracking-tight">
+          <h2 className="font-display text-ink text-xl font-bold tracking-tight">
             คำถามที่ถามกันบ่อย
           </h2>
           <div className="mt-4 space-y-2.5">
             {FAQ.map((item) => (
               <Card key={item.q} className="p-4 sm:p-5">
-                <p className="text-espresso text-sm font-semibold">{item.q}</p>
+                <p className="text-ink text-sm font-medium">{item.q}</p>
                 <p className="text-muted mt-1.5 text-xs leading-relaxed">{item.a}</p>
               </Card>
             ))}

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Noto_Sans_Thai } from 'next/font/google';
+import { IBM_Plex_Sans_Thai, Inter, Space_Grotesk } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale } from 'next-intl/server';
 
@@ -8,21 +8,45 @@ import '@/styles/globals.css';
 
 import { Providers } from './providers';
 
-/* DEV_SPEC §15 Typography — Inter for the whole product. Inter ships no Thai
- * glyphs, so Thai falls through to Noto Sans Thai, which is matched to it on
- * x-height and weight. Both are wired to CSS vars so brand.css stays the one
- * place that names a family. */
-const inter = Inter({
+/* Typography (ROVE_BRAND_SPEC §3). Three faces, each with one job:
+ *
+ *   display  Space Grotesk — a tight grotesk for headlines only. The spec asks
+ *            for General Sans / Cabinet Grotesk / Satoshi, which are Fontshare
+ *            fonts and cannot be self-hosted through next/font/google; Space
+ *            Grotesk is the closest thing Google serves — same tight, slightly
+ *            odd grotesk, and it survives -0.03em tracking at hero size.
+ *   body     Inter at 400/500, per §3's "same family, or Inter".
+ *   thai     IBM Plex Sans Thai. Almost all of the product's copy is Thai, so
+ *            this is the face most readers actually see. It has to be loaded
+ *            explicitly — left to fall back, Thai lands on a system serif and
+ *            the page stops being the brand mid-sentence (§8).
+ *
+ * Only the weights the spec allows are downloaded. 600/800 are gone on
+ * purpose: §3 caps a screen at two weights, and a weight you cannot load is a
+ * weight nobody reaches for by accident. */
+/* Named `--font-grotesk`, NOT `--font-display`: Tailwind's theme also defines
+ * `--font-display` (from `--brand-font-display`), and when both existed the
+ * next/font one won for any plain `font-family: var(--font-display)` in CSS —
+ * which silently dropped the Thai face off the end of the display stack and
+ * put every Thai headline on a system fallback. */
+const spaceGrotesk = Space_Grotesk({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'],
-  variable: '--font-inter',
+  weight: ['500', '700'],
+  variable: '--font-grotesk',
   display: 'swap',
 });
 
-const notoSansThai = Noto_Sans_Thai({
+const inter = Inter({
+  subsets: ['latin'],
+  weight: ['400', '500', '700'],
+  variable: '--font-body',
+  display: 'swap',
+});
+
+const plexThai = IBM_Plex_Sans_Thai({
   subsets: ['latin', 'thai'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-noto-thai',
+  weight: ['400', '500', '700'],
+  variable: '--font-thai',
   display: 'swap',
 });
 
@@ -39,7 +63,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   // Mobile-first: the trip room is used on a phone.
   maximumScale: 5,
-  themeColor: '#FFFFFF',
+  // Cream, not white — the browser chrome should meet the page, not frame it.
+  themeColor: '#FFFCF1',
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -48,7 +73,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const locale = await getLocale();
 
   return (
-    <html lang={locale} className={`${inter.variable} ${notoSansThai.variable}`}>
+    <html
+      lang={locale}
+      className={`${spaceGrotesk.variable} ${inter.variable} ${plexThai.variable}`}
+    >
       <body className="min-h-dvh antialiased">
         <NextIntlClientProvider>
           <Providers>{children}</Providers>

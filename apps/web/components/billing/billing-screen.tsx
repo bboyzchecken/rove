@@ -50,7 +50,7 @@ export function BillingScreen() {
   return (
     <div className="space-y-7 px-4 py-5">
       <header>
-        <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight">
+        <h1 className="font-display text-ink text-2xl font-bold tracking-tight">
           บิลและการชำระเงิน
         </h1>
         <p className="text-muted mt-1 text-sm">ทุกอย่างที่คุณจ่ายให้ ROVE พร้อมใบเสร็จย้อนหลัง</p>
@@ -62,14 +62,14 @@ export function BillingScreen() {
         <Card accent="primary" className="p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="font-display text-espresso text-lg font-extrabold">
+              <p className="font-display text-ink text-lg font-bold">
                 {subscription?.planName ?? 'ROVE ฟรี'}
               </p>
               <p className="text-muted mt-1 text-xs leading-relaxed">
                 {subscription ? subscriptionStatusLine(subscription) : '—'}
               </p>
             </div>
-            <Badge tone={subscription?.status === 'active' ? 'matcha' : 'outline'} size="md">
+            <Badge tone={subscription?.status === 'active' ? 'green' : 'outline'} size="md">
               {subscription?.status === 'active' ? 'กำลังใช้งาน' : 'ไม่มีค่ารายเดือน'}
             </Badge>
           </div>
@@ -85,7 +85,7 @@ export function BillingScreen() {
           <p className="text-muted/80 px-1 text-[11px] leading-relaxed">
             ไม่มีค่าใช้จ่ายรายเดือนและไม่มีการตัดเงินอัตโนมัติ · ปลดล็อกเป็นทริป ๆ ไปจากในห้องทริปนั้น
             —{' '}
-            <Link href="/pricing" className="text-primary font-semibold">
+            <Link href="/pricing" className="text-primary font-medium">
               ดูราคาทั้งหมด
             </Link>
           </p>
@@ -131,7 +131,7 @@ export function BillingScreen() {
               title="ยังไม่เคยซื้ออะไรเลย"
               hint="ทุกทริปร่างด้วย AI ได้ฟรีอยู่แล้ว ถ้าซื้อสิทธิ์เพิ่มเมื่อไหร่ ใบเสร็จจะมาอยู่ตรงนี้"
               action={
-                <ButtonLink href="/trips" size="sm" variant="espresso">
+                <ButtonLink href="/trips" size="sm" variant="ink">
                   ไปที่ทริปของฉัน
                 </ButtonLink>
               }
@@ -142,7 +142,7 @@ export function BillingScreen() {
             {years.map((group) => (
               <div key={group.year}>
                 <div className="mb-1.5 flex items-baseline justify-between px-1">
-                  <p className="text-espresso text-sm font-bold">{group.year}</p>
+                  <p className="text-ink text-sm font-bold">{group.year}</p>
                   <p className="text-muted nums text-[11px]">
                     รวม {formatMoney(group.totalThb, 'THB')}
                   </p>
@@ -179,21 +179,21 @@ function OrderRow({ order }: { order: Order }) {
       <span
         className={cn(
           'flex size-9 shrink-0 items-center justify-center rounded-full',
-          order.method === 'points' ? 'bg-sun/55' : 'bg-surface',
+          order.method === 'points' ? 'bg-yellow/55' : 'bg-surface',
         )}
         aria-hidden="true"
       >
         {order.kind === 'ai_credit' ? (
-          <Sparkles className="text-espresso size-4" strokeWidth={2.5} />
+          <Sparkles className="text-ink size-4" strokeWidth={2.5} />
         ) : order.method === 'points' ? (
-          <Wallet className="text-espresso size-4" strokeWidth={2.5} />
+          <Wallet className="text-ink size-4" strokeWidth={2.5} />
         ) : (
-          <ReceiptText className="text-espresso size-4" strokeWidth={2.5} />
+          <ReceiptText className="text-ink size-4" strokeWidth={2.5} />
         )}
       </span>
 
       <span className="min-w-0 flex-1">
-        <span className="text-espresso block truncate text-sm font-semibold">{order.title}</span>
+        <span className="text-ink block truncate text-sm font-medium">{order.title}</span>
         <span className="text-muted mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px]">
           <span className="nums">{formatThaiDate(order.issuedAt)}</span>
           <span aria-hidden="true">·</span>
@@ -203,7 +203,7 @@ function OrderRow({ order }: { order: Order }) {
       </span>
 
       <span className="shrink-0 text-right">
-        <span className="text-espresso nums block text-sm font-bold">
+        <span className="text-ink nums block text-sm font-bold">
           {orderAmountLabel(order)}
         </span>
         <span className="text-muted text-[11px]">{ORDER_KIND_LABEL[order.kind]}</span>
@@ -227,7 +227,7 @@ function PlanRow({ plan }: { plan: SubscriptionPlan }) {
     <Card className="p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-espresso text-sm font-bold">{plan.name}</p>
+          <p className="text-ink text-sm font-bold">{plan.name}</p>
           <p className="text-muted mt-0.5 text-xs leading-relaxed">{plan.tagline}</p>
           <ul className="text-muted mt-2 space-y-1 text-[11px]">
             {plan.perks.map((perk) => (
@@ -239,7 +239,7 @@ function PlanRow({ plan }: { plan: SubscriptionPlan }) {
           </ul>
         </div>
         <div className="shrink-0 text-right">
-          <p className="text-espresso nums text-sm font-bold">{planPriceLabel(plan)}</p>
+          <p className="text-ink nums text-sm font-bold">{planPriceLabel(plan)}</p>
           <Badge tone="outline" className="mt-1.5">
             เร็ว ๆ นี้
           </Badge>

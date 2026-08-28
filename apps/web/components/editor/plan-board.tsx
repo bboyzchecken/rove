@@ -67,11 +67,11 @@ import { cn } from '@/lib/utils';
  */
 const TYPE_META: Record<ItemType, { dot: string; label: string }> = {
   poi: { dot: 'bg-primary', label: 'สถานที่' },
-  meal: { dot: 'bg-sun', label: 'มื้ออาหาร' },
-  transport: { dot: 'bg-sky', label: 'เดินทาง' },
-  stay: { dot: 'bg-joyfull', label: 'ที่พัก' },
-  free: { dot: 'bg-matcha', label: 'เวลาว่าง' },
-  flight: { dot: 'bg-espresso', label: 'เที่ยวบิน' },
+  meal: { dot: 'bg-yellow', label: 'มื้ออาหาร' },
+  transport: { dot: 'bg-blue', label: 'เดินทาง' },
+  stay: { dot: 'bg-pink', label: 'ที่พัก' },
+  free: { dot: 'bg-green', label: 'เวลาว่าง' },
+  flight: { dot: 'bg-ink', label: 'เที่ยวบิน' },
 };
 
 const TRAVEL_ICON = { train: TrainFront, walk: Footprints, bus: Bus, car: Car };
@@ -160,7 +160,7 @@ export function PlanBoard({ tripId, fxRate }: { tripId: string; fxRate: number }
               onClick={() => setDayId(d.id)}
               className={cn(
                 'shrink-0 rounded-2xl px-3.5 py-2 text-left transition',
-                active ? 'bg-espresso text-bg' : 'bg-surface text-muted',
+                active ? 'bg-ink text-bg' : 'bg-surface text-muted',
               )}
             >
               <span className="font-display block text-sm font-bold">วัน {d.index}</span>
@@ -178,7 +178,7 @@ export function PlanBoard({ tripId, fxRate }: { tripId: string; fxRate: number }
           <Card className="p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="font-display text-espresso text-lg font-extrabold">
+                <p className="font-display text-ink text-lg font-bold">
                   {day.label} · {day.city}
                 </p>
                 <p className="text-muted mt-0.5 text-xs">
@@ -186,9 +186,9 @@ export function PlanBoard({ tripId, fxRate }: { tripId: string; fxRate: number }
                 </p>
               </div>
               {day.weather ? (
-                <div className="bg-sky/25 flex items-center gap-2 rounded-full px-3 py-1.5">
+                <div className="bg-blue/25 flex items-center gap-2 rounded-full px-3 py-1.5">
                   <span>{day.weather.icon}</span>
-                  <span className="text-espresso text-xs font-semibold">
+                  <span className="text-ink text-xs font-medium">
                     {day.weather.high}° / {day.weather.low}°
                   </span>
                   <span className="text-muted text-[11px]">{day.weather.text}</span>
@@ -199,14 +199,14 @@ export function PlanBoard({ tripId, fxRate }: { tripId: string; fxRate: number }
             <div className="mt-3 flex flex-wrap gap-1.5">
               <Button
                 size="sm"
-                variant={view === 'timeline' ? 'espresso' : 'soft'}
+                variant={view === 'timeline' ? 'ink' : 'soft'}
                 onClick={() => setView('timeline')}
               >
                 ไทม์ไลน์
               </Button>
               <Button
                 size="sm"
-                variant={view === 'map' ? 'espresso' : 'soft'}
+                variant={view === 'map' ? 'ink' : 'soft'}
                 onClick={() => setView('map')}
               >
                 <MapIcon className="size-3.5" /> แผนที่
@@ -245,11 +245,11 @@ export function PlanBoard({ tripId, fxRate }: { tripId: string; fxRate: number }
 
           {/* rationale -------------------------------------------------- */}
           {showWhy ? (
-            <Card accent="sun" className="animate-rove-rise p-4">
+            <Card accent="yellow" className="animate-rove-rise p-4">
               <p className="section-label mb-2">เหตุผลที่ ROVE จัดแบบนี้</p>
               <ul className="space-y-2">
                 {rationalesFor(day.items, members).map((reason) => (
-                  <li key={reason} className="text-espresso flex gap-2 text-xs leading-relaxed">
+                  <li key={reason} className="text-ink flex gap-2 text-xs leading-relaxed">
                     <span className="text-primary">•</span>
                     {reason}
                   </li>
@@ -301,7 +301,7 @@ export function PlanBoard({ tripId, fxRate }: { tripId: string; fxRate: number }
 
               <button
                 onClick={() => setAdding(true)}
-                className="border-border text-muted hover:bg-surface mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed py-3 text-sm font-semibold"
+                className="border-border text-muted hover:bg-surface mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed py-3 text-sm font-medium"
               >
                 <Plus className="size-4" /> เพิ่มรายการในวันนี้
               </button>
@@ -389,7 +389,7 @@ function PlanHistorySheet({
         {versions.map((version) => (
           <li key={version.id} className="flex items-center gap-2 py-2.5">
             <Badge tone="outline">{ACTION_LABEL[version.action] ?? version.action}</Badge>
-            <span className="text-espresso min-w-0 flex-1 truncate text-sm">{version.title}</span>
+            <span className="text-ink min-w-0 flex-1 truncate text-sm">{version.title}</span>
             <span className="text-muted shrink-0 text-[11px]">
               {new Date(version.createdAt).toLocaleTimeString('th-TH', {
                 hour: '2-digit',
@@ -458,7 +458,7 @@ function SortableTimelineCard({
     >
       {/* time rail */}
       <div className="w-12 shrink-0 pt-3.5 text-right">
-        <span className="text-espresso nums text-xs font-medium">{item.start}</span>
+        <span className="text-ink nums text-xs font-medium">{item.start}</span>
         {item.end ? <span className="text-muted nums block text-[10px]">{item.end}</span> : null}
       </div>
 
@@ -467,10 +467,10 @@ function SortableTimelineCard({
         <span className="bg-surface mt-1 w-px flex-1" />
       </div>
 
-      <Card className={cn('mb-2 min-w-0 flex-1 p-3.5', isDragging && 'shadow-warm')}>
+      <Card className={cn('mb-2 min-w-0 flex-1 p-3.5', isDragging && 'shadow-float')}>
         <div className="flex items-start gap-2">
           <button onClick={onEdit} className="min-w-0 flex-1 text-left">
-            <p className="text-espresso text-sm font-semibold">{item.title}</p>
+            <p className="text-ink text-sm font-medium">{item.title}</p>
             {item.area ? <p className="text-muted mt-0.5 text-[11px]">{item.area}</p> : null}
           </button>
           <button
@@ -491,22 +491,22 @@ function SortableTimelineCard({
               {formatMoney(Math.round(item.costJpy * fxRate), 'THB')}
             </Badge>
           ) : null}
-          {item.openHours ? <Badge tone="sky">เปิด {item.openHours}</Badge> : null}
+          {item.openHours ? <Badge tone="blue">เปิด {item.openHours}</Badge> : null}
           {item.booked ? (
-            <Badge tone="matcha">
+            <Badge tone="green">
               <Ticket className="size-3" /> จองแล้ว
             </Badge>
           ) : item.bookable ? (
             <button
               onClick={onBook}
-              className="bg-espresso text-bg inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+              className="bg-ink text-bg inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium"
             >
               <Ticket className="size-3" /> หาที่จอง
             </button>
           ) : null}
           <button
             onClick={onEdit}
-            className="text-muted hover:text-espresso inline-flex items-center gap-1 rounded-full px-1.5 py-1 text-[11px]"
+            className="text-muted hover:text-ink inline-flex items-center gap-1 rounded-full px-1.5 py-1 text-[11px]"
             aria-label={`คุยกันเรื่อง ${item.title}`}
           >
             <MessageCircle className="size-3" /> คุยกัน

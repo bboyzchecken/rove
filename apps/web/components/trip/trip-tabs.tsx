@@ -45,8 +45,8 @@ export function TripTabs({ tripId }: { tripId: string }) {
               key={tab.key}
               href={href as never}
               className={cn(
-                'font-display rounded-full px-3.5 py-1.5 text-sm font-semibold whitespace-nowrap transition',
-                active ? 'bg-espresso text-bg' : 'text-muted hover:bg-surface',
+                'font-display rounded-full px-3.5 py-1.5 text-sm font-medium whitespace-nowrap transition',
+                active ? 'bg-ink text-bg' : 'text-muted hover:bg-surface',
               )}
             >
               {t(tab.key)}

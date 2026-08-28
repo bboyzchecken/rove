@@ -92,7 +92,7 @@ export function PhotoBookSheet({
                     style={{ background: option.accent }}
                   />
                 </span>
-                <span className="text-espresso block py-1.5 text-[11px] font-semibold">
+                <span className="text-ink block py-1.5 text-[11px] font-medium">
                   {option.name}
                 </span>
               </button>

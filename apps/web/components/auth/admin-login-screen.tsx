@@ -48,7 +48,7 @@ export function AdminLoginScreen() {
       <div className="flex flex-col gap-6 py-10">
         <div className="text-center">
           <div>
-            <h1 className="font-display text-espresso flex items-center justify-center gap-2 text-xl font-extrabold tracking-tight">
+            <h1 className="font-display text-ink flex items-center justify-center gap-2 text-xl font-bold tracking-tight">
               <ShieldCheck className="size-5" strokeWidth={2.5} />
               เข้าสู่ระบบสำหรับทีมงาน
             </h1>
@@ -60,7 +60,7 @@ export function AdminLoginScreen() {
 
         {reason ? (
           <Card accent="primary" className="p-4" role="alert">
-            <p className="text-espresso text-sm font-semibold">{reason}</p>
+            <p className="text-ink text-sm font-medium">{reason}</p>
           </Card>
         ) : null}
 
@@ -73,7 +73,7 @@ export function AdminLoginScreen() {
             </p>
             <a
               href={`/api/auth/demo?next=${encodeURIComponent(next)}`}
-              className="border-border text-muted hover:bg-surface flex w-full items-center justify-center gap-2 rounded-full border border-dashed px-4 py-2.5 text-sm font-semibold transition"
+              className="border-border text-muted hover:bg-surface flex w-full items-center justify-center gap-2 rounded-full border border-dashed px-4 py-2.5 text-sm font-medium transition"
             >
               <Wrench className="size-4" strokeWidth={2.5} />
               เข้าสู่ระบบด้วยบัญชีทดลอง (admin)

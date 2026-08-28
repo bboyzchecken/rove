@@ -132,7 +132,7 @@ export interface DestinationSuggestion {
   cities: string[];
   subtitle: string;
   pill: string;
-  accent: 'primary' | 'matcha' | 'sky' | 'sun' | 'joyfull';
+  accent: 'primary' | 'green' | 'blue' | 'yellow' | 'pink';
   budgetPerPersonThb: [number, number];
   reason: string;
   /** 0–100 fit for the locked length + season. */
