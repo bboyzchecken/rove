@@ -8,13 +8,18 @@ import {
   Flower,
   Heart,
   Sparkle,
-  SquiggleArrow,
   StarBurst,
   Underline,
   Wave,
 } from '@/components/brand/doodle';
-import { TiltedTag } from '@/components/brand/tilted-tag';
-import { HERO_TOP, PublicShell, SHELL_SECTION } from '@/components/common/public-shell';
+import {
+  HeroCanvas,
+  heroButtonClass,
+  heroButtonGhostClass,
+  heroNavCtaClass,
+  heroNavLinkClass,
+} from '@/components/brand/hero-canvas';
+import { PublicShell, SHELL_SECTION } from '@/components/common/public-shell';
 import { PlatformStatsSection } from '@/components/public/platform-stats';
 import { TravellerReviewsSection } from '@/components/public/traveller-reviews';
 import { SectionHeader } from '@/components/common/section';
@@ -123,43 +128,20 @@ const FEATURES = [
 ] as const;
 
 /**
- * The hero's tilted tags (§4).
+ * What the hero's tilted tags say (§4). Where they sit, at what angle, and
+ * which drop on a phone is `HeroCanvas`'s business — a page choosing its own
+ * coordinates is what put a tag across the knockout the first time.
  *
- * Five, which is inside §4.2.1's four-to-six. The colour mix is §4.2.5 — two
- * accents plus one ink anchor — and the two accents are chosen so the §2.4
- * lock still holds: everything about dates and the trip is yellow, everything
- * about other people is pink, and the one "serious" tag is ink.
- *
- * Every angle is different and none is 0 (§4.2.2).
- *
- * `at` is a percentage inside the headline box, not the hero, so the numbers
- * below mean something: the three headline lines occupy roughly 0–33%, 33–66%
- * and 66–100%, and each tag is parked at a line's ragged right end or just
- * past its left edge. That is §4.2.4 — clip the edge of a letter, never the
- * middle of a word.
- *
- * Two zones are off limits. The knockout runs from about 27% to 70% across
- * line three and §4.2.7 says nothing may cover it, so the tags on that line
- * sit outside 72% or inside 25%. And the body paragraph below the headline is
- * body copy: §9 allows an overlay on display type only, so no tag reaches it.
- *
- * Anchored to whichever edge the tag is nearest — `right-[4%]` rather than
- * `left-[52%]` — because a left percentage that clips a letter at 1440px
- * lands in the middle of the word at 390px, where the same headline is a
- * third of the width. §10's mobile rule is that a tag never covers more than
- * one letter, and edge anchoring is what holds it at both ends.
- *
- * The two marked `wide` drop below `lg`, where even three tags is enough
- * overlay for a 390px headline.
+ * The colour mix is §4.2.5: two accents plus one ink anchor. The two accents
+ * are picked so §2.4's lock still holds — dates and the trip are yellow,
+ * other people are pink, and the one "serious" tag is ink.
  */
 const HERO_TAGS = [
-  { label: 'หาวันว่าง', tone: 'yellow', rotate: -9, at: '-top-[8%] right-[4%]', wide: false },
-  { label: 'AI ร่างให้', tone: 'ink', rotate: -4, at: 'top-[8%] -right-[16%]', wide: true },
-  { label: 'ชวนเพื่อน', tone: 'pink', rotate: 7, at: 'top-[46%] left-[58%]', wide: false },
-  { label: 'แพลนรายวัน', tone: 'yellow', rotate: 11, at: 'top-[74%] -right-[12%]', wide: true },
-  // Clipping line two's left edge, not line three's: on a phone the knockout
-  // takes most of line three, and a tag there covered "จบ" whole.
-  { label: 'คุยกันในแพลน', tone: 'pink', rotate: -12, at: 'top-[34%] -left-[9%]', wide: false },
+  { label: 'หาวันว่าง', tone: 'yellow' },
+  { label: 'AI ร่างให้', tone: 'ink' },
+  { label: 'คุยกันในแพลน', tone: 'pink' },
+  { label: 'ชวนเพื่อน', tone: 'pink' },
+  { label: 'แพลนรายวัน', tone: 'yellow' },
 ] as const;
 
 /** Destinations are not a fixed list — these are just what the demo shows. */
@@ -187,144 +169,70 @@ export default function LandingPage() {
       chrome="canvas"
       actions={
         <>
-          <Link
-            href="/explore"
-            className="font-display hidden px-3 text-sm font-medium text-white/80 transition hover:text-white sm:inline"
-          >
+          <Link href="/explore" className={`${heroNavLinkClass} hidden sm:inline`}>
             สำรวจแพลน
           </Link>
-          <Link
-            href="/login"
-            className="font-display px-3 text-sm font-medium text-white/80 transition hover:text-white"
-          >
+          <Link href="/login" className={heroNavLinkClass}>
             เข้าสู่ระบบ
           </Link>
           {/* §7 Nav: one white pill on the right, over the canvas. */}
-          <Link
-            href="/new"
-            className="font-display text-ink inline-flex h-9 items-center rounded-full bg-white px-4 text-sm font-medium transition hover:bg-white/90"
-          >
-            เริ่มวางแพลน
+          <Link href="/new" className={heroNavCtaClass}>
+            เริ่มวางแผน
           </Link>
         </>
       }
     >
       {/* =========================================================== hero (canvas)
-          §6's layer order, bottom to top: canvas, the large anchor doodle,
-          the headline, the knockout word, the small doodles, the tilted tags,
-          then the CTA. The headline sitting *between* two doodle layers is
-          what makes the marks read as drawn on rather than pasted over, so
-          the z-indexes below are the spec, not decoration.
-
-          §2.2: this canvas is `--brand-canvas #2B6BA8` and could only ever be
-          that or ink. White type on yellow, pink or green is under 2.6:1. */}
-      <section className="bg-canvas relative overflow-hidden">
-        {/* Layer 2 — the anchor. §5.1.7 wants one mark far larger than the
-            rest, and it hangs off the right edge of the *viewport*, not of
-            the content column: sitting fully inside the column it read as a
-            floating icon rather than as something drawn across the poster.
-            Deliberately no larger — at full height it stopped being an accent
-            and became the illustration. */}
-        <Flower className="text-pink pointer-events-none absolute top-16 -right-20 z-0 size-52 sm:-right-24 sm:size-[26rem]" />
-
-        <div className={`${SHELL_SECTION} ${HERO_TOP} relative pb-14 sm:pb-20`}>
-
-          <div className="animate-rove-rise relative z-10 max-w-2xl pt-10 sm:pt-16">
-            <p className="font-display text-sm font-medium text-white/80">
-              ท่องเที่ยวไปโดยไม่มีเส้นทางตายตัว
-            </p>
-
-            {/* Layers 3 to 6 all measure themselves against this box, so the
-                doodles and tags land on the headline rather than near it. */}
-            <div className="relative mt-5">
-              {/* Layers 3 and 4. Lines are broken by hand into a short stack
-                  (§3.1) — each `block` is one line, ragged right, never
-                  centred. The knockout lands on the phrase carrying the
-                  promise, and takes the period §3.2 offers for the extra
-                  beat. Exactly one per hero. */}
-              <h1 className="t-hero relative z-10 text-white">
-                <span className="block">วางแพลนเที่ยว</span>
-                <span className="block">กันทั้งกลุ่ม</span>
-                <span className="block">
-                  จบใน<span className="knockout">ที่เดียว.</span>
-                </span>
-              </h1>
-
-              {/* Layer 5 — the small marks, over the display type. §5.3 allows
-                  that here and forbids it over body copy, which is why they
-                  stop at the headline. These two plus the anchor and the
-                  CTA's curl arrow make four: §5.3's ceiling for a hero. */}
-              {/* Hidden on a phone, where the anchor flower already occupies
-                  this corner and the two marks read as one smudge. §10 lets a
-                  doodle scale down or drop on mobile; this one drops. */}
-              <StarBurst className="text-green pointer-events-none absolute top-[30%] -right-16 z-20 hidden size-24 sm:block" />
-              {/* Left of the knockout, not under it: §4.2.7 keeps that word
-                  clean, and a mark clipping its corner reads as a smudge. */}
-              <Sparkle className="text-yellow pointer-events-none absolute -bottom-6 left-[6%] z-20 hidden size-12 lg:block" />
-
-              {/* Layer 6 — the tilted tags, above the headline. Absolutely
-                  placed rather than laid out in flow: §4.2.3 rules out a
-                  shared baseline or even spacing, which is exactly what any
-                  layout container would hand them. */}
-              <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-30">
-                {HERO_TAGS.map((tag) => (
-                  <TiltedTag
-                    key={tag.label}
-                    tone={tag.tone}
-                    rotate={tag.rotate}
-                    className={`absolute ${tag.at} ${tag.wide ? 'hidden lg:inline-block' : ''}`}
-                  >
-                    {tag.label}
-                  </TiltedTag>
-                ))}
-              </div>
-            </div>
-
-            <p className="mt-7 max-w-md leading-relaxed text-white/85">
-              ทุกคนหย่อนที่อยากไปลงห้องเดียวกัน AI ร่างแพลนรายวันพร้อมงบและเหตุผลให้
-              แล้วค่อยแก้ด้วยกัน จบทริปแล้วหารเงินกันในแอปได้เลย
-            </p>
-
-            {/* Layer 7 — §7 Hero CTA: white fill, ink text, 16px/32px, and
-                near-full-width on a phone. */}
-            <div className="relative mt-9 inline-flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-              <Link
-                href="/new"
-                className="font-display text-ink inline-flex h-14 w-full items-center justify-center gap-2 rounded-full bg-white px-8 font-medium transition hover:bg-white/90 active:scale-[0.98] sm:w-auto"
-              >
-                เริ่มทริปแรก <ArrowRight className="size-4" />
-              </Link>
-              {/*
-                The published example plan, not the demo *room*: /t/:id is
-                behind the sign-in wall, and a landing page whose "look around
-                first" button asks you to sign in first is not a look around.
-                Dynamic route, so typedRoutes needs the cast.
-              */}
-              <Link
-                href={DEMO_PUBLIC_PATH as never}
-                className="font-display inline-flex h-14 items-center justify-center rounded-full border-[1.5px] border-white/45 px-8 font-medium text-white transition hover:bg-white/10"
-              >
-                ดูทริปตัวอย่าง
-              </Link>
-              {/* §7: the curl arrow points at the CTA from *outside* the pill.
-                  Anchored to the row rather than to either button, so it
-                  clears both — parked on one it landed across the other's
-                  label. */}
-              <SquiggleArrow className="pointer-events-none absolute -top-2 -right-24 hidden h-20 w-14 rotate-[80deg] text-white/70 lg:block" />
-            </div>
-
-            <div className="mt-8 flex items-center gap-3 text-[13px] text-white/75">
-              <span className="flex -space-x-2">
-                {['shiba', 'cat', 'capybara', 'penguin'].map((id) => (
-                  <CharacterAvatar key={id} characterId={id} size="xs" ring />
-                ))}
-              </span>
-              ทริปกลุ่ม 3–6 คน จะไปมุมไหนของโลกก็วางแพลนจบในที่เดียว
-            </div>
-          </div>
-
-        </div>
-      </section>
+          Composition, layer order and tag placement all live in `HeroCanvas`
+          (§6). This page supplies only what is specific to it: the words, the
+          anchor mark, and which two small doodles sit in the gaps. */}
+      <HeroCanvas
+        eyebrow="ท่องเที่ยวไปโดยไม่มีเส้นทางตายตัว"
+        /* Lines are broken by hand into a short stack (§3.1) — each `block` is
+           one line, ragged right, never centred. The knockout lands on the
+           phrase carrying the promise and takes the period §3.2 offers for
+           the extra beat. Exactly one per hero. */
+        headline={
+          <>
+            <span className="block">วางแพลนเที่ยว</span>
+            <span className="block">กันทั้งกลุ่ม</span>
+            <span className="block">
+              จบใน<span className="knockout">ที่เดียว.</span>
+            </span>
+          </>
+        }
+        lead="ทุกคนหย่อนที่อยากไปลงห้องเดียวกัน AI ร่างแพลนรายวันพร้อมงบและเหตุผลให้ แล้วค่อยแก้ด้วยกัน จบทริปแล้วหารเงินกันในแอปได้เลย"
+        tags={HERO_TAGS}
+        anchor={Flower}
+        anchorTone="text-pink"
+        marks={
+          <>
+            {/* Dropped on a phone, where the anchor already owns this corner
+                and the two marks read as one smudge (§10). */}
+            <StarBurst className="text-green pointer-events-none absolute top-[30%] -right-16 z-20 hidden size-24 sm:block" />
+            {/* Left of the knockout, never under it — §4.2.7 keeps that word
+                clean, and a mark clipping its corner reads as a smudge. */}
+            <Sparkle className="text-yellow pointer-events-none absolute -bottom-6 left-[6%] z-20 hidden size-12 lg:block" />
+          </>
+        }
+        arrow
+        actions={
+          <>
+            <Link href="/new" className={heroButtonClass}>
+              เริ่มทริปแรก <ArrowRight className="size-4" />
+            </Link>
+            {/*
+              The published example plan, not the demo *room*: /t/:id is behind
+              the sign-in wall, and a landing page whose "look around first"
+              button asks you to sign in first is not a look around. Dynamic
+              route, so typedRoutes needs the cast.
+            */}
+            <Link href={DEMO_PUBLIC_PATH as never} className={heroButtonGhostClass}>
+              ดูทริปตัวอย่าง
+            </Link>
+          </>
+        }
+      />
 
       {/* ------------------------------------------- destinations (still cream)
           Pills are where the palette runs at full strength (§5 Tags): small

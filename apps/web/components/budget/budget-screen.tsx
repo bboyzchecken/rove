@@ -58,7 +58,7 @@ export function BudgetScreen({ tripId }: { tripId: string }) {
         <Card accent="primary" className="p-5">
           <div className="flex items-end justify-between gap-4">
             <div>
-              <p className="font-display text-ink nums text-3xl font-bold tracking-tight">
+              <p className="font-display text-ink nums text-3xl font-medium tracking-tight">
                 {formatMoney(budget.perPersonThb, 'THB')}
               </p>
               <p className="text-muted mt-1 text-xs">
@@ -68,7 +68,7 @@ export function BudgetScreen({ tripId }: { tripId: string }) {
             </div>
             <div className="text-right">
               <p className="text-muted text-xs">งบที่ตั้งไว้</p>
-              <p className="font-display text-ink nums font-bold">
+              <p className="font-display text-ink nums font-medium">
                 {formatMoney(trip.budgetPerPersonThb, 'THB')}
               </p>
             </div>
@@ -127,11 +127,11 @@ export function BudgetScreen({ tripId }: { tripId: string }) {
           </div>
 
           <div className="bg-ink text-bg grid grid-cols-[1fr_auto_auto] items-center gap-3 px-4 py-3">
-            <span className="font-display text-sm font-bold">รวม</span>
+            <span className="font-display text-sm font-medium">รวม</span>
             <span className="nums w-24 text-right text-xs">
               ¥{budget.totalJpy.toLocaleString('en-US')}
             </span>
-            <span className="font-display nums w-24 text-right text-sm font-bold">
+            <span className="font-display nums w-24 text-right text-sm font-medium">
               {formatMoney(budget.perPersonThb, 'THB')}
             </span>
           </div>

@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
+import { Sparkle } from '@/components/brand/doodle';
 import { OAuthButtons } from '@/components/auth/oauth-buttons';
 import { BackHome, PublicShell } from '@/components/common/public-shell';
 import { Card } from '@/components/ui/card';
@@ -50,21 +51,26 @@ export function LoginScreen() {
 
   return (
     <PublicShell width="focused" center actions={<BackHome />}>
-      <div className="flex flex-col gap-7 py-10">
+      <div className="relative flex flex-col gap-7 py-10">
+        {/* One mark, in the margin (§5.3). The door to the product is a task
+            screen, not a marketing page — §1 keeps it fully calm, so there is
+            no canvas, no tilt and no overlay here. */}
+        <Sparkle className="text-pink pointer-events-none absolute -top-2 -right-6 hidden size-12 sm:block" />
         <div className="text-center">
           <div>
-            <h1 className="font-display text-ink text-2xl font-bold tracking-tight">
-              เข้าสู่ระบบเพื่อเริ่มวางแพลน
-            </h1>
-            <p className="text-muted mt-2 text-sm leading-relaxed">
+            <h1 className="t-h2 text-ink">เข้าสู่ระบบเพื่อเริ่มวางแพลน</h1>
+            <p className="text-muted t-small mt-3">
               ใช้บัญชีที่มีอยู่แล้วได้เลย ถ้ายังไม่เคยใช้ ROVE ระบบจะสร้างบัญชีให้อัตโนมัติ
             </p>
           </div>
         </div>
 
+        {/* Not `accent="primary"`: §2.4 locks blue to *action*, and a failed
+            sign-in is not one. A bordered white card with danger type says
+            "read this" without claiming to be a button. */}
         {reason ? (
-          <Card accent="primary" className="p-4" role="alert">
-            <p className="text-ink text-sm font-medium">{reason}</p>
+          <Card className="border-danger/45 p-4" role="alert">
+            <p className="text-danger text-sm font-medium">{reason}</p>
           </Card>
         ) : null}
 

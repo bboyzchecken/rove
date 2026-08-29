@@ -47,7 +47,7 @@ export function TripList() {
     <div className="space-y-7 px-4 py-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-ink text-2xl font-bold tracking-tight">
+          <h1 className="font-display text-ink text-2xl font-medium tracking-tight">
             ทริปของฉัน
           </h1>
           <p className="text-muted mt-1 text-sm">
@@ -94,7 +94,7 @@ export function TripList() {
                               <Badge tone={status.tone}>{status.label}</Badge>
                               {trip.role === 'owner' ? <Badge tone="outline">เจ้าของ</Badge> : null}
                             </div>
-                            <p className="font-display text-ink truncate font-bold">
+                            <p className="font-display text-ink truncate font-medium">
                               {trip.title}
                             </p>
                             <p className="text-muted mt-0.5 truncate text-xs">

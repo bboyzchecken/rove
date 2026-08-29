@@ -78,7 +78,7 @@ export function HomeScreen() {
       {/* ------------------------------------------------------- greeting */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-ink text-2xl font-bold tracking-tight">
+          <h1 className="font-display text-ink text-2xl font-medium tracking-tight">
             สวัสดี {me?.name ?? ''}
           </h1>
           <p className="text-muted mt-1 text-sm">
@@ -90,7 +90,7 @@ export function HomeScreen() {
         <Link href="/profile" className="shrink-0">
           <Card accent="yellow" className="flex items-center gap-2 px-3 py-2">
             <Sparkles className="text-ink size-4" />
-            <span className="font-display text-ink nums text-sm font-bold">
+            <span className="font-display text-ink nums text-sm font-medium">
               {(me?.points ?? 0).toLocaleString('th-TH')}
             </span>
             <span className="text-muted text-[11px]">แต้ม</span>
@@ -130,7 +130,7 @@ export function HomeScreen() {
             <Card className="shadow-float overflow-hidden">
               <TripCover src={next.cover} frame="banner" priority>
                 <div className="bg-ink text-bg absolute top-3 left-3 rounded-full px-3 py-1.5 backdrop-blur-sm">
-                  <span className="font-display nums text-lg leading-none font-bold">
+                  <span className="font-display nums text-lg leading-none font-medium">
                     {next.daysUntil}
                   </span>
                   <span className="ml-1 text-[11px]">วัน</span>
@@ -140,7 +140,7 @@ export function HomeScreen() {
               <div className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-display text-ink text-lg font-bold">
+                    <p className="font-display text-ink text-lg font-medium">
                       {next.title}
                     </p>
                     <p className="text-muted mt-0.5 text-sm">
@@ -174,7 +174,7 @@ export function HomeScreen() {
               {upcoming.map((trip) => (
                 <div key={trip.id} className="flex items-center gap-3">
                   <div className="w-14 shrink-0 text-center">
-                    <div className="font-display text-ink nums text-lg leading-none font-bold">
+                    <div className="font-display text-ink nums text-lg leading-none font-medium">
                       {trip.daysUntil}
                     </div>
                     <div className="text-muted text-[10px]">วัน</div>
@@ -270,7 +270,7 @@ export function HomeScreen() {
                 >
                   <TripCover src={trip.cover} frame="card" />
                   <div className="p-3">
-                    <p className="text-ink text-sm font-bold">{trip.title}</p>
+                    <p className="text-ink text-sm font-medium">{trip.title}</p>
                     <p className="text-muted mt-0.5 text-[11px]">{trip.dateLabel}</p>
                     <div className="text-muted mt-2 flex items-center justify-between text-[11px]">
                       <span>

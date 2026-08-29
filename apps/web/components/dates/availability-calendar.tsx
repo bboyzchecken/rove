@@ -91,7 +91,7 @@ export function AvailabilityCalendar({
           <div
             key={label}
             className={cn(
-              'text-center text-[11px] font-bold',
+              'text-center text-[11px] font-medium',
               index === 0 || index === 6 ? 'text-primary/70' : 'text-muted',
             )}
           >
@@ -139,7 +139,7 @@ export function AvailabilityCalendar({
                 'active:scale-[0.97]',
               )}
             >
-              <span className="nums text-[13px] leading-none font-bold">{day}</span>
+              <span className="nums text-[13px] leading-none font-medium">{day}</span>
 
               <span className="flex flex-wrap justify-center gap-0.5">
                 {board.members.map((member) => {
@@ -168,7 +168,7 @@ export function AvailabilityCalendar({
       </div>
 
       <div className="border-border flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t px-4 py-2.5">
-        <span className="text-muted text-[11px] font-bold">ว่างกัน</span>
+        <span className="text-muted text-[11px] font-medium">ว่างกัน</span>
         {[
           { label: 'ไม่มี', className: 'bg-surface border border-border' },
           { label: 'บางคน', className: 'bg-primary/25' },

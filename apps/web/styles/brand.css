@@ -72,15 +72,27 @@
   --brand-field-border: 43 22% 80%; /* visible on cream, white and colour */
 
   /* --- Semantic ----------------------------------------------------------
-   * `primary` is blue, because §2.4 locks blue to action. It is an alias, not
-   * a sixth colour: `bg-primary` and `bg-blue` are the same paint. The alias
-   * exists so a button says what it is for rather than what colour it is. */
-  --brand-primary: 208 56% 51%; /* = blue */
-  --brand-primary-fg: 0 0% 100%; /* white — §2.5 allows it at 16px+ bold */
+   * `primary` is blue, because §2.4 locks blue to action. The alias exists so
+   * a button or a link says what it is *for* rather than what colour it is.
+   *
+   * It resolves to the canvas blue, not `--brand-blue`. §2.2's table is why:
+   * #3D86C8 is a 3.72 against cream and 3.82 against white, so every link,
+   * label and small primary-coloured string in the product failed AA on it —
+   * `text-primary` is worn by 12px labels far more often than by display
+   * type. #2B6BA8 is the same hue one step darker and lands at 5.42 on cream.
+   * `--brand-blue` keeps its job at tag and doodle scale, where ink sits on
+   * it rather than the other way round. */
+  --brand-primary: 209.3 59.3% 41.4%; /* = canvas blue */
+  --brand-primary-fg: 0 0% 100%; /* white — 5.47 on this blue, passes AA */
 
-  --brand-success: 108 51% 48%; /* = green, money confirmed */
+  /* Green means money confirmed (§2.4) — but as *type* it has to be the deep
+   * end of the hue, not the tag fill. #54B73C on cream is 2.44 and on white
+   * 2.50, and `text-success` is worn by 14px figures: a points balance, a
+   * settle-up amount. `--green-mid` is the same green read at 9.1 on cream.
+   * The bright green stays where §2.2 puts it — tag and doodle scale. */
+  --brand-success: 95 78% 18%; /* = green-mid */
   --brand-warning: 32 89% 21%; /* yellow-mid — yellow itself fails on cream */
-  --brand-danger: 4 68% 46%;
+  --brand-danger: 4 68% 42%;
 
   /* --- Shape (§5) ---------------------------------------------------------
    * Cards 14–16px, pills fully round. The old 24px was a different brand: on
@@ -161,7 +173,14 @@
   --brand-green-deep: 108 50% 86%;
   --brand-green-mid: 108 30% 74%;
 
-  --brand-primary: 208 48% 56%;
+  /* The active nav item and every primary control on this surface. It
+   * inverts with the page: a *light* blue block carrying dark blue type,
+   * rather than the product's dark blue block carrying white. White on the
+   * old 56%-lightness blue was 3.31 and failed; this pair is 6.5, and on a
+   * near-black page a light pill is the one that reads as selected anyway. */
+  --brand-primary: 208 55% 70%;
+  --brand-primary-fg: 210 91% 17%; /* = blue-deep */
+
   --brand-success: 108 42% 62%;
   --brand-warning: 43 70% 62%;
   --brand-danger: 4 72% 66%;

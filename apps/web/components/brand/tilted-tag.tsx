@@ -51,6 +51,9 @@ export function TiltedTag({
         TONE[tone],
         className,
       )}
+      // Marks the overlay layer for the readability audit, which checks that
+      // no tag lands on the knockout word or on body copy.
+      data-tilted-tag=""
       // Inline because the angle is per-tag and arbitrary: a Tailwind class
       // built from a runtime value is never generated, and a fixed set of
       // rotate utilities would push every hero toward reusing the same five

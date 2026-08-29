@@ -45,7 +45,7 @@ export function ReceiptView({ orderId }: { orderId: string }) {
   if (!order) {
     return (
       <div className="px-4 py-12 text-center">
-        <p className="font-display text-ink text-lg font-bold">ไม่พบใบเสร็จนี้</p>
+        <p className="font-display text-ink text-lg font-medium">ไม่พบใบเสร็จนี้</p>
         <p className="text-muted mt-1 text-sm">ลิงก์อาจเก่าไป หรือเป็นใบเสร็จของบัญชีอื่น</p>
         <ButtonLink href="/billing" size="sm" variant="ink" className="mt-4">
           กลับไปหน้าบิล
@@ -78,13 +78,13 @@ export function ReceiptView({ orderId }: { orderId: string }) {
         {/* head -------------------------------------------------------- */}
         <div className="border-border flex flex-wrap items-start justify-between gap-3 border-b p-5">
           <div>
-            <p className="font-display text-ink text-lg font-bold tracking-tight">
+            <p className="font-display text-ink text-lg font-medium tracking-tight">
               {env.brandName}
             </p>
             <p className="text-muted mt-0.5 text-[11px]">ใบเสร็จรับเงิน / Receipt</p>
           </div>
           <div className="text-right">
-            <p className="text-ink nums text-sm font-bold">{order.number}</p>
+            <p className="text-ink nums text-sm font-medium">{order.number}</p>
             <p className="text-muted nums mt-0.5 text-[11px]">
               ออกเมื่อ {formatThaiDate(order.issuedAt)}
             </p>
@@ -146,8 +146,8 @@ export function ReceiptView({ orderId }: { orderId: string }) {
               />
             ) : null}
             <div className="flex items-baseline justify-between pt-1.5">
-              <p className="text-ink text-sm font-bold">ยอดที่ชำระ</p>
-              <p className="font-display text-ink nums text-xl font-bold">
+              <p className="text-ink text-sm font-medium">ยอดที่ชำระ</p>
+              <p className="font-display text-ink nums text-xl font-medium">
                 {formatMoney(order.totalThb, order.currency)}
               </p>
             </div>

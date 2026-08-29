@@ -29,7 +29,7 @@ export function DateStepBar({ current }: { current: DateStep }) {
             >
               <span
                 className={cn(
-                  'flex size-5 items-center justify-center rounded-full text-[10px] font-bold',
+                  'flex size-5 items-center justify-center rounded-full text-[10px] font-medium',
                   done
                     ? 'bg-ink text-bg'
                     : active

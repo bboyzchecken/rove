@@ -102,7 +102,7 @@ export function ExpenseBoard({ tripId, fxRate }: { tripId: string; fxRate: numbe
                 </div>
 
                 <div className="shrink-0 text-right">
-                  <p className="text-ink nums text-sm font-bold">{formatMoney(thb, 'THB')}</p>
+                  <p className="text-ink nums text-sm font-medium">{formatMoney(thb, 'THB')}</p>
                   {entry.currency === 'JPY' ? (
                     <p className="text-muted nums text-[10px]">
                       ¥{entry.amount.toLocaleString('en-US')}

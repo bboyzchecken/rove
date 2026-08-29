@@ -95,7 +95,7 @@ export function TripHeader({ tripId }: { tripId: string }) {
               </Badge>
             )}
           </div>
-          <h1 className="font-display text-ink text-xl font-bold tracking-tight sm:text-2xl">
+          <h1 className="font-display text-ink text-xl font-medium tracking-tight sm:text-2xl">
             {canEdit ? (
               <button
                 type="button"

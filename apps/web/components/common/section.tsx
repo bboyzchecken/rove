@@ -47,7 +47,7 @@ export function Stat({
   return (
     <div className={cn('relative', className)}>
       {mark ? <StarBurst className="text-pink absolute -top-2 -left-4 size-6" /> : null}
-      <div className="font-display text-ink relative text-2xl leading-none font-bold tracking-tight">
+      <div className="font-display text-ink relative text-2xl leading-none font-medium tracking-tight">
         {value}
       </div>
       <div className="text-muted mt-1.5 text-xs font-medium">{label}</div>

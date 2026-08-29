@@ -120,7 +120,7 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
               </Badge>
             ) : null}
           </div>
-          <h1 className="font-display text-ink text-2xl font-bold tracking-tight">
+          <h1 className="font-display text-ink text-2xl font-medium tracking-tight">
             {recap.title}
           </h1>
           <p className="text-muted mt-1 text-sm">
@@ -148,7 +148,7 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
       <section className="px-4">
         {isPublic ? (
           <Card accent="green" className="p-4">
-            <p className="font-display text-ink font-bold">ทริปนี้เปิดสาธารณะอยู่</p>
+            <p className="font-display text-ink font-medium">ทริปนี้เปิดสาธารณะอยู่</p>
             <p className="text-muted mt-1 text-xs">
               ทุกครั้งที่มีคนก๊อปแพลนนี้ไปแล้วจองตาม คุณได้แต้มเพิ่ม —
               เอาไปเป็นส่วนลดตอนจองทริปหน้าได้
@@ -178,7 +178,7 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
                 <Sparkles className="size-4" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="font-display text-ink font-bold">
+                <p className="font-display text-ink font-medium">
                   เปิดทริปนี้เป็นสาธารณะ รับ {recap.pointsPerPublish.toLocaleString('th-TH')} แต้ม
                 </p>
                 <p className="text-muted mt-1 text-xs">
@@ -217,7 +217,7 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
                     <Icon className="size-4" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-ink text-xs font-bold">{decision.title}</p>
+                    <p className="text-ink text-xs font-medium">{decision.title}</p>
                     <p className="text-ink/90 mt-0.5 text-sm">{decision.detail}</p>
                     {who ? <p className="text-muted mt-1 text-[11px]">โดย {who.name}</p> : null}
                   </div>
@@ -236,7 +236,7 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
             {recap.itinerary.map((day) => (
               <Card key={day.id} className="p-3.5">
                 <div className="flex items-baseline justify-between gap-3">
-                  <p className="text-ink text-sm font-bold">{day.label}</p>
+                  <p className="text-ink text-sm font-medium">{day.label}</p>
                   <span className="text-muted text-[11px]">{day.city}</span>
                 </div>
                 <ul className="mt-2 space-y-1.5">

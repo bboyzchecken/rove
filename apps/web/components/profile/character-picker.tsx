@@ -26,7 +26,7 @@ export function CharacterPicker() {
       <div className="mb-4 flex items-center gap-3">
         <CharacterAvatar characterId={selected} size="xl" />
         <div>
-          <p className="font-display text-ink text-lg font-bold">
+          <p className="font-display text-ink text-lg font-medium">
             {current?.name ?? '—'}
           </p>
           <p className="text-muted text-xs">ตัวนี้จะไปกับคุณทุกทริป ทุกคอมเมนต์ ทุกบิลที่หารกัน</p>

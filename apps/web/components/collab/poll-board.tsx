@@ -100,7 +100,7 @@ function PollCard({
     <Card accent={poll.closed ? 'none' : 'blue'} className="p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-ink text-sm font-bold">{poll.question}</p>
+          <p className="text-ink text-sm font-medium">{poll.question}</p>
           <p className="text-muted mt-0.5 text-[11px]">
             {poll.closed ? 'ปิดแล้ว · ' : ''}
             ตอบแล้ว {poll.answered}/{members.length} คน
@@ -163,7 +163,7 @@ function PollCard({
                 <span
                   className={cn(
                     'text-ink min-w-0 flex-1 truncate text-sm',
-                    winning && 'font-bold',
+                    winning && 'font-medium',
                   )}
                 >
                   {option.label}

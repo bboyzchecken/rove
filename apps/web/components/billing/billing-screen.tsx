@@ -50,7 +50,7 @@ export function BillingScreen() {
   return (
     <div className="space-y-7 px-4 py-5">
       <header>
-        <h1 className="font-display text-ink text-2xl font-bold tracking-tight">
+        <h1 className="font-display text-ink text-2xl font-medium tracking-tight">
           บิลและการชำระเงิน
         </h1>
         <p className="text-muted mt-1 text-sm">ทุกอย่างที่คุณจ่ายให้ ROVE พร้อมใบเสร็จย้อนหลัง</p>
@@ -62,7 +62,7 @@ export function BillingScreen() {
         <Card accent="primary" className="p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="font-display text-ink text-lg font-bold">
+              <p className="font-display text-ink text-lg font-medium">
                 {subscription?.planName ?? 'ROVE ฟรี'}
               </p>
               <p className="text-muted mt-1 text-xs leading-relaxed">
@@ -142,7 +142,7 @@ export function BillingScreen() {
             {years.map((group) => (
               <div key={group.year}>
                 <div className="mb-1.5 flex items-baseline justify-between px-1">
-                  <p className="text-ink text-sm font-bold">{group.year}</p>
+                  <p className="text-ink text-sm font-medium">{group.year}</p>
                   <p className="text-muted nums text-[11px]">
                     รวม {formatMoney(group.totalThb, 'THB')}
                   </p>
@@ -203,7 +203,7 @@ function OrderRow({ order }: { order: Order }) {
       </span>
 
       <span className="shrink-0 text-right">
-        <span className="text-ink nums block text-sm font-bold">
+        <span className="text-ink nums block text-sm font-medium">
           {orderAmountLabel(order)}
         </span>
         <span className="text-muted text-[11px]">{ORDER_KIND_LABEL[order.kind]}</span>
@@ -227,7 +227,7 @@ function PlanRow({ plan }: { plan: SubscriptionPlan }) {
     <Card className="p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-ink text-sm font-bold">{plan.name}</p>
+          <p className="text-ink text-sm font-medium">{plan.name}</p>
           <p className="text-muted mt-0.5 text-xs leading-relaxed">{plan.tagline}</p>
           <ul className="text-muted mt-2 space-y-1 text-[11px]">
             {plan.perks.map((perk) => (
@@ -239,7 +239,7 @@ function PlanRow({ plan }: { plan: SubscriptionPlan }) {
           </ul>
         </div>
         <div className="shrink-0 text-right">
-          <p className="text-ink nums text-sm font-bold">{planPriceLabel(plan)}</p>
+          <p className="text-ink nums text-sm font-medium">{planPriceLabel(plan)}</p>
           <Badge tone="outline" className="mt-1.5">
             เร็ว ๆ นี้
           </Badge>

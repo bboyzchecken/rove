@@ -153,7 +153,7 @@ export function AiGenerateDialog({
               className={cn('text-primary size-6', draft.isRunning && 'animate-rove-spin')}
             />
             <div>
-              <p className="font-display text-ink font-bold">
+              <p className="font-display text-ink font-medium">
                 {draft.isDone
                   ? 'ร่างแพลนเสร็จแล้ว'
                   : draft.isRunning
@@ -263,8 +263,8 @@ export function AiGenerateDialog({
                 that decides it (W26.2 / W26.3). */}
             <Card accent="primary" className="p-4">
               <div className="flex items-baseline justify-between gap-3">
-                <p className="font-display text-ink text-lg font-bold">Trip Pass</p>
-                <p className="font-display text-ink nums text-2xl font-bold">
+                <p className="font-display text-ink text-lg font-medium">Trip Pass</p>
+                <p className="font-display text-ink nums text-2xl font-medium">
                   {formatMoney(passPrice, 'THB')}
                 </p>
               </div>
@@ -371,7 +371,7 @@ export function AiGenerateDialog({
               />
             </div>
             <p className="text-ink mt-3 flex items-center gap-2 text-sm font-medium">
-              <span className="bg-primary text-primary-fg flex size-6 items-center justify-center rounded-full text-[10px] font-bold">
+              <span className="bg-primary text-primary-fg flex size-6 items-center justify-center rounded-full text-[10px] font-medium">
                 {Math.max(1, Math.round(job.progress * 5))}
               </span>
               {job.step}

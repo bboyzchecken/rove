@@ -148,7 +148,7 @@ export function ReviewSummaryLine({ summary }: { summary: ReviewSummary }) {
     <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
       <span className="flex items-center gap-1.5">
         <Stars value={Math.round(summary.averageRating)} />
-        <span className="text-ink nums text-sm font-bold">{summary.averageRating}</span>
+        <span className="text-ink nums text-sm font-medium">{summary.averageRating}</span>
         <span className="text-muted text-xs">({summary.count} รีวิว)</span>
       </span>
       {summary.budgetSaid > 0 ? (

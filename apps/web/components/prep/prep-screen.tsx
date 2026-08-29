@@ -84,7 +84,7 @@ export function PrepScreen({ tripId }: { tripId: string }) {
         <>
           <Card accent="green" className="p-4">
             <div className="mb-2 flex items-center justify-between">
-              <p className="font-display text-ink font-bold">เตรียมตัวไปแล้ว</p>
+              <p className="font-display text-ink font-medium">เตรียมตัวไปแล้ว</p>
               <span className="text-muted nums text-xs font-medium">
                 {done}/{tasks.length}
               </span>

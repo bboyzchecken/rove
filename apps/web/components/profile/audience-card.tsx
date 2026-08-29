@@ -86,7 +86,7 @@ export function AudienceCard() {
             </div>
 
             {trip.pointsEarned > 0 ? (
-              <span className="text-success nums inline-flex shrink-0 items-center gap-1 text-sm font-bold">
+              <span className="text-success nums inline-flex shrink-0 items-center gap-1 text-sm font-medium">
                 <Sparkles className="size-3.5" />+{trip.pointsEarned.toLocaleString('th-TH')}
               </span>
             ) : (

@@ -235,7 +235,7 @@ export function NewTripFlow() {
       {/* step 0 -------------------------------------------------------- */}
       {step === 0 ? (
         <div className="animate-rove-rise">
-          <h1 className="font-display text-ink text-2xl font-bold tracking-tight md:text-3xl">
+          <h1 className="font-display text-ink text-2xl font-medium tracking-tight md:text-3xl">
             ตอนนี้รู้อะไรแล้วบ้าง
           </h1>
           <p className="text-muted mt-1 text-sm">
@@ -258,7 +258,7 @@ export function NewTripFlow() {
                     <option.icon className="size-5" strokeWidth={2.2} />
                   </span>
                   <div className="flex-1 sm:flex-none">
-                    <p className="font-display text-ink font-bold">{option.title}</p>
+                    <p className="font-display text-ink font-medium">{option.title}</p>
                     <p className="text-muted text-xs">{option.hint}</p>
                   </div>
                   <ArrowRight className="text-muted size-4 shrink-0 sm:mt-auto" />
@@ -279,7 +279,7 @@ export function NewTripFlow() {
             <ArrowLeft className="size-3.5" /> เปลี่ยนวิธีเริ่ม
           </button>
 
-          <h1 className="font-display text-ink text-2xl font-bold tracking-tight md:text-3xl">
+          <h1 className="font-display text-ink text-2xl font-medium tracking-tight md:text-3xl">
             {routing ? 'บินไปลงที่ไหน' : coordinating ? 'ไปกันกี่คน' : 'ไปวันไหน'}
           </h1>
           {routing ? (
@@ -440,16 +440,16 @@ export function NewTripFlow() {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setParty((p) => Math.max(1, p - 1))}
-                    className="bg-surface text-ink size-10 rounded-full text-lg font-bold"
+                    className="bg-surface text-ink size-10 rounded-full text-lg font-medium"
                   >
                     −
                   </button>
-                  <span className="font-display text-ink w-8 text-center text-xl font-bold">
+                  <span className="font-display text-ink w-8 text-center text-xl font-medium">
                     {party}
                   </span>
                   <button
                     onClick={() => setParty((p) => Math.min(12, p + 1))}
-                    className="bg-surface text-ink size-10 rounded-full text-lg font-bold"
+                    className="bg-surface text-ink size-10 rounded-full text-lg font-medium"
                   >
                     +
                   </button>
@@ -495,7 +495,7 @@ export function NewTripFlow() {
             <ArrowLeft className="size-3.5" /> กลับไปแก้รายละเอียด
           </button>
 
-          <h1 className="font-display text-ink text-2xl font-bold tracking-tight md:text-3xl">
+          <h1 className="font-display text-ink text-2xl font-medium tracking-tight md:text-3xl">
             เลือกตัวละครของคุณ
           </h1>
           <p className="text-muted mt-1 text-sm">

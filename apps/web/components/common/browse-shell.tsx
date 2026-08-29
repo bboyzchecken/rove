@@ -45,6 +45,7 @@ export function BrowseShell({
   width = 'page',
   center = false,
   actions,
+  hero,
   children,
 }: {
   signedIn: boolean;
@@ -52,12 +53,35 @@ export function BrowseShell({
   center?: boolean;
   /** Rendered only for anonymous visitors — see the note above. */
   actions?: React.ReactNode;
+  /**
+   * A full-bleed `HeroCanvas`, for anonymous visitors only.
+   *
+   * Same reasoning as `actions`, and now also ROVE_BRAND_SPEC §1: to someone
+   * without an account this page is marketing and gets the loud treatment, and
+   * to someone signed in it is a tab in their own app and must stay as calm as
+   * every other screen behind the wall. The mode follows the reader, exactly
+   * as the chrome already does.
+   */
+  hero?: React.ReactNode;
   children: React.ReactNode;
 }) {
   if (!signedIn) {
     return (
-      <PublicShell width={width} center={center} actions={actions}>
-        {children}
+      // `bleed` when there is a hero: a full-bleed canvas cannot live inside a
+      // constrained `main`, so the shell hands the page its own gutter back.
+      <PublicShell
+        width={width}
+        center={center}
+        actions={actions}
+        bleed={Boolean(hero)}
+        chrome={hero ? 'canvas' : 'default'}
+      >
+        {hero}
+        {hero ? (
+          <div className={cn('mx-auto w-full px-4', WIDTH[width])}>{children}</div>
+        ) : (
+          children
+        )}
       </PublicShell>
     );
   }

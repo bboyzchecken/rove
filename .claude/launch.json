@@ -14,6 +14,15 @@
         "--turbopack"
       ],
       "port": 3100
+    },
+    {
+      "name": "rove-web-mock",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set NEXT_PUBLIC_DATA_MODE=mock && pnpm --dir apps/web exec next dev --turbopack -p 3101"
+      ],
+      "port": 3101
     }
   ]
 }

@@ -163,7 +163,7 @@ export function PlanBoard({ tripId, fxRate }: { tripId: string; fxRate: number }
                 active ? 'bg-ink text-bg' : 'bg-surface text-muted',
               )}
             >
-              <span className="font-display block text-sm font-bold">วัน {d.index}</span>
+              <span className="font-display block text-sm font-medium">วัน {d.index}</span>
               <span className={cn('block text-[10px]', active ? 'text-bg/70' : 'text-muted')}>
                 {d.city}
               </span>
@@ -178,7 +178,7 @@ export function PlanBoard({ tripId, fxRate }: { tripId: string; fxRate: number }
           <Card className="p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="font-display text-ink text-lg font-bold">
+                <p className="font-display text-ink text-lg font-medium">
                   {day.label} · {day.city}
                 </p>
                 <p className="text-muted mt-0.5 text-xs">

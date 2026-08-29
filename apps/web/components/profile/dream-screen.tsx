@@ -17,7 +17,7 @@ export function DreamScreen() {
   return (
     <div className="space-y-5 px-4 py-5">
       <div>
-        <h1 className="font-display text-ink text-2xl font-bold tracking-tight">
+        <h1 className="font-display text-ink text-2xl font-medium tracking-tight">
           ที่อยากไปสักวัน
         </h1>
         <p className="text-muted mt-1 text-sm">

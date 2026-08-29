@@ -83,7 +83,7 @@ export function LocaleSwitchCompact({ className }: { className?: string }) {
           title={LABEL[option] ?? option}
           aria-current={option === locale}
           className={cn(
-            'rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide transition',
+            'rounded-full px-2.5 py-1 text-[11px] font-medium tracking-wide transition',
             option === locale ? 'bg-ink text-bg' : 'text-muted hover:text-ink',
           )}
         >

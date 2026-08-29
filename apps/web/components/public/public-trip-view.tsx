@@ -60,7 +60,7 @@ export function PublicTripView({
     return (
       <BrowseShell signedIn={signedIn} width="focused" center>
         <div className="py-16 text-center">
-          <h1 className="font-display text-ink text-xl font-bold">ไม่พบแพลนนี้</h1>
+          <h1 className="font-display text-ink text-xl font-medium">ไม่พบแพลนนี้</h1>
           <p className="text-muted mt-2 text-sm">ลิงก์อาจถูกปิดหรือสร้างใหม่ไปแล้ว</p>
           <ButtonLink href="/explore" className="mt-5">
             ไปหน้าสำรวจ
@@ -103,7 +103,7 @@ export function PublicTripView({
 
       <div className="mt-3 flex items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-ink text-2xl font-bold tracking-tight">
+          <h1 className="font-display text-ink text-2xl font-medium tracking-tight">
             {trip.title}
           </h1>
           <p className="text-muted mt-0.5 text-sm">
@@ -151,7 +151,7 @@ export function PublicTripView({
       {perPersonJpy > 0 ? (
         <Card accent="primary" className="mt-4 p-4">
           <p className="text-muted text-xs">ค่าใช้จ่ายโดยประมาณต่อคน (เฉพาะที่อยู่ในแพลน)</p>
-          <p className="font-display text-ink nums mt-1 text-2xl font-bold">
+          <p className="font-display text-ink nums mt-1 text-2xl font-medium">
             {formatMoney(Math.round(perPersonJpy * trip.fxRate), 'THB')}
           </p>
         </Card>

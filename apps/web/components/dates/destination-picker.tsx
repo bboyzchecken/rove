@@ -64,7 +64,7 @@ export function DestinationPicker({
                 )}
               >
                 {dest.recommended ? (
-                  <div className="bg-primary text-primary-fg flex items-center gap-1.5 px-4 py-1.5 text-[11px] font-bold">
+                  <div className="bg-primary text-primary-fg flex items-center gap-1.5 px-4 py-1.5 text-[11px] font-medium">
                     <Sparkles className="size-3.5" /> แนะนำสำหรับกลุ่มคุณ
                   </div>
                 ) : null}
@@ -73,7 +73,7 @@ export function DestinationPicker({
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="text-3xl leading-none">{dest.flag}</div>
-                      <h3 className="font-display text-ink mt-2 text-lg font-bold tracking-tight">
+                      <h3 className="font-display text-ink mt-2 text-lg font-medium tracking-tight">
                         {dest.name}
                       </h3>
                       <p className="text-muted text-xs">{dest.subtitle}</p>
@@ -98,7 +98,7 @@ export function DestinationPicker({
                   <div className="border-border mt-3 flex items-end justify-between border-t pt-3">
                     <div>
                       <div className="text-muted text-[10px]">งบต่อคน (ไม่รวมตั๋วเครื่องบิน)</div>
-                      <div className="nums font-display text-ink text-sm font-bold">
+                      <div className="nums font-display text-ink text-sm font-medium">
                         ฿{dest.budgetPerPersonThb[0].toLocaleString('th-TH')}–
                         {dest.budgetPerPersonThb[1].toLocaleString('th-TH')}
                       </div>
@@ -122,7 +122,7 @@ export function DestinationPicker({
       {selected ? (
         <Card accent="solid" className="flex flex-wrap items-center justify-between gap-3 p-4">
           <div>
-            <p className="font-display text-base font-bold">
+            <p className="font-display text-base font-medium">
               {selected.flag} เริ่มวางแผน {selected.name}
             </p>
             <p className="mt-0.5 text-xs opacity-80">

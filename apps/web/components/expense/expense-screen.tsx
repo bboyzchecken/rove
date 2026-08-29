@@ -73,14 +73,14 @@ export function ExpenseScreen({ tripId }: { tripId: string }) {
               <div className="shrink-0 text-right">
                 {row.balanceThb > 0 ? (
                   <>
-                    <p className="text-success nums text-sm font-bold">
+                    <p className="text-success nums text-sm font-medium">
                       +{formatMoney(row.balanceThb, 'THB')}
                     </p>
                     <p className="text-muted text-[10px]">ควรได้คืน</p>
                   </>
                 ) : row.balanceThb < 0 ? (
                   <>
-                    <p className="text-primary nums text-sm font-bold">
+                    <p className="text-primary nums text-sm font-medium">
                       {formatMoney(row.balanceThb, 'THB')}
                     </p>
                     <p className="text-muted text-[10px]">ต้องจ่ายคืน</p>
@@ -116,7 +116,7 @@ export function ExpenseScreen({ tripId }: { tripId: string }) {
                     <span className="text-ink text-sm font-medium">
                       {nameOf(s.toMemberId)}
                     </span>
-                    <span className="text-ink nums ml-auto text-sm font-bold">
+                    <span className="text-ink nums ml-auto text-sm font-medium">
                       {formatMoney(s.amountThb, 'THB')}
                     </span>
                     <Button

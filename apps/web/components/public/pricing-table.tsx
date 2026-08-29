@@ -36,7 +36,7 @@ export function PricingTable() {
             )}
           >
             <div className="flex items-start justify-between gap-2">
-              <p className="font-display text-ink text-lg font-bold">{plan.name}</p>
+              <p className="font-display text-ink text-lg font-medium">{plan.name}</p>
               {highlighted ? (
                 <Badge tone="green" size="md">
                   ที่คนส่วนใหญ่ใช้
@@ -48,7 +48,7 @@ export function PricingTable() {
               )}
             </div>
 
-            <p className="font-display text-ink nums mt-2 text-3xl font-bold">
+            <p className="font-display text-ink nums mt-2 text-3xl font-medium">
               {planPriceLabel(plan)}
             </p>
             <p className="text-muted mt-1.5 text-xs leading-relaxed">{plan.tagline}</p>

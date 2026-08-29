@@ -79,7 +79,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     return (
       <div className="bg-bg text-ink flex min-h-dvh items-center justify-center px-6">
         <div className="max-w-sm text-center">
-          <h1 className="font-display text-xl font-bold">หน้านี้สำหรับแอดมิน</h1>
+          <h1 className="font-display text-xl font-medium">หน้านี้สำหรับแอดมิน</h1>
           <p className="text-muted mt-2 text-sm">
             บัญชีนี้ไม่มีสิทธิ์เข้าถึงหน้าหลังบ้าน — ถ้าคิดว่าผิดพลาด ติดต่อทีมงาน
           </p>
@@ -97,7 +97,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <aside className="bg-surface md:border-border shrink-0 md:w-56 md:border-r">
         <div className="flex h-14 items-center gap-2 px-4">
           <RoveMark className="text-primary size-4" />
-          <span className="font-display text-ink text-sm font-bold tracking-tight">
+          <span className="font-display text-ink text-sm font-medium tracking-tight">
             ROVE แอดมิน
           </span>
         </div>

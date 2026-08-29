@@ -225,7 +225,7 @@ function CompareTable({
             {columns.map((col, i) => (
               <th
                 key={col.id}
-                className={cn('text-ink p-3 font-bold', i === 0 && 'text-muted')}
+                className={cn('text-ink p-3 font-medium', i === 0 && 'text-muted')}
               >
                 {col.label}
               </th>
@@ -279,7 +279,7 @@ function VariantCard({
     <Card accent={variant.source === 'ai' ? 'blue' : 'pink'} className="p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-ink text-sm font-bold">
+          <p className="text-ink text-sm font-medium">
             {variant.label}
             {variant.source === 'fork' ? (
               <span className="text-muted ml-2 text-[10px] font-medium">เก็บไว้จากแพลนจริง</span>
@@ -295,7 +295,7 @@ function VariantCard({
             onClick={() => castVote(1)}
             aria-label="โหวตให้แพลนนี้"
             className={cn(
-              'flex h-8 items-center gap-1 rounded-full px-2.5 text-xs font-bold transition',
+              'flex h-8 items-center gap-1 rounded-full px-2.5 text-xs font-medium transition',
               variant.votes.mine === 1
                 ? 'bg-ink text-bg'
                 : 'bg-bg/70 text-ink hover:bg-bg',
@@ -308,7 +308,7 @@ function VariantCard({
             onClick={() => castVote(-1)}
             aria-label="ไม่เอาแพลนนี้"
             className={cn(
-              'flex h-8 items-center gap-1 rounded-full px-2.5 text-xs font-bold transition',
+              'flex h-8 items-center gap-1 rounded-full px-2.5 text-xs font-medium transition',
               variant.votes.mine === -1
                 ? 'bg-ink text-bg'
                 : 'bg-bg/70 text-ink hover:bg-bg',
@@ -357,7 +357,7 @@ function VariantCard({
         <div className="mt-2 space-y-3">
           {variant.days.map((day) => (
             <div key={day.id} className="bg-bg/70 rounded-2xl p-3">
-              <p className="text-ink text-xs font-bold">
+              <p className="text-ink text-xs font-medium">
                 {day.label} · {day.city}
               </p>
               <ul className="mt-1.5 space-y-1">

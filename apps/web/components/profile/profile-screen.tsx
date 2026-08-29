@@ -36,7 +36,7 @@ export function ProfileScreen() {
       <div className="flex items-center gap-4">
         <CharacterAvatar characterId={me?.characterId ?? 'shiba'} size="xl" />
         <div className="min-w-0 flex-1">
-          <h1 className="font-display text-ink truncate text-2xl font-bold tracking-tight">
+          <h1 className="font-display text-ink truncate text-2xl font-medium tracking-tight">
             {me?.name ?? '—'}
           </h1>
           <p className="text-muted truncate text-sm">{subtitleOf(me)}</p>
@@ -56,7 +56,7 @@ export function ProfileScreen() {
         <div className="flex items-center justify-between">
           <div>
             <p className="section-label">แต้ม ROVE</p>
-            <p className="font-display text-ink nums mt-1 text-3xl font-bold">
+            <p className="font-display text-ink nums mt-1 text-3xl font-medium">
               {(me?.points ?? 0).toLocaleString('th-TH')}
             </p>
             <p className="text-muted mt-1 text-xs">
@@ -114,7 +114,7 @@ export function ProfileScreen() {
         <SectionHeader label="ที่อยากไปสักวัน" />
         <Card accent="pink" className="flex flex-wrap items-center justify-between gap-3 p-4">
           <div>
-            <p className="font-display text-ink font-bold">
+            <p className="font-display text-ink font-medium">
               เก็บไว้แล้ว {dreams.length} อย่าง
             </p>
             <p className="text-muted mt-0.5 text-xs">รายการส่วนตัว เพื่อนในทริปไม่เห็น</p>

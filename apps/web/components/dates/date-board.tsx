@@ -132,7 +132,7 @@ export function DateBoard({ tripId }: { tripId: string }) {
               <p className="flex items-center gap-1.5 text-sm opacity-80">
                 <PartyPopper className="size-4" /> ได้วันแล้ว
               </p>
-              <p className="font-display mt-1 text-xl font-bold tracking-tight">
+              <p className="font-display mt-1 text-xl font-medium tracking-tight">
                 {thaiRangeLabel(locked.startDate, locked.endDate)} · {locked.days} วัน{' '}
                 {locked.days - 1} คืน
               </p>
@@ -205,7 +205,7 @@ export function DateBoard({ tripId }: { tripId: string }) {
               >
                 <ChevronLeft className="size-4" />
               </button>
-              <span className="font-display text-ink min-w-32 text-center text-sm font-bold">
+              <span className="font-display text-ink min-w-32 text-center text-sm font-medium">
                 {thaiMonthLabel(board.month)}
               </span>
               <button
@@ -245,7 +245,7 @@ export function DateBoard({ tripId }: { tripId: string }) {
                 <Eraser className="size-4" /> ล้างเดือนนี้
               </Button>
               <span className="text-muted ml-auto text-xs">
-                ใส่ไว้แล้ว <span className="nums font-bold">{myDayCount}</span> วัน
+                ใส่ไว้แล้ว <span className="nums font-medium">{myDayCount}</span> วัน
               </span>
               <Button
                 size="sm"
@@ -265,7 +265,7 @@ export function DateBoard({ tripId }: { tripId: string }) {
               className="flex flex-wrap items-center justify-between gap-3 p-4"
             >
               <div>
-                <p className="font-display text-ink text-base font-bold">
+                <p className="font-display text-ink text-base font-medium">
                   {thaiRangeLabel(range.start, range.end)} ·{' '}
                   {Math.round(
                     (new Date(range.end).getTime() - new Date(range.start).getTime()) / 86_400_000,
@@ -327,7 +327,7 @@ export function DateBoard({ tripId }: { tripId: string }) {
                         )}
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-display text-ink text-sm font-bold">
+                          <span className="font-display text-ink text-sm font-medium">
                             {thaiRangeLabel(window.startDate, window.endDate)}
                           </span>
                           <span className="flex items-center gap-1.5">

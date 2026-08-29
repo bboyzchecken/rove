@@ -48,7 +48,7 @@ export function AdminScreen() {
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-ink text-2xl font-bold tracking-tight">
+          <h1 className="font-display text-ink text-2xl font-medium tracking-tight">
             ภาพรวมระบบ
           </h1>
           <p className="text-muted mt-1 text-sm">รีเฟรชอัตโนมัติทุกนาที</p>
@@ -88,7 +88,7 @@ export function AdminScreen() {
             <Card className="p-4">
               <div className="flex items-end justify-between gap-4">
                 <div>
-                  <p className="font-display text-ink nums text-2xl font-bold">
+                  <p className="font-display text-ink nums text-2xl font-medium">
                     ${stats.aiCostTodayUsd.toFixed(2)}
                   </p>
                   <p className="text-muted mt-1 text-xs">

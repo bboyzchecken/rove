@@ -70,7 +70,7 @@ export function CreatorEarningsCard() {
                 {entry.estimated ? ' (ประมาณการ)' : ''}
               </p>
             </div>
-            <span className="text-ink nums shrink-0 text-sm font-bold">
+            <span className="text-ink nums shrink-0 text-sm font-medium">
               {formatMoney(entry.amountThb, 'THB')}
             </span>
           </div>
@@ -91,7 +91,7 @@ function Figure({ label, amount }: { label: string; amount: number }) {
   return (
     <div>
       <p className="text-muted text-[11px]">{label}</p>
-      <p className="text-ink nums text-base font-bold">{formatMoney(amount, 'THB')}</p>
+      <p className="text-ink nums text-base font-medium">{formatMoney(amount, 'THB')}</p>
     </div>
   );
 }

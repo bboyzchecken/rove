@@ -198,7 +198,7 @@ function Column({
   return (
     <div className="min-w-0">
       <p className="text-muted text-[11px]">{label}</p>
-      <p className="nums text-ink text-sm font-bold">
+      <p className="nums text-ink text-sm font-medium">
         {changed ? (
           <>
             <span className="text-muted line-through">{from}</span> {to}
@@ -237,7 +237,7 @@ function Stepper({
       >
         <Minus className="size-3.5" />
       </button>
-      <span className="nums text-ink text-sm font-bold">
+      <span className="nums text-ink text-sm font-medium">
         {value} {suffix}
       </span>
       <button

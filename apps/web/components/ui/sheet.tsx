@@ -77,7 +77,7 @@ export function Sheet({
       >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <h2 className="font-display text-ink text-lg font-bold tracking-tight">
+            <h2 className="font-display text-ink text-lg font-medium tracking-tight">
               {title}
             </h2>
             {description ? <p className="text-muted mt-0.5 text-xs">{description}</p> : null}

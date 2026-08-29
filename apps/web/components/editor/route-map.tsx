@@ -75,7 +75,7 @@ export function RouteMap({ items, city }: { items: PlanItem[]; city: string }) {
               x={p.x}
               y={p.y + 4}
               textAnchor="middle"
-              className="fill-white text-[11px] font-bold"
+              className="fill-white text-[11px] font-medium"
             >
               {i + 1}
             </text>
@@ -86,7 +86,7 @@ export function RouteMap({ items, city }: { items: PlanItem[]; city: string }) {
       <ol className="divide-border divide-y">
         {points.map((p, i) => (
           <li key={p.item.id} className="flex items-center gap-2.5 px-3.5 py-2">
-            <span className="bg-primary/12 text-primary flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold">
+            <span className="bg-primary/12 text-primary flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-medium">
               {i + 1}
             </span>
             <span className="text-ink min-w-0 flex-1 truncate text-xs font-medium">

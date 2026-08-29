@@ -113,7 +113,7 @@ export function AirportPicker({
         >
           <span className="text-lg leading-none">{value ? flagOf(value.countryCode) : '✈️'}</span>
           <span className="min-w-0 flex-1">
-            <span className="text-ink nums block text-sm font-bold">
+            <span className="text-ink nums block text-sm font-medium">
               {value ? airportLabel(value) : chosen}
             </span>
             <span className="text-muted block truncate text-[11px]">
@@ -185,7 +185,7 @@ export function AirportPicker({
                       {airport.name}
                     </span>
                   </span>
-                  <span className="bg-ink text-bg nums font-display shrink-0 rounded-lg px-2 py-1 text-[11px] font-bold">
+                  <span className="bg-ink text-bg nums font-display shrink-0 rounded-lg px-2 py-1 text-[11px] font-medium">
                     {airport.iata}
                   </span>
                 </button>

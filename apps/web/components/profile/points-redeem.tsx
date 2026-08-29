@@ -87,7 +87,7 @@ export function PointsRedeemCard() {
                   : 'bg-surface cursor-not-allowed opacity-50',
               )}
             >
-              <span className="text-ink nums block text-sm font-bold">
+              <span className="text-ink nums block text-sm font-medium">
                 ฿{tier.amountThb}
               </span>
               <span className="text-muted nums block text-[11px]">
@@ -188,7 +188,7 @@ function ConfirmRedeem({
           <Card className="p-4">
             <div className="flex items-baseline justify-between gap-3">
               <span className="text-muted text-xs">โค้ดส่วนลด</span>
-              <span className="font-display text-ink nums text-xl font-bold">
+              <span className="font-display text-ink nums text-xl font-medium">
                 ฿{tier.amountThb.toLocaleString('th-TH')}
               </span>
             </div>
@@ -219,7 +219,7 @@ function Line({ label, value, strong }: { label: string; value: string; strong?:
       <span
         className={cn(
           'nums text-sm',
-          strong ? 'text-ink font-bold' : 'text-ink font-medium',
+          strong ? 'text-ink font-medium' : 'text-ink font-medium',
         )}
       >
         {value}
@@ -241,7 +241,7 @@ function CodeLine({
     <div className="flex items-center gap-3 p-3.5">
       <Ticket className="text-primary size-4 shrink-0" />
       <div className="min-w-0 flex-1">
-        <p className="text-ink nums text-sm font-bold tracking-wide">{code.code}</p>
+        <p className="text-ink nums text-sm font-medium tracking-wide">{code.code}</p>
         <p className="text-muted text-[11px]">
           ลด ฿{code.amountThb.toLocaleString('th-TH')} · หมดอายุ{' '}
           {new Date(code.expiresAt).toLocaleDateString('th-TH', {

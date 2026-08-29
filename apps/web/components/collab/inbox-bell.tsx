@@ -54,7 +54,7 @@ export function InboxBell({ className }: { className?: string }) {
       >
         <Bell className="size-4.5" strokeWidth={2.5} />
         {unread > 0 ? (
-          <span className="bg-primary text-primary-fg nums absolute top-0.5 right-0.5 flex min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold">
+          <span className="bg-primary text-primary-fg nums absolute top-0.5 right-0.5 flex min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-medium">
             {unread > 9 ? '9+' : unread}
           </span>
         ) : null}

@@ -304,7 +304,7 @@ export function RouteSummary({ route, className }: { route: TripRoute; className
     <Card accent="green" className={cn('p-4', className)}>
       <div className="mb-2 flex items-center justify-between">
         <p className="section-label">ทริปนี้จะเป็นแบบนี้</p>
-        <span className="text-ink nums text-xs font-bold">
+        <span className="text-ink nums text-xs font-medium">
           {route.days} วัน {route.nights} คืน
         </span>
       </div>
@@ -322,7 +322,7 @@ export function RouteSummary({ route, className }: { route: TripRoute; className
               {stop.arriveTime ? ` ${stop.arriveTime} น.` : ''}
               {stop.departDate ? ` – ${thaiDate(stop.departDate)}` : ''}
             </span>
-            <span className="text-ink nums ml-auto shrink-0 font-bold">
+            <span className="text-ink nums ml-auto shrink-0 font-medium">
               {stop.open ? 'ยังไม่มีขากลับ' : `${stop.nights} คืน`}
             </span>
           </li>

@@ -89,7 +89,7 @@ function Figure({
 }) {
   return (
     <Card accent={accent} className="p-5">
-      <p className="font-display text-ink nums text-3xl leading-none font-bold">
+      <p className="font-display text-ink nums text-3xl leading-none font-medium">
         {value.toLocaleString('th-TH', {
           minimumFractionDigits: decimals,
           maximumFractionDigits: decimals,

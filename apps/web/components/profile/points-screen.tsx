@@ -43,7 +43,7 @@ export function PointsScreen() {
   return (
     <div className="space-y-7 px-4 py-5">
       <header>
-        <h1 className="font-display text-ink text-2xl font-bold tracking-tight">
+        <h1 className="font-display text-ink text-2xl font-medium tracking-tight">
           ประวัติแต้ม
         </h1>
         <p className="text-muted mt-1 text-sm">แต้มทุกแต้มมาจากไหน และถูกใช้ไปกับอะไร</p>
@@ -143,7 +143,7 @@ function LedgerRow({ entry }: { entry: PointsEntry }) {
         </span>
       </span>
 
-      <span className={cn('nums shrink-0 text-sm font-bold', earned ? 'text-success' : 'text-muted')}>
+      <span className={cn('nums shrink-0 text-sm font-medium', earned ? 'text-success' : 'text-muted')}>
         {earned ? '+' : '−'}
         {Math.abs(entry.delta).toLocaleString('th-TH')}
       </span>
@@ -198,7 +198,7 @@ function Figure({ label, value, tone }: { label: string; value: number; tone?: '
       <p className="text-muted text-[11px]">{label}</p>
       <p
         className={cn(
-          'font-display nums mt-1 text-xl font-bold',
+          'font-display nums mt-1 text-xl font-medium',
           tone === 'earn' ? 'text-success' : 'text-ink',
         )}
       >

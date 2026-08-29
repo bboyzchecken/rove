@@ -39,7 +39,7 @@ export function AiCreditPanel({ tripId, onStart }: { tripId: string; onStart: ()
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <RoveMark className="text-primary size-4 shrink-0" />
-            <p className="font-display text-ink font-bold">ให้ AI ร่างแพลนใหม่</p>
+            <p className="font-display text-ink font-medium">ให้ AI ร่างแพลนใหม่</p>
           </div>
 
           <p className="text-muted mt-1 text-sm leading-relaxed">

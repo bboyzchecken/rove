@@ -79,7 +79,7 @@ export function TripNowScreen({ tripId }: { tripId: string }) {
         <Badge tone="outline">โหมดวันเดินทาง</Badge>
       </div>
 
-      <h1 className="font-display text-ink mt-3 text-xl font-bold tracking-tight">
+      <h1 className="font-display text-ink mt-3 text-xl font-medium tracking-tight">
         {frame.title}
       </h1>
 
@@ -153,7 +153,7 @@ function NowCard({
   return (
     <Card accent={accent} className="mt-4 p-4">
       <p className="text-muted text-xs font-medium">{label}</p>
-      <p className="font-display text-ink mt-1 text-lg font-bold">{item.title}</p>
+      <p className="font-display text-ink mt-1 text-lg font-medium">{item.title}</p>
       <p className="text-muted nums mt-0.5 text-sm">
         {item.start}
         {item.end ? `–${item.end}` : ''}

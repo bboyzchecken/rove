@@ -53,7 +53,7 @@ export function RouteCard({ tripId, editable }: { tripId: string; editable: bool
       {flights.length === 0 ? (
         <Card accent="blue" className="flex flex-wrap items-center justify-between gap-3 p-4">
           <div>
-            <p className="font-display text-ink font-bold">ยังไม่ได้ใส่เที่ยวบิน</p>
+            <p className="font-display text-ink font-medium">ยังไม่ได้ใส่เที่ยวบิน</p>
             <p className="text-muted mt-0.5 text-xs">
               ใส่สนามบินกับวันบิน แล้ววันเดินทาง จำนวนคืน และประเทศจะถูกตั้งให้อัตโนมัติ
             </p>
@@ -104,7 +104,7 @@ function LegRow({ leg }: { leg: FlightLeg }) {
       </span>
 
       <div className="min-w-0 flex-1">
-        <p className="text-ink nums flex items-center gap-1.5 text-sm font-bold">
+        <p className="text-ink nums flex items-center gap-1.5 text-sm font-medium">
           {leg.from} <ArrowRight className="text-muted size-3" /> {leg.to}
           {leg.flightNo ? (
             <span className="text-muted text-[11px] font-normal">{leg.flightNo}</span>

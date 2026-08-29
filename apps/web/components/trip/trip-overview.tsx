@@ -66,7 +66,7 @@ export function TripOverview({ tripId }: { tripId: string }) {
       {/* ---------------------------------------------------- checklist */}
       <Card accent="yellow" className="p-4">
         <div className="mb-3 flex items-center justify-between">
-          <p className="font-display text-ink font-bold">เตรียมห้องทริปให้พร้อม</p>
+          <p className="font-display text-ink font-medium">เตรียมห้องทริปให้พร้อม</p>
           <span className="text-muted nums text-xs font-medium">
             {doneSteps}/{checklist.length}
           </span>
@@ -119,7 +119,7 @@ export function TripOverview({ tripId }: { tripId: string }) {
       {!hasDates && !locked ? (
         <Card accent="primary" className="flex flex-wrap items-center justify-between gap-3 p-4">
           <div>
-            <p className="font-display text-ink font-bold">ยังไม่มีวันเดินทาง</p>
+            <p className="font-display text-ink font-medium">ยังไม่มีวันเดินทาง</p>
             <p className="text-muted mt-0.5 text-xs">
               ให้ทุกคนแตะวันที่ตัวเองว่าง แล้ว ROVE จะหาช่วงที่ตรงกันให้
             </p>
@@ -235,10 +235,10 @@ export function TripOverview({ tripId }: { tripId: string }) {
           <Link href={`/t/${tripId}/wishlist`}>
             <Card accent="green" className="h-full p-4">
               <div className="flex items-center justify-between">
-                <p className="font-display text-ink font-bold">ที่อยากไปเข้าแพลนแล้ว</p>
+                <p className="font-display text-ink font-medium">ที่อยากไปเข้าแพลนแล้ว</p>
                 <ChevronRight className="text-muted size-4" />
               </div>
-              <p className="font-display text-ink nums mt-2 text-3xl font-bold">
+              <p className="font-display text-ink nums mt-2 text-3xl font-medium">
                 {coverage.percent}%
               </p>
               <Progress value={coverage.percent / 100} tone="ink" className="mt-2" />
@@ -252,10 +252,10 @@ export function TripOverview({ tripId }: { tripId: string }) {
           <Link href={`/t/${tripId}/budget`}>
             <Card accent="primary" className="h-full p-4">
               <div className="flex items-center justify-between">
-                <p className="font-display text-ink font-bold">งบประมาณการต่อคน</p>
+                <p className="font-display text-ink font-medium">งบประมาณการต่อคน</p>
                 <ChevronRight className="text-muted size-4" />
               </div>
-              <p className="font-display text-ink nums mt-2 text-3xl font-bold">
+              <p className="font-display text-ink nums mt-2 text-3xl font-medium">
                 {formatMoney(budget?.perPersonThb ?? 0, 'THB')}
               </p>
               <Progress value={budget?.budgetUsed ?? 0} tone="ink" className="mt-2" />

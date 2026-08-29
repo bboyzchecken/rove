@@ -48,7 +48,7 @@ export function AdminLoginScreen() {
       <div className="flex flex-col gap-6 py-10">
         <div className="text-center">
           <div>
-            <h1 className="font-display text-ink flex items-center justify-center gap-2 text-xl font-bold tracking-tight">
+            <h1 className="font-display text-ink flex items-center justify-center gap-2 text-xl font-medium tracking-tight">
               <ShieldCheck className="size-5" strokeWidth={2.5} />
               เข้าสู่ระบบสำหรับทีมงาน
             </h1>

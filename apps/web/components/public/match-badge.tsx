@@ -30,7 +30,7 @@ export function MatchBadge({
     <div className={cn('flex flex-col gap-1', className)}>
       <span
         className={cn(
-          'inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold',
+          'inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
           tone,
         )}
       >
