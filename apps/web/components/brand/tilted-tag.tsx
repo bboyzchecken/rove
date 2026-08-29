@@ -37,12 +37,22 @@ export type TiltedTagTone = keyof typeof TONE;
 export function TiltedTag({
   tone = 'ink',
   rotate,
+  shiftX = 0,
   className,
   ...props
 }: React.HTMLAttributes<HTMLSpanElement> & {
   tone?: TiltedTagTone;
   /** Degrees, -12 to 12. Never 0, and never the same value twice in a hero. */
   rotate: number;
+  /**
+   * How far the tag slides out of its anchor edge, as a percentage of its own
+   * width. `-80` leaves a fifth of the pill over the text.
+   *
+   * It lives here rather than as a Tailwind `translate-x-*` class because the
+   * rotation below is already an inline `transform`, and an inline style beats
+   * a utility outright — the class would simply have been dropped.
+   */
+  shiftX?: number;
 }) {
   return (
     <span
@@ -54,11 +64,11 @@ export function TiltedTag({
       // Marks the overlay layer for the readability audit, which checks that
       // no tag lands on the knockout word or on body copy.
       data-tilted-tag=""
-      // Inline because the angle is per-tag and arbitrary: a Tailwind class
+      // Inline because both values are per-tag and arbitrary: a Tailwind class
       // built from a runtime value is never generated, and a fixed set of
       // rotate utilities would push every hero toward reusing the same five
       // angles — which is the alignment §4.2.2 rules out.
-      style={{ transform: `rotate(${rotate}deg)` }}
+      style={{ transform: `translateX(${shiftX}%) rotate(${rotate}deg)` }}
       {...props}
     />
   );

@@ -6,6 +6,7 @@ import {
   heroButtonClass,
   heroNavCtaClass,
 } from '@/components/brand/hero-canvas';
+import { SectionIntro } from '@/components/brand/section-intro';
 import { PublicShell, SHELL_SECTION } from '@/components/common/public-shell';
 import { PricingTable } from '@/components/public/pricing-table';
 import { ButtonLink } from '@/components/ui/button';
@@ -116,11 +117,12 @@ export default function PricingPage() {
         </p>
 
         {/* ------------------------------------------------------------ faq */}
-        <section className="mx-auto mt-14 max-w-2xl">
-          <h2 className="font-display text-ink text-xl font-medium tracking-tight">
-            คำถามที่ถามกันบ่อย
-          </h2>
-          <div className="mt-4 space-y-2.5">
+        <section className="mx-auto mt-16 max-w-2xl">
+          <SectionIntro
+            title="คำถามที่ถามกันบ่อย"
+            lead="ทุกข้อข้างล่างคือสิ่งที่คนถามก่อนจ่าย ตอบไว้ตรงนี้เลยจะได้ไม่ต้องทักมาถาม"
+          />
+          <div className="mt-8 space-y-2.5">
             {FAQ.map((item) => (
               <Card key={item.q} className="p-4 sm:p-5">
                 <p className="text-ink text-sm font-medium">{item.q}</p>

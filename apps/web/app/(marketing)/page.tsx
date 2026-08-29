@@ -3,14 +3,11 @@ import Link from 'next/link';
 import { ArrowRight, CalendarDays, CalendarSearch, Plane } from 'lucide-react';
 
 import {
-  CircleAround,
   DottedPath,
   Flower,
   Heart,
   Sparkle,
   StarBurst,
-  Underline,
-  Wave,
 } from '@/components/brand/doodle';
 import {
   HeroCanvas,
@@ -19,10 +16,10 @@ import {
   heroNavCtaClass,
   heroNavLinkClass,
 } from '@/components/brand/hero-canvas';
+import { SectionIntro } from '@/components/brand/section-intro';
 import { PublicShell, SHELL_SECTION } from '@/components/common/public-shell';
 import { PlatformStatsSection } from '@/components/public/platform-stats';
 import { TravellerReviewsSection } from '@/components/public/traveller-reviews';
-import { SectionHeader } from '@/components/common/section';
 import { ButtonLink } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -234,29 +231,14 @@ export default function LandingPage() {
         }
       />
 
-      {/* ------------------------------------------- destinations (still cream)
-          Pills are where the palette runs at full strength (§5 Tags): small
-          enough that four saturated colours in a row cost nothing against the
-          §2.3 ratio, which is exactly why the cards below them do not. */}
-      <section className={`${SHELL_SECTION} pb-14`}>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="section-label mr-1">ไปได้ทุกที่</span>
-          {DESTINATIONS.map((d) => (
-            <Badge key={d.label} tone={d.tone} size="md">
-              {d.label}
-            </Badge>
-          ))}
-          <Badge tone="outline" size="md">
-            และที่อื่นทั่วโลก
-          </Badge>
-        </div>
-      </section>
-
       {/* --------------------------------------------------------- entry (white) */}
       <section className="bg-surface border-border border-y">
-        <div className={`${SHELL_SECTION} py-14`}>
-          <SectionHeader label="เริ่มยังไงก็ได้ · ไม่เกิน 3 หน้าจอ" />
-          <div className="grid gap-3 sm:grid-cols-3">
+        <div className={`${SHELL_SECTION} py-16`}>
+          <SectionIntro
+            title="เริ่มจากสิ่งที่คุณรู้อยู่แล้ว"
+            lead="รู้แค่วันก็ได้ รู้แค่ตั๋วก็ได้ หรือยังไม่รู้อะไรเลยก็ได้ — ไม่เกินสามหน้าจอก็มีห้องทริปให้เพื่อนเข้ามาแล้ว"
+          />
+          <div className="mt-8 grid gap-3 sm:grid-cols-3">
             {ENTRIES.map((entry) => (
               <Link key={entry.key} href={`/new?from=${entry.key}`} className="group">
                 <Card className="h-full p-5 transition group-hover:-translate-y-0.5">
@@ -281,66 +263,97 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* --------------------------------------------------------- steps (cream)
-          A calm content section (§1): cream ground, ink type, one doodle in
-          the margin, nothing tilted. The illustration lives here rather than
-          in the hero — §6's hero is canvas, type and marks only, and a
-          cream-backed picture would have punched a hole in the full-bleed. */}
-      <section className={`${SHELL_SECTION} relative py-14`}>
-        <SectionHeader label="ทำงานยังไง" />
-        {/* The dotted path is the journey mark (§5.2) — this is the one section
-            where it says something the copy does not. */}
-        <DottedPath className="pointer-events-none absolute top-8 right-2 hidden h-12 w-24 lg:block" />
+      {/* -------------------------------------------------- destinations (cream)
+          This was a bare row of pills under an 11px label, sitting between the
+          hero and the entry cards with nothing to say what it was — it read as
+          a leftover rather than a section. It now carries the heading it
+          needed and the illustration that actually matches it: landmarks from
+          five continents strung along a dotted route is a picture of "anywhere
+          in the world", which is the claim the pills are the evidence for. */}
+      <section className={`${SHELL_SECTION} py-16`}>
+        <SectionIntro
+          title="จะไปมุมไหนของโลก ก็วางแพลนที่นี่ได้"
+          lead="ROVE ไม่ได้ผูกกับประเทศไหนเป็นพิเศษ ที่เห็นข้างล่างเป็นแค่ตัวอย่างจากทริปที่คนเปิดสาธารณะไว้"
+        />
+
         <Image
           src="/brand/hero-landing.webp"
-          alt="กลุ่มเพื่อนสะพายเป้เดินทางด้วยกัน มีแลนด์มาร์กจากหลายทวีปอยู่ด้านหลังและเส้นทางจุดไข่ปลาลากผ่านหมุดสถานที่"
+          alt="แลนด์มาร์กจากหลายทวีปเรียงกัน มีเส้นทางจุดไข่ปลาลากผ่านหมุดสถานที่ และกลุ่มเพื่อนสะพายเป้เดินอยู่ด้านหน้า"
           width={1440}
           height={816}
           priority
-          className="mb-10 w-full"
+          className="mt-8 w-full"
         />
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {STEPS.map((step) => (
-            <div key={step.n}>
-              <span className="bg-yellow text-yellow-deep font-display flex size-9 items-center justify-center rounded-full text-sm font-medium">
-                {step.n}
-              </span>
-              <p className="text-ink mt-3 font-medium">{step.title}</p>
-              <p className="text-muted t-small mt-1">{step.text}</p>
-            </div>
+
+        {/* Pills are where the palette runs at full strength (§7 Tags): small
+            enough that four saturated colours in a row cost nothing against
+            §2.3, which is exactly why the cards elsewhere do not. Flat and
+            untilted — tilting is a hero-only device. */}
+        <div className="mt-8 flex flex-wrap items-center gap-2">
+          {DESTINATIONS.map((d) => (
+            <Badge key={d.label} tone={d.tone} size="md">
+              {d.label}
+            </Badge>
           ))}
+          <Badge tone="outline" size="md">
+            และที่อื่นทั่วโลก
+          </Badge>
         </div>
       </section>
 
-      {/*
-        --------------------------------------------------- social proof (cream)
-        Between the steps and the features, per W24.1: the reader has just been
-        told how it works and the next question is "does anyone actually use
-        it". Both render nothing at all until the real numbers are worth
-        saying — the page is expected to close back up around them, and no
-        placeholder is left behind.
+      {/* --------------------------------------------------------- steps (white)
+          Led by the problem rather than by a label. "ทำงานยังไง" set over a
+          full-width illustration gave the picture more of the page than the
+          point had, and a reader has to want the answer before four numbered
+          steps mean anything to them. */}
+      <section className="bg-surface border-border border-y">
+        <div className={`${SHELL_SECTION} relative py-16`}>
+          <SectionIntro
+            title="แชทเลื่อนหาย แต่แพลนไม่ควรหายไปด้วย"
+            lead="ที่อยากไปของแต่ละคน วันว่างที่ไม่ตรงกัน บิลที่ยังไม่ได้หาร — ทั้งหมดอยู่ในห้องเดียว และไม่มีใครต้องรับหน้าที่สรุป"
+            underline
+          />
+          {/* The dotted path is the journey mark (§5.2) — this is the one
+              section where it says something the copy does not. */}
+          <DottedPath className="pointer-events-none absolute top-10 right-2 hidden h-12 w-24 lg:block" />
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {STEPS.map((step) => (
+              <div key={step.n}>
+                <span className="bg-yellow text-yellow-deep font-display flex size-9 items-center justify-center rounded-full text-sm font-medium">
+                  {step.n}
+                </span>
+                <p className="t-h3 text-ink mt-3">{step.title}</p>
+                <p className="text-muted t-small mt-1.5">{step.text}</p>
+              </div>
+            ))}
+          </div>
 
-        Which is why they stay on cream and carry no band of their own. Given
-        one, the cream → white → cream alternation in §7 would depend on
-        whether there happened to be reviews that day: with the band present
-        the rhythm read correctly, and the moment it collapsed the steps and
-        the features became two cream sections meeting. On cream these are a
-        continuation of the steps section above them either way, and the
-        alternation is carried by sections that always render.
-      */}
-      <PlatformStatsSection className={`${SHELL_SECTION} pt-14`} />
-      <TravellerReviewsSection className={`${SHELL_SECTION} pt-14`} />
+          {/*
+            ------------------------------------------------------ social proof
+            Between the steps and the features, per W24.1: the reader has just
+            been told how it works and the next question is "does anyone
+            actually use it". Both render nothing at all until the real numbers
+            are worth saying — the page closes back up around them and no
+            placeholder is left behind.
 
-      {/* ------------------------------------------------------ features (white) */}
-      <section className="bg-surface border-border mt-14 border-y">
-        <div className={`${SHELL_SECTION} py-14`}>
-        {/* §5.2 puts the underline scribble under a section heading. One mark,
-            ink, in a calm content area — no tilt, no overlay. */}
-        <div className="relative mb-6 inline-block">
-          <SectionHeader label="สิ่งที่แอปวางแพลนอื่นไม่ค่อยมี" className="mb-0" />
-          <Underline className="absolute -bottom-2 left-0 h-2 w-full" />
+            Which is why they share the steps band rather than carrying one of
+            their own. Given a band each, the cream → white → cream alternation
+            in §7 would depend on whether there happened to be reviews that
+            day: with the band present the rhythm read correctly, and the
+            moment it collapsed, two cream sections met.
+          */}
+          <PlatformStatsSection className="pt-16" />
+          <TravellerReviewsSection className="pt-16" />
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      </section>
+
+      {/* ------------------------------------------------------ features (cream) */}
+      <section className={`${SHELL_SECTION} py-16`}>
+        <SectionIntro
+          title="สิ่งที่แอปวางแพลนอื่นไม่ค่อยมี"
+          lead="ส่วนใหญ่ช่วยเก็บรายการที่อยากไป แต่ไม่ได้ช่วยตอนที่กลุ่มต้องตัดสินใจ หรือตอนที่ต้องเคลียร์เงินกันทีหลัง"
+        />
+        <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => (
             <Card key={f.title} className="p-5">
               <span
@@ -353,27 +366,21 @@ export default function LandingPage() {
             </Card>
           ))}
         </div>
-        </div>
       </section>
 
-      {/* ----------------------------------------------------- character (cream)
+      {/* ----------------------------------------------------- character (white)
           The one full-strength colour block in the content half of the page,
           and pink because §2.4 gives pink to people. */}
-      <section>
-        <div className={`${SHELL_SECTION} py-14`}>
-          {/* §5.2 gives the wave line one job: dividing sections. */}
-          <Wave className="text-border pointer-events-none mb-10 block h-4" />
+      <section className="bg-surface border-border border-t">
+        <div className={`${SHELL_SECTION} py-16`}>
           <Card accent="pink" className="relative overflow-hidden p-6 sm:p-8">
             <Heart className="text-pink-deep/25 pointer-events-none absolute -top-3 -right-3 size-24" />
             <div className="relative flex flex-wrap items-center justify-between gap-6">
               <div className="max-w-md">
-                <p className="t-h2">
-                  เลือกตัวละครของตัวเองได้{' '}
-                  <span className="relative inline-block">
-                    20 แบบ
-                    <CircleAround className="absolute -inset-x-3 -inset-y-2 h-[calc(100%+1rem)] w-[calc(100%+1.5rem)]" />
-                  </span>
-                </p>
+                {/* No circle-around on the number. Ringing "20 แบบ" drew a box
+                    around it, and a number in a box reads as a cap — the
+                    opposite of what the sentence is offering. */}
+                <p className="t-h2">เลือกตัวละครของตัวเองได้ 20 แบบ</p>
                 <p className="text-pink-mid t-small mt-3">
                   ไม่ต้องอัปรูป ไม่ต้องคิดชื่อเล่น — เลือกตัวที่ใช่ แล้วมันจะตามคุณไปทุกทริป
                   ทั้งในรายชื่อสมาชิก คอมเมนต์ และบิลที่หารกัน

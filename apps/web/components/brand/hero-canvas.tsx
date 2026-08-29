@@ -31,6 +31,15 @@ import { cn } from '@/lib/utils';
 /**
  * Tag positions, as a fixed set of slots rather than free coordinates.
  *
+ * HOW FAR A TAG INTRUDES IS MEASURED AGAINST THE TAG, NOT THE HEADLINE.
+ * Each slot pins to an edge of the headline box and then slides back out by
+ * `shiftX` percent of its *own* width, so a pill always leaves the same
+ * fraction of itself over the type. Expressed as a percentage of the headline
+ * instead — which is what this did first — the same number is a graze on a
+ * wide English line and a pill parked across the middle of a short Thai one.
+ * That is how "คุยกันในแพลน" ended up sitting on top of "วาง": §4.2.4 asks for
+ * the edge of a letter, and the box-relative maths could not promise it.
+ *
  * Each slot is a percentage inside the *headline box*, and each is anchored
  * to the edge it is nearest — `right-[4%]` and not `left-[52%]` — because a
  * left percentage that clips a letter at 1440px lands mid-word at 390px,
@@ -47,24 +56,11 @@ import { cn } from '@/lib/utils';
  * cannot accidentally repeat an angle or line two tags up (§4.2.3).
  */
 const SLOTS = [
-  // Line one, right edge. Barely negative on the top: above this box is the
-  // eyebrow, and an eyebrow is body copy (§9).
-  { at: '-top-[3%] -right-[9%]', rotate: -9, wide: false },
-  // Line one again, further out — the pair reads as a cluster, not a column.
-  { at: 'top-[13%] -right-[19%]', rotate: 5, wide: true },
-  // Line one's left edge. This one started on line two's right, which on a
-  // page whose second line is short sat close enough to the knockout below to
-  // graze it by 85 square pixels on a phone. Distance from that word is worth
-  // more than a perfectly even scatter.
-  { at: 'top-[4%] -left-[12%]', rotate: 7, wide: false },
-  // Line two, left edge.
-  { at: 'top-[34%] -left-[8%]', rotate: -12, wide: false },
-  // Line three, LEFT only. The knockout is by convention the last thing on
-  // the last line, so the right of line three is the one place a tag can
-  // never go — §4.2.7 keeps that word clean, and a slot there grazed it on
-  // every page the moment the headline got shorter. Encoding it here means no
-  // page can reintroduce the collision by rewording its hero.
-  { at: 'top-[78%] -left-[11%]', rotate: 11, wide: true },
+  { at: '-top-[3%] right-0', shiftX: 74, rotate: -9, wide: false },
+  { at: 'top-[13%] right-0', shiftX: 92, rotate: 5, wide: true },
+  { at: 'top-[4%] left-0', shiftX: -82, rotate: 7, wide: false },
+  { at: 'top-[34%] left-0', shiftX: -88, rotate: -12, wide: false },
+  { at: 'top-[78%] left-0', shiftX: -80, rotate: 11, wide: true },
 ] as const;
 
 export interface HeroTag {
@@ -167,6 +163,7 @@ export function HeroCanvas({
                     key={tag.label}
                     tone={tag.tone}
                     rotate={slot.rotate}
+                    shiftX={slot.shiftX}
                     className={cn('absolute', slot.at, slot.wide && 'hidden lg:inline-block')}
                   >
                     {tag.label}

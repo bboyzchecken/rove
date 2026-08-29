@@ -14,6 +14,10 @@
  *   overKnockout  anything painting *above* the knockout word (§4.2.7). Marks
  *                 behind it are ignored — it is an opaque block, so being
  *                 behind it is invisible, not a collision.
+ *   tagIntrusion  a tilted tag with more than 45% of itself over the headline.
+ *                 Overlapping display type is the effect, so overBody stays
+ *                 quiet about it; a pill across the middle of a word is not
+ *                 (§4.2.4, edge of a letter).
  *   contrast      every text node against the colour actually painted behind
  *                 it, at the AA threshold for its size and weight (§2.2).
  *   weights       600 and 800 are not loaded and 700 is the hero's alone
@@ -131,7 +135,26 @@ const IN_PAGE = () => {
   const tags = [...document.querySelectorAll('[data-tilted-tag]')].filter(vis);
   const knockouts = [...document.querySelectorAll('.knockout')].filter(vis);
 
-  const out = { overBody: [], overKnockout: [], contrast: [], weights: [], overflow: null };
+  const out = { overBody: [], overKnockout: [], tagIntrusion: [], contrast: [], weights: [], overflow: null };
+
+  // §4.2.4 — a tag clips the *edge* of a letter. Overlapping display type is
+  // allowed and is the whole effect, so the overBody check below says nothing
+  // about it; what makes a headline unreadable is a pill parked across the
+  // middle of a word. Measured as how much of the tag's own width sits over
+  // the headline, which is the thing the eye actually reads as "covered".
+  for (const tag of tags) {
+    const tr = tag.getBoundingClientRect();
+    for (const h of document.querySelectorAll('h1')) {
+      const hr = h.getBoundingClientRect();
+      const w = Math.max(0, Math.min(tr.right, hr.right) - Math.max(tr.left, hr.left));
+      const vOverlap = Math.max(0, Math.min(tr.bottom, hr.bottom) - Math.max(tr.top, hr.top));
+      if (vOverlap < 4 || tr.width === 0) continue;
+      const share = w / tr.width;
+      if (share > 0.45) {
+        out.tagIntrusion.push({ tag: label(tag), share: +share.toFixed(2) });
+      }
+    }
+  }
 
   for (const t of texts) {
     const size = parseFloat(getComputedStyle(t).fontSize);
@@ -210,6 +233,7 @@ for (const [route, vps] of Object.entries(report)) {
     const bits = [];
     if (r.overBody?.length) bits.push(`overBody=${r.overBody.length}`);
     if (r.overKnockout?.length) bits.push(`overKnockout=${r.overKnockout.length}`);
+    if (r.tagIntrusion?.length) bits.push(`tagIntrusion=${r.tagIntrusion.length}`);
     if (r.contrast?.length) bits.push(`contrast=${r.contrast.length}`);
     if (r.weights?.length) bits.push(`weights=${r.weights.length}`);
     if (r.overflow) bits.push(`overflow=${r.overflow.scrollWidth}px`);
