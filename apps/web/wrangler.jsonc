@@ -7,8 +7,15 @@
  * goes through the OpenNext adapter, which targets Workers.
  *
  * There is deliberately no production Worker here. The apex (rovetravel.site)
- * is a static holding page in `apps/coming-soon`, deployed to Pages, so that it
- * cannot be taken down by anything that goes wrong in this build.
+ * is a static holding page on the orphan `site` branch, served by Pages, so
+ * that it cannot be taken down by anything that goes wrong in this build.
+ *
+ * The brand is being decided in public between two of these, and a Worker is
+ * addressed by the name below rather than by the branch it was built from, so
+ * the two names have to stay distinct:
+ *
+ *   uat         → rove-uat          the current cozy terracotta brand (here)
+ *   uat-doodle  → rove-uat-doodle   doodle v3
  *
  * NOTE ON ENV VARS: nothing below sets a NEXT_PUBLIC_* value, and it would not
  * work if it did — those are inlined by `next build`, long before this file is
