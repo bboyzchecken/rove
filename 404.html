@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      Nothing is published yet, so every path that is not the holding page is a
+      path that does not exist — send it home.
+
+      This is a 404.html rather than a `/* / 200` rule in `_redirects` because
+      Pages evaluates redirects *before* looking for a matching asset, so a
+      catch-all there would swallow /assets/mark.svg and the OG image with it.
+      Pages serves this file automatically for anything it cannot find.
+    -->
+    <meta http-equiv="refresh" content="0; url=/" />
+    <title>ROVE</title>
+    <link rel="canonical" href="https://rovetravel.site/" />
+    <meta name="robots" content="noindex" />
+  </head>
+  <body>
+    <p>กำลังพาไปหน้าแรก… <a href="/">rovetravel.site</a></p>
+    <script>
+      location.replace("/");
+    </script>
+  </body>
+</html>

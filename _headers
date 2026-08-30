@@ -1,0 +1,21 @@
+# Cloudflare Pages response headers for the holding page.
+# https://developers.cloudflare.com/pages/configuration/headers/
+
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), camera=(), microphone=(), interest-cohort=()
+  # Google Fonts is the only third party the page talks to. Everything else is
+  # same-origin, and there is no form, so there is nothing to post anywhere.
+  Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+
+# The page changes when we say it changes, and when it does we want it seen the
+# same day — short cache, revalidated.
+/
+  Cache-Control: public, max-age=0, must-revalidate
+
+# Fingerprint-free asset names, so these cannot be cached forever. An hour is
+# long enough to be free and short enough that a logo fix lands the same day.
+/assets/*
+  Cache-Control: public, max-age=3600

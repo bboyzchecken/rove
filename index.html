@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ROVE — วางแผนเที่ยวกับเพื่อน แล้วพบกันเร็ว ๆ นี้</title>
+    <meta
+      name="description"
+      content="ROVE คือที่ที่แก๊งเพื่อนวางแผนทริปด้วยกันจนจบ — หาวันที่ตรงกัน ให้ทุกคนหย่อนที่อยากไป ให้ AI ร่างให้ แล้วหารเงินกันในที่เดียว กำลังจะเปิดให้ใช้เร็ว ๆ นี้"
+    />
+    <meta name="theme-color" content="#D9714E" />
+    <link rel="icon" href="assets/mark.svg" type="image/svg+xml" />
+    <link rel="canonical" href="https://rovetravel.site/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://rovetravel.site/" />
+    <meta property="og:site_name" content="ROVE" />
+    <meta property="og:locale" content="th_TH" />
+    <meta property="og:title" content="ROVE — วางแผนเที่ยวกับเพื่อน แล้วพบกันเร็ว ๆ นี้" />
+    <meta
+      property="og:description"
+      content="หาวันที่ตรงกัน ให้ทุกคนหย่อนที่อยากไป ให้ AI ร่างให้ แล้วหารเงินกันจบในที่เดียว"
+    />
+    <meta property="og:image" content="https://rovetravel.site/assets/og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&family=Noto+Sans+Thai:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      /* ======================================================================
+       * Holding page for rovetravel.site.
+       *
+       * Standalone on purpose: no build step, no framework, no adapter. It has
+       * to be able to go live while the app itself is still being wired up, so
+       * it must not share a failure mode with the app.
+       *
+       * Colours, radii and type are copied by hand from apps/web/styles/brand.css.
+       * That file stays the single source of truth — when the brand moves, this
+       * page is updated to match, it does not get a vote.
+       * ==================================================================== */
+      :root {
+        color-scheme: light;
+
+        --primary: hsl(15 65% 58%); /* cha thai terracotta */
+        --primary-light: hsl(15 65% 70%);
+        --espresso: hsl(17 26% 19%); /* all type is this colour */
+        --bg: hsl(0 0% 100%);
+        --surface: hsl(30 10% 96%);
+        --muted: hsl(22 18% 43%);
+        --border: hsl(30 8% 90%);
+
+        --radius: 1.5rem;
+
+        --font-sans: "Inter", "Noto Sans Thai", system-ui, sans-serif;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        background-color: var(--bg);
+        color: var(--espresso);
+        font-family: var(--font-sans);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      /* The one piece of decoration: a wash of terracotta behind the mark, so
+       * the page reads as ROVE's before a single word is understood. Flat, no
+       * shadow — separation comes from colour (brand.css, Elevation). */
+      .glow {
+        position: fixed;
+        inset-block-start: -22rem;
+        inset-inline-start: 50%;
+        translate: -50% 0;
+        inline-size: min(46rem, 130vw);
+        block-size: min(46rem, 130vw);
+        border-radius: 50%;
+        background: radial-gradient(
+          circle,
+          hsl(15 65% 58% / 0.13) 0%,
+          hsl(15 65% 58% / 0.05) 45%,
+          transparent 70%
+        );
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      main {
+        position: relative;
+        z-index: 1;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2.5rem;
+        inline-size: min(56rem, 100% - 2.5rem);
+        margin-inline: auto;
+        padding-block: 4rem 3rem;
+        text-align: center;
+      }
+
+      /* ---------------------------------------------------------------- mark */
+      .stack {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.25rem;
+      }
+
+      .mark {
+        inline-size: 4.5rem;
+        block-size: 4.5rem;
+        animation: settle 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+
+      .wordmark {
+        margin: 0;
+        font-size: clamp(2rem, 9vw, 2.75rem);
+        font-weight: 800;
+        letter-spacing: 0.24em;
+        /* The tracking is applied to the right of every glyph including the
+         * last, which pushes the word off its own centre. Pull it back. */
+        text-indent: 0.24em;
+        line-height: 1;
+      }
+
+      /* ---------------------------------------------------------------- copy */
+      .headline {
+        margin: 0;
+        font-size: clamp(1.75rem, 6.5vw, 3rem);
+        font-weight: 800;
+        line-height: 1.25;
+        letter-spacing: -0.01em;
+        text-wrap: balance;
+      }
+
+      .headline em {
+        font-style: normal;
+        color: var(--primary);
+      }
+
+      .lede {
+        margin: 0;
+        max-inline-size: 34rem;
+        font-size: clamp(1rem, 3.6vw, 1.1875rem);
+        color: var(--muted);
+        text-wrap: pretty;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.4375rem 0.9375rem;
+        border-radius: 999px;
+        background-color: var(--surface);
+        border: 1px solid var(--border);
+        font-size: 0.8125rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+      }
+
+      .badge::before {
+        content: "";
+        inline-size: 0.5rem;
+        block-size: 0.5rem;
+        border-radius: 50%;
+        background-color: var(--primary);
+        animation: pulse 2.4s ease-in-out infinite;
+      }
+
+      /* -------------------------------------------------------------- blocks */
+      .what {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+        gap: 0.875rem;
+        inline-size: 100%;
+        max-inline-size: 44rem;
+        text-align: start;
+      }
+
+      .block {
+        padding: 1.25rem 1.25rem 1.375rem;
+        border-radius: var(--radius);
+        background-color: var(--tint);
+      }
+
+      /* The accent palette, tinted over white rather than a second set of
+       * pastel hexes — one value per colour, same rule as brand.css. */
+      .block:nth-child(1) {
+        --tint: hsl(137 36% 65% / 0.22); /* matcha */
+      }
+      .block:nth-child(2) {
+        --tint: hsl(207 68% 81% / 0.3); /* sky */
+      }
+      .block:nth-child(3) {
+        --tint: hsl(52 82% 68% / 0.3); /* sun */
+      }
+
+      .block h2 {
+        margin: 0 0 0.25rem;
+        font-size: 1rem;
+        font-weight: 700;
+      }
+
+      .block p {
+        margin: 0;
+        font-size: 0.9375rem;
+        color: var(--muted);
+        text-wrap: pretty;
+      }
+
+      .block .emoji {
+        display: block;
+        font-size: 1.5rem;
+        line-height: 1;
+        margin-block-end: 0.625rem;
+      }
+
+      /* -------------------------------------------------------------- footer */
+      footer {
+        position: relative;
+        z-index: 1;
+        padding: 1.5rem 1.25rem 2.5rem;
+        text-align: center;
+        font-size: 0.875rem;
+        color: var(--muted);
+      }
+
+      footer p {
+        margin: 0;
+      }
+
+      footer a {
+        color: var(--espresso);
+        font-weight: 500;
+        text-underline-offset: 0.2em;
+        text-decoration-color: var(--primary-light);
+        text-decoration-thickness: 2px;
+      }
+
+      footer a:hover {
+        color: var(--primary);
+      }
+
+      footer .fine {
+        margin-block-start: 0.5rem;
+        font-size: 0.8125rem;
+        opacity: 0.75;
+      }
+
+      /* -------------------------------------------------------------- motion */
+      @keyframes settle {
+        from {
+          opacity: 0;
+          rotate: -35deg;
+          scale: 0.85;
+        }
+        to {
+          opacity: 1;
+          rotate: 0deg;
+          scale: 1;
+        }
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.35;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.001ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.001ms !important;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="glow" aria-hidden="true"></div>
+
+    <main>
+      <div class="stack">
+        <img class="mark" src="assets/mark.svg" alt="" width="72" height="72" />
+        <h1 class="wordmark">ROVE</h1>
+      </div>
+
+      <div class="stack">
+        <span class="badge">กำลังสร้างอยู่</span>
+        <p class="headline">แล้วพบกัน<em>เร็ว ๆ นี้</em></p>
+        <p class="lede">
+          ที่ที่แก๊งเพื่อนวางแผนทริปด้วยกันจนจบ — ไม่ต้องไล่ทวงในแชท
+          ไม่ต้องมีใครคนเดียวแบกงานสรุปทั้งทริป
+        </p>
+      </div>
+
+      <div class="what">
+        <div class="block">
+          <span class="emoji" aria-hidden="true">🗓️</span>
+          <h2>หาวันที่ตรงกันก่อน</h2>
+          <p>ทุกคนแตะวันว่างของตัวเอง แล้วค่อยดูว่าช่วงไหนไปกันได้ครบ</p>
+        </div>
+        <div class="block">
+          <span class="emoji" aria-hidden="true">🤖</span>
+          <h2>ให้ AI ร่างให้</h2>
+          <p>จัดวันให้ตามโซน เวลาเปิด-ปิด และอากาศ พร้อมบอกด้วยว่าทำไมถึงจัดแบบนี้</p>
+        </div>
+        <div class="block">
+          <span class="emoji" aria-hidden="true">🧾</span>
+          <h2>หารเงินจบในที่เดียว</h2>
+          <p>แยกของกลางกับของส่วนตัว บอกเลยว่าใครต้องคืนใครกี่บาท</p>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <p>
+        อยากรู้ก่อนใครว่าเปิดเมื่อไหร่ ทักมาได้ที่
+        <a href="mailto:hello@rovetravel.site">hello@rovetravel.site</a>
+      </p>
+      <p class="fine">© <span id="year">2026</span> ROVE</p>
+    </footer>
+
+    <script>
+      // The only script on the page: keep the copyright year honest without a
+      // redeploy. Everything else here is static by design.
+      document.getElementById("year").textContent = String(new Date().getFullYear());
+    </script>
+  </body>
+</html>
