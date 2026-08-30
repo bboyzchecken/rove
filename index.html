@@ -71,8 +71,22 @@
         padding: 0;
       }
 
+      /* Nothing on this page is meant to be reachable by scrolling sideways, so
+       * nothing is allowed to make that possible. `clip` rather than `hidden`:
+       * `hidden` on the root turns it into a scroll container, which breaks
+       * `position: fixed` and sticky children. */
+      html {
+        overflow-x: clip;
+      }
+
       body {
-        min-height: 100dvh;
+        /* Not `dvh`. The dynamic viewport unit re-measures every time a mobile
+         * browser's address bar collapses or expands, which on a centred layout
+         * means the whole page slides under your thumb as you scroll. `svh` is
+         * the small viewport — the one that is always visible — so it is a
+         * fixed number for the life of the page. */
+        min-height: 100vh;
+        min-height: 100svh;
         display: flex;
         flex-direction: column;
         background-color: var(--bg);
@@ -91,8 +105,14 @@
         inset-block-start: -22rem;
         inset-inline-start: 50%;
         translate: -50% 0;
-        inline-size: min(46rem, 130vw);
-        block-size: min(46rem, 130vw);
+        /* Percent, not `vw`. On a fixed element a percentage resolves against
+         * the viewport *without* the scrollbar, while `vw` includes it — so
+         * `130vw` grew and shrank by the scrollbar's width every time one
+         * appeared, and the wash visibly jumped. Deliberately wider than the
+         * screen; `overflow-x: clip` above is what keeps that from turning into
+         * somewhere you can pan to. */
+        inline-size: min(46rem, 130%);
+        aspect-ratio: 1;
         border-radius: 50%;
         background: radial-gradient(
           circle,
