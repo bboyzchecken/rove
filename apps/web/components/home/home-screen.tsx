@@ -40,7 +40,17 @@ const MONTHS = [
   'ธ.ค.',
 ];
 
-const PAST_ACCENTS = ['matcha', 'sky', 'joyfull'] as const;
+/**
+ * §2.5 — /home is one of the three screens where several feature colours may
+ * appear at once, because each quick-action card IS a feature: it opens that
+ * room, so it wears that room's colour and teaches the mapping on the way in.
+ *
+ * That licence stops at cards which are not features. The year-stat grid and
+ * the past-trip rail used to cycle hues purely for variety, which is §8's
+ * "pastel rainbow on one screen" — four stats are not four features, and a
+ * colour that means nothing is what made v2 read as generic playful. They are
+ * uniform now; on the trip rail the cover photography carries the variety.
+ */
 
 export function HomeScreen() {
   const { data: me } = useMe();
@@ -57,18 +67,23 @@ export function HomeScreen() {
 
   const quickActions = activeTripId
     ? ([
-        { label: 'ชวนเพื่อนเข้าทริป', href: `/t/${activeTripId}`, icon: UserPlus, accent: 'sky' },
+        {
+          label: 'ชวนเพื่อนเข้าทริป',
+          href: `/t/${activeTripId}`,
+          icon: UserPlus,
+          accent: 'countdown',
+        },
         {
           label: 'ให้ AI ร่างแพลน',
           href: `/t/${activeTripId}/plan`,
           icon: Sparkles,
-          accent: 'matcha',
+          accent: 'itinerary',
         },
         {
           label: 'บันทึกรายจ่าย',
           href: `/t/${activeTripId}/expense`,
           icon: Receipt,
-          accent: 'sun',
+          accent: 'documents',
         },
       ] as const)
     : [];
@@ -78,7 +93,7 @@ export function HomeScreen() {
       {/* ------------------------------------------------------- greeting */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight">
+          <h1 className="font-display text-ink text-2xl font-medium tracking-tight">
             สวัสดี {me?.name ?? ''}
           </h1>
           <p className="text-muted mt-1 text-sm">
@@ -88,9 +103,9 @@ export function HomeScreen() {
           </p>
         </div>
         <Link href="/profile" className="shrink-0">
-          <Card accent="sun" className="flex items-center gap-2 px-3 py-2">
-            <Sparkles className="text-espresso size-4" />
-            <span className="font-display text-espresso nums text-sm font-extrabold">
+          <Card accent="gray" className="flex items-center gap-2 px-3 py-2">
+            <Sparkles className="text-ink size-4" />
+            <span className="font-display text-ink nums text-sm font-medium">
               {(me?.points ?? 0).toLocaleString('th-TH')}
             </span>
             <span className="text-muted text-[11px]">แต้ม</span>
@@ -104,8 +119,8 @@ export function HomeScreen() {
           {quickActions.map((action) => (
             <Link key={action.label} href={action.href as never}>
               <Card accent={action.accent} className="flex h-full flex-col items-start gap-2 p-3.5">
-                <action.icon className="text-espresso size-5" strokeWidth={2.2} />
-                <span className="text-espresso text-xs leading-tight font-semibold">
+                <action.icon className="text-ink size-5" strokeWidth={2.2} />
+                <span className="text-ink text-xs leading-tight font-medium">
                   {action.label}
                 </span>
               </Card>
@@ -120,17 +135,17 @@ export function HomeScreen() {
           <SectionHeader
             label="ทริปที่กำลังจะถึง"
             action={
-              <Link href={`/t/${next.id}` as never} className="text-primary text-xs font-semibold">
+              <Link href={`/t/${next.id}` as never} className="text-primary text-xs font-medium">
                 เปิดห้องทริป
               </Link>
             }
           />
 
           <Link href={`/t/${next.id}` as never}>
-            <Card className="shadow-warm overflow-hidden">
+            <Card className="overflow-hidden">
               <TripCover src={next.cover} frame="banner" priority>
-                <div className="bg-espresso text-bg absolute top-3 left-3 rounded-full px-3 py-1.5 backdrop-blur-sm">
-                  <span className="font-display nums text-lg leading-none font-extrabold">
+                <div className="bg-ink text-bg absolute top-3 left-3 rounded-full px-3 py-1.5 backdrop-blur-sm">
+                  <span className="font-display nums text-lg leading-none font-medium">
                     {next.daysUntil}
                   </span>
                   <span className="ml-1 text-[11px]">วัน</span>
@@ -140,7 +155,7 @@ export function HomeScreen() {
               <div className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-display text-espresso text-lg font-extrabold">
+                    <p className="font-display text-ink text-lg font-medium">
                       {next.title}
                     </p>
                     <p className="text-muted mt-0.5 text-sm">
@@ -151,9 +166,9 @@ export function HomeScreen() {
                 </div>
 
                 {next.weather ? (
-                  <div className="bg-sky/25 mt-3 flex items-center gap-2 rounded-2xl px-3 py-2">
+                  <div className="bg-surface mt-3 flex items-center gap-2 rounded-2xl px-3 py-2">
                     <span className="text-lg">{next.weather.icon}</span>
-                    <span className="text-espresso text-sm font-medium">
+                    <span className="text-ink text-sm font-medium">
                       {next.weather.high}° / {next.weather.low}°
                     </span>
                     <span className="text-muted text-xs">{next.weather.text}</span>
@@ -174,7 +189,7 @@ export function HomeScreen() {
               {upcoming.map((trip) => (
                 <div key={trip.id} className="flex items-center gap-3">
                   <div className="w-14 shrink-0 text-center">
-                    <div className="font-display text-espresso nums text-lg leading-none font-extrabold">
+                    <div className="font-display text-ink nums text-lg leading-none font-medium">
                       {trip.daysUntil}
                     </div>
                     <div className="text-muted text-[10px]">วัน</div>
@@ -182,7 +197,7 @@ export function HomeScreen() {
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
-                      <p className="text-espresso truncate text-sm font-semibold">{trip.title}</p>
+                      <p className="text-ink truncate text-sm font-medium">{trip.title}</p>
                       <p className="text-muted shrink-0 text-[11px]">
                         {trip.weather?.icon} {trip.weather?.high}°
                       </p>
@@ -220,16 +235,16 @@ export function HomeScreen() {
         <section>
           <SectionHeader label={`สรุปปี ${stats.year}`} />
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-            <Card accent="matcha" className="p-4">
+            <Card accent="gray" className="p-4">
               <Stat value={stats.trips} label="ทริป" />
             </Card>
-            <Card accent="sky" className="p-4">
+            <Card accent="gray" className="p-4">
               <Stat value={stats.days} label="วันที่ออกเดินทาง" />
             </Card>
-            <Card accent="sun" className="p-4">
+            <Card accent="gray" className="p-4">
               <Stat value={stats.countries} label="ประเทศ" hint={`${stats.places} สถานที่`} />
             </Card>
-            <Card accent="joyfull" className="p-4">
+            <Card accent="gray" className="p-4">
               <Stat
                 value={formatMoney(stats.spentThb, 'THB')}
                 label="ใช้ไปทั้งปี"
@@ -262,27 +277,27 @@ export function HomeScreen() {
         <section>
           <SectionHeader label="ทริปที่ผ่านมา" />
           <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 pb-1">
-            {past.map((trip, i) => (
+            {past.map((trip) => (
               <Link key={trip.id} href={`/recap/${trip.id}` as never} className="shrink-0">
                 <Card
-                  accent={PAST_ACCENTS[i % PAST_ACCENTS.length]}
+                  accent="gray"
                   className="w-64 overflow-hidden"
                 >
                   <TripCover src={trip.cover} frame="card" />
                   <div className="p-3">
-                    <p className="text-espresso text-sm font-bold">{trip.title}</p>
+                    <p className="text-ink text-sm font-medium">{trip.title}</p>
                     <p className="text-muted mt-0.5 text-[11px]">{trip.dateLabel}</p>
                     <div className="text-muted mt-2 flex items-center justify-between text-[11px]">
                       <span>
                         {trip.days} วัน · {trip.places} ที่
                       </span>
-                      <span className="text-espresso nums font-semibold">
+                      <span className="text-ink nums font-medium">
                         {formatMoney(trip.spentThb, 'THB')}
                       </span>
                     </div>
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <CharacterStack characterIds={trip.characterIds ?? []} size="xs" />
-                      <span className="text-primary text-[11px] font-semibold">ดูบันทึกทริป</span>
+                      <span className="text-primary text-[11px] font-medium">ดูบันทึกทริป</span>
                     </div>
                   </div>
                 </Card>
@@ -298,7 +313,7 @@ export function HomeScreen() {
           <SectionHeader
             label="ที่อยากไปสักวัน"
             action={
-              <Link href="/dreams" className="text-primary text-xs font-semibold">
+              <Link href="/dreams" className="text-primary text-xs font-medium">
                 ดูทั้งหมด {dreams.length}
               </Link>
             }
@@ -311,9 +326,9 @@ export function HomeScreen() {
                   `/new?from=route&city=${encodeURIComponent(dream.destination.split(' · ')[1] ?? '')}` as never
                 }
               >
-                <Card accent={dream.accent} className="flex items-center gap-3 p-3.5">
+                <Card accent="wishlist" className="flex items-center gap-3 p-3.5">
                   <div className="min-w-0 flex-1">
-                    <p className="text-espresso truncate text-sm font-semibold">{dream.title}</p>
+                    <p className="text-ink truncate text-sm font-medium">{dream.title}</p>
                     <p className="text-muted mt-0.5 text-[11px]">{dream.destination}</p>
                   </div>
                   <ChevronRight className="text-muted size-4 shrink-0" />

@@ -23,7 +23,7 @@ export interface Character {
   /** 320×320 webp in /public/characters */
   image: string;
   /** Accent token the picker tints the tile with. */
-  accent: 'primary' | 'matcha' | 'sky' | 'sun' | 'joyfull';
+  accent: 'primary' | 'green' | 'blue' | 'yellow' | 'pink';
 }
 
 export interface Member {
@@ -201,7 +201,7 @@ export interface Trip {
 export interface BudgetLine {
   category: string;
   icon: string;
-  accent: 'primary' | 'matcha' | 'sky' | 'sun' | 'joyfull';
+  accent: 'primary' | 'green' | 'blue' | 'yellow' | 'pink';
   totalJpy: number;
   perPersonJpy: number;
   prepaid?: boolean;
@@ -232,7 +232,7 @@ export interface DreamItem {
   destination: string;
   note?: string;
   url?: string;
-  accent: 'primary' | 'matcha' | 'sky' | 'sun' | 'joyfull';
+  accent: 'primary' | 'green' | 'blue' | 'yellow' | 'pink';
 }
 
 export interface CalendarTrip {

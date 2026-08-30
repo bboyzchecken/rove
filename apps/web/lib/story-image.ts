@@ -43,21 +43,32 @@ export function drawStoryImage(input: StoryInput): HTMLCanvasElement {
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('เบราว์เซอร์นี้สร้างรูปสรุปทริปไม่ได้');
 
-  const primary = token('--brand-primary', 'hsl(15 65% 58%)');
-  const espresso = token('--brand-espresso', 'hsl(17 26% 19%)');
-  const muted = token('--brand-muted', 'hsl(22 18% 43%)');
-  const surface = token('--brand-surface', 'hsl(30 10% 96%)');
+  // Read from `:root`, so the card takes the NEUTRAL palette even when it is
+  // drawn from inside a feature-scoped screen — a story image pasted into a
+  // chat has no room to be in, the same reason the OG card and the app icon
+  // are ink (§2.5).
+  //
+  // The fallbacks are v3's own values rather than v2's cobalt-and-cream: they
+  // only fire if a token read fails, and a fallback that quietly restores the
+  // old brand is worse than no fallback at all.
+  const primary = token('--brand-primary', 'hsl(0 0% 0%)');
+  const ink = token('--brand-ink', 'hsl(0 0% 0%)');
+  const muted = token('--brand-muted', 'hsl(0 0% 32.2%)');
+  const surface = token('--brand-surface', 'hsl(0 0% 96.9%)');
   const bg = token('--brand-bg', 'hsl(0 0% 100%)');
 
+  // Canvas cannot use the `--font-*` variables — those are class names on the
+  // document, not families. The families are named here and only here, and
+  // must track `app/layout.tsx`.
   const font = (size: number, weight = 400) =>
-    `${weight} ${size}px "Noto Sans Thai", Inter, system-ui, sans-serif`;
+    `${weight} ${size}px "IBM Plex Sans Thai", "Space Grotesk", Inter, system-ui, sans-serif`;
 
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, STORY_SIZE, STORY_SIZE);
 
-  // A terracotta band down the left edge instead of a background photo: the
-  // covers are light illustrations and text over them needs a scrim heavy
-  // enough to hide the artwork it is sitting on.
+  // A blue band down the left edge instead of a background photo: the covers
+  // are light illustrations and text over them needs a scrim heavy enough to
+  // hide the artwork it is sitting on.
   ctx.fillStyle = primary;
   ctx.fillRect(0, 0, 24, STORY_SIZE);
 
@@ -65,12 +76,12 @@ export function drawStoryImage(input: StoryInput): HTMLCanvasElement {
   let y = 180;
 
   ctx.fillStyle = muted;
-  ctx.font = font(34, 600);
+  ctx.font = font(34, 500);
   ctx.fillText(input.dateLabel, pad, y);
 
   y += 92;
-  ctx.fillStyle = espresso;
-  y = wrapText(ctx, input.title, pad, y, STORY_SIZE - pad * 2, 84, font(76, 800));
+  ctx.fillStyle = ink;
+  y = wrapText(ctx, input.title, pad, y, STORY_SIZE - pad * 2, 84, font(76, 700));
 
   y += 20;
   ctx.fillStyle = muted;
@@ -90,8 +101,8 @@ export function drawStoryImage(input: StoryInput): HTMLCanvasElement {
     ctx.arc(pad + 10, y - 12, 10, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = espresso;
-    ctx.font = font(40, 600);
+    ctx.fillStyle = ink;
+    ctx.font = font(40, 500);
     ctx.fillText(ellipsis(ctx, highlight, STORY_SIZE - pad * 2 - 48), pad + 44, y);
     y += 74;
   }
@@ -106,8 +117,8 @@ export function drawStoryImage(input: StoryInput): HTMLCanvasElement {
     ctx.font = font(30, 500);
     ctx.fillText('โดยประมาณต่อคน', pad + 40, boxTop + 52);
 
-    ctx.fillStyle = espresso;
-    ctx.font = font(56, 800);
+    ctx.fillStyle = ink;
+    ctx.font = font(56, 700);
     ctx.fillText(`฿${input.perPersonThb.toLocaleString('th-TH')}`, pad + 40, boxTop + 108);
   }
 
@@ -115,7 +126,7 @@ export function drawStoryImage(input: StoryInput): HTMLCanvasElement {
   // compass rose made of four lines.
   drawMark(ctx, pad, STORY_SIZE - 128, 44, primary);
   ctx.fillStyle = muted;
-  ctx.font = font(30, 600);
+  ctx.font = font(30, 500);
   ctx.fillText(input.brandName, pad + 64, STORY_SIZE - 116);
 
   return canvas;

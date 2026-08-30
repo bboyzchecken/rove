@@ -15,6 +15,14 @@ import { cn } from '@/lib/utils';
  *
  * `frame` therefore chooses how much room the cover gets, not what shape it is
  * cut to. Overlays — a badge, the change-cover button — go in as children.
+ *
+ * The leftover space is cream, and that is not a neutral default. Every cover
+ * is generated on cream (`scripts/gen-brand-assets.mjs`), so the filler and
+ * the artwork are the same colour and the picture reads as sitting on the
+ * card rather than as a 3:2 photo pillarboxed inside a tinted band. The old
+ * pale-blue filler was left over from a palette whose covers had white
+ * grounds; against a cream cover it drew a hard seam down both sides of every
+ * trip in the product.
  */
 const FRAME = {
   /**
@@ -47,7 +55,7 @@ export function TripCover({
   children?: React.ReactNode;
 }) {
   return (
-    <div className={cn('bg-sky/25 relative overflow-hidden', FRAME[frame], className)}>
+    <div className={cn('bg-bg relative overflow-hidden', FRAME[frame], className)}>
       <Image
         src={src}
         alt=""

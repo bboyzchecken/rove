@@ -26,15 +26,34 @@ export interface DaySelection {
   end: string | null;
 }
 
-/** Free-member ratio → colour block. Nobody free stays neutral. */
+/**
+ * Free-member ratio → colour block. Nobody free stays neutral.
+ *
+ * A heat scale is the one thing in the product that genuinely needs more than
+ * two steps of a colour, and v3 gives it one hue to do it in: the room's own.
+ * Ramping the light colour by opacity keeps every step the same yellow, so the
+ * grid reads as one measurement rather than as five states — v2 ramped
+ * `--brand-primary`, which under v3 is black and would have turned the calendar
+ * into a greyscale chart.
+ *
+ * The top of the ramp is the SOLID half rather than more of the light one: at
+ * a 40px cell it is well inside §2.3's small-and-loud budget, and "everyone is
+ * free" is the one cell the eye is supposed to land on.
+ *
+ * Black type the whole way up (§2.4) — including on the solid, where it is
+ * 14.6:1. Only the empty cells drop to muted, because there the number is
+ * genuinely secondary.
+ */
 function heatClass(free: number, total: number, selected: boolean) {
-  if (selected) return 'bg-sky/70 text-espresso';
+  // Selection is not part of the scale — it is ink, so a chosen day reads as
+  // chosen no matter how many people were free on it.
+  if (selected) return 'bg-ink text-bg';
   if (total === 0 || free === 0) return 'bg-surface text-muted';
   const ratio = free / total;
-  if (ratio === 1) return 'bg-primary text-primary-fg';
-  if (ratio >= 0.66) return 'bg-primary/45 text-espresso';
-  if (ratio >= 0.34) return 'bg-primary/25 text-espresso';
-  return 'bg-primary/12 text-espresso';
+  if (ratio === 1) return 'bg-feature-solid text-ink';
+  if (ratio >= 0.66) return 'bg-feature text-ink';
+  if (ratio >= 0.34) return 'bg-feature/55 text-ink';
+  return 'bg-feature/25 text-ink';
 }
 
 export function AvailabilityCalendar({
@@ -91,8 +110,8 @@ export function AvailabilityCalendar({
           <div
             key={label}
             className={cn(
-              'text-center text-[11px] font-bold',
-              index === 0 || index === 6 ? 'text-primary/70' : 'text-muted',
+              'text-center text-[11px] font-medium',
+              index === 0 || index === 6 ? 'text-ink/70' : 'text-muted',
             )}
           >
             {label}
@@ -132,14 +151,14 @@ export function AvailabilityCalendar({
               className={cn(
                 'relative flex min-h-16 flex-col items-center gap-1 rounded-[0.75rem] px-0.5 py-1.5 transition',
                 heatClass(row.free.length, total, selected),
-                isEdge && 'ring-espresso ring-2',
-                inLocked(date) && !selected && 'ring-espresso/40 ring-2',
-                mode === 'mine' && mine === 'free' && 'ring-espresso ring-2',
-                mode === 'mine' && mine === 'maybe' && 'ring-sun ring-dashed ring-2',
+                isEdge && 'ring-ink ring-2',
+                inLocked(date) && !selected && 'ring-ink/40 ring-2',
+                mode === 'mine' && mine === 'free' && 'ring-ink ring-2',
+                mode === 'mine' && mine === 'maybe' && 'ring-feature-solid ring-dashed ring-2',
                 'active:scale-[0.97]',
               )}
             >
-              <span className="nums text-[13px] leading-none font-bold">{day}</span>
+              <span className="nums text-[13px] leading-none font-medium">{day}</span>
 
               <span className="flex flex-wrap justify-center gap-0.5">
                 {board.members.map((member) => {
@@ -160,7 +179,7 @@ export function AvailabilityCalendar({
               </span>
 
               {everyone ? (
-                <span className="bg-primary-fg absolute top-1 right-1 size-1.5 rounded-full opacity-80" />
+                <span className="bg-ink absolute top-1 right-1 size-1.5 rounded-full" />
               ) : null}
             </button>
           );
@@ -168,12 +187,14 @@ export function AvailabilityCalendar({
       </div>
 
       <div className="border-border flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t px-4 py-2.5">
-        <span className="text-muted text-[11px] font-bold">ว่างกัน</span>
+        <span className="text-muted text-[11px] font-medium">ว่างกัน</span>
+        {/* These four MUST stay in step with `heatClass` above — a legend that
+            has drifted from its scale is worse than no legend. */}
         {[
           { label: 'ไม่มี', className: 'bg-surface border border-border' },
-          { label: 'บางคน', className: 'bg-primary/25' },
-          { label: 'เกือบครบ', className: 'bg-primary/45' },
-          { label: 'ครบทุกคน', className: 'bg-primary' },
+          { label: 'บางคน', className: 'bg-feature/55' },
+          { label: 'เกือบครบ', className: 'bg-feature' },
+          { label: 'ครบทุกคน', className: 'bg-feature-solid' },
         ].map((item) => (
           <span key={item.label} className="flex items-center gap-1.5">
             <span className={cn('size-3 rounded', item.className)} />

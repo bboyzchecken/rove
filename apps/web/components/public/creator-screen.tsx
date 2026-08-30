@@ -34,7 +34,7 @@ export function CreatorScreen({ handle, signedIn }: { handle: string; signedIn: 
     return (
       <BrowseShell signedIn={signedIn} width="focused" center>
         <div className="py-16 text-center">
-          <h1 className="font-display text-espresso text-xl font-extrabold">ไม่พบโปรไฟล์นี้</h1>
+          <h1 className="font-display text-ink text-xl font-medium">ไม่พบโปรไฟล์นี้</h1>
           <p className="text-muted mt-2 text-sm">อาจพิมพ์ชื่อผิด หรือเจ้าของยังไม่ได้เปิดโปรไฟล์</p>
           <ButtonLink href="/explore" className="mt-5">
             ไปหน้าสำรวจ
@@ -54,11 +54,11 @@ export function CreatorScreen({ handle, signedIn }: { handle: string; signedIn: 
         </ButtonLink>
       }
     >
-      <Card accent="joyfull" className="mt-6 p-5">
+      <Card accent="gray" className="mt-6 p-5">
         <div className="flex items-center gap-4">
           <CharacterAvatar characterId={creator.characterId} size="lg" />
           <div>
-            <h1 className="font-display text-espresso text-xl font-extrabold tracking-tight">
+            <h1 className="font-display text-ink text-xl font-medium tracking-tight">
               {creator.name}
             </h1>
             <p className="text-muted text-sm">@{creator.handle}</p>
@@ -90,7 +90,7 @@ export function CreatorScreen({ handle, signedIn }: { handle: string; signedIn: 
                 <Card className="overflow-hidden p-0">
                   <TripCover src={trip.cover} frame="card" />
                   <div className="p-3.5">
-                    <p className="text-espresso line-clamp-1 text-sm font-extrabold">{trip.title}</p>
+                    <p className="text-ink line-clamp-1 text-sm font-medium">{trip.title}</p>
                     <p className="text-muted mt-0.5 text-xs">
                       {trip.days} วัน · {trip.cities.join(' · ')}
                     </p>
@@ -112,8 +112,8 @@ export function CreatorScreen({ handle, signedIn }: { handle: string; signedIn: 
         )}
       </section>
 
-      <Card accent="sun" className="mt-6 p-4">
-        <p className="text-espresso flex items-center gap-1.5 text-sm font-semibold">
+      <Card accent="gray" className="mt-6 p-4">
+        <p className="text-ink flex items-center gap-1.5 text-sm font-medium">
           <Sparkles className="size-4" />
           อยากมีหน้าแบบนี้ของตัวเองไหม
         </p>

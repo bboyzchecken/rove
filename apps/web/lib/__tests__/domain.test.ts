@@ -279,7 +279,7 @@ describe('plan', () => {
 
   it('rolls plan costs up by category and keeps manual lines the plan is silent on', () => {
     const manual = [
-      { category: 'ที่พัก', icon: '🏠', accent: 'joyfull' as const, totalJpy: 268_000, perPersonJpy: 67_000, prepaid: true },
+      { category: 'ที่พัก', icon: '🏠', accent: 'pink' as const, totalJpy: 268_000, perPersonJpy: 67_000, prepaid: true },
       { category: 'อาหาร', icon: '🍜', accent: 'primary' as const, totalJpy: 999, perPersonJpy: 999 },
     ];
     const lines = budgetFromPlan(days, 4, manual);
@@ -292,7 +292,7 @@ describe('plan', () => {
 
   it('keeps the manual estimate when no item has a price yet', () => {
     const manual = [
-      { category: 'ที่พัก', icon: '🏠', accent: 'joyfull' as const, totalJpy: 1, perPersonJpy: 1 },
+      { category: 'ที่พัก', icon: '🏠', accent: 'pink' as const, totalJpy: 1, perPersonJpy: 1 },
     ];
     const empty: PlanDay[] = [{ ...days[0]!, items: [] }];
     expect(budgetFromPlan(empty, 4, manual)).toBe(manual);

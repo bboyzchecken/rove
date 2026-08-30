@@ -129,7 +129,7 @@ function ReviewForm({
           {save.isPending ? 'กำลังบันทึก…' : mine ? 'อัปเดตรีวิว' : 'บันทึกรีวิว'}
         </Button>
         {save.isSuccess && !save.isPending ? (
-          <span className="text-matcha text-xs">บันทึกแล้ว</span>
+          <span className="text-success text-xs">บันทึกแล้ว</span>
         ) : null}
         {save.isError ? (
           <span className="text-warning text-xs">บันทึกไม่สำเร็จ — ลองใหม่</span>
@@ -148,13 +148,13 @@ export function ReviewSummaryLine({ summary }: { summary: ReviewSummary }) {
     <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
       <span className="flex items-center gap-1.5">
         <Stars value={Math.round(summary.averageRating)} />
-        <span className="text-espresso nums text-sm font-bold">{summary.averageRating}</span>
+        <span className="text-ink nums text-sm font-medium">{summary.averageRating}</span>
         <span className="text-muted text-xs">({summary.count} รีวิว)</span>
       </span>
       {summary.budgetSaid > 0 ? (
         <span className="text-muted text-xs">
           ใช้จริงเฉลี่ย{' '}
-          <span className="text-espresso font-semibold">
+          <span className="text-ink font-medium">
             {formatMoney(summary.actualBudgetPerPerson, 'THB')}
           </span>
           /คน · จาก {summary.budgetSaid} คนที่บอก
@@ -170,11 +170,11 @@ export function ReviewLine({ review }: { review: TripReview }) {
       <CharacterAvatar characterId={review.characterId} size="xs" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="text-espresso text-xs font-semibold">{review.name}</span>
+          <span className="text-ink text-xs font-medium">{review.name}</span>
           <Stars value={review.rating} />
         </div>
         {review.body ? (
-          <p className="text-espresso mt-1 text-xs leading-relaxed">{review.body}</p>
+          <p className="text-ink mt-1 text-xs leading-relaxed">{review.body}</p>
         ) : null}
         {review.actualBudgetPerPerson > 0 ? (
           <p className="text-muted mt-1 text-[11px]">
@@ -190,7 +190,7 @@ export function Stars({ value }: { value: number }) {
   return (
     <span className="flex items-center gap-0.5" aria-label={`${value} จาก 5 ดาว`}>
       {[1, 2, 3, 4, 5].map((n) => (
-        <Star key={n} className={cn('size-3', n <= value ? 'fill-sun text-sun' : 'text-border')} />
+        <Star key={n} className={cn('size-3', n <= value ? 'fill-ink text-ink' : 'text-border')} />
       ))}
     </span>
   );
@@ -208,7 +208,7 @@ function StarPicker({ value, onChange }: { value: number; onChange: (n: number) 
           onClick={() => onChange(n)}
           className="hover:bg-surface rounded-full p-1 transition"
         >
-          <Star className={cn('size-6', n <= value ? 'fill-sun text-sun' : 'text-border')} />
+          <Star className={cn('size-6', n <= value ? 'fill-ink text-ink' : 'text-border')} />
         </button>
       ))}
     </div>

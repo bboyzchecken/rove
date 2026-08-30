@@ -38,7 +38,7 @@ export function ExpenseScreen({ tripId }: { tripId: string }) {
     <div className="space-y-7">
       <section>
         <SectionHeader label="ใช้ไปแล้วจริงๆ" />
-        <Card accent="primary" className="p-5">
+        <Card accent="feature" className="p-5">
           <div className="grid grid-cols-3 gap-4">
             <Stat value={formatMoney(summary.totalThb, 'THB')} label="รวมทั้งทริป" />
             <Stat value={formatMoney(summary.sharedTotalThb, 'THB')} label="ของกลาง" />
@@ -60,7 +60,7 @@ export function ExpenseScreen({ tripId }: { tripId: string }) {
               <CharacterAvatar characterId={row.member.characterId} size="md" />
 
               <div className="min-w-0 flex-1">
-                <p className="text-espresso text-sm font-semibold">{row.member.name}</p>
+                <p className="text-ink text-sm font-medium">{row.member.name}</p>
                 <p className="text-muted mt-0.5 text-[11px]">
                   จ่ายไป {formatMoney(row.paidThb, 'THB')} · ส่วนที่ต้องรับผิดชอบ{' '}
                   {formatMoney(row.shareThb, 'THB')}
@@ -73,14 +73,14 @@ export function ExpenseScreen({ tripId }: { tripId: string }) {
               <div className="shrink-0 text-right">
                 {row.balanceThb > 0 ? (
                   <>
-                    <p className="text-success nums text-sm font-bold">
+                    <p className="text-success nums text-sm font-medium">
                       +{formatMoney(row.balanceThb, 'THB')}
                     </p>
                     <p className="text-muted text-[10px]">ควรได้คืน</p>
                   </>
                 ) : row.balanceThb < 0 ? (
                   <>
-                    <p className="text-primary nums text-sm font-bold">
+                    <p className="text-primary nums text-sm font-medium">
                       {formatMoney(row.balanceThb, 'THB')}
                     </p>
                     <p className="text-muted text-[10px]">ต้องจ่ายคืน</p>
@@ -96,9 +96,9 @@ export function ExpenseScreen({ tripId }: { tripId: string }) {
 
       <section>
         <SectionHeader label="น้องหารสรุปให้" />
-        <Card accent="matcha" className="p-4">
+        <Card accent="gray" className="p-4">
           {summary.settlements.length === 0 ? (
-            <p className="text-espresso text-sm">ตอนนี้ไม่มีใครติดใคร — เคลียร์กันหมดแล้ว 🎉</p>
+            <p className="text-ink text-sm">ตอนนี้ไม่มีใครติดใคร — เคลียร์กันหมดแล้ว 🎉</p>
           ) : (
             <>
               <ul className="space-y-2.5">
@@ -108,15 +108,15 @@ export function ExpenseScreen({ tripId }: { tripId: string }) {
                     className="flex flex-wrap items-center gap-2.5"
                   >
                     <CharacterAvatar characterId={characterOf(s.fromMemberId)} size="sm" />
-                    <span className="text-espresso text-sm font-semibold">
+                    <span className="text-ink text-sm font-medium">
                       {nameOf(s.fromMemberId)}
                     </span>
                     <ArrowRight className="text-muted size-4" />
                     <CharacterAvatar characterId={characterOf(s.toMemberId)} size="sm" />
-                    <span className="text-espresso text-sm font-semibold">
+                    <span className="text-ink text-sm font-medium">
                       {nameOf(s.toMemberId)}
                     </span>
-                    <span className="text-espresso nums ml-auto text-sm font-bold">
+                    <span className="text-ink nums ml-auto text-sm font-medium">
                       {formatMoney(s.amountThb, 'THB')}
                     </span>
                     <Button

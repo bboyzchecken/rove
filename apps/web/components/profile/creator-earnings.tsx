@@ -36,8 +36,8 @@ export function CreatorEarningsCard() {
     <section>
       <SectionHeader label="รายได้จากแพลนสาธารณะ" />
 
-      <Card accent="matcha" className="p-4">
-        <p className="text-espresso flex items-center gap-2 text-sm font-semibold">
+      <Card accent="gray" className="p-4">
+        <p className="text-ink flex items-center gap-2 text-sm font-medium">
           <TrendingUp className="size-4" />
           ส่วนแบ่ง {statement.sharePercent}% จากค่าคอมที่พาร์ตเนอร์จ่าย
         </p>
@@ -60,7 +60,7 @@ export function CreatorEarningsCard() {
         {statement.entries.slice(0, 8).map((entry, i) => (
           <div key={`${entry.occurredAt}-${i}`} className="flex items-center gap-3 p-3.5">
             <div className="min-w-0 flex-1">
-              <p className="text-espresso text-sm font-semibold">{entry.partner}</p>
+              <p className="text-ink text-sm font-medium">{entry.partner}</p>
               <p className="text-muted text-[11px]">
                 {new Date(entry.occurredAt).toLocaleDateString('th-TH', {
                   day: 'numeric',
@@ -70,7 +70,7 @@ export function CreatorEarningsCard() {
                 {entry.estimated ? ' (ประมาณการ)' : ''}
               </p>
             </div>
-            <span className="text-espresso nums shrink-0 text-sm font-bold">
+            <span className="text-ink nums shrink-0 text-sm font-medium">
               {formatMoney(entry.amountThb, 'THB')}
             </span>
           </div>
@@ -91,7 +91,7 @@ function Figure({ label, amount }: { label: string; amount: number }) {
   return (
     <div>
       <p className="text-muted text-[11px]">{label}</p>
-      <p className="text-espresso nums text-base font-extrabold">{formatMoney(amount, 'THB')}</p>
+      <p className="text-ink nums text-base font-medium">{formatMoney(amount, 'THB')}</p>
     </div>
   );
 }

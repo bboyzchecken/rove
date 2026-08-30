@@ -1,26 +1,71 @@
 @import 'tailwindcss';
 @import './brand.css';
 
-/* Map the brand tokens into Tailwind v4's theme so `bg-surface`, `text-muted`,
- * `rounded-brand` etc. work everywhere. Nothing outside brand.css may name a
- * colour. */
+/* Map the brand tokens into Tailwind v4's theme so `bg-surface`, `text-ink`,
+ * `rounded-brand` etc. work everywhere.
+ *
+ * `--color-*: initial` clears Tailwind's stock palette first. Nothing in the
+ * app used it, and removing it makes the rule in brand.css enforceable rather
+ * than aspirational: after this reset `bg-yellow-500` is not a class that
+ * exists, so the only yellow you can reach for is the brand's own.
+ *
+ * `inline` matters — it inlines `hsl(var(--brand-*))` into each utility rather
+ * than freezing today's value, which is what lets `[data-surface='admin']`
+ * re-theme every component underneath it by redeclaring the variables. */
 @theme inline {
+  --color-*: initial;
+
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  /* --- §2.1 Neutrals --- */
+  --color-ink: hsl(var(--brand-ink));
+  --color-white: hsl(var(--brand-white));
+  --color-gray: hsl(var(--brand-gray));
+
+  /* --- §2.5 The active feature ------------------------------------------
+   * THE PAIR NEARLY EVERY COMPONENT SHOULD USE.
+   *
+   * `bg-feature` and `text-feature-solid` resolve against whatever
+   * `data-feature` is in scope, so one `Card` renders pink inside Wishlist
+   * and orange inside Documents without either screen naming a hue. That is
+   * §2.5 ("one feature colour per screen") enforced by the cascade instead of
+   * by code review.
+   *
+   * `-light` is for areas, `-solid` for small accents — §2.3, and the reason
+   * they are two tokens rather than one with an opacity modifier. */
+  --color-feature: hsl(var(--feature-light));
+  --color-feature-solid: hsl(var(--feature-solid));
+
+  /* --- §2.2 The six pairs, by name ---------------------------------------
+   * Reach for these ONLY where §2.5 permits several features at once: the
+   * trip dashboard where each feature is its own entry card, a legend, and
+   * the marketing hero's doodle overlay. Anywhere else, `bg-feature` is the
+   * correct answer and naming a hue here is the bug §2.5 describes. */
+  --color-blue-light: hsl(var(--brand-blue-light));
+  --color-blue-solid: hsl(var(--brand-blue-solid));
+  --color-pink-light: hsl(var(--brand-pink-light));
+  --color-pink-solid: hsl(var(--brand-pink-solid));
+  --color-yellow-light: hsl(var(--brand-yellow-light));
+  --color-yellow-solid: hsl(var(--brand-yellow-solid));
+  --color-green-light: hsl(var(--brand-green-light));
+  --color-green-solid: hsl(var(--brand-green-solid));
+  --color-orange-light: hsl(var(--brand-orange-light));
+  --color-orange-solid: hsl(var(--brand-orange-solid));
+  --color-purple-light: hsl(var(--brand-purple-light));
+  --color-purple-solid: hsl(var(--brand-purple-solid));
+
+  /* --- Surfaces --- */
   --color-bg: hsl(var(--brand-bg));
   --color-surface: hsl(var(--brand-surface));
-  --color-primary: hsl(var(--brand-primary));
-  --color-primary-light: hsl(var(--brand-primary-light));
-  --color-primary-fg: hsl(var(--brand-primary-fg));
-  --color-espresso: hsl(var(--brand-espresso));
   --color-muted: hsl(var(--brand-muted));
   --color-border: hsl(var(--brand-border));
   --color-field: hsl(var(--brand-field));
   --color-field-border: hsl(var(--brand-field-border));
 
-  --color-matcha: hsl(var(--brand-matcha));
-  --color-sky: hsl(var(--brand-sky));
-  --color-sun: hsl(var(--brand-sun));
-  --color-joyfull: hsl(var(--brand-joyfull));
-
+  /* --- Semantic --- */
+  --color-primary: hsl(var(--brand-primary));
+  --color-primary-fg: hsl(var(--brand-primary-fg));
   --color-success: hsl(var(--brand-success));
   --color-warning: hsl(var(--brand-warning));
   --color-danger: hsl(var(--brand-danger));
@@ -33,15 +78,16 @@
   --font-display: var(--brand-font-display);
   --font-mono: var(--brand-font-mono);
 
-  --shadow-warm-sm: var(--brand-shadow-sm);
-  --shadow-warm: var(--brand-shadow);
-  --shadow-warm-lg: var(--brand-shadow-lg);
+  /* Only things that float *above* the page get one (§5: cards have none). */
+  --shadow-float-sm: var(--brand-shadow-sm);
+  --shadow-float: var(--brand-shadow);
+  --shadow-float-lg: var(--brand-shadow-lg);
 }
 
 html,
 body {
   background-color: var(--color-bg);
-  color: var(--color-espresso);
+  color: var(--color-ink);
   font-family: var(--font-sans);
 }
 
@@ -61,13 +107,165 @@ label[for] {
   cursor: pointer;
 }
 
-/* Section headers: small, bold, wide-tracked uppercase Inter. */
-.section-label {
+/* ============================================================================
+ * TYPE SCALE (§3) AND DOODLES (§5)
+ *
+ * Written as classes rather than left to per-component Tailwind, because the
+ * scale is the part of a type system that drifts first: six screens each
+ * picking `text-2xl` and their own tracking is how a display face stops
+ * looking like one family. Size, leading and tracking travel together here.
+ *
+ * Sentence case everywhere. No Title Case, no ALL CAPS.
+ *
+ * ALL OF IT LIVES IN `@layer components`, AND THAT IS LOAD-BEARING.
+ * Unlayered CSS beats every `@layer` rule regardless of specificity, so while
+ * these sat outside a layer the `color` declarations in `.doodle` and
+ * `.section-label` silently won over Tailwind's own utilities — every doodle
+ * rendered ink no matter what `text-pink` or `text-white` the caller passed.
+ * Inside `components`, utilities (a later layer) win, which is the entire
+ * point of `stroke: currentColor`.
+ * ==========================================================================*/
+
+@layer components {
+
+/* §3.1 — the signature hero treatment. A short, ragged-right block of tight
+ * lines, and 700 is allowed here and nowhere else. The caller breaks the lines
+ * by hand: ~10 characters each, so the headline reads as a stack rather than a
+ * paragraph.
+ *
+ * THE NUMBERS ARE THAI NUMBERS, NOT LATIN ONES. §3.1's 0.98/-0.03em describe
+ * a Latin grotesk, and this hero is set in IBM Plex Sans Thai — measured in
+ * the browser at 700, the face reports these ink extents per 1em:
+ *
+ *   วางแพลนเที่ยว   ascent 1.04   descent 0.02
+ *   กันทั้งกลุ่ม      ascent 1.11   descent 0.35   ← ั้ stacked over, ุ under
+ *
+ * So two adjacent lines need 1.13em between baselines before a ไม้โท stops
+ * landing inside the line above it. At 0.98 they overlapped by a third of an
+ * em: the tone marks of one line sat in the counters of the one above, which
+ * is what made the stack read as a texture rather than as three lines. 1.2 is
+ * the tightest leading that keeps every mark in its own line and still reads
+ * as a stack.
+ *
+ * Tracking is 0 for the same reason, and it matters more. Thai does not put
+ * spaces between words — the reader segments วาง|แพลน|เที่ยว purely from the
+ * shapes, so the sidebearings are the only word boundary there is. -0.03em is
+ * 1.3px of it gone at 44px and nearly 3px at 96px, which is exactly the
+ * "everything is glued together" the hero was getting. Latin runs in Space
+ * Grotesk lose a little of their tightness at 0; a Thai-first product trades
+ * that away without thinking twice. */
+.t-hero {
+  font-family: var(--brand-font-display);
+  font-size: clamp(2.75rem, 7vw, 6rem); /* 44 → 96px */
+  line-height: 1.2;
+  letter-spacing: 0;
   font-weight: 700;
-  font-size: 0.6875rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  text-align: left;
+  /* Deliberately no `text-wrap: balance` and no centring: §3.1 wants the
+   * ragged right edge that manual breaks produce, and balancing would undo
+   * them. Normal wrapping stays on as a safety net for narrow screens. */
+}
+
+/* §3 knockout — exactly one word per hero, inverted out of the white page.
+ *
+ * THE COLOURS SWAPPED IN v3, AND THAT IS THE POINT. v2's hero was a full-bleed
+ * cobalt canvas carrying white type, so its knockout was a white block with
+ * ink text. v3 deletes that canvas: the hero is the white page like every
+ * other screen, the headline is black, and the knockout is the inversion of
+ * *that* — a black block with white text.
+ *
+ * §3 also calls this "the only place white text appears", which is the same
+ * rule §2.4 states from the other side: white text only on black. One word,
+ * on the word carrying the promise.
+ *
+ * `inline-block` with its own line-height, rather than a plain inline span:
+ * an inline background is sized by the font's content box, and IBM Plex Sans
+ * Thai's is roughly 1.5em tall to make room for stacked vowels and tone
+ * marks. At 90px that painted a slab half again as tall as the word.
+ *
+ * 1.12 is the floor that still clears a ไม้โท over a สระอี — the same 1.11em
+ * ascent `.t-hero` above is sized around. At 0.92 the slab was shorter than
+ * its own word, so a stacked mark broke out through the top edge and lost its
+ * counter against the page. With the 0.12em of padding the box now stands
+ * 1.24em, which covers the tallest stack the face can make. */
+.knockout {
+  display: inline-block;
+  background: hsl(var(--brand-ink));
+  color: hsl(var(--brand-white));
+  line-height: 1.12;
+  padding: 0.08em 0.1em 0.04em;
+  border-radius: 4px; /* §4 — the one radius that is not a pill or a card */
+  /* The knockout sits on the headline's own baseline grid; without this the
+   * inline-block would drop the whole line by its descender. */
+  vertical-align: baseline;
+}
+
+/* Section headings. Same Thai correction as `.t-hero`, and these need it more
+ * than the hero does: a heading here wraps on its own rather than being broken
+ * by hand, so any two of its lines can be the ones with a ุ under and a ั้
+ * over. 1.35 clears that pair; 1.2 did not. Tracking goes to 0 rather than to
+ * -0.02em, because at 28px the sidebearing a Thai reader segments words with
+ * is only a few pixels wide to begin with. */
+.t-h2 {
+  font-family: var(--brand-font-display);
+  font-size: clamp(1.75rem, 3.5vw, 2rem); /* 28 → 32px */
+  line-height: 1.35;
+  letter-spacing: 0;
+  font-weight: 500;
+}
+
+.t-h3 {
+  font-family: var(--brand-font-display);
+  font-size: 1.25rem; /* 20px */
+  line-height: 1.45;
+  letter-spacing: 0;
+  font-weight: 500;
+}
+
+.t-body {
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.t-small {
+  font-size: 0.8125rem; /* 13px */
+  line-height: 1.6;
+}
+
+/* The eyebrow above a section, and the only place letterspacing is allowed.
+ * Sentence case per §3 — the old ALL CAPS version belonged to a brand whose
+ * personality came from the type rather than from the linework. */
+.section-label,
+.t-tag {
+  font-family: var(--brand-font-display);
+  font-size: 0.6875rem; /* 11px */
+  line-height: 1.4;
+  /* No tracking, for the reason `.t-hero` spells out at length: Thai puts no
+   * spaces between words, so the sidebearings ARE the word boundary, and
+   * opening them up is what glues a label into a single shape. §3 only ever
+   * permitted letterspacing on a label; it never required it. */
+  letter-spacing: 0;
+  font-weight: 500;
+  text-transform: none;
   color: hsl(var(--brand-muted));
+}
+
+/* The content-area highlight: a key phrase in a flat colour block. Once per
+ * section, never three in one headline. The hero uses `.knockout` instead.
+ *
+ * It fills with the section's OWN feature colour rather than a fixed hue, so
+ * a highlighted phrase inside Wishlist is pink and the same markup inside
+ * Documents is orange, with no class change. Black text on it either way —
+ * §2.4, which every one of the six light colours passes at 13:1 or better. */
+.hl {
+  background: hsl(var(--feature-light));
+  color: hsl(var(--brand-ink));
+  padding: 0 0.5rem;
+  border-radius: 6px;
+  /* Without this a highlight that wraps loses its padding and its corners on
+   * every line but the first — which is most of them, in Thai. */
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 /* Figures line up in columns — money, times, counts. */
@@ -85,6 +283,34 @@ label[for] {
   display: none;
 }
 
+/* ----------------------------------------------------------- doodles (§5) --
+ * Every doodle is stroke-only, ink by default, round caps and joins. Setting
+ * it here rather than per-path means a doodle cannot be authored wrong: the
+ * SVG components carry geometry only, and `stroke: currentColor` lets any
+ * caller re-colour its marks with `text-*`.
+ *
+ * §5.1.2 fixes which colours those may be, and v3 narrowed it: black on white,
+ * on the gray, and on all six light surfaces — which is everywhere in the
+ * product. The solid accents are allowed on the marketing hero and nowhere
+ * else. That is the same reasoning as §2.3's size rule: a solid at doodle
+ * scale is a small loud mark, but a page whose linework is all pastel loses
+ * the black-drawn-on look the brand is remembered by. */
+.doodle {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 4; /* §5.1 — 3–4px at 100% scale */
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* §5.1.7 wants scale to vary wildly — a 200px anchor beside 40px marks.
+   * Non-scaling stroke is what makes that possible: every doodle keeps the
+   * same 4px line no matter how big it is drawn, so they read as one pen
+   * rather than as one shape zoomed. */
+  vector-effect: non-scaling-stroke;
+  color: hsl(var(--brand-ink));
+  pointer-events: none;
+}
+} /* @layer components */
+
 @keyframes rove-spin {
   to {
     transform: rotate(360deg);
@@ -100,6 +326,15 @@ label[for] {
     transform: none;
   }
 }
+/* The doodle draws itself in — used once, on the hero, and only there. */
+@keyframes rove-draw {
+  from {
+    stroke-dashoffset: var(--draw-length, 400);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
 
 .animate-rove-spin {
   animation: rove-spin 2.4s linear infinite;
@@ -107,10 +342,18 @@ label[for] {
 .animate-rove-rise {
   animation: rove-rise 0.32s ease-out both;
 }
+.animate-rove-draw path,
+.animate-rove-draw circle {
+  stroke-dasharray: var(--draw-length, 400);
+  animation: rove-draw 1.1s ease-out both;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .animate-rove-spin,
-  .animate-rove-rise {
+  .animate-rove-rise,
+  .animate-rove-draw path,
+  .animate-rove-draw circle {
     animation: none;
+    stroke-dasharray: none;
   }
 }

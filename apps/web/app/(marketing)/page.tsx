@@ -2,11 +2,24 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, CalendarDays, CalendarSearch, Plane } from 'lucide-react';
 
-import { RoveMark } from '@/components/brand/rove-mark';
+import {
+  DottedPath,
+  Flower,
+  Heart,
+  Sparkle,
+  StarBurst,
+} from '@/components/brand/doodle';
+import {
+  HeroCanvas,
+  heroButtonClass,
+  heroButtonGhostClass,
+  heroNavCtaClass,
+  heroNavLinkClass,
+} from '@/components/brand/hero-canvas';
+import { SectionIntro } from '@/components/brand/section-intro';
 import { PublicShell, SHELL_SECTION } from '@/components/common/public-shell';
 import { PlatformStatsSection } from '@/components/public/platform-stats';
 import { TravellerReviewsSection } from '@/components/public/traveller-reviews';
-import { SectionHeader } from '@/components/common/section';
 import { ButtonLink } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -17,6 +30,56 @@ import { CHARACTERS } from '@/lib/catalog/characters';
 /**
  * Landing page (M1 — W1.1). Three entry cards, each of which must reach a
  * created trip within three screens (X1.1).
+ *
+ * The page is the two modes in ROVE_BRAND_SPEC v3 §1, in order, and the
+ * contrast between them is still the design — but v3 changes what the loud
+ * half is made of:
+ *
+ *   Hero     the same white page as everything else, carrying oversized BLACK
+ *            700 display broken by hand, two tilted pastel tags clipping the
+ *            letters on the right, and four doodles at wildly different
+ *            scales. Loud because of the drawing and the scale, not because of
+ *            a colour field.
+ *   Content  everything below. White with §6's gray blocks on it, ink type at
+ *            normal scale, flat untilted chips, one doodle per section in the
+ *            margin. Calm, and committed to that.
+ *
+ * v2 got its hero from a full-bleed cobalt band. §2.1 makes white the page on
+ * every screen and §2.4 allows white type only on black, so that band is gone
+ * — and the page is better for it, because the hero now demonstrates the thing
+ * it is selling: a white page with pastel rooms in it.
+ *
+ * WHERE THE SIX COLOURS APPEAR, AND WHY IT IS NOT A RAINBOW
+ * §2.5 forbids mixing feature colours on a screen and then names marketing as
+ * an exception. This page uses that licence exactly twice — the three entry
+ * cards and the six-card feature grid — and in both the colour is the FEATURE
+ * MAP being taught, in the order a visitor will meet it. Everywhere else on
+ * the page (the destination chips, the numbered steps, the stat grid) is
+ * deliberately uncoloured, because those are not features and a colour that
+ * means nothing is what v2's UAT reacted to.
+ *
+ * The hero carries no knockout slab. §3 offers one, but a black block around
+ * "ที่เดียว" cut the promise out of the stack rather than landing it — the line
+ * reads harder as one unbroken run of display type, with the hand-made break
+ * and the period doing the emphasis instead.
+ *
+ * The two modes never blend. No tilt below the hero, no doodle overlay on a
+ * content screen, and no full-bleed colour band anywhere.
+ */
+
+/**
+ * The three ways into a trip.
+ *
+ * Colour follows §2.2's feature map, which under v3 is a stronger claim than
+ * v2's thematic lock: each of these cards is a doorway into a specific room, so
+ * it wears that room's colour and the visitor has already learned one third of
+ * the palette before they sign up. A known flight is a fixed point on the route
+ * (Itinerary, blue); known dates are the countdown (yellow); not knowing yet is
+ * the thing the group votes on (Wishlist, pink).
+ *
+ * Black text on all three (§2.4) — including the blue, which v2 set in white
+ * because its blue was a dark cobalt. This one is a pastel and white on it is
+ * 1.22:1.
  */
 const ENTRIES = [
   {
@@ -24,21 +87,21 @@ const ENTRIES = [
     icon: Plane,
     title: 'รู้เที่ยวบินแล้ว',
     hint: 'ใส่สนามบินกับวันบิน — BKK→NRT 4 ธ.ค. ถึง 08:05 — ที่เหลือ ROVE จัดให้',
-    accent: 'matcha',
+    chip: 'bg-blue-light text-ink',
   },
   {
     key: 'date',
     icon: CalendarDays,
     title: 'รู้วันแล้ว',
     hint: 'ลาไว้แล้ว เหลือแค่ไม่รู้จะไปไหน',
-    accent: 'sky',
+    chip: 'bg-yellow-light text-ink',
   },
   {
     key: 'coordinate',
     icon: CalendarSearch,
     title: 'ยังไม่รู้วัน',
     hint: 'ให้ทุกคนแตะวันว่าง แล้วหาช่วงที่ตรงกันก่อน',
-    accent: 'sun',
+    chip: 'bg-pink-light text-ink',
   },
 ] as const;
 
@@ -49,138 +112,229 @@ const STEPS = [
   { n: '4', title: 'แก้ด้วยกัน แล้วไปเที่ยว', text: 'ลากสลับได้ คุยกันในแพลน หารเงินกันจบในแอป' },
 ];
 
+/**
+ * The feature grid, and the one screen in the product where all six colours
+ * are meant to be seen at once.
+ *
+ * §2.5 names three exceptions to "one feature colour per screen", and this is
+ * the marketing form of the "legend listing all features" one: six cards, six
+ * rooms, six colours, in the order a visitor will meet them. v2's version
+ * reused pink twice and yellow twice and skipped two features entirely, which
+ * is what a decorative palette produces — this one is the map itself.
+ */
 const FEATURES = [
   {
     emoji: '🧭',
-    title: 'Coverage Board',
+    title: 'Coverage board',
     text: 'บอกตรงๆ ว่าของใครยังไม่ได้เข้าแพลน จะได้ไม่มีใครน้อยใจทีหลัง',
-    accent: 'matcha',
+    chip: 'bg-pink-light text-ink',
   },
   {
     emoji: '🤖',
     title: 'AI ที่บอกเหตุผล',
     text: 'ร่างฟรี 2 ครั้งต่อทริป บอกด้วยว่าทำไมถึงจัดแบบนี้ และถามกลับเมื่อไม่แน่ใจ',
-    accent: 'sky',
+    chip: 'bg-blue-light text-ink',
   },
   {
     emoji: '🧾',
     title: 'น้องหาร',
     text: 'แยกของกลางกับของส่วนตัว บอกเลยว่าใครจ่ายไปเท่าไหร่ ใครต้องคืนใครกี่บาท',
-    accent: 'sun',
+    chip: 'bg-orange-light text-ink',
   },
   {
     emoji: '🐨',
     title: 'ตัวละครประจำตัว',
     text: 'เลือกได้ 20 ตัว ใช้แทนรูปโปรไฟล์ทั้งแอป เห็นปุ๊บรู้ปั๊บว่าใครเป็นใคร',
-    accent: 'joyfull',
+    chip: 'bg-purple-light text-ink',
   },
   {
     emoji: '⭐',
     title: 'ชวนเพื่อนแล้วได้แต้ม',
     text: 'แต้มจากการชวนเพื่อนและจากทริปที่เปิดสาธารณะ เอามาแลกเป็นการร่างของ AI ได้',
-    accent: 'primary',
+    chip: 'bg-yellow-light text-ink',
   },
   {
     emoji: '📊',
     title: 'สรุปทั้งปีของตัวเอง',
     text: 'ปีนี้ไปมากี่ทริป กี่วัน กี่ประเทศ ใช้เงินไปเท่าไหร่ — รวมมาให้ในที่เดียว',
-    accent: 'matcha',
+    chip: 'bg-green-light text-ink',
   },
 ] as const;
 
-/** Destinations are not a fixed list — these are just what the demo shows. */
-const DESTINATIONS: { label: string; accent: 'primary' | 'matcha' | 'sky' | 'sun' | 'joyfull' }[] =
-  [
-    { label: 'โตเกียว', accent: 'primary' },
-    { label: 'โซล', accent: 'sky' },
-    { label: 'ไทเป', accent: 'matcha' },
-    { label: 'ดานัง', accent: 'sun' },
-    { label: 'บาหลี', accent: 'joyfull' },
-    { label: 'ลิสบอน', accent: 'matcha' },
-    { label: 'เรคยาวิก', accent: 'sky' },
-    { label: 'เมลเบิร์น', accent: 'sun' },
-    { label: 'เม็กซิโกซิตี', accent: 'primary' },
-    { label: 'มาร์ราเกช', accent: 'joyfull' },
-  ];
+/**
+ * What the hero's tilted tags say (§4). Where they sit, at what angle, and
+ * which drop on a phone is `HeroCanvas`'s business — a page choosing its own
+ * coordinates is what put a tag across the knockout the first time.
+ *
+ * Two tags, both on the right. `HeroCanvas`'s first two slots are the
+ * right-anchored ones, so the length of this list is what keeps the left of
+ * the headline clear: the Thai lines are long and ragged, and a pill hanging
+ * off their left edge landed mid-word rather than on a letter's edge, which
+ * is the graze §4.2.4 asks for. `countdown` for the dates tag, because that is
+ * the room "หาวันว่าง" opens, and ink for the anchor §4.2.5 asks every cluster
+ * to have.
+ */
+const HERO_TAGS = [
+  { label: 'หาวันว่าง', tone: 'countdown' },
+  { label: 'AI ร่างให้', tone: 'ink' },
+] as const;
+
+/**
+ * Destinations are not a fixed list — these are just what the demo shows.
+ *
+ * They no longer carry a colour each. Under v3 a colour means a feature, and
+ * Tokyo is not a feature: cycling four pastels down a row of city names is
+ * decoration, which reads as §8's "pastel rainbow on one screen" and teaches
+ * the visitor that ROVE's colours mean nothing in particular — the exact habit
+ * this rebrand removes. The row is one calm band of chips, and the colour on
+ * this page is spent on the hero above it.
+ */
+const DESTINATIONS = [
+  'โตเกียว',
+  'โซล',
+  'ไทเป',
+  'ดานัง',
+  'บาหลี',
+  'ลิสบอน',
+  'เรคยาวิก',
+  'เมลเบิร์น',
+  'เม็กซิโกซิตี',
+  'มาร์ราเกช',
+];
 
 export default function LandingPage() {
   return (
     <PublicShell
       width="wide"
       bleed
+      // §6 Nav — white, black wordmark, black pill on the right. The header
+      // used to float over the hero so the cobalt could run to the top of the
+      // viewport; with the hero white there is nothing to float over, and it
+      // takes an ordinary row again.
       actions={
         <>
-          <ButtonLink href="/explore" variant="ghost" size="sm">
+          <Link href="/explore" className={`${heroNavLinkClass} hidden sm:inline`}>
             สำรวจแพลน
-          </ButtonLink>
-          <ButtonLink href="/login" variant="ghost" size="sm">
+          </Link>
+          <Link href="/login" className={heroNavLinkClass}>
             เข้าสู่ระบบ
-          </ButtonLink>
-          <ButtonLink href="/new" size="sm">
-            เริ่มวางแพลน
-          </ButtonLink>
+          </Link>
+          {/* §7 Nav: one white pill on the right, over the canvas. */}
+          <Link href="/new" className={heroNavCtaClass}>
+            เริ่มวางแผน
+          </Link>
         </>
       }
     >
-      {/* ------------------------------------------------------------ hero */}
-      <section className={`${SHELL_SECTION} grid items-center gap-8 pt-6 pb-12 md:grid-cols-2 md:pt-12`}>
-        <div className="animate-rove-rise">
-          <p className="text-primary font-display flex items-center gap-1.5 text-sm font-bold tracking-wide">
-            <RoveMark className="size-3.5" />
-            ท่องเที่ยวไปโดยไม่มีเส้นทางตายตัว
-          </p>
-          <h1 className="font-display text-espresso mt-3 text-3xl leading-[1.2] font-extrabold tracking-tight text-balance sm:text-4xl lg:text-5xl">
-            วางแพลนเที่ยวกันทั้งกลุ่ม โดยไม่ต้องแย่งกันคุมแชท
-          </h1>
-          <p className="text-muted mt-4 max-w-md leading-relaxed">
-            ทุกคนหย่อนที่อยากไปลงห้องเดียวกัน AI ร่างแพลนรายวันพร้อมงบและเหตุผลให้
-            แล้วค่อยแก้ด้วยกัน จบทริปแล้วหารเงินกันในแอปได้เลย
-          </p>
-
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <ButtonLink href="/new" size="lg">
+      {/* =========================================================== hero (canvas)
+          Composition, layer order and tag placement all live in `HeroCanvas`
+          (§6). This page supplies only what is specific to it: the words, the
+          anchor mark, and which two small doodles sit in the gaps. */}
+      <HeroCanvas
+        eyebrow="ท่องเที่ยวไปโดยไม่มีเส้นทางตายตัว"
+        /* Lines are broken by hand into a short stack (§3.1) — each `block` is
+           one line, ragged right, never centred. The last line carries the
+           promise and keeps the period §3.2 offers for the extra beat; the
+           weight and the break do that work, without a knockout slab. */
+        headline={
+          <>
+            <span className="block">วางแพลนเที่ยว</span>
+            <span className="block">กันทั้งกลุ่ม</span>
+            <span className="block">จบในที่เดียว.</span>
+          </>
+        }
+        lead="ทุกคนหย่อนที่อยากไปลงห้องเดียวกัน AI ร่างแพลนรายวันพร้อมงบและเหตุผลให้ แล้วค่อยแก้ด้วยกัน จบทริปแล้วหารเงินกันในแอปได้เลย"
+        tags={HERO_TAGS}
+        anchor={Flower}
+        anchorTone="text-pink-light"
+        marks={
+          <>
+            {/* Dropped on a phone, where the anchor already owns this corner
+                and the two marks read as one smudge (§10). */}
+            <StarBurst className="text-green-solid pointer-events-none absolute top-[30%] -right-16 z-20 hidden size-24 sm:block" />
+            {/* Under the start of the last line, clear of the type — a mark
+                clipping a letter's corner reads as a smudge, not a doodle. */}
+            <Sparkle className="text-yellow-solid pointer-events-none absolute -bottom-6 left-[6%] z-20 hidden size-12 lg:block" />
+          </>
+        }
+        arrow
+        actions={
+          <>
+            <Link href="/new" className={heroButtonClass}>
               เริ่มทริปแรก <ArrowRight className="size-4" />
-            </ButtonLink>
+            </Link>
             {/*
               The published example plan, not the demo *room*: /t/:id is behind
               the sign-in wall, and a landing page whose "look around first"
               button asks you to sign in first is not a look around. Dynamic
               route, so typedRoutes needs the cast.
             */}
-            <ButtonLink href={DEMO_PUBLIC_PATH as never} variant="outline" size="lg">
+            <Link href={DEMO_PUBLIC_PATH as never} className={heroButtonGhostClass}>
               ดูทริปตัวอย่าง
-            </ButtonLink>
-          </div>
+            </Link>
+          </>
+        }
+      />
 
-          <div className="text-muted mt-6 flex items-center gap-3 text-xs">
-            <span className="flex -space-x-2">
-              {['shiba', 'cat', 'capybara', 'penguin'].map((id) => (
-                <CharacterAvatar key={id} characterId={id} size="xs" ring />
-              ))}
-            </span>
-            ทริปกลุ่ม 3–6 คน จะไปมุมไหนของโลกก็วางแพลนจบในที่เดียว
-          </div>
-        </div>
-
-        <div className="animate-rove-rise">
-          <Image
-            src="/brand/hero-landing.webp"
-            alt="กลุ่มเพื่อนสะพายเป้เดินทางด้วยกัน มีแลนด์มาร์กจากหลายทวีปอยู่ด้านหลังและเส้นทางจุดไข่ปลาลากผ่านหมุดสถานที่"
-            width={1440}
-            height={816}
-            priority
-            className="w-full"
+      {/* --------------------------------------------------------- entry (white) */}
+      <section className="bg-surface border-border border-y">
+        <div className={`${SHELL_SECTION} py-16`}>
+          <SectionIntro
+            title="เริ่มจากสิ่งที่คุณรู้อยู่แล้ว"
+            lead="รู้แค่วันก็ได้ รู้แค่ตั๋วก็ได้ หรือยังไม่รู้อะไรเลยก็ได้ — ไม่เกินสามหน้าจอก็มีห้องทริปให้เพื่อนเข้ามาแล้ว"
           />
+          <div className="mt-8 grid gap-3 sm:grid-cols-3">
+            {ENTRIES.map((entry) => (
+              <Link key={entry.key} href={`/new?from=${entry.key}`} className="group">
+                <Card className="h-full p-5 transition group-hover:-translate-y-0.5">
+                  {/* The colour lives in the chip, not in the card. Three
+                      saturated cards side by side is the adjacency §2.3 rules
+                      out; three saturated chips is punctuation. */}
+                  <span
+                    className={`flex size-10 items-center justify-center rounded-full ${entry.chip}`}
+                  >
+                    <entry.icon className="size-5" strokeWidth={2} />
+                  </span>
+                  <p className="t-h3 text-ink mt-4">{entry.title}</p>
+                  <p className="text-muted t-small mt-1.5">{entry.hint}</p>
+                  <span className="text-ink mt-3 inline-flex items-center gap-1 text-sm font-medium">
+                    เริ่มเลย{' '}
+                    <ArrowRight className="size-3.5 transition group-hover:translate-x-0.5" />
+                  </span>
+                </Card>
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* --------------------------------------------------- destinations */}
-      <section className={`${SHELL_SECTION} pb-12`}>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="section-label mr-1">ไปได้ทุกที่</span>
-          {DESTINATIONS.map((d) => (
-            <Badge key={d.label} tone={d.accent} size="md">
-              {d.label}
+      {/* -------------------------------------------------- destinations (cream)
+          This was a bare row of pills under an 11px label, sitting between the
+          hero and the entry cards with nothing to say what it was — it read as
+          a leftover rather than a section. It now carries the heading it
+          needed and the illustration that actually matches it: landmarks from
+          five continents strung along a dotted route is a picture of "anywhere
+          in the world", which is the claim the pills are the evidence for. */}
+      <section className={`${SHELL_SECTION} py-16`}>
+        <SectionIntro
+          title="จะไปมุมไหนของโลก ก็วางแพลนที่นี่ได้"
+          lead="ROVE ไม่ได้ผูกกับประเทศไหนเป็นพิเศษ ที่เห็นข้างล่างเป็นแค่ตัวอย่างจากทริปที่คนเปิดสาธารณะไว้"
+        />
+
+        <Image
+          src="/brand/hero-landing.webp"
+          alt="แลนด์มาร์กจากหลายทวีปเรียงกัน มีเส้นทางจุดไข่ปลาลากผ่านหมุดสถานที่ และกลุ่มเพื่อนสะพายเป้เดินอยู่ด้านหน้า"
+          width={1440}
+          height={816}
+          priority
+          className="mt-8 w-full"
+        />
+
+        {/* Flat and untilted — tilting is a hero-only device. */}
+        <div className="mt-8 flex flex-wrap items-center gap-2">
+          {DESTINATIONS.map((label) => (
+            <Badge key={label} size="md">
+              {label}
             </Badge>
           ))}
           <Badge tone="outline" size="md">
@@ -189,97 +343,109 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ---------------------------------------------------------- entry */}
-      <section className={`${SHELL_SECTION} pb-14`}>
-        <SectionHeader label="เริ่มยังไงก็ได้ · ไม่เกิน 3 หน้าจอ" />
-        <div className="grid gap-3 sm:grid-cols-3">
-          {ENTRIES.map((entry) => (
-            <Link key={entry.key} href={`/new?from=${entry.key}`} className="group">
-              <Card
-                accent={entry.accent}
-                className="h-full p-5 transition group-hover:-translate-y-0.5"
-              >
-                <entry.icon className="text-espresso size-6" strokeWidth={2.2} />
-                <p className="font-display text-espresso mt-3 text-lg font-bold">{entry.title}</p>
-                <p className="text-muted mt-1 text-sm leading-relaxed">{entry.hint}</p>
-                <span className="text-espresso mt-3 inline-flex items-center gap-1 text-sm font-semibold">
-                  เริ่มเลย{' '}
-                  <ArrowRight className="size-3.5 transition group-hover:translate-x-0.5" />
-                </span>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* ---------------------------------------------------------- steps */}
-      <section className="bg-surface">
-        <div className={`${SHELL_SECTION} py-14`}>
-          <SectionHeader label="ทำงานยังไง" />
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* --------------------------------------------------------- steps (white)
+          Led by the problem rather than by a label. "ทำงานยังไง" set over a
+          full-width illustration gave the picture more of the page than the
+          point had, and a reader has to want the answer before four numbered
+          steps mean anything to them. */}
+      <section className="bg-surface border-border border-y">
+        <div className={`${SHELL_SECTION} relative py-16`}>
+          <SectionIntro
+            title="แชทเลื่อนหาย แต่แพลนไม่ควรหายไปด้วย"
+            lead="ที่อยากไปของแต่ละคน วันว่างที่ไม่ตรงกัน บิลที่ยังไม่ได้หาร — ทั้งหมดอยู่ในห้องเดียว และไม่มีใครต้องรับหน้าที่สรุป"
+            underline
+          />
+          {/* The dotted path is the journey mark (§5.2) — this is the one
+              section where it says something the copy does not. */}
+          <DottedPath className="pointer-events-none absolute top-10 right-2 hidden h-12 w-24 lg:block" />
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {STEPS.map((step) => (
               <div key={step.n}>
-                <span className="bg-primary/12 text-primary font-display flex size-9 items-center justify-center rounded-full text-sm font-extrabold">
+                <span className="bg-ink text-white font-display flex size-9 items-center justify-center rounded-full text-sm font-medium">
                   {step.n}
                 </span>
-                <p className="font-display text-espresso mt-3 font-bold">{step.title}</p>
-                <p className="text-muted mt-1 text-sm leading-relaxed">{step.text}</p>
+                <p className="t-h3 text-ink mt-3">{step.title}</p>
+                <p className="text-muted t-small mt-1.5">{step.text}</p>
               </div>
             ))}
           </div>
+
+          {/*
+            ------------------------------------------------------ social proof
+            Between the steps and the features, per W24.1: the reader has just
+            been told how it works and the next question is "does anyone
+            actually use it". Both render nothing at all until the real numbers
+            are worth saying — the page closes back up around them and no
+            placeholder is left behind.
+
+            Which is why they share the steps band rather than carrying one of
+            their own. Given a band each, the cream → white → cream alternation
+            in §7 would depend on whether there happened to be reviews that
+            day: with the band present the rhythm read correctly, and the
+            moment it collapsed, two cream sections met.
+          */}
+          <PlatformStatsSection className="pt-16" />
+          <TravellerReviewsSection className="pt-16" />
         </div>
       </section>
 
-      {/*
-        ---------------------------------------------------- social proof
-        Between the steps and the features, per W24.1: the reader has just been
-        told how it works and the next question is "does anyone actually use
-        it". Both sections render nothing at all until the real numbers are
-        worth saying — the page is expected to close back up around them, and
-        no placeholder is left behind.
-      */}
-      <PlatformStatsSection className={`${SHELL_SECTION} pt-14`} />
-      <TravellerReviewsSection className={`${SHELL_SECTION} pt-14`} />
-
-      {/* -------------------------------------------------------- features */}
-      <section className={`${SHELL_SECTION} py-14`}>
-        <SectionHeader label="สิ่งที่แอปวางแพลนอื่นไม่ค่อยมี" />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {/* ------------------------------------------------------ features (cream) */}
+      <section className={`${SHELL_SECTION} py-16`}>
+        <SectionIntro
+          title="สิ่งที่แอปวางแพลนอื่นไม่ค่อยมี"
+          lead="ส่วนใหญ่ช่วยเก็บรายการที่อยากไป แต่ไม่ได้ช่วยตอนที่กลุ่มต้องตัดสินใจ หรือตอนที่ต้องเคลียร์เงินกันทีหลัง"
+        />
+        <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => (
-            <Card key={f.title} accent={f.accent} className="p-5">
-              <span className="text-2xl">{f.emoji}</span>
-              <p className="font-display text-espresso mt-2 font-bold">{f.title}</p>
-              <p className="text-muted mt-1 text-sm leading-relaxed">{f.text}</p>
+            <Card key={f.title} className="p-5">
+              <span
+                className={`flex size-10 items-center justify-center rounded-full text-lg ${f.chip}`}
+              >
+                {f.emoji}
+              </span>
+              <p className="t-h3 text-ink mt-4">{f.title}</p>
+              <p className="text-muted t-small mt-1.5">{f.text}</p>
             </Card>
           ))}
         </div>
       </section>
 
-      {/* ------------------------------------------------------- character */}
-      <section className={`${SHELL_SECTION} pb-14`}>
-        <Card accent="joyfull" className="overflow-hidden p-6 sm:p-8">
-          <div className="flex flex-wrap items-center justify-between gap-6">
-            <div className="max-w-md">
-              <p className="font-display text-espresso text-2xl font-extrabold tracking-tight">
-                เลือกตัวละครของตัวเองได้ 20 แบบ
-              </p>
-              <p className="text-muted mt-2 text-sm leading-relaxed">
-                ไม่ต้องอัปรูป ไม่ต้องคิดชื่อเล่น — เลือกตัวที่ใช่ แล้วมันจะตามคุณไปทุกทริป
-                ทั้งในรายชื่อสมาชิก คอมเมนต์ และบิลที่หารกัน
-              </p>
-              <ButtonLink href="/profile" variant="espresso" size="sm" className="mt-4">
-                ดูตัวละครทั้งหมด
-              </ButtonLink>
+      {/* ----------------------------------------------------- character
+          The one full-strength colour block in the content half of the page.
+          Pink because characters are how you appear to the group, and Wishlist
+          is the feature about people wanting things together — the closest
+          room this block belongs to. §2.2's pairs replaced v2's thematic
+          "pink = people", so the colour has to be argued from a feature now
+          rather than from a mood. */}
+      <section className="border-border border-t bg-white">
+        <div className={`${SHELL_SECTION} py-16`}>
+          <Card accent="wishlist" className="relative overflow-hidden p-6 sm:p-8">
+            {/* Solid pink at doodle scale, over the light pink fill — §2.3's
+                small-and-loud against big-and-calm. */}
+            <Heart className="text-pink-solid pointer-events-none absolute -top-3 -right-3 size-24" />
+            <div className="relative flex flex-wrap items-center justify-between gap-6">
+              <div className="max-w-md">
+                {/* No circle-around on the number. Ringing "20 แบบ" drew a box
+                    around it, and a number in a box reads as a cap — the
+                    opposite of what the sentence is offering. */}
+                <p className="t-h2">เลือกตัวละครของตัวเองได้ 20 แบบ</p>
+                <p className="text-ink t-small mt-3">
+                  ไม่ต้องอัปรูป ไม่ต้องคิดชื่อเล่น — เลือกตัวที่ใช่ แล้วมันจะตามคุณไปทุกทริป
+                  ทั้งในรายชื่อสมาชิก คอมเมนต์ และบิลที่หารกัน
+                </p>
+                <ButtonLink href="/profile" variant="primary" size="sm" className="mt-5">
+                  ดูตัวละครทั้งหมด
+                </ButtonLink>
+              </div>
+              <div className="flex max-w-xs flex-wrap gap-1.5">
+                {CHARACTERS.slice(0, 12).map((c) => (
+                  <CharacterAvatar key={c.id} characterId={c.id} size="md" />
+                ))}
+              </div>
             </div>
-            <div className="flex max-w-xs flex-wrap gap-1.5">
-              {CHARACTERS.slice(0, 12).map((c) => (
-                <CharacterAvatar key={c.id} characterId={c.id} size="md" />
-              ))}
-            </div>
-          </div>
-        </Card>
+          </Card>
+        </div>
       </section>
-
     </PublicShell>
   );
 }

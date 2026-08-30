@@ -77,13 +77,13 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   */
   if (me && !me.isAdmin) {
     return (
-      <div className="bg-bg text-espresso flex min-h-dvh items-center justify-center px-6">
+      <div className="bg-bg text-ink flex min-h-dvh items-center justify-center px-6">
         <div className="max-w-sm text-center">
-          <h1 className="font-display text-xl font-extrabold">หน้านี้สำหรับแอดมิน</h1>
+          <h1 className="font-display text-xl font-medium">หน้านี้สำหรับแอดมิน</h1>
           <p className="text-muted mt-2 text-sm">
             บัญชีนี้ไม่มีสิทธิ์เข้าถึงหน้าหลังบ้าน — ถ้าคิดว่าผิดพลาด ติดต่อทีมงาน
           </p>
-          <Link href="/home" className="text-primary mt-4 inline-block text-sm font-semibold">
+          <Link href="/home" className="text-primary mt-4 inline-block text-sm font-medium">
             กลับไปหน้าผู้ใช้
           </Link>
         </div>
@@ -92,12 +92,12 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="bg-bg text-espresso min-h-dvh md:flex">
+    <div className="bg-bg text-ink min-h-dvh md:flex">
       {/* --------------------------------------------------------- sidebar */}
       <aside className="bg-surface md:border-border shrink-0 md:w-56 md:border-r">
         <div className="flex h-14 items-center gap-2 px-4">
           <RoveMark className="text-primary size-4" />
-          <span className="font-display text-espresso text-sm font-extrabold tracking-tight">
+          <span className="font-display text-ink text-sm font-medium tracking-tight">
             ROVE แอดมิน
           </span>
         </div>
@@ -108,9 +108,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             const active = isActive(item.href, 'exact' in item ? item.exact : false);
 
             const className = cn(
-              'rounded-brand-sm flex items-center gap-2.5 px-3 py-2 text-sm font-semibold whitespace-nowrap transition',
+              'rounded-brand-sm flex items-center gap-2.5 px-3 py-2 text-sm font-medium whitespace-nowrap transition',
               active ? 'bg-primary text-primary-fg' : 'text-muted',
-              ready && !active && 'hover:bg-bg hover:text-espresso',
+              ready && !active && 'hover:bg-bg hover:text-ink',
               !ready && 'cursor-not-allowed opacity-40',
             );
 
@@ -155,7 +155,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2.5">
-            <Link href="/home" className="text-muted hover:text-espresso text-xs transition">
+            <Link href="/home" className="text-muted hover:text-ink text-xs transition">
               กลับไปหน้าผู้ใช้
             </Link>
             <CharacterAvatar characterId={me?.characterId ?? 'shiba'} size="sm" />

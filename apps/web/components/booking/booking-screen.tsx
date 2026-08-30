@@ -37,10 +37,10 @@ const KINDS: { key: BookingKind; label: string }[] = [
 
 const STATUS_META: Record<
   BookingStatus,
-  { label: string; tone: 'neutral' | 'matcha' | 'outline' }
+  { label: string; tone: 'neutral' | 'feature' | 'outline' }
 > = {
   idea: { label: 'ยังไม่จอง', tone: 'outline' },
-  booked: { label: 'จองแล้ว', tone: 'matcha' },
+  booked: { label: 'จองแล้ว', tone: 'feature' },
   cancelled: { label: 'ยกเลิกแล้ว', tone: 'neutral' },
 };
 
@@ -69,7 +69,7 @@ export function BookingScreen({ tripId }: { tripId: string }) {
             {saved.map((entry) => (
               <div key={entry.id} className="flex items-start gap-3 p-3.5">
                 <div className="min-w-0 flex-1">
-                  <p className="text-espresso text-sm font-semibold">{entry.title}</p>
+                  <p className="text-ink text-sm font-medium">{entry.title}</p>
                   <p className="text-muted mt-0.5 text-[11px]">
                     {entry.partner}
                     {entry.pricePerPersonThb
@@ -120,8 +120,8 @@ export function BookingScreen({ tripId }: { tripId: string }) {
               key={option.key}
               onClick={() => setKind(option.key)}
               className={cn(
-                'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition',
-                kind === option.key ? 'bg-espresso text-bg' : 'bg-surface text-muted',
+                'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition',
+                kind === option.key ? 'bg-ink text-bg' : 'bg-surface text-muted',
               )}
             >
               {option.label}
@@ -134,7 +134,7 @@ export function BookingScreen({ tripId }: { tripId: string }) {
             <Card key={offer.id} className="p-3.5">
               <div className="flex items-start gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-espresso text-sm font-semibold">{offer.title}</p>
+                  <p className="text-ink text-sm font-medium">{offer.title}</p>
                   <p className="text-muted mt-0.5 text-[11px]">
                     {offer.partner}
                     {offer.pricePerPersonThb
@@ -151,13 +151,13 @@ export function BookingScreen({ tripId }: { tripId: string }) {
                     href={offer.url}
                     target="_blank"
                     rel="noopener noreferrer nofollow"
-                    className="bg-espresso text-bg font-display inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold"
+                    className="bg-ink text-bg font-display inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium"
                   >
                     ไปจอง <ExternalLink className="size-3" />
                   </a>
                   <button
                     onClick={() => save.mutate({ ...offer, status: 'idea' })}
-                    className="text-primary inline-flex items-center gap-1 text-[11px] font-semibold"
+                    className="text-primary inline-flex items-center gap-1 text-[11px] font-medium"
                   >
                     <Plus className="size-3" /> เก็บไว้ในทริป
                   </button>

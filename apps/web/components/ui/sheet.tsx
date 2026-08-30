@@ -63,7 +63,7 @@ export function Sheet({
       <button
         aria-label="ปิด"
         onClick={onClose}
-        className="bg-espresso/35 absolute inset-0 backdrop-blur-[2px]"
+        className="bg-ink/35 absolute inset-0 backdrop-blur-[2px]"
       />
 
       <div
@@ -71,13 +71,13 @@ export function Sheet({
         aria-modal="true"
         aria-label={title}
         className={cn(
-          'bg-bg shadow-warm-lg animate-rove-rise relative max-h-[88dvh] w-full overflow-y-auto rounded-t-[2rem] p-5 sm:max-w-md sm:rounded-[2rem]',
+          'bg-bg shadow-float-lg animate-rove-rise relative max-h-[88dvh] w-full overflow-y-auto rounded-t-[2rem] p-5 sm:max-w-md sm:rounded-[2rem]',
           className,
         )}
       >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <h2 className="font-display text-espresso text-lg font-extrabold tracking-tight">
+            <h2 className="font-display text-ink text-lg font-medium tracking-tight">
               {title}
             </h2>
             {description ? <p className="text-muted mt-0.5 text-xs">{description}</p> : null}

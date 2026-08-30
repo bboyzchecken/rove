@@ -36,26 +36,22 @@ export function PlatformStatsSection({ className }: { className?: string }) {
       <SectionHeader label="ตัวเลขจริงจากคนที่ใช้อยู่" />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Figure
-          accent="matcha"
           value={stats.planners}
           label="คนวางแพลนกับ ROVE"
           hint="นับเฉพาะคนที่เปิดทริปจริง"
         />
         <Figure
-          accent="sky"
           value={stats.publicTrips}
           label="แพลนที่เปิดให้ตามรอย"
           hint="เจ้าของกดเปิดสาธารณะเอง"
         />
         <Figure
-          accent="sun"
           value={stats.clones}
           label="ครั้งที่มีคนก๊อปแพลนไปใช้"
           hint="ก๊อปแล้วแก้ต่อเป็นของตัวเอง"
         />
         {showRating ? (
           <Figure
-            accent="joyfull"
             value={stats.averageRating}
             decimals={1}
             label={`คะแนนเฉลี่ยจาก ${stats.reviews.toLocaleString('th-TH')} รีวิว`}
@@ -63,7 +59,6 @@ export function PlatformStatsSection({ className }: { className?: string }) {
           />
         ) : (
           <Figure
-            accent="joyfull"
             value={stats.reviews}
             label="รีวิวจากคนที่ไปมาแล้ว"
             hint="เขียนหลังจบทริปเท่านั้น"
@@ -78,24 +73,22 @@ function Figure({
   value,
   label,
   hint,
-  accent,
   decimals = 0,
 }: {
   value: number;
   label: string;
   hint: string;
-  accent: 'matcha' | 'sky' | 'sun' | 'joyfull';
   decimals?: number;
 }) {
   return (
-    <Card accent={accent} className="p-5">
-      <p className="font-display text-espresso nums text-3xl leading-none font-extrabold">
+    <Card accent="gray" className="p-5">
+      <p className="font-display text-ink nums text-3xl leading-none font-medium">
         {value.toLocaleString('th-TH', {
           minimumFractionDigits: decimals,
           maximumFractionDigits: decimals,
         })}
       </p>
-      <p className="text-espresso mt-2 text-sm font-semibold">{label}</p>
+      <p className="text-ink mt-2 text-sm font-medium">{label}</p>
       <p className="text-muted mt-0.5 text-[11px] leading-relaxed">{hint}</p>
     </Card>
   );

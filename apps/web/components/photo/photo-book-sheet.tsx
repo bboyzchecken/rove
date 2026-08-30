@@ -86,13 +86,13 @@ export function PhotoBookSheet({
                   className="flex h-12 items-center justify-center"
                   style={{ background: option.paper, color: option.ink }}
                 >
-                  <span className="text-xs font-bold">Aa</span>
+                  <span className="text-xs font-medium">Aa</span>
                   <span
                     className="ml-1.5 inline-block size-2 rounded-full"
                     style={{ background: option.accent }}
                   />
                 </span>
-                <span className="text-espresso block py-1.5 text-[11px] font-semibold">
+                <span className="text-ink block py-1.5 text-[11px] font-medium">
                   {option.name}
                 </span>
               </button>

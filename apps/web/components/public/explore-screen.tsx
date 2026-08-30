@@ -4,12 +4,14 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Copy, Eye, Search, Sparkles } from 'lucide-react';
 
+import { Flower, Spiral } from '@/components/brand/doodle';
+import { HeroCanvas, heroNavCtaClass } from '@/components/brand/hero-canvas';
 import { BrowseShell } from '@/components/common/browse-shell';
 import { MatchBadge } from '@/components/public/match-badge';
 import { TravellerReviewsSection } from '@/components/public/traveller-reviews';
 import { Stars } from '@/components/trip/trip-review';
 import { TripCover } from '@/components/trip/trip-cover';
-import { Button, ButtonLink } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
 import { bareInputClass, fieldShellClass } from '@/components/ui/field';
@@ -26,6 +28,15 @@ import { cn } from '@/lib/utils';
  */
 
 const PAGE_SIZE = 12;
+
+/** §4.2.5 — two accents plus the ink anchor. Real categories, not slogans. */
+const HERO_TAGS = [
+  { label: 'ก๊อปได้เลย', tone: 'itinerary' },
+  { label: 'ทริปจริง', tone: 'ink' },
+  { label: 'เจ้าของเปิดเอง', tone: 'wishlist' },
+  { label: 'แก้ต่อได้', tone: 'memo' },
+  { label: 'มีรีวิว', tone: 'journal' },
+] as const;
 
 const QUICK_FILTERS = [
   { id: '', label: 'ทั้งหมด' },
@@ -65,17 +76,38 @@ export function ExploreScreen({ signedIn }: { signedIn: boolean }) {
       // Anonymous only: a signed-in reader already has "สร้างทริป" in the
       // middle of the bottom bar and in the desktop nav.
       actions={
-        <ButtonLink href="/new" size="sm" variant="soft">
+        <Link href="/new" className={heroNavCtaClass}>
           เริ่มทริปของฉัน
-        </ButtonLink>
+        </Link>
+      }
+      // §1 — loud to a visitor, calm to a member. `BrowseShell` renders this
+      // for anonymous readers only; a signed-in user gets the heading below
+      // instead, because to them this is just another tab in their app.
+      hero={
+        <HeroCanvas
+          eyebrow="สำรวจแพลนสาธารณะ"
+          headline={
+            <>
+              <span className="block">ตามรอยทริป</span>
+              <span className="block">ที่คนไป</span>
+              <span className="block">
+                มาแล้ว<span className="knockout">จริงๆ.</span>
+              </span>
+            </>
+          }
+          lead="ทุกแพลนคือทริปจริงที่เจ้าของเปิดสาธารณะ — กดก๊อปไปเป็นของตัวเองแล้วแก้ต่อได้เลย"
+          tags={HERO_TAGS}
+          anchor={Spiral}
+          anchorTone="text-green-light"
+          marks={
+            <Flower className="text-yellow-solid pointer-events-none absolute top-[26%] -right-14 z-20 hidden size-20 sm:block" />
+          }
+        />
       }
     >
-      <h1 className="font-display text-espresso mt-6 text-2xl font-extrabold tracking-tight">
-        ตามรอยทริปที่คนไปมาแล้วจริงๆ
-      </h1>
-      <p className="text-muted mt-1 text-sm">
-        ทุกแพลนคือทริปจริงที่เจ้าของเปิดสาธารณะ — กดก๊อปไปเป็นของตัวเองแล้วแก้ต่อได้เลย
-      </p>
+      {signedIn ? (
+        <h1 className="t-h2 text-ink mt-6">ตามรอยทริปที่คนไปมาแล้วจริงๆ</h1>
+      ) : null}
 
       <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
         <label className={cn(fieldShellClass, 'sm:max-w-xs')}>
@@ -101,10 +133,10 @@ export function ExploreScreen({ signedIn }: { signedIn: boolean }) {
                 setPages(1);
               }}
               className={cn(
-                'font-display rounded-full px-3.5 py-1.5 text-sm font-semibold whitespace-nowrap transition',
+                'font-display rounded-full px-3.5 py-1.5 text-sm font-medium whitespace-nowrap transition',
                 quick === filter.id && !query
-                  ? 'bg-espresso text-bg'
-                  : 'bg-surface text-espresso hover:bg-border',
+                  ? 'bg-ink text-bg'
+                  : 'bg-surface text-ink hover:bg-border',
               )}
             >
               {filter.label}
@@ -122,7 +154,7 @@ export function ExploreScreen({ signedIn }: { signedIn: boolean }) {
                 setPages(1);
               }}
               className={cn(
-                'rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition',
+                'rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition',
                 sort === mode && !matching
                   ? 'bg-primary/12 text-primary'
                   : 'text-muted hover:bg-surface',
@@ -141,7 +173,7 @@ export function ExploreScreen({ signedIn }: { signedIn: boolean }) {
             เรียงตามที่เข้ากับทริปของฉัน
           </span>
           <select
-            className="bg-surface text-espresso rounded-full px-3 py-1.5 text-xs font-semibold outline-none"
+            className="bg-surface text-ink rounded-full px-3 py-1.5 text-xs font-medium outline-none"
             value={matchTripId}
             onChange={(e) => {
               setMatchTripId(e.target.value);
@@ -166,7 +198,7 @@ export function ExploreScreen({ signedIn }: { signedIn: boolean }) {
 
       {isError && matching ? (
         <Card className="mt-4 p-4">
-          <p className="text-espresso text-sm font-semibold">เทียบกับทริปนี้ไม่ได้</p>
+          <p className="text-ink text-sm font-medium">เทียบกับทริปนี้ไม่ได้</p>
           <p className="text-muted mt-1 text-xs">
             ทริปอาจถูกลบไปแล้ว — เลือกทริปอื่นหรือกลับไปเรียงตามปกติ
           </p>
@@ -183,7 +215,7 @@ export function ExploreScreen({ signedIn }: { signedIn: boolean }) {
 
       {!isLoading && items.length === 0 ? (
         <Card className="mt-6 p-8 text-center">
-          <p className="text-espresso text-sm font-semibold">ยังไม่เจอแพลนที่ตรงกับที่ค้นหา</p>
+          <p className="text-ink text-sm font-medium">ยังไม่เจอแพลนที่ตรงกับที่ค้นหา</p>
           <p className="text-muted mt-1 text-xs">ลองคำอื่น หรือเป็นคนแรกที่เปิดทริปแนวนี้ให้คนอื่นตามรอย</p>
         </Card>
       ) : null}
@@ -222,7 +254,7 @@ function ExploreCard({ trip }: { trip: ExploreTrip }) {
         <TripCover src={trip.cover} frame="card" />
         <div className="p-3.5">
           {trip.match ? <MatchBadge match={trip.match} className="mb-2" /> : null}
-          <p className="text-espresso line-clamp-1 text-sm font-extrabold">{trip.title}</p>
+          <p className="text-ink line-clamp-1 text-sm font-medium">{trip.title}</p>
           <p className="text-muted mt-0.5 line-clamp-1 text-xs">
             {trip.days} วัน · {trip.cities.join(' · ')}
             {trip.budgetPerPersonThb > 0

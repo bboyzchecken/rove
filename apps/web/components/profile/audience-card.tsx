@@ -38,8 +38,8 @@ export function AudienceCard() {
     <section>
       <SectionHeader label="คนตามรอยฉัน" />
 
-      <Card accent="sky" className="p-4">
-        <p className="text-espresso flex items-center gap-2 text-sm font-semibold">
+      <Card accent="gray" className="p-4">
+        <p className="text-ink flex items-center gap-2 text-sm font-medium">
           <Users className="size-4" />
           แพลนสาธารณะ {audience.publicTrips.toLocaleString('th-TH')} ใบ
         </p>
@@ -55,7 +55,7 @@ export function AudienceCard() {
 
         {top && top.clones > 0 ? (
           <p className="text-muted mt-3 text-[11px] leading-relaxed">
-            ถูกตามรอยมากที่สุดคือ <span className="text-espresso font-semibold">{top.title}</span> —{' '}
+            ถูกตามรอยมากที่สุดคือ <span className="text-ink font-medium">{top.title}</span> —{' '}
             {top.clones.toLocaleString('th-TH')} คน
           </p>
         ) : null}
@@ -68,12 +68,12 @@ export function AudienceCard() {
               {trip.slug ? (
                 <Link
                   href={`/p/${trip.slug}` as never}
-                  className="text-espresso truncate text-sm font-semibold hover:underline"
+                  className="text-ink truncate text-sm font-medium hover:underline"
                 >
                   {trip.title}
                 </Link>
               ) : (
-                <p className="text-espresso truncate text-sm font-semibold">{trip.title}</p>
+                <p className="text-ink truncate text-sm font-medium">{trip.title}</p>
               )}
               <p className="text-muted mt-0.5 flex items-center gap-2.5 text-[11px]">
                 <span className="nums inline-flex items-center gap-1">
@@ -86,7 +86,7 @@ export function AudienceCard() {
             </div>
 
             {trip.pointsEarned > 0 ? (
-              <span className="text-success nums inline-flex shrink-0 items-center gap-1 text-sm font-bold">
+              <span className="text-success nums inline-flex shrink-0 items-center gap-1 text-sm font-medium">
                 <Sparkles className="size-3.5" />+{trip.pointsEarned.toLocaleString('th-TH')}
               </span>
             ) : (

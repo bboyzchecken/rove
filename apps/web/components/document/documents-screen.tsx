@@ -58,7 +58,7 @@ export function DocumentsScreen({ tripId }: { tripId: string }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-espresso text-sm font-semibold">เอกสารของทริป</p>
+          <p className="text-ink text-sm font-medium">เอกสารของทริป</p>
           <p className="text-muted mt-0.5 text-xs">ตั๋ว โรงแรม ประกัน — เก็บไว้ที่เดียว ทุกคนในห้องเปิดได้</p>
         </div>
         <Button size="sm" disabled={upload.isPending} onClick={() => input.current?.click()}>
@@ -91,9 +91,9 @@ export function DocumentsScreen({ tripId }: { tripId: string }) {
       ) : null}
 
       {!isLoading && documents.length === 0 ? (
-        <Card accent="matcha" className="p-8 text-center">
-          <FileText className="text-espresso mx-auto size-8" strokeWidth={2} />
-          <p className="text-espresso mt-3 text-sm font-semibold">ยังไม่มีเอกสารในทริปนี้</p>
+        <Card accent="feature" className="p-8 text-center">
+          <FileText className="text-ink mx-auto size-8" strokeWidth={2} />
+          <p className="text-ink mt-3 text-sm font-medium">ยังไม่มีเอกสารในทริปนี้</p>
           <p className="text-muted mx-auto mt-1 max-w-xs text-xs leading-relaxed">
             อัปโหลดตั๋วกับใบจองโรงแรมไว้ตั้งแต่ตอนนี้ — วันเดินทางจะได้ไม่ต้องไล่หาในแชท
           </p>
@@ -158,11 +158,11 @@ function DocumentRow({
   return (
     <Card className="flex items-center gap-3 p-3">
       <span className="bg-surface flex size-10 shrink-0 items-center justify-center rounded-xl">
-        <Icon className="text-espresso size-4.5" strokeWidth={2.5} />
+        <Icon className="text-ink size-4.5" strokeWidth={2.5} />
       </span>
 
       <button onClick={onPreview} className="min-w-0 flex-1 text-left">
-        <p className="text-espresso line-clamp-1 text-sm font-semibold">{doc.name}</p>
+        <p className="text-ink line-clamp-1 text-sm font-medium">{doc.name}</p>
         <p className="text-muted mt-0.5 text-[11px]">
           {isImage ? 'รูปภาพ' : doc.contentType === 'application/pdf' ? 'PDF' : 'เอกสาร'} ·{' '}
           {formatBytes(doc.sizeBytes)}
@@ -173,7 +173,7 @@ function DocumentRow({
         href={doc.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-muted hover:text-espresso shrink-0 text-xs font-semibold"
+        className="text-muted hover:text-ink shrink-0 text-xs font-medium"
       >
         เปิด
       </a>
@@ -183,7 +183,7 @@ function DocumentRow({
           onClick={() => remove.mutate(doc.id)}
           disabled={remove.isPending}
           aria-label={`ลบ ${doc.name}`}
-          className="text-muted hover:text-espresso shrink-0"
+          className="text-muted hover:text-ink shrink-0"
         >
           <Trash2 className="size-4" />
         </button>
@@ -263,9 +263,9 @@ function DocumentPreview({ doc, onClose }: { doc: TripDocument; onClose: () => v
           />
         </div>
       ) : (
-        <Card accent="sky" className="p-6 text-center">
-          <FileText className="text-espresso mx-auto size-8" strokeWidth={2} />
-          <p className="text-espresso mt-3 text-sm font-semibold">
+        <Card accent="gray" className="p-6 text-center">
+          <FileText className="text-ink mx-auto size-8" strokeWidth={2} />
+          <p className="text-ink mt-3 text-sm font-medium">
             {doc.contentType === 'application/pdf' ? 'ไฟล์ PDF' : 'ไฟล์เอกสาร'}
           </p>
           <p className="text-muted mt-1 text-xs">{formatBytes(doc.sizeBytes)}</p>
@@ -276,7 +276,7 @@ function DocumentPreview({ doc, onClose }: { doc: TripDocument; onClose: () => v
         href={doc.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="bg-espresso text-bg font-display mt-4 flex h-11 items-center justify-center rounded-full text-sm font-semibold"
+        className="bg-ink text-bg font-display mt-4 flex h-11 items-center justify-center rounded-full text-sm font-medium"
       >
         เปิด / ดาวน์โหลด
       </a>

@@ -34,12 +34,12 @@ export function AiCreditPanel({ tripId, onStart }: { tripId: string; onStart: ()
   const perPerson = credits?.passPerPersonThb ?? passPrice;
 
   return (
-    <Card accent={hasPass || freeLeft > 0 ? 'matcha' : 'sun'} className="p-4 sm:p-5">
+    <Card accent={hasPass || freeLeft > 0 ? 'feature' : 'warning'} className="p-4 sm:p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <RoveMark className="text-primary size-4 shrink-0" />
-            <p className="font-display text-espresso font-bold">ให้ AI ร่างแพลนใหม่</p>
+            <p className="font-display text-ink font-medium">ให้ AI ร่างแพลนใหม่</p>
           </div>
 
           <p className="text-muted mt-1 text-sm leading-relaxed">

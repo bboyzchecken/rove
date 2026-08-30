@@ -113,7 +113,7 @@ export function AirportPicker({
         >
           <span className="text-lg leading-none">{value ? flagOf(value.countryCode) : '✈️'}</span>
           <span className="min-w-0 flex-1">
-            <span className="text-espresso nums block text-sm font-bold">
+            <span className="text-ink nums block text-sm font-medium">
               {value ? airportLabel(value) : chosen}
             </span>
             <span className="text-muted block truncate text-[11px]">
@@ -149,7 +149,7 @@ export function AirportPicker({
       )}
 
       {open ? (
-        <div className="bg-bg border-field-border shadow-warm-lg animate-rove-rise absolute inset-x-0 top-full z-20 mt-1.5 max-h-72 overflow-y-auto rounded-2xl border p-1">
+        <div className="bg-bg border-field-border shadow-float-lg animate-rove-rise absolute inset-x-0 top-full z-20 mt-1.5 max-h-72 overflow-y-auto rounded-2xl border p-1">
           {options.length === 0 ? (
             <p className="text-muted px-3 py-3 text-xs">
               {isFetching ? 'กำลังค้นหา…' : 'ไม่พบสนามบินที่ตรง — ลองใส่รหัส 3 ตัวจากตั๋ว เช่น NRT'}
@@ -157,7 +157,7 @@ export function AirportPicker({
           ) : (
             <>
               {!debounced ? (
-                <p className="text-muted px-3 pt-2 pb-1 text-[11px] font-semibold">
+                <p className="text-muted px-3 pt-2 pb-1 text-[11px] font-medium">
                   ที่คนไทยไปบ่อย
                 </p>
               ) : null}
@@ -174,7 +174,7 @@ export function AirportPicker({
                 >
                   <span className="text-lg leading-none">{flagOf(airport.countryCode)}</span>
                   <span className="min-w-0 flex-1">
-                    <span className="text-espresso block truncate text-sm font-semibold">
+                    <span className="text-ink block truncate text-sm font-medium">
                       {airport.cityTh || airport.city}
                       <span className="text-muted ml-1.5 text-[11px] font-normal">
                         {airport.countryTh}
@@ -185,7 +185,7 @@ export function AirportPicker({
                       {airport.name}
                     </span>
                   </span>
-                  <span className="bg-espresso text-bg nums font-display shrink-0 rounded-lg px-2 py-1 text-[11px] font-bold">
+                  <span className="bg-ink text-bg nums font-display shrink-0 rounded-lg px-2 py-1 text-[11px] font-medium">
                     {airport.iata}
                   </span>
                 </button>

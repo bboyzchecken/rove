@@ -34,7 +34,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ siz
   // Maskable icons are cropped to a circle on some launchers, so the mark sits
   // inside the safe area with room to spare rather than filling the square.
   const inner = Math.round(size * 0.58);
-  const mark = `data:image/svg+xml;utf8,${encodeURIComponent(MARK('#D9714E'))}`;
+  const mark = `data:image/svg+xml;utf8,${encodeURIComponent(MARK('#000000'))}`;
 
   return new ImageResponse(
     (

@@ -164,7 +164,7 @@ function AdaptSummary({ diff }: { diff: AdaptDiff }) {
 }
 
 const CHANGE_META: Record<AdaptChange['kind'], { icon: typeof Plus; tone: string }> = {
-  day_added: { icon: CalendarPlus, tone: 'text-matcha' },
+  day_added: { icon: CalendarPlus, tone: 'text-success' },
   day_removed: { icon: Minus, tone: 'text-muted' },
   item_removed: { icon: Minus, tone: 'text-muted' },
   item_moved: { icon: Wand2, tone: 'text-primary' },
@@ -177,7 +177,7 @@ function ChangeLine({ change }: { change: AdaptChange }) {
   return (
     <li className="flex items-start gap-2 text-xs leading-relaxed">
       <Icon className={cn('mt-0.5 size-3.5 shrink-0', tone)} />
-      <span className="text-espresso">
+      <span className="text-ink">
         {what}
         <span className="text-muted"> — {change.reason}</span>
       </span>
@@ -198,7 +198,7 @@ function Column({
   return (
     <div className="min-w-0">
       <p className="text-muted text-[11px]">{label}</p>
-      <p className="nums text-espresso text-sm font-bold">
+      <p className="nums text-ink text-sm font-medium">
         {changed ? (
           <>
             <span className="text-muted line-through">{from}</span> {to}
@@ -231,19 +231,19 @@ function Stepper({
       <button
         type="button"
         aria-label={`ลด${suffix}`}
-        className="text-espresso hover:bg-surface rounded-full p-1.5 transition disabled:opacity-40"
+        className="text-ink hover:bg-surface rounded-full p-1.5 transition disabled:opacity-40"
         onClick={() => step(-1)}
         disabled={value <= min}
       >
         <Minus className="size-3.5" />
       </button>
-      <span className="nums text-espresso text-sm font-bold">
+      <span className="nums text-ink text-sm font-medium">
         {value} {suffix}
       </span>
       <button
         type="button"
         aria-label={`เพิ่ม${suffix}`}
-        className="text-espresso hover:bg-surface rounded-full p-1.5 transition disabled:opacity-40"
+        className="text-ink hover:bg-surface rounded-full p-1.5 transition disabled:opacity-40"
         onClick={() => step(1)}
         disabled={value >= max}
       >

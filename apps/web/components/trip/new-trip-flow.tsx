@@ -235,7 +235,7 @@ export function NewTripFlow() {
       {/* step 0 -------------------------------------------------------- */}
       {step === 0 ? (
         <div className="animate-rove-rise">
-          <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight md:text-3xl">
+          <h1 className="font-display text-ink text-2xl font-medium tracking-tight md:text-3xl">
             ตอนนี้รู้อะไรแล้วบ้าง
           </h1>
           <p className="text-muted mt-1 text-sm">
@@ -253,12 +253,12 @@ export function NewTripFlow() {
                 }}
                 className="h-full text-left"
               >
-                <Card className="hover:shadow-warm flex h-full items-center gap-3.5 p-4 transition sm:flex-col sm:items-start sm:gap-3 sm:p-5">
-                  <span className="bg-primary/12 text-primary flex size-11 shrink-0 items-center justify-center rounded-2xl">
+                <Card className="hover:bg-surface flex h-full items-center gap-3.5 p-4 transition sm:flex-col sm:items-start sm:gap-3 sm:p-5">
+                  <span className="bg-feature text-ink flex size-11 shrink-0 items-center justify-center rounded-2xl">
                     <option.icon className="size-5" strokeWidth={2.2} />
                   </span>
                   <div className="flex-1 sm:flex-none">
-                    <p className="font-display text-espresso font-bold">{option.title}</p>
+                    <p className="font-display text-ink font-medium">{option.title}</p>
                     <p className="text-muted text-xs">{option.hint}</p>
                   </div>
                   <ArrowRight className="text-muted size-4 shrink-0 sm:mt-auto" />
@@ -274,12 +274,12 @@ export function NewTripFlow() {
         <div className="animate-rove-rise">
           <button
             onClick={() => setStep(0)}
-            className="text-muted mb-3 inline-flex items-center gap-1 text-xs font-semibold"
+            className="text-muted mb-3 inline-flex items-center gap-1 text-xs font-medium"
           >
             <ArrowLeft className="size-3.5" /> เปลี่ยนวิธีเริ่ม
           </button>
 
-          <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight md:text-3xl">
+          <h1 className="font-display text-ink text-2xl font-medium tracking-tight md:text-3xl">
             {routing ? 'บินไปลงที่ไหน' : coordinating ? 'ไปกันกี่คน' : 'ไปวันไหน'}
           </h1>
           {routing ? (
@@ -327,8 +327,8 @@ export function NewTripFlow() {
                         it. Phones skip it: there the summary is just the next
                         block down, and a placeholder would only be noise. */}
                     {route.stops.length === 0 ? (
-                      <Card accent="sky" className="hidden p-4 lg:block">
-                        <p className="text-espresso text-xs leading-relaxed">
+                      <Card accent="gray" className="hidden p-4 lg:block">
+                        <p className="text-ink text-xs leading-relaxed">
                           เลือกสนามบินปลายทางแล้ว สรุปทริป — วันเดินทาง จำนวนคืน และประเทศ —
                           จะขึ้นตรงนี้ให้เห็นระหว่างกรอก
                         </p>
@@ -350,7 +350,7 @@ export function NewTripFlow() {
                 <div>
                   <button
                     onClick={() => setPasting((v) => !v)}
-                    className="text-primary inline-flex items-center gap-1.5 text-xs font-semibold"
+                    className="text-primary inline-flex items-center gap-1.5 text-xs font-medium"
                   >
                     <ClipboardPaste className="size-3.5" />
                     {pasting ? 'ซ่อนช่องวางตั๋ว' : 'มีอีเมลตั๋วอยู่แล้ว? วางมาเลย'}
@@ -374,8 +374,8 @@ export function NewTripFlow() {
                         {parsing ? 'กำลังอ่าน…' : 'ใส่ตัวอย่างให้ดู'}
                       </Button>
                       {ticketNote ? (
-                        <Card accent="sun" className="p-3">
-                          <p className="text-espresso text-xs">{ticketNote}</p>
+                        <Card accent="feature" className="p-3">
+                          <p className="text-ink text-xs">{ticketNote}</p>
                         </Card>
                       ) : null}
                     </div>
@@ -411,14 +411,14 @@ export function NewTripFlow() {
                     {nights + 1} วัน {nights} คืน · {thaiRangeLabel(startDate, endDate)}
                   </p>
 
-                  <Card accent="sky" className="p-4">
-                    <p className="text-espresso text-xs leading-relaxed">
+                  <Card accent="gray" className="p-4">
+                    <p className="text-ink text-xs leading-relaxed">
                       ยังไม่ต้องเลือกปลายทางตอนนี้ — สร้างห้องแล้ว ROVE จะแนะนำที่ที่เหมาะกับ{' '}
                       {nights + 1} วันนี้ให้ พอจองตั๋วได้แล้วค่อยใส่เที่ยวบินทีหลัง
                     </p>
                     <button
                       onClick={() => setEntry('route')}
-                      className="text-primary mt-2 text-xs font-semibold"
+                      className="text-primary mt-2 text-xs font-medium"
                     >
                       จองตั๋วแล้ว? ใส่เที่ยวบินเลยดีกว่า →
                     </button>
@@ -428,8 +428,8 @@ export function NewTripFlow() {
 
               {/* --- coordinate door -------------------------------------- */}
               {coordinating ? (
-                <Card accent="sky" className="p-4">
-                  <p className="text-espresso text-xs leading-relaxed">
+                <Card accent="gray" className="p-4">
+                  <p className="text-ink text-xs leading-relaxed">
                     สร้างห้องก่อนโดยยังไม่ต้องมีวัน — ทุกคนเข้ามาแตะวันที่ตัวเองว่าง แล้ว ROVE
                     จะหาช่วงที่ซ้อนกันมากที่สุดให้ พร้อมแนะนำปลายทางที่เหมาะกับจำนวนวันนั้น
                   </p>
@@ -440,16 +440,16 @@ export function NewTripFlow() {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setParty((p) => Math.max(1, p - 1))}
-                    className="bg-surface text-espresso size-10 rounded-full text-lg font-bold"
+                    className="bg-surface text-ink size-10 rounded-full text-lg font-medium"
                   >
                     −
                   </button>
-                  <span className="font-display text-espresso w-8 text-center text-xl font-extrabold">
+                  <span className="font-display text-ink w-8 text-center text-xl font-medium">
                     {party}
                   </span>
                   <button
                     onClick={() => setParty((p) => Math.min(12, p + 1))}
-                    className="bg-surface text-espresso size-10 rounded-full text-lg font-bold"
+                    className="bg-surface text-ink size-10 rounded-full text-lg font-medium"
                   >
                     +
                   </button>
@@ -490,12 +490,12 @@ export function NewTripFlow() {
         <div className="animate-rove-rise">
           <button
             onClick={() => setStep(1)}
-            className="text-muted mb-3 inline-flex items-center gap-1 text-xs font-semibold"
+            className="text-muted mb-3 inline-flex items-center gap-1 text-xs font-medium"
           >
             <ArrowLeft className="size-3.5" /> กลับไปแก้รายละเอียด
           </button>
 
-          <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight md:text-3xl">
+          <h1 className="font-display text-ink text-2xl font-medium tracking-tight md:text-3xl">
             เลือกตัวละครของคุณ
           </h1>
           <p className="text-muted mt-1 text-sm">
@@ -510,7 +510,7 @@ export function NewTripFlow() {
                 onClick={() => setCharacter(c.id)}
                 className={cn(
                   'rounded-2xl p-1.5 transition',
-                  character === c.id ? 'bg-espresso' : 'bg-surface',
+                  character === c.id ? 'bg-ink' : 'bg-surface',
                 )}
                 title={c.name}
               >
@@ -522,7 +522,7 @@ export function NewTripFlow() {
           <Card className="mt-5 max-w-3xl p-4 md:mt-7 md:p-5">
             <p className="section-label mb-2">สรุปทริปที่จะสร้าง</p>
             <div className="flex flex-wrap gap-1.5">
-              <Badge tone="primary">
+              <Badge tone="ink">
                 {coordinating
                   ? 'ยังไม่กำหนดวัน'
                   : routing
@@ -531,12 +531,12 @@ export function NewTripFlow() {
               </Badge>
               {routing
                 ? route.stops.map((stop) => (
-                    <Badge key={stop.airport} tone="sky">
+                    <Badge key={stop.airport} tone="feature">
                       {stop.city} {stop.nights} คืน
                     </Badge>
                   ))
                 : null}
-              <Badge tone="matcha">{party} คน</Badge>
+              <Badge tone="feature">{party} คน</Badge>
             </div>
             {coordinating ? (
               <p className="text-muted mt-2 text-[11px]">
@@ -551,8 +551,8 @@ export function NewTripFlow() {
           </Card>
 
           {error ? (
-            <Card accent="primary" className="mt-3 max-w-3xl p-3">
-              <p className="text-espresso text-xs">{error}</p>
+            <Card accent="gray" className="mt-3 max-w-3xl p-3">
+              <p className="text-ink text-xs">{error}</p>
             </Card>
           ) : null}
 

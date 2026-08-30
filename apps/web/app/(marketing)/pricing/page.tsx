@@ -1,6 +1,13 @@
 import Link from 'next/link';
 
-import { PublicShell } from '@/components/common/public-shell';
+import { Sparkle, StarBurst } from '@/components/brand/doodle';
+import {
+  HeroCanvas,
+  heroButtonClass,
+  heroNavCtaClass,
+} from '@/components/brand/hero-canvas';
+import { SectionIntro } from '@/components/brand/section-intro';
+import { PublicShell, SHELL_SECTION } from '@/components/common/public-shell';
 import { PricingTable } from '@/components/public/pricing-table';
 import { ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -44,32 +51,64 @@ const FAQ = [
   },
 ];
 
+/**
+ * §4.2.6 wants a real category, not a slogan. On a pricing page the honest
+ * categories are the terms themselves — and the ink tag anchoring the cluster
+ * is the refund, which is the one people disbelieve.
+ */
+const HERO_TAGS = [
+  { label: 'ฟรีทั้งห้อง', tone: 'journal' },
+  { label: 'คืนเต็มจำนวน', tone: 'ink' },
+  { label: 'ไม่มีรายเดือน', tone: 'documents' },
+  { label: 'จ่ายเป็นทริป', tone: 'countdown' },
+  { label: 'ไม่ต้องใส่บัตร', tone: 'itinerary' },
+] as const;
+
 export default function PricingPage() {
   return (
     <PublicShell
       width="wide"
+      bleed
       actions={
-        <ButtonLink href="/new" size="sm">
+        <Link href="/new" className={heroNavCtaClass}>
           เริ่มวางแผน
-        </ButtonLink>
+        </Link>
       }
     >
-      <div className="py-8 sm:py-12">
-        <header className="mx-auto max-w-2xl text-center">
-          <h1 className="font-display text-espresso text-3xl font-extrabold tracking-tight sm:text-4xl">
-            จ่ายตอนที่ทริปคุ้มที่จะจ่าย
-          </h1>
-          <p className="text-muted mt-3 text-sm leading-relaxed sm:text-base">
-            วางแผนกับเพื่อนได้ฟรีทั้งห้อง ให้ AI ร่างให้ {FREE_DRAFTS_PER_TRIP} ครั้งต่อทริป ·
-            อยากร่างต่อไม่อั้นก็ปลดล็อกทริปนั้นครั้งเดียว
-            <br className="hidden sm:block" />
-            แล้วถ้าคุณจองผ่าน ROVE เราคืนให้เต็มจำนวน
-          </p>
-        </header>
+      {/* =========================================================== hero (canvas)
+          §1 puts pricing on the marketing side of the line, so it is fully
+          committed: canvas, oversized white display, one knockout. The tags
+          name what you actually get rather than shouting — §4.2.6 wants a real
+          category, and on a pricing page the categories are the terms. */}
+      <HeroCanvas
+        eyebrow="ราคา"
+        headline={
+          <>
+            <span className="block">จ่ายตอนที่</span>
+            <span className="block">ทริปคุ้ม</span>
+            <span className="block">
+              ที่จะ<span className="knockout">จ่าย.</span>
+            </span>
+          </>
+        }
+        lead={`วางแผนกับเพื่อนได้ฟรีทั้งห้อง ให้ AI ร่างให้ ${FREE_DRAFTS_PER_TRIP} ครั้งต่อทริป · อยากร่างต่อไม่อั้นก็ปลดล็อกทริปนั้นครั้งเดียว แล้วถ้าคุณจองผ่าน ROVE เราคืนให้เต็มจำนวน`}
+        tags={HERO_TAGS}
+        anchor={StarBurst}
+        anchorTone="text-yellow-light"
+        marks={
+          <Sparkle className="text-green-solid pointer-events-none absolute top-[34%] -right-14 z-20 hidden size-16 sm:block" />
+        }
+        arrow
+        actions={
+          <Link href="/new" className={heroButtonClass}>
+            เริ่มวางแผน — ฟรี
+          </Link>
+        }
+      />
 
-        <div className="mt-8 sm:mt-10">
-          <PricingTable />
-        </div>
+      {/* ------------------------------------------------------ plans (cream) */}
+      <div className={`${SHELL_SECTION} py-14`}>
+        <PricingTable />
 
         <p className="text-muted/80 mx-auto mt-5 max-w-2xl text-center text-[11px] leading-relaxed">
           ราคารวมภาษีแล้ว · ยังไม่มีระบบตัดเงินจริงในช่วงทดสอบ
@@ -77,14 +116,15 @@ export default function PricingPage() {
         </p>
 
         {/* ------------------------------------------------------------ faq */}
-        <section className="mx-auto mt-14 max-w-2xl">
-          <h2 className="font-display text-espresso text-xl font-extrabold tracking-tight">
-            คำถามที่ถามกันบ่อย
-          </h2>
-          <div className="mt-4 space-y-2.5">
+        <section className="mx-auto mt-16 max-w-2xl">
+          <SectionIntro
+            title="คำถามที่ถามกันบ่อย"
+            lead="ทุกข้อข้างล่างคือสิ่งที่คนถามก่อนจ่าย ตอบไว้ตรงนี้เลยจะได้ไม่ต้องทักมาถาม"
+          />
+          <div className="mt-8 space-y-2.5">
             {FAQ.map((item) => (
               <Card key={item.q} className="p-4 sm:p-5">
-                <p className="text-espresso text-sm font-semibold">{item.q}</p>
+                <p className="text-ink text-sm font-medium">{item.q}</p>
                 <p className="text-muted mt-1.5 text-xs leading-relaxed">{item.a}</p>
               </Card>
             ))}

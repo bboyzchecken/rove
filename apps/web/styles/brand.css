@@ -1,127 +1,345 @@
 /* ============================================================================
- * BRAND TOKENS — ROVE (DEV_SPEC §15)
+ * BRAND TOKENS — ROVE (ROVE_BRAND_SPEC v3 §2, §3, §4)
+ *
+ * Style: doodle UI — soft neubrutalism with hand-drawn doodle accents.
  *
  * This file is the ONLY place a brand colour, radius or font family is written
  * down. Nothing else in the app may hardcode one. Change the brand → change
  * this file, nothing else.
  *
- * Values are hsl channels, consumed as `hsl(var(--brand-primary))`.
+ * Values are hsl channels, consumed as `hsl(var(--brand-*))`, so every token
+ * still takes Tailwind's `/opacity` modifier.
+ *
+ * WHAT v3 CHANGED, AND WHY IT IS A REPLACEMENT RATHER THAN A TWEAK
+ * v1–v2 were a saturated brand: a cream page, a full-bleed cobalt hero, four
+ * hues whose meaning was thematic (yellow = planning, blue = action). UAT's
+ * verdict was "ไม่ get ทันที" — nothing on screen told you *where in the
+ * product you were*, because the colours described moods rather than places.
+ *
+ * v3 inverts that. The page is white, the colour lives in six pastel pairs,
+ * and each pair is locked to one feature area (§2.2). Recognition now comes
+ * from colour-to-feature mapping, which is a thing a user can learn, instead
+ * of from a memorable brand hue, which is a thing they cannot act on.
+ *
+ * Every terracotta / espresso / cream / cobalt value from v1–v2 is deleted
+ * here, not overridden — the rewrite checklist's first line.
  * ==========================================================================*/
 
 :root {
-  /* --- Primary: cha thai terracotta — actions and highlights only --------- */
-  --brand-primary: 15 65% 58%; /* #D9714E */
-  --brand-primary-light: 15 65% 70%; /* #E49A81 */
-  --brand-primary-fg: 0 0% 100%; /* white on terracotta */
+  /* --- §2.1 Neutrals ------------------------------------------------------
+   * Three, and they carry the whole structure of a screen. Colour is context;
+   * these are the parts you actually operate.
+   *
+   *   white   the page, every screen, no exceptions
+   *   gray    secondary buttons, inputs, subtle blocks, disabled states
+   *   ink     primary CTA fill, all body text, all doodle strokes
+   *
+   * `--brand-ink` is a true #000000 rather than v2's #101010. On a white page
+   * with no shadows anywhere, the type and the linework are the only things
+   * holding the layout together, and the extra 6% of lightness measurably
+   * softened both. Neubrutalism has nothing to hide behind. */
+  --brand-white: 0 0% 100%; /* #FFFFFF */
+  --brand-gray: 0 0% 96.9%; /* #F7F7F7 */
+  --brand-ink: 0 0% 0%; /* #000000 */
 
-  /* --- Base -------------------------------------------------------------- */
-  --brand-espresso: 17 26% 19%; /* #3D2B24 — ALL type is this colour */
-  --brand-bg: 0 0% 100%; /* white page */
-  --brand-surface: 30 10% 96%; /* neutral card on white */
-  --brand-muted: 22 18% 43%; /* #6B5B4E secondary text */
-  --brand-border: 30 8% 90%;
+  /* --- §2.2 Feature colours -----------------------------------------------
+   * Six pairs. Each feature owns a LIGHT (surface) and a SOLID (accent), and
+   * §2.3 governs which is allowed where:
+   *
+   *            light                          solid
+   *   used for card fills, section bands,      icon circles, checkmarks, dots,
+   *            banners, chips                  active indicators, progress
+   *   size     large areas                     small, under ~48px
+   *   rule     big and calm                    small and loud
+   *
+   * A solid must never fill a large area. Its saturation is the point — it is
+   * spent on the one element the eye is meant to land on.
+   *
+   * The hue names are the raw palette. Nothing in the app should reach for
+   * them directly: use `--feature-light` / `--feature-solid` below, which the
+   * screen's own `data-feature` resolves. The named pairs stay reachable for
+   * the three places §2.5 allows several at once — the trip dashboard, a
+   * legend, and the marketing hero's doodle overlay. */
 
-  /* --- Form fields --------------------------------------------------------
-   * A field is the one thing on the page you are meant to reach into, so it
-   * never borrows the colour of what it sits on: always white, always with a
-   * line around it. That holds on a white sheet and on a surface card alike —
-   * without it a field on `--brand-surface` disappears into the card. */
-  --brand-field: 0 0% 100%;
-  --brand-field-border: 26 14% 82%; /* #D8D0C9 — visible on white and on surface */
+  /* Itinerary & Map — sky, travel, the route */
+  --brand-blue-light: 189.6 100% 85.3%; /* #B4F3FF */
+  --brand-blue-solid: 192.6 100% 62.5%; /* #40D7FF */
 
-  /* --- Accent palette ----------------------------------------------------
-   * The colour blocks. Components tint these over white rather than using a
-   * second set of pastel hexes, so there is exactly one value per colour. */
-  --brand-matcha: 137 36% 65%; /* #8BC99A success / nature */
-  --brand-sky: 207 68% 81%; /* #A8D4F0 info / calm */
-  --brand-sun: 52 82% 68%; /* #F0E06B warning / happy */
-  --brand-joyfull: 260 37% 80%; /* #C4B8E8 playful / secondary */
+  /* Wishlist — voting, wanting, playful and a bit romantic */
+  --brand-pink-light: 319.3 100% 89%; /* #FFC7ED */
+  --brand-pink-solid: 319.3 100% 72%; /* #FF70D1 */
 
-  /* --- Semantic ----------------------------------------------------------- */
-  --brand-success: 137 40% 36%;
-  --brand-warning: 32 78% 42%;
-  --brand-danger: 4 68% 50%;
+  /* Trip countdown — anticipation, excitement before departure */
+  --brand-yellow-light: 52 100% 77.8%; /* #FFF08E */
+  --brand-yellow-solid: 48.8 94.1% 60%; /* #F9D539 */
 
-  /* --- Shape & type ------------------------------------------------------- */
-  --brand-radius: 1.5rem; /* 24px — chunky friendly blocks */
-  --brand-radius-sm: 0.875rem;
-  --brand-radius-lg: 2rem;
+  /* Journal — private writing, calm */
+  --brand-green-light: 106.6 100% 83.3%; /* #BDFFAA */
+  --brand-green-solid: 106.8 88.5% 65.9%; /* #7DF55B */
 
-  /* Inter for everything. It carries no Thai glyphs, so Thai text falls
-   * through to Noto Sans Thai — matched for x-height and weight. */
-  --brand-font-sans: var(--font-inter), var(--font-noto-thai), system-ui, sans-serif;
-  --brand-font-display: var(--brand-font-sans);
+  /* Documents & Finance — needs attention, check this */
+  --brand-orange-light: 27.1 100% 80%; /* #FFC799 */
+  --brand-orange-solid: 27 100% 62.2%; /* #FF953E */
+
+  /* Memo — notes, quick capture */
+  --brand-purple-light: 266.7 100% 87.6%; /* #DCC0FF */
+  --brand-purple-solid: 266.5 100% 73.3%; /* #B377FF */
+
+  /* --- §2.5 The active feature --------------------------------------------
+   * ONE FEATURE COLOUR PER SCREEN, ENFORCED BY THE CASCADE RATHER THAN BY
+   * REVIEW.
+   *
+   * A screen (or a card standing in for one) sets `data-feature="wishlist"`
+   * and these two variables resolve to that pair; every `bg-feature`,
+   * `text-feature-solid` and `border-feature` underneath re-points with it.
+   * Components therefore never name a hue, which is what makes the mapping
+   * survive: a card cannot be pink on the budget screen, because nothing in
+   * the card says "pink" anywhere.
+   *
+   * The default is deliberately neutral, not a colour. An unscoped component
+   * renders gray-on-white — obviously unstyled rather than accidentally
+   * wearing another feature's identity. */
+  --feature-light: var(--brand-gray);
+  --feature-solid: var(--brand-ink);
+
+  /* --- Surfaces -----------------------------------------------------------
+   * v2 had a cream page and white cards, and alternated them down a page for
+   * rhythm. v3's §2.1 makes white the page everywhere, so the rhythm now runs
+   * the other way: white is the ground, `--brand-surface` (#F7F7F7) is the
+   * quiet block that sits ON it, and a feature's light colour is the loud one.
+   *
+   * That is why `--brand-surface` is the gray and not the white — `bg-surface`
+   * is worn by ~130 cards and inputs whose job is "a block, quieter than the
+   * page's content", and on a white page that block has to be the gray. */
+  --brand-bg: var(--brand-white);
+  --brand-surface: var(--brand-gray);
+
+  /* Secondary type. §2.1 puts all body copy on ink, and it stays there — this
+   * is for the metadata layer under it: timestamps, hints, captions.
+   *
+   * #525252 and not something lighter, because this token has to clear 4.5:1
+   * on EIGHT grounds, not one. It is read on white, on the gray, and on all
+   * six light feature surfaces, and the six differ enormously in luminance
+   * (#FFF08E is 18.1 against black, #DCC0FF only 13.0). Measured across all
+   * of them the worst case is purple at 4.85; the next step lighter, #595959,
+   * drops purple to 4.35 and fails. */
+  --brand-muted: 0 0% 32.2%; /* #525252 */
+
+  /* Hairlines. §4's separation comes from colour and spacing, so a border is
+   * for the rare case where two white things genuinely abut. */
+  --brand-border: 0 0% 89.8%; /* #E5E5E5 */
+
+  /* --- Form fields (§6 Inputs) --------------------------------------------
+   * §6 is explicit and it inverts v2: a field is `#F7F7F7` with NO border,
+   * and the focus ring is a 2px ink line. v2 made a field white-with-a-line
+   * so it would separate from the cream page; on a white page the same field
+   * would be invisible, so the fill and the page swap roles. */
+  --brand-field: var(--brand-gray);
+  --brand-field-border: 0 0% 89.8%;
+
+  /* --- Semantic -----------------------------------------------------------
+   * §6's first rule: NEVER COLOUR A PRIMARY BUTTON WITH A FEATURE COLOUR.
+   * Feature colour is context, black is action. So `primary` is simply ink,
+   * and the alias survives only so a control says what it is *for*.
+   *
+   * This is the single biggest behavioural change in v3. In v2 `primary` was
+   * cobalt and every screen's main action inherited the brand's loudest hue;
+   * now colour never competes with the CTA, which is what lets six pastel
+   * feature areas coexist without any of them fighting the button. */
+  --brand-primary: var(--brand-ink);
+  --brand-primary-fg: var(--brand-white);
+
+  /* State colours — a DOCUMENTED DEVIATION, and the only one in this file.
+   *
+   * §2 defines six feature pairs and no error colour, and §2.4's rule ("black
+   * text on every colour") is about text sitting ON a fill, not about coloured
+   * type. But ~42 call sites need a validation error, an overdue amount or a
+   * confirmed total to read as such, and the six accents cannot do it: they
+   * are pastels chosen to be backgrounds, and every one of them fails AA as
+   * type on white.
+   *
+   * So these are dark, functional state colours, deliberately outside the
+   * brand palette and used only as TYPE and hairlines — never as a fill, never
+   * as a section background, never anywhere a feature colour belongs. Each is
+   * measured on white AND on the light surface it will appear over:
+   *
+   *   success  6.52 on white, 5.60 on #BDFFAA
+   *   warning  7.34 on white, 4.85 on #FFC799
+   *   danger   6.54 on white, 6.10 on #F7F7F7
+   *
+   * `warning` is the deep end of the Documents & Finance orange on purpose —
+   * §2.6 makes orange the product's "needs checking" signal, so the state
+   * colour and the feature identity are the same hue read at two depths. */
+  --brand-success: 127.7 48.6% 28.2%; /* #256B2E */
+  --brand-warning: 28.7 100% 27.1%; /* #8A4200 */
+  --brand-danger: 3.2 71.3% 41%; /* #B3261E */
+
+  /* --- §4 Shape -----------------------------------------------------------
+   * Heavy rounding, zero shadows, and the same radii on every component.
+   *
+   * v2 pulled cards down to 16px because a big radius on a saturated block
+   * read as a sticker. v3's blocks are pastel and its page is white, so the
+   * sticker risk is gone and §4's 20–24px is back — that heavy rounding is
+   * half of what "soft neubrutalism" means; without it flat fills with no
+   * shadows just read as unstyled divs. */
+  --brand-radius: 1.375rem; /* 22px — cards and surfaces, §4's 20–24 */
+  --brand-radius-sm: 0.9375rem; /* 15px — inputs and small blocks, §4's 14–16 */
+  --brand-radius-lg: 1.5rem; /* 24px — the top of the same range */
+
+  /* --- §3 Type ------------------------------------------------------------
+   * Display and body are the same grotesk; the difference between them is
+   * size and tracking, not family. Thai must be paired explicitly — left to
+   * fall back, it lands on a system serif and the page stops being the brand
+   * mid-sentence (§3's own rule, and §9's checklist item). */
+  --brand-font-sans: var(--font-body), var(--font-thai), system-ui, sans-serif;
+  --brand-font-display: var(--font-grotesk), var(--font-thai), system-ui, sans-serif;
   --brand-font-mono: var(--brand-font-sans);
 
   /* --- Elevation ----------------------------------------------------------
-   * Flat by default: separation comes from colour blocks, not shadow. Only
-   * things that float above the page (dialogs, sheets) get a real shadow. */
-  --brand-shadow-sm: 0 1px 2px rgba(61, 43, 36, 0.05);
-  --brand-shadow: 0 6px 20px rgba(61, 43, 36, 0.1);
-  --brand-shadow-lg: 0 16px 40px rgba(61, 43, 36, 0.16);
+   * §4: NO SHADOWS ANYWHERE. No box-shadow, no glow, no blur. Separation
+   * comes from colour and spacing. §8 calls this the single most important
+   * rule for keeping the style crisp — one drop shadow and it reads as
+   * generic SaaS.
+   *
+   * What survives is for things that genuinely leave the page: a modal, a
+   * sheet, a dropdown. Those are not "cards with elevation", they are objects
+   * in front of the page, and without a shadow a white sheet on a white page
+   * has no edge at all. Held to the smallest values that still say "in
+   * front", and reachable only through `shadow-float*` so a card cannot pick
+   * one up by habit. */
+  --brand-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.06);
+  --brand-shadow: 0 6px 20px rgb(0 0 0 / 0.1);
+  --brand-shadow-lg: 0 16px 40px rgb(0 0 0 / 0.16);
 }
 
 /* ============================================================================
- * ADMIN SURFACE (Phase 5 — W25.1)
+ * §2.5 FEATURE SCOPES
+ *
+ * The mapping, in one place. A screen declares which room it is with
+ * `data-feature`, and everything underneath inherits the pair.
+ *
+ * The names are the FEATURE, never the hue — `data-feature="wishlist"`, not
+ * `data-feature="pink"`. That is the whole point of §2.5: if screens named
+ * hues, moving Wishlist to another colour would mean editing every screen
+ * instead of one line here.
+ * ==========================================================================*/
+
+[data-feature='itinerary'] {
+  --feature-light: var(--brand-blue-light);
+  --feature-solid: var(--brand-blue-solid);
+}
+
+[data-feature='wishlist'] {
+  --feature-light: var(--brand-pink-light);
+  --feature-solid: var(--brand-pink-solid);
+}
+
+[data-feature='countdown'] {
+  --feature-light: var(--brand-yellow-light);
+  --feature-solid: var(--brand-yellow-solid);
+}
+
+[data-feature='journal'] {
+  --feature-light: var(--brand-green-light);
+  --feature-solid: var(--brand-green-solid);
+}
+
+[data-feature='documents'] {
+  --feature-light: var(--brand-orange-light);
+  --feature-solid: var(--brand-orange-solid);
+}
+
+[data-feature='memo'] {
+  --feature-light: var(--brand-purple-light);
+  --feature-solid: var(--brand-purple-solid);
+}
+
+/* An explicit way back to neutral, for a screen that belongs to no feature —
+ * settings, auth, the account pages. Spelled out rather than left to the
+ * default so it survives being nested inside a feature-scoped shell. */
+[data-feature='none'] {
+  --feature-light: var(--brand-gray);
+  --feature-solid: var(--brand-ink);
+}
+
+/* ============================================================================
+ * ADMIN SURFACE
  *
  * A scope in this file, not a second colour file: brand.css is the only place
  * a brand colour is written down, and an admin palette that lived elsewhere
- * would drift the first time terracotta changed.
+ * would drift the first time the palette changed.
  *
- * Nothing in globals.css needs to know about this. Every Tailwind utility
- * already reads `hsl(var(--brand-*))`, so re-declaring the variables under
- * `[data-surface='admin']` re-themes every component underneath it — the same
- * `Card`, the same `Button`, the same everything.
+ * Every Tailwind utility reads `hsl(var(--brand-*))`, so re-declaring the
+ * variables here re-themes every component underneath — the same `Card`, the
+ * same `Button`, the same everything.
  *
- * This is NOT the dark theme the note below rules out. It is one surface, for
- * one audience, and the reason it is dark is that it inverts the brand's own
- * espresso rather than reaching for a neutral grey — an admin console that
- * looks like every other dashboard would have been the easier thing to build
- * and the wrong one.
+ * This is NOT a dark theme for the product. It is one surface, for one
+ * audience, and it stays dark in v3 for the same reason it was dark in v2: an
+ * operator reads columns of figures for an hour at a time, and the product's
+ * white page is built for a phone in daylight, not for that.
+ *
+ * The feature pairs do NOT follow it here. Admin has no Wishlist and no
+ * Journal — it has rows with a status, so the same six hues are re-tuned as
+ * data colours: desaturated, darkened, and readable as a *set* rather than as
+ * six identities. A table of full-strength pastels reads as bunting.
  * ==========================================================================*/
 
 [data-surface='admin'] {
-  /* Espresso is the brand's type colour. Turned into the page, it gives a
-   * dark surface that is still made of ROVE's own hue. */
-  --brand-bg: 17 26% 11%;
-  --brand-surface: 17 20% 16%;
-  /* Cards lift off the page with lightness, not shadow — the flat principle
-   * survives the inversion (§15 Visual Direction). */
-  --brand-espresso: 30 20% 92%; /* now the type colour ON the dark page */
-  --brand-muted: 24 12% 62%; /* 4.5:1 on the new background */
-  --brand-border: 17 14% 24%;
+  --brand-bg: 0 0% 7%;
+  --brand-surface: 0 0% 12%;
+  /* Ink is the type colour, so on a dark page it inverts to near-white. Not a
+   * pure #FFF: at 21:1 against this background, an hour of tabular figures is
+   * genuinely harder to read than at 16:1. */
+  --brand-ink: 0 0% 93%;
+  --brand-muted: 0 0% 64%; /* 4.6:1 on the surface above */
+  --brand-border: 0 0% 20%;
 
-  /* A field is still the one thing you reach into, so it still separates
-   * itself from what it sits on — by going darker here instead of white. */
-  --brand-field: 17 22% 9%;
-  --brand-field-border: 17 14% 30%;
+  /* A field still separates itself from what it sits on — by going darker
+   * here rather than lighter, which is the same rule inverted. */
+  --brand-field: 0 0% 4%;
+  --brand-field-border: 0 0% 26%;
 
-  /* Terracotta is unchanged: primary actions and the active nav item, and
-   * nothing else. On this background it carries further than it did on white. */
+  /* The primary control inverts with the page: a light pill carrying dark
+   * type. On a near-black surface that is what reads as "the action" — a
+   * black button would disappear into the page it sits on. */
+  --brand-primary: 0 0% 93%;
+  --brand-primary-fg: 0 0% 7%;
 
-  /* The accents stop being decoration and become status (§4.2): matcha =
-   * done, sun = waiting, joyfull = information, danger = careful. Desaturated
-   * and darkened so a table of them reads as data rather than as bunting —
-   * this, not the background colour, is where "เลิกการ์ตูน" actually happens. */
-  --brand-matcha: 137 24% 38%;
-  --brand-sky: 207 30% 40%;
-  --brand-sun: 44 42% 40%;
-  --brand-joyfull: 260 20% 44%;
+  /* Status, not identity. Lightness lands near 70% so each is legible as type
+   * on the dark page, and saturation is pulled well down so a column of them
+   * reads as data. */
+  --brand-blue-light: 192 40% 70%;
+  --brand-blue-solid: 192 55% 55%;
+  --brand-pink-light: 319 34% 74%;
+  --brand-pink-solid: 319 45% 60%;
+  --brand-yellow-light: 49 45% 70%;
+  --brand-yellow-solid: 49 55% 55%;
+  --brand-green-light: 107 32% 68%;
+  --brand-green-solid: 107 40% 52%;
+  --brand-orange-light: 27 45% 68%;
+  --brand-orange-solid: 27 55% 55%;
+  --brand-purple-light: 267 40% 76%;
+  --brand-purple-solid: 267 50% 64%;
 
-  --brand-success: 137 42% 62%;
-  --brand-warning: 38 76% 62%;
+  --feature-light: 0 0% 12%;
+  --feature-solid: 0 0% 93%;
+
+  /* Light enough to be type on a near-black page — the product's dark state
+   * colours would be unreadable here. */
+  --brand-success: 128 42% 62%;
+  --brand-warning: 32 70% 62%;
   --brand-danger: 4 72% 66%;
 
-  /* 24px corners on a data table are unreadable — the eye loses the column. */
+  /* 22px corners on a data table are unreadable — the eye loses the column. */
   --brand-radius: 0.625rem; /* 10px */
   --brand-radius-sm: 0.375rem; /* 6px */
   --brand-radius-lg: 0.875rem;
 
-  /* Shadow on a dark page has to be black. Espresso-tinted shadow is lighter
+  /* Shadow on a dark page has to be black. An ink-tinted shadow is lighter
    * than the surface under it, which reads as a glow. */
-  --brand-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --brand-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
-  --brand-shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
+  --brand-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --brand-shadow: 0 6px 20px rgb(0 0 0 / 0.45);
+  --brand-shadow-lg: 0 16px 40px rgb(0 0 0 / 0.55);
 }
 
 /* Admin work is reading columns of figures, so tabular numerals are the
@@ -129,8 +347,3 @@
 [data-surface='admin'] table {
   font-variant-numeric: tabular-nums;
 }
-
-/* A dark theme is a Phase 2 decision (§16) — the product is a white canvas
- * with colour blocks on it, and inverting that is a redesign, not a token
- * swap. The admin scope above is that redesign, done once, for one surface
- * that no signed-in traveller ever sees. */

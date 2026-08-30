@@ -126,13 +126,13 @@ export function DateBoard({ tripId }: { tripId: string }) {
 
       {/* ------------------------------------------------------ locked ---- */}
       {locked ? (
-        <Card accent="none" className="bg-espresso text-bg p-4">
+        <Card accent="ink" className="p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="flex items-center gap-1.5 text-sm opacity-80">
                 <PartyPopper className="size-4" /> ได้วันแล้ว
               </p>
-              <p className="font-display mt-1 text-xl font-extrabold tracking-tight">
+              <p className="font-display mt-1 text-xl font-medium tracking-tight">
                 {thaiRangeLabel(locked.startDate, locked.endDate)} · {locked.days} วัน{' '}
                 {locked.days - 1} คืน
               </p>
@@ -185,8 +185,8 @@ export function DateBoard({ tripId }: { tripId: string }) {
                   type="button"
                   onClick={() => setMode(tab.key)}
                   className={cn(
-                    'font-display flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition',
-                    mode === tab.key ? 'bg-espresso text-bg' : 'text-muted',
+                    'font-display flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition',
+                    mode === tab.key ? 'bg-ink text-bg' : 'text-muted',
                   )}
                 >
                   <tab.icon className="size-3.5" />
@@ -205,7 +205,7 @@ export function DateBoard({ tripId }: { tripId: string }) {
               >
                 <ChevronLeft className="size-4" />
               </button>
-              <span className="font-display text-espresso min-w-32 text-center text-sm font-bold">
+              <span className="font-display text-ink min-w-32 text-center text-sm font-medium">
                 {thaiMonthLabel(board.month)}
               </span>
               <button
@@ -245,7 +245,7 @@ export function DateBoard({ tripId }: { tripId: string }) {
                 <Eraser className="size-4" /> ล้างเดือนนี้
               </Button>
               <span className="text-muted ml-auto text-xs">
-                ใส่ไว้แล้ว <span className="nums font-bold">{myDayCount}</span> วัน
+                ใส่ไว้แล้ว <span className="nums font-medium">{myDayCount}</span> วัน
               </span>
               <Button
                 size="sm"
@@ -261,11 +261,11 @@ export function DateBoard({ tripId }: { tripId: string }) {
           {/* --------------------------------------------- selection bar -- */}
           {mode === 'range' && range && rangeMembers ? (
             <Card
-              accent="primary"
+              accent="feature"
               className="flex flex-wrap items-center justify-between gap-3 p-4"
             >
               <div>
-                <p className="font-display text-espresso text-base font-extrabold">
+                <p className="font-display text-ink text-base font-medium">
                   {thaiRangeLabel(range.start, range.end)} ·{' '}
                   {Math.round(
                     (new Date(range.end).getTime() - new Date(range.start).getTime()) / 86_400_000,
@@ -327,12 +327,12 @@ export function DateBoard({ tripId }: { tripId: string }) {
                         )}
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-display text-espresso text-sm font-extrabold">
+                          <span className="font-display text-ink text-sm font-medium">
                             {thaiRangeLabel(window.startDate, window.endDate)}
                           </span>
                           <span className="flex items-center gap-1.5">
-                            {window.everyone ? <Badge tone="solid">ทุกคนว่าง</Badge> : null}
-                            <Badge tone="matcha">{window.days} วัน</Badge>
+                            {window.everyone ? <Badge tone="active">ทุกคนว่าง</Badge> : null}
+                            <Badge tone="feature">{window.days} วัน</Badge>
                           </span>
                         </div>
                         <p className="text-muted mt-1 text-xs">{window.reason}</p>
@@ -372,7 +372,7 @@ export function DateBoard({ tripId }: { tripId: string }) {
               label={`สมาชิก ${board.members.length} คน`}
               action={
                 pending.length > 0 ? (
-                  <span className="text-primary text-[11px] font-semibold">
+                  <span className="text-primary text-[11px] font-medium">
                     รออีก {pending.length} คน
                   </span>
                 ) : (
@@ -391,7 +391,7 @@ export function DateBoard({ tripId }: { tripId: string }) {
                   <div key={member.id} className="flex items-center gap-3 p-3">
                     <CharacterAvatar characterId={member.characterId} size="sm" />
                     <div className="min-w-0 flex-1">
-                      <p className="text-espresso text-sm font-semibold">
+                      <p className="text-ink text-sm font-medium">
                         {member.name}
                         {member.id === meId ? (
                           <span className="text-muted font-normal"> (คุณ)</span>
@@ -401,7 +401,7 @@ export function DateBoard({ tripId }: { tripId: string }) {
                         {submitted ? `ใส่วันว่างแล้ว · ${count} วัน` : 'ยังไม่ได้ใส่วันว่าง'}
                       </p>
                     </div>
-                    <Badge tone={submitted ? 'matcha' : 'outline'}>
+                    <Badge tone={submitted ? 'feature' : 'outline'}>
                       {submitted ? 'พร้อม' : 'รออยู่'}
                     </Badge>
                   </div>
@@ -410,8 +410,8 @@ export function DateBoard({ tripId }: { tripId: string }) {
             </Card>
           </section>
 
-          <Card accent="sun" className="p-4">
-            <p className="text-espresso text-xs leading-relaxed">
+          <Card accent="feature" className="p-4">
+            <p className="text-ink text-xs leading-relaxed">
               <strong>พอล็อควันแล้ว</strong> ระบบจะแนะนำปลายทางที่เหมาะกับจำนวนวัน ฤดูกาล
               และงบของกลุ่ม — แล้วค่อยไปต่อที่ &ldquo;ที่อยากไป&rdquo; เพื่อให้ AI ร่างแพลนได้
             </p>

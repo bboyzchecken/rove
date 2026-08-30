@@ -92,6 +92,17 @@ export function PublicShell({
 /** The landing page's sections, lined up with the header above them. */
 export const SHELL_SECTION = `mx-auto ${WIDTH.wide} ${GUTTER}`;
 
+/**
+ * Top spacing for a hero's first section.
+ *
+ * v2 exported this as `pt-14` because the header floated *over* a full-bleed
+ * cobalt hero and the content had to clear it. v3 has no coloured hero to
+ * float over — the header and the hero are the same white page — so the header
+ * takes an ordinary row again and the hero only needs a little air under it.
+ * The constant stays so the marketing pages keep one place to change it.
+ */
+export const HERO_TOP = 'pt-2';
+
 function SiteHeader({ actions }: { actions?: React.ReactNode }) {
   return (
     <header
@@ -103,6 +114,9 @@ function SiteHeader({ actions }: { actions?: React.ReactNode }) {
       )}
     >
       <Link href="/" aria-label={`${env.brandName} — หน้าแรกของเว็บ`}>
+        {/* §6 Nav: black wordmark on white. The period picks up whatever
+            `data-feature` is in scope, which on marketing is none — so it
+            resolves to ink and reads as part of the word. */}
         <RoveLogo size="sm" />
       </Link>
 
@@ -127,13 +141,13 @@ function SiteFooter() {
       >
         <RoveLogo size="sm" tone="mono" />
         <nav className="flex flex-wrap items-center gap-4">
-          <Link href="/pricing" className="hover:text-espresso">
+          <Link href="/pricing" className="hover:text-ink">
             ราคา
           </Link>
-          <Link href="/terms" className="hover:text-espresso">
+          <Link href="/terms" className="hover:text-ink">
             เงื่อนไขการใช้งาน
           </Link>
-          <Link href="/privacy" className="hover:text-espresso">
+          <Link href="/privacy" className="hover:text-ink">
             นโยบายความเป็นส่วนตัว
           </Link>
         </nav>

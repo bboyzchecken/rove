@@ -19,18 +19,21 @@ export function MatchBadge({
   className?: string;
   compact?: boolean;
 }) {
+  // A three-step scale, so it uses the two halves of the room's pair and then
+  // falls back to gray — §2.3's solid for the score worth acting on, the light
+  // fill for a decent one, neutral for the rest. Black type throughout (§2.4).
   const tone =
     match.score >= 80
-      ? 'bg-matcha/15 text-matcha'
+      ? 'bg-feature-solid text-ink'
       : match.score >= 60
-        ? 'bg-primary/12 text-primary'
+        ? 'bg-feature text-ink'
         : 'bg-surface text-muted';
 
   return (
     <div className={cn('flex flex-col gap-1', className)}>
       <span
         className={cn(
-          'inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold',
+          'inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
           tone,
         )}
       >

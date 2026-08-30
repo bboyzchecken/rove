@@ -53,29 +53,36 @@ export function RouteMap({ items, city }: { items: PlanItem[]; city: string }) {
         role="img"
         aria-label={`เส้นทางวันนี้ใน${city}`}
       >
-        <rect width="660" height="220" className="fill-matcha/12" />
+        {/* Ground, then soft blocks standing in for districts and water.
+            One hue at three depths rather than v2's green/blue/yellow: this is
+            a MAP, and §2.2 gives Itinerary & Map its blue precisely so the
+            schematic reads as the feature it belongs to. Three greens and a
+            blue said "these districts are different kinds of place", which the
+            data behind them never actually knew. */}
+        <rect width="660" height="220" className="fill-feature/25" />
+        <rect x="30" y="20" width="180" height="80" rx="16" className="fill-feature/60" />
+        <rect x="420" y="130" width="210" height="70" rx="16" className="fill-feature" />
+        <rect x="240" y="150" width="120" height="50" rx="14" className="fill-feature/60" />
 
-        {/* soft blocks standing in for districts and water */}
-        <rect x="30" y="20" width="180" height="80" rx="16" className="fill-matcha/25" />
-        <rect x="420" y="130" width="210" height="70" rx="16" className="fill-sky/35" />
-        <rect x="240" y="150" width="120" height="50" rx="14" className="fill-sun/25" />
-
+        {/* The route is the dotted path from §5.2's vocabulary, drawn in ink so
+            it survives every one of those tints underneath it. */}
         <path
           d={path}
-          className="stroke-primary/70"
+          className="stroke-ink"
           strokeWidth={3}
           strokeDasharray="7 7"
+          strokeLinecap="round"
           fill="none"
         />
 
         {points.map((p, i) => (
           <g key={p.item.id}>
-            <circle cx={p.x} cy={p.y} r={13} className="fill-primary" />
+            <circle cx={p.x} cy={p.y} r={13} className="fill-ink" />
             <text
               x={p.x}
               y={p.y + 4}
               textAnchor="middle"
-              className="fill-white text-[11px] font-bold"
+              className="fill-white text-[11px] font-medium"
             >
               {i + 1}
             </text>
@@ -86,10 +93,10 @@ export function RouteMap({ items, city }: { items: PlanItem[]; city: string }) {
       <ol className="divide-border divide-y">
         {points.map((p, i) => (
           <li key={p.item.id} className="flex items-center gap-2.5 px-3.5 py-2">
-            <span className="bg-primary/12 text-primary flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold">
+            <span className="bg-feature text-ink flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-medium">
               {i + 1}
             </span>
-            <span className="text-espresso min-w-0 flex-1 truncate text-xs font-medium">
+            <span className="text-ink min-w-0 flex-1 truncate text-xs font-medium">
               {p.item.title}
             </span>
             {p.item.travel ? (

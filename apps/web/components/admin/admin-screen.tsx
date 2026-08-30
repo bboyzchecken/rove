@@ -48,7 +48,7 @@ export function AdminScreen() {
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight">
+          <h1 className="font-display text-ink text-2xl font-medium tracking-tight">
             ภาพรวมระบบ
           </h1>
           <p className="text-muted mt-1 text-sm">รีเฟรชอัตโนมัติทุกนาที</p>
@@ -88,7 +88,7 @@ export function AdminScreen() {
             <Card className="p-4">
               <div className="flex items-end justify-between gap-4">
                 <div>
-                  <p className="font-display text-espresso nums text-2xl font-extrabold">
+                  <p className="font-display text-ink nums text-2xl font-medium">
                     ${stats.aiCostTodayUsd.toFixed(2)}
                   </p>
                   <p className="text-muted mt-1 text-xs">
@@ -103,7 +103,7 @@ export function AdminScreen() {
               </div>
               <Progress
                 value={costRatio}
-                tone={costRatio >= 0.8 ? 'primary' : 'espresso'}
+                tone={costRatio >= 0.8 ? 'feature' : 'ink'}
                 className="mt-3"
               />
               <p className="text-muted mt-2 text-[11px]">
@@ -149,7 +149,7 @@ const POI_COLUMNS: Column<Poi>[] = [
   {
     key: 'name',
     header: 'ชื่อ',
-    cell: (poi) => <span className="font-semibold">{poi.name}</span>,
+    cell: (poi) => <span className="font-medium">{poi.name}</span>,
     sortBy: (poi) => poi.name,
   },
   {
@@ -201,7 +201,7 @@ function LandingProofSection() {
       <SectionHeader label="หลักฐานทางสังคมบนหน้าแรก" />
       <Card className="p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-espresso flex items-center gap-2 text-sm font-semibold">
+          <p className="text-ink flex items-center gap-2 text-sm font-medium">
             {showing ? <Megaphone className="size-4" /> : <EyeOff className="size-4" />}
             {showing ? 'กำลังแสดงบนหน้าแรก' : 'ยังไม่แสดงบนหน้าแรก'}
           </p>

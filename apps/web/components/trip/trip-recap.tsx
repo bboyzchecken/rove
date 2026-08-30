@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 
 import { SectionHeader, Stat } from '@/components/common/section';
+import { NextTripCard } from '@/components/trip/next-trip-card';
 import { TripCover } from '@/components/trip/trip-cover';
 import { TripReviewCard } from '@/components/trip/trip-review';
 import { Badge } from '@/components/ui/badge';
@@ -53,7 +54,26 @@ const DECISION_ICON: Record<RecapDecisionKind, typeof CalendarCheck> = {
   vote: ThumbsUp,
 };
 
-const SPEND_ACCENT = ['bg-primary', 'bg-matcha', 'bg-sky', 'bg-sun', 'bg-joyfull'] as const;
+/**
+ * The spend breakdown's bars.
+ *
+ * Five categories, and v2 gave them five hues — which under v3 would be five
+ * feature identities on a screen that belongs to Journal, and would tell the
+ * reader that "ที่พัก" is somehow the Wishlist of spending. A category is not a
+ * feature.
+ *
+ * One hue at four depths instead, plus ink for the largest. The bars are
+ * already sorted by amount, so the ramp is not decoration — it runs the same
+ * direction as the data, and a reader can rank the categories from the bars
+ * alone in a way five unrelated pastels never allowed.
+ */
+const SPEND_ACCENT = [
+  'bg-ink',
+  'bg-feature-solid',
+  'bg-feature',
+  'bg-feature/60',
+  'bg-feature/35',
+] as const;
 
 export function TripRecapScreen({ tripId }: { tripId: string }) {
   const { data: recap, isLoading } = useTripRecap(tripId);
@@ -103,7 +123,7 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
       <TripCover src={recap.cover} frame="banner" priority>
         <Link
           href="/trips"
-          className="bg-bg/90 text-espresso absolute top-4 left-4 flex size-9 items-center justify-center rounded-full"
+          className="bg-bg/90 text-ink absolute top-4 left-4 flex size-9 items-center justify-center rounded-full"
           aria-label="กลับไปหน้าทริปของฉัน"
         >
           <ChevronLeft className="size-5" />
@@ -115,12 +135,12 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
           <div className="mb-1.5 flex flex-wrap items-center gap-2">
             <Badge tone="neutral">จบทริปแล้ว</Badge>
             {isPublic ? (
-              <Badge tone="matcha">
+              <Badge tone="feature">
                 <Globe className="size-3" /> เปิดสาธารณะ
               </Badge>
             ) : null}
           </div>
-          <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight">
+          <h1 className="font-display text-ink text-2xl font-medium tracking-tight">
             {recap.title}
           </h1>
           <p className="text-muted mt-1 text-sm">
@@ -147,8 +167,8 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
       {/* ------------------------------------------------------ publish */}
       <section className="px-4">
         {isPublic ? (
-          <Card accent="matcha" className="p-4">
-            <p className="font-display text-espresso font-bold">ทริปนี้เปิดสาธารณะอยู่</p>
+          <Card accent="feature" className="p-4">
+            <p className="font-display text-ink font-medium">ทริปนี้เปิดสาธารณะอยู่</p>
             <p className="text-muted mt-1 text-xs">
               ทุกครั้งที่มีคนก๊อปแพลนนี้ไปแล้วจองตาม คุณได้แต้มเพิ่ม —
               เอาไปเป็นส่วนลดตอนจองทริปหน้าได้
@@ -172,13 +192,13 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
             </p>
           </Card>
         ) : recap.canPublish ? (
-          <Card accent="sun" className="p-4">
+          <Card accent="gray" className="p-4">
             <div className="flex items-start gap-3">
               <span className="bg-bg text-primary flex size-9 shrink-0 items-center justify-center rounded-2xl">
                 <Sparkles className="size-4" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="font-display text-espresso font-bold">
+                <p className="font-display text-ink font-medium">
                   เปิดทริปนี้เป็นสาธารณะ รับ {recap.pointsPerPublish.toLocaleString('th-TH')} แต้ม
                 </p>
                 <p className="text-muted mt-1 text-xs">
@@ -217,8 +237,8 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
                     <Icon className="size-4" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-espresso text-xs font-bold">{decision.title}</p>
-                    <p className="text-espresso/90 mt-0.5 text-sm">{decision.detail}</p>
+                    <p className="text-ink text-xs font-medium">{decision.title}</p>
+                    <p className="text-ink/90 mt-0.5 text-sm">{decision.detail}</p>
                     {who ? <p className="text-muted mt-1 text-[11px]">โดย {who.name}</p> : null}
                   </div>
                 </div>
@@ -236,7 +256,7 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
             {recap.itinerary.map((day) => (
               <Card key={day.id} className="p-3.5">
                 <div className="flex items-baseline justify-between gap-3">
-                  <p className="text-espresso text-sm font-bold">{day.label}</p>
+                  <p className="text-ink text-sm font-medium">{day.label}</p>
                   <span className="text-muted text-[11px]">{day.city}</span>
                 </div>
                 <ul className="mt-2 space-y-1.5">
@@ -245,7 +265,7 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
                       <span className="text-muted nums w-10 shrink-0 text-[11px]">
                         {item.start}
                       </span>
-                      <span className="text-espresso min-w-0 flex-1 text-sm">{item.title}</span>
+                      <span className="text-ink min-w-0 flex-1 text-sm">{item.title}</span>
                       {item.area ? (
                         <span className="text-muted shrink-0 text-[11px]">{item.area}</span>
                       ) : null}
@@ -267,8 +287,8 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
               {recap.spending.map((line, i) => (
                 <li key={line.category}>
                   <div className="flex items-baseline justify-between gap-3">
-                    <span className="text-espresso text-sm">{line.category}</span>
-                    <span className="text-espresso nums text-sm font-semibold">
+                    <span className="text-ink text-sm">{line.category}</span>
+                    <span className="text-ink nums text-sm font-medium">
                       {formatMoney(line.amountThb, 'THB')}
                     </span>
                   </div>
@@ -304,8 +324,8 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
             {recap.activity.slice(0, 12).map((event) => {
               const who = recap.members.find((m) => m.id === event.memberId);
               return (
-                <p key={event.id} className="text-espresso p-3 text-xs">
-                  <span className="font-semibold">{who?.name ?? 'สมาชิก'}</span>{' '}
+                <p key={event.id} className="text-ink p-3 text-xs">
+                  <span className="font-medium">{who?.name ?? 'สมาชิก'}</span>{' '}
                   <span className="text-muted">{event.text}</span>
                 </p>
               );
@@ -313,6 +333,17 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
           </Card>
         </section>
       ) : null}
+
+      {/* ----------------------------------------------------- next trip
+          The last thing read on a finished trip is how the next one starts.
+          It sits below publishing on purpose: the card above turns this trip
+          into something other people can use, and this one turns it into the
+          starting point of your own next one — and both are arguments for
+          leaving the trip finished rather than editing it into the next
+          holiday. See NextTripCard for why that argument is worth making. */}
+      <section className="px-4">
+        <NextTripCard tripId={tripId} surface="recap" />
+      </section>
     </div>
   );
 }

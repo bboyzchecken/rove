@@ -7,7 +7,7 @@
  * read as a compass rather than a snowflake.
  *
  * Colour comes from `currentColor` — the caller decides terracotta / white /
- * espresso by setting `text-*`.
+ * ink by setting `text-*`.
  */
 export function RoveMark({
   className,
@@ -22,9 +22,9 @@ export function RoveMark({
         <path d="M28.8 28.8 71.2 71.2" />
         <path d="M71.2 28.8 28.8 71.2" />
       </g>
-      {/* The espresso core only appears at display sizes — at favicon scale it
+      {/* The ink core only appears at display sizes — at favicon scale it
        * would close up into a muddy dot. */}
-      {core ? <circle cx="50" cy="50" r="7.5" className="fill-espresso" /> : null}
+      {core ? <circle cx="50" cy="50" r="7.5" className="fill-ink" /> : null}
     </svg>
   );
 }

@@ -56,7 +56,7 @@ function ReviewCard({ review }: { review: PublicReview }) {
     <Card className="flex h-full flex-col p-5">
       <Stars value={review.rating} />
 
-      <p className="text-espresso mt-3 flex-1 text-sm leading-relaxed">
+      <p className="text-ink mt-3 flex-1 text-sm leading-relaxed">
         {/* No truncation with an ellipsis: a review cut mid-sentence reads as
             an edited one. Long ones are simply long. */}
         {review.body}
@@ -65,7 +65,7 @@ function ReviewCard({ review }: { review: PublicReview }) {
       <div className="mt-4 flex items-center gap-2.5">
         <CharacterAvatar characterId={review.characterId} size="sm" />
         <div className="min-w-0 flex-1">
-          <p className="text-espresso truncate text-xs font-semibold">{review.name}</p>
+          <p className="text-ink truncate text-xs font-medium">{review.name}</p>
           {/* The trip is the point: it is what the reader can go and copy. It
               only links when the plan is still published — an unpublished one
               keeps its name and loses its link rather than 404ing. */}

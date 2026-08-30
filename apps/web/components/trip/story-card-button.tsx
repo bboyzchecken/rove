@@ -80,7 +80,7 @@ export function StoryCardButton({ tripId }: { tripId: string }) {
           <ImageDown className="size-4" />
         </span>
         <span className="flex-1">
-          <span className="text-espresso block text-sm font-semibold">รูปสรุปทริป (1:1)</span>
+          <span className="text-ink block text-sm font-medium">รูปสรุปทริป (1:1)</span>
           <span className="text-muted block text-[11px]">
             {state === 'working' ? 'กำลังวาด…' : 'สำหรับลงสตอรี่หรือฟีด'}
           </span>

@@ -131,7 +131,7 @@ function CoverPicker({ tripId, trip, onDone }: { tripId: string; trip: Trip; onD
       )}
 
       {error ? (
-        <p className="text-danger text-xs font-semibold" role="alert">
+        <p className="text-danger text-xs font-medium" role="alert">
           {error}
         </p>
       ) : null}
@@ -173,7 +173,7 @@ function CoverPicker({ tripId, trip, onDone }: { tripId: string; trip: Trip; onD
       </Group>
 
       {update.isError ? (
-        <p className="text-danger text-xs font-semibold" role="alert">
+        <p className="text-danger text-xs font-medium" role="alert">
           บันทึกรูปปกไม่สำเร็จ ลองใหม่อีกครั้ง
         </p>
       ) : null}
@@ -190,7 +190,7 @@ function CoverPicker({ tripId, trip, onDone }: { tripId: string; trip: Trip; onD
 function Group({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-muted mb-1.5 text-[11px] font-semibold">{label}</p>
+      <p className="text-muted mb-1.5 text-[11px] font-medium">{label}</p>
       <div className="grid grid-cols-3 gap-2">{children}</div>
     </div>
   );
@@ -219,7 +219,7 @@ function Tile({
       )}
     >
       <TripCover src={src} frame="card" />
-      <span className="text-espresso bg-bg/85 absolute inset-x-0 bottom-0 truncate px-1.5 py-1 text-[10px] font-semibold">
+      <span className="text-ink bg-bg/85 absolute inset-x-0 bottom-0 truncate px-1.5 py-1 text-[10px] font-medium">
         {label}
       </span>
       {selected ? (

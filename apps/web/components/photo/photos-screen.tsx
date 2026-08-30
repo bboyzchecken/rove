@@ -82,8 +82,8 @@ export function PhotosScreen({ tripId }: { tripId: string }) {
       </div>
 
       {error ? (
-        <Card accent="primary" className="p-3.5">
-          <p className="text-espresso text-xs">{error}</p>
+        <Card accent="gray" className="p-3.5">
+          <p className="text-danger text-xs">{error}</p>
         </Card>
       ) : null}
 
@@ -130,9 +130,9 @@ export function PhotosScreen({ tripId }: { tripId: string }) {
       ) : null}
 
       {!isLoading && photos.length === 0 ? (
-        <Card accent="sky" className="p-8 text-center">
-          <Camera className="text-espresso mx-auto size-8" strokeWidth={2} />
-          <p className="text-espresso mt-3 text-sm font-semibold">ยังไม่มีรูปในทริปนี้</p>
+        <Card accent="feature" className="p-8 text-center">
+          <Camera className="text-ink mx-auto size-8" strokeWidth={2} />
+          <p className="text-ink mt-3 text-sm font-medium">ยังไม่มีรูปในทริปนี้</p>
           <p className="text-muted mx-auto mt-1 max-w-xs text-xs leading-relaxed">
             ถ่ายอะไรมาก็เอามาลงตรงนี้ได้เลย — พอทริปจบค่อยกดทำ Photo Book เก็บไว้อ่านทีหลัง
           </p>
@@ -206,8 +206,8 @@ function FilterChip({
     <button
       onClick={onClick}
       className={cn(
-        'rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition',
-        active ? 'bg-espresso text-bg' : 'bg-surface text-espresso hover:bg-border',
+        'rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition',
+        active ? 'bg-ink text-bg' : 'bg-surface text-ink hover:bg-border',
       )}
     >
       {children}

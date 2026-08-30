@@ -22,15 +22,22 @@ export default function OpengraphImage() {
           flexDirection: 'column',
           justifyContent: 'center',
           padding: '72px',
-          background: '#ffffff',
-          color: '#3D2B24',
+          background: '#FFFFFF',
+          color: '#000000',
           fontFamily: 'sans-serif',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 44, fontWeight: 800 }}>
-          <span>R</span>
-          <span style={{ color: '#D9714E' }}>✳</span>
-          <span>VE</span>
+        {/* The wordmark, lowercase, black on white (§6 Nav). Satori has no
+            access to the app's fonts or CSS variables, so this is the one file
+            where the palette is typed out — keep it in step with
+            styles/brand.css.
+
+            The period is ink rather than an accent because a share card has no
+            section to be in, which is the same reason `RoveIcon` is ink: the
+            period takes the CURRENT feature's colour, and a link pasted into a
+            chat has no current feature. */}
+        <div style={{ display: 'flex', fontSize: 44, fontWeight: 700, letterSpacing: '-1.3px' }}>
+          <span>rove.</span>
         </div>
 
         <div
@@ -39,7 +46,7 @@ export default function OpengraphImage() {
             flexDirection: 'column',
             marginTop: 28,
             fontSize: 62,
-            fontWeight: 800,
+            fontWeight: 700,
             lineHeight: 1.15,
             letterSpacing: '-2px',
           }}
@@ -48,13 +55,22 @@ export default function OpengraphImage() {
           <span>โดยไม่ต้องแย่งกันคุมแชท</span>
         </div>
 
-        <div style={{ display: 'flex', marginTop: 26, fontSize: 28, color: '#6B5B4E' }}>
+        <div style={{ display: 'flex', marginTop: 26, fontSize: 28, color: '#525252' }}>
           หาวันที่ทุกคนว่าง · ให้ AI ร่างแพลน · หารเงินกันจบในที่เดียว
         </div>
 
+        {/* Six bars, one per feature, in the order a user meets them: dates,
+            wishlist, plan, money, journal, notes. This is §2.5's "legend
+            listing all features" exception, and it is the whole v3 idea in one
+            row — the card says "this product is six colour-coded rooms" before
+            anyone has clicked the link.
+
+            The LIGHT halves, not the solids: a 110px bar is a large area by
+            §2.3's reckoning, and six saturated bars would out-shout the
+            headline above them. */}
         <div style={{ display: 'flex', gap: 12, marginTop: 40 }}>
-          {['#D9714E', '#8BC99A', '#A8D4F0', '#F0E06B', '#C4B8E8'].map((color) => (
-            <div key={color} style={{ width: 96, height: 14, borderRadius: 999, background: color }} />
+          {['#FFF08E', '#FFC7ED', '#B4F3FF', '#FFC799', '#BDFFAA', '#DCC0FF'].map((color) => (
+            <div key={color} style={{ width: 110, height: 14, borderRadius: 999, background: color }} />
           ))}
         </div>
       </div>

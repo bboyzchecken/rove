@@ -48,9 +48,9 @@ export function PollBoard({ tripId }: { tripId: string }) {
       </div>
 
       {polls.length === 0 ? (
-        <Card accent="sun" className="p-5 text-center">
-          <BarChart3 className="text-espresso mx-auto size-7" strokeWidth={2} />
-          <p className="text-espresso mt-2 text-sm font-semibold">ยังไม่มีโพลในทริปนี้</p>
+        <Card accent="gray" className="p-5 text-center">
+          <BarChart3 className="text-ink mx-auto size-7" strokeWidth={2} />
+          <p className="text-ink mt-2 text-sm font-medium">ยังไม่มีโพลในทริปนี้</p>
           <p className="text-muted mx-auto mt-1 max-w-xs text-xs leading-relaxed">
             เถียงกันในแชทแล้วไม่จบสักที? ตั้งเป็นโพลให้ทุกคนกดเลือก แล้วค่อยปิดเมื่อได้ข้อสรุป
           </p>
@@ -97,10 +97,10 @@ function PollCard({
   const leader = Math.max(...poll.options.map((o) => o.votes), 0);
 
   return (
-    <Card accent={poll.closed ? 'none' : 'sky'} className="p-4">
+    <Card accent={poll.closed ? 'gray' : 'feature'} className="p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-espresso text-sm font-extrabold">{poll.question}</p>
+          <p className="text-ink text-sm font-medium">{poll.question}</p>
           <p className="text-muted mt-0.5 text-[11px]">
             {poll.closed ? 'ปิดแล้ว · ' : ''}
             ตอบแล้ว {poll.answered}/{members.length} คน
@@ -114,7 +114,7 @@ function PollCard({
                 onClick={() => close.mutate(poll.id)}
                 disabled={close.isPending}
                 aria-label="ปิดโพลนี้"
-                className="text-muted hover:text-espresso"
+                className="text-muted hover:text-ink"
               >
                 <Lock className="size-3.5" />
               </button>
@@ -123,7 +123,7 @@ function PollCard({
               onClick={() => remove.mutate(poll.id)}
               disabled={remove.isPending}
               aria-label="ลบโพลนี้"
-              className="text-muted hover:text-espresso"
+              className="text-muted hover:text-ink"
             >
               <Trash2 className="size-3.5" />
             </button>
@@ -154,7 +154,7 @@ function PollCard({
                 <span
                   className={cn(
                     'flex size-4 shrink-0 items-center justify-center rounded-full border',
-                    chosen ? 'bg-espresso border-espresso' : 'border-field-border',
+                    chosen ? 'bg-ink border-ink' : 'border-field-border',
                   )}
                 >
                   {chosen ? <Check className="text-bg size-2.5" strokeWidth={4} /> : null}
@@ -162,8 +162,8 @@ function PollCard({
 
                 <span
                   className={cn(
-                    'text-espresso min-w-0 flex-1 truncate text-sm',
-                    winning && 'font-bold',
+                    'text-ink min-w-0 flex-1 truncate text-sm',
+                    winning && 'font-medium',
                   )}
                 >
                   {option.label}
@@ -180,7 +180,7 @@ function PollCard({
                 ))}
               </span>
 
-              <Progress value={share} tone={winning ? 'espresso' : 'primary'} className="mt-1.5" />
+              <Progress value={share} tone={winning ? 'ink' : 'feature'} className="mt-1.5" />
             </button>
           );
         })}
@@ -238,7 +238,7 @@ function PollComposer({ tripId, onClose }: { tripId: string; onClose: () => void
         </Field>
 
         <div>
-          <p className="text-muted mb-1.5 text-[11px] font-semibold">ตัวเลือก</p>
+          <p className="text-muted mb-1.5 text-[11px] font-medium">ตัวเลือก</p>
           <div className="space-y-2">
             {options.map((option, index) => (
               <div key={index} className="flex items-center gap-2">
@@ -251,7 +251,7 @@ function PollComposer({ tripId, onClose }: { tripId: string; onClose: () => void
                   <button
                     onClick={() => setOptions((current) => current.filter((_, i) => i !== index))}
                     aria-label={`เอาตัวเลือกที่ ${index + 1} ออก`}
-                    className="text-muted hover:text-espresso shrink-0"
+                    className="text-muted hover:text-ink shrink-0"
                   >
                     <X className="size-4" />
                   </button>
@@ -263,7 +263,7 @@ function PollComposer({ tripId, onClose }: { tripId: string; onClose: () => void
           {options.length < 6 ? (
             <button
               onClick={() => setOptions((current) => [...current, ''])}
-              className="text-muted hover:text-espresso mt-2 flex items-center gap-1 text-xs font-semibold"
+              className="text-muted hover:text-ink mt-2 flex items-center gap-1 text-xs font-medium"
             >
               <Plus className="size-3.5" />
               เพิ่มตัวเลือก

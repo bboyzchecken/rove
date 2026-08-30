@@ -48,13 +48,13 @@ export function InboxBell({ className }: { className?: string }) {
         onClick={() => setOpen(true)}
         aria-label={unread > 0 ? `การแจ้งเตือน ${unread} รายการที่ยังไม่ได้อ่าน` : 'การแจ้งเตือน'}
         className={cn(
-          'text-espresso hover:bg-surface relative flex size-9 items-center justify-center rounded-full transition',
+          'text-ink hover:bg-surface relative flex size-9 items-center justify-center rounded-full transition',
           className,
         )}
       >
         <Bell className="size-4.5" strokeWidth={2.5} />
         {unread > 0 ? (
-          <span className="bg-primary text-primary-fg nums absolute top-0.5 right-0.5 flex min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold">
+          <span className="bg-primary text-primary-fg nums absolute top-0.5 right-0.5 flex min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-medium">
             {unread > 9 ? '9+' : unread}
           </span>
         ) : null}
@@ -71,7 +71,7 @@ export function InboxBell({ className }: { className?: string }) {
             <button
               onClick={() => markRead.mutate(undefined)}
               disabled={markRead.isPending}
-              className="text-muted hover:text-espresso mb-3 flex items-center gap-1.5 text-xs font-semibold"
+              className="text-muted hover:text-ink mb-3 flex items-center gap-1.5 text-xs font-medium"
             >
               <CheckCheck className="size-3.5" />
               อ่านทั้งหมด
@@ -80,7 +80,7 @@ export function InboxBell({ className }: { className?: string }) {
 
           {(inbox?.items ?? []).length === 0 ? (
             <Card className="p-6 text-center">
-              <p className="text-espresso text-sm font-semibold">ยังไม่มีอะไรถึงคุณ</p>
+              <p className="text-ink text-sm font-medium">ยังไม่มีอะไรถึงคุณ</p>
               <p className="text-muted mt-1 text-xs leading-relaxed">
                 เวลามีคนทัก @ชื่อคุณ หรือเปิดโพลใหม่ จะมาโผล่ตรงนี้
               </p>
@@ -116,14 +116,14 @@ function NotificationRow({
 
   const body = (
     <Card
-      accent={notification.read ? 'none' : 'sky'}
+      accent={notification.read ? 'none' : 'feature'}
       className="flex items-start gap-3 p-3 text-left"
     >
       <span className="bg-bg/70 flex size-8 shrink-0 items-center justify-center rounded-full">
-        <Icon className="text-espresso size-4" strokeWidth={2.5} />
+        <Icon className="text-ink size-4" strokeWidth={2.5} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="text-espresso block text-xs font-semibold">{notification.title}</span>
+        <span className="text-ink block text-xs font-medium">{notification.title}</span>
         {notification.body ? (
           <span className="text-muted mt-0.5 block line-clamp-2 text-[11px] leading-relaxed">
             {notification.body}

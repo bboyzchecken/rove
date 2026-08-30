@@ -33,13 +33,13 @@ import { cn } from '@/lib/utils';
  */
 const CATEGORY_META: Record<
   PrepCategory,
-  { label: string; tone: 'primary' | 'sky' | 'matcha' | 'sun' | 'joyfull' | 'neutral' }
+  { label: string; tone: 'feature' | 'neutral' }
 > = {
-  document: { label: 'เอกสาร', tone: 'primary' },
-  packing: { label: 'ของที่ต้องเอาไป', tone: 'sky' },
-  booking: { label: 'ต้องจอง', tone: 'matcha' },
-  money: { label: 'เรื่องเงิน', tone: 'sun' },
-  health: { label: 'สุขภาพ', tone: 'joyfull' },
+  document: { label: 'เอกสาร', tone: 'feature' },
+  packing: { label: 'ของที่ต้องเอาไป', tone: 'feature' },
+  booking: { label: 'ต้องจอง', tone: 'feature' },
+  money: { label: 'เรื่องเงิน', tone: 'feature' },
+  health: { label: 'สุขภาพ', tone: 'feature' },
   other: { label: 'อื่นๆ', tone: 'neutral' },
 };
 
@@ -82,14 +82,14 @@ export function PrepScreen({ tripId }: { tripId: string }) {
         </>
       ) : (
         <>
-          <Card accent="matcha" className="p-4">
+          <Card accent="feature" className="p-4">
             <div className="mb-2 flex items-center justify-between">
-              <p className="font-display text-espresso font-bold">เตรียมตัวไปแล้ว</p>
-              <span className="text-muted nums text-xs font-semibold">
+              <p className="font-display text-ink font-medium">เตรียมตัวไปแล้ว</p>
+              <span className="text-muted nums text-xs font-medium">
                 {done}/{tasks.length}
               </span>
             </div>
-            <Progress value={tasks.length === 0 ? 0 : done / tasks.length} tone="espresso" />
+            <Progress value={tasks.length === 0 ? 0 : done / tasks.length} tone="ink" />
             <p className="text-muted mt-2 text-xs">
               {done === tasks.length
                 ? 'ครบแล้วทุกข้อ — พร้อมบินได้เลย'
@@ -118,7 +118,7 @@ export function PrepScreen({ tripId }: { tripId: string }) {
               action={
                 <button
                   onClick={() => applyTemplate.mutate()}
-                  className="text-primary text-xs font-semibold"
+                  className="text-primary text-xs font-medium"
                 >
                   เติมรายการมาตรฐาน
                 </button>
@@ -135,7 +135,7 @@ export function PrepScreen({ tripId }: { tripId: string }) {
                       className={cn(
                         'flex size-6 shrink-0 items-center justify-center rounded-full transition',
                         task.done
-                          ? 'bg-espresso text-bg'
+                          ? 'bg-ink text-bg'
                           : 'border-muted/30 border-2 border-dashed',
                       )}
                     >
@@ -146,7 +146,7 @@ export function PrepScreen({ tripId }: { tripId: string }) {
                       <p
                         className={cn(
                           'text-sm',
-                          task.done ? 'text-muted line-through' : 'text-espresso font-medium',
+                          task.done ? 'text-muted line-through' : 'text-ink font-medium',
                         )}
                       >
                         {task.title}
@@ -216,7 +216,7 @@ function PrepNoteBlock({ tripId }: { tripId: string }) {
                 await saveNote.mutateAsync(value);
                 setDraft(null);
               }}
-              className="text-primary text-xs font-semibold"
+              className="text-primary text-xs font-medium"
             >
               {saveNote.isPending ? 'กำลังบันทึก…' : 'บันทึก'}
             </button>
@@ -292,8 +292,8 @@ function AddPrepSheet({
                 key={option}
                 onClick={() => setCategory(option)}
                 className={cn(
-                  'rounded-full px-3 py-1.5 text-xs font-semibold transition',
-                  category === option ? 'bg-espresso text-bg' : 'bg-surface text-muted',
+                  'rounded-full px-3 py-1.5 text-xs font-medium transition',
+                  category === option ? 'bg-ink text-bg' : 'bg-surface text-muted',
                 )}
               >
                 {CATEGORY_META[option].label}
@@ -308,8 +308,8 @@ function AddPrepSheet({
             <button
               onClick={() => setAssigneeId(null)}
               className={cn(
-                'rounded-full px-3 py-1.5 text-xs font-semibold transition',
-                assigneeId === null ? 'bg-espresso text-bg' : 'bg-surface text-muted',
+                'rounded-full px-3 py-1.5 text-xs font-medium transition',
+                assigneeId === null ? 'bg-ink text-bg' : 'bg-surface text-muted',
               )}
             >
               ทั้งกลุ่ม
@@ -319,8 +319,8 @@ function AddPrepSheet({
                 key={member.id}
                 onClick={() => setAssigneeId(member.id)}
                 className={cn(
-                  'flex items-center gap-1.5 rounded-full py-1 pr-3 pl-1 text-xs font-semibold transition',
-                  assigneeId === member.id ? 'bg-espresso text-bg' : 'bg-surface text-muted',
+                  'flex items-center gap-1.5 rounded-full py-1 pr-3 pl-1 text-xs font-medium transition',
+                  assigneeId === member.id ? 'bg-ink text-bg' : 'bg-surface text-muted',
                 )}
               >
                 <CharacterAvatar characterId={member.characterId} size="xs" />
@@ -347,8 +347,8 @@ function FilterChip({
     <button
       onClick={onClick}
       className={cn(
-        'shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition',
-        active ? 'bg-espresso text-bg' : 'bg-surface text-muted hover:bg-border',
+        'shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition',
+        active ? 'bg-ink text-bg' : 'bg-surface text-muted hover:bg-border',
       )}
     >
       {children}

@@ -685,22 +685,22 @@ export const BUDGET: BudgetLine[] = [
   {
     category: 'ที่พัก',
     icon: '🏠',
-    accent: 'joyfull',
+    accent: 'pink',
     totalJpy: 268_000,
     perPersonJpy: 67_000,
     prepaid: true,
   },
-  { category: 'เดินทาง', icon: '🚄', accent: 'sky', totalJpy: 112_000, perPersonJpy: 28_000 },
+  { category: 'เดินทาง', icon: '🚄', accent: 'blue', totalJpy: 112_000, perPersonJpy: 28_000 },
   { category: 'อาหาร', icon: '🍜', accent: 'primary', totalJpy: 152_000, perPersonJpy: 38_000 },
   {
     category: 'ตั๋ว/กิจกรรม',
     icon: '🎟️',
-    accent: 'matcha',
+    accent: 'green',
     totalJpy: 68_400,
     perPersonJpy: 17_100,
   },
-  { category: 'ช้อปปิ้ง', icon: '🛍️', accent: 'sun', totalJpy: 80_000, perPersonJpy: 20_000 },
-  { category: 'อื่นๆ', icon: '✨', accent: 'joyfull', totalJpy: 24_000, perPersonJpy: 6_000 },
+  { category: 'ช้อปปิ้ง', icon: '🛍️', accent: 'yellow', totalJpy: 80_000, perPersonJpy: 20_000 },
+  { category: 'อื่นๆ', icon: '✨', accent: 'pink', totalJpy: 24_000, perPersonJpy: 6_000 },
 ];
 
 /** Items that still have no cost — W7.2 highlights these. */

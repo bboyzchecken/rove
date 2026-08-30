@@ -60,7 +60,7 @@ export function PublicTripView({
     return (
       <BrowseShell signedIn={signedIn} width="focused" center>
         <div className="py-16 text-center">
-          <h1 className="font-display text-espresso text-xl font-extrabold">ไม่พบแพลนนี้</h1>
+          <h1 className="font-display text-ink text-xl font-medium">ไม่พบแพลนนี้</h1>
           <p className="text-muted mt-2 text-sm">ลิงก์อาจถูกปิดหรือสร้างใหม่ไปแล้ว</p>
           <ButtonLink href="/explore" className="mt-5">
             ไปหน้าสำรวจ
@@ -103,7 +103,7 @@ export function PublicTripView({
 
       <div className="mt-3 flex items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight">
+          <h1 className="font-display text-ink text-2xl font-medium tracking-tight">
             {trip.title}
           </h1>
           <p className="text-muted mt-0.5 text-sm">
@@ -124,14 +124,14 @@ export function PublicTripView({
           >
             <CharacterAvatar characterId={creator.characterId} size="xs" />
             <span className="text-muted text-xs">
-              โดย <span className="text-espresso font-semibold">{creator.name}</span>
+              โดย <span className="text-ink font-medium">{creator.name}</span>
             </span>
           </Link>
         ) : (
           <span className="flex items-center gap-2">
             <CharacterAvatar characterId={creator.characterId} size="xs" />
             <span className="text-muted text-xs">
-              โดย <span className="text-espresso font-semibold">{creator.name}</span>
+              โดย <span className="text-ink font-medium">{creator.name}</span>
             </span>
           </span>
         )}
@@ -149,9 +149,9 @@ export function PublicTripView({
       </div>
 
       {perPersonJpy > 0 ? (
-        <Card accent="primary" className="mt-4 p-4">
+        <Card accent="gray" className="mt-4 p-4">
           <p className="text-muted text-xs">ค่าใช้จ่ายโดยประมาณต่อคน (เฉพาะที่อยู่ในแพลน)</p>
-          <p className="font-display text-espresso nums mt-1 text-2xl font-extrabold">
+          <p className="font-display text-ink nums mt-1 text-2xl font-medium">
             {formatMoney(Math.round(perPersonJpy * trip.fxRate), 'THB')}
           </p>
         </Card>
@@ -185,11 +185,11 @@ export function PublicTripView({
                 const Icon = item.travel ? TRAVEL_ICON[item.travel.mode] : null;
                 return (
                   <div key={item.id} className="flex gap-3 p-3.5">
-                    <span className="text-espresso nums w-12 shrink-0 text-xs font-medium">
+                    <span className="text-ink nums w-12 shrink-0 text-xs font-medium">
                       {item.start}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="text-espresso text-sm font-semibold">{item.title}</p>
+                      <p className="text-ink text-sm font-medium">{item.title}</p>
                       {item.area ? (
                         <p className="text-muted mt-0.5 text-[11px]">{item.area}</p>
                       ) : null}
@@ -217,8 +217,8 @@ export function PublicTripView({
         ค่าใช้จ่ายจริงและยอดที่หารกันในกลุ่มไม่ถูกแชร์ในลิงก์นี้
       </p>
 
-      <Card accent="sun" className="mt-4 p-4">
-        <p className="text-espresso text-sm font-semibold">อยากไปตามแพลนนี้ไหม</p>
+      <Card accent="gray" className="mt-4 p-4">
+        <p className="text-ink text-sm font-medium">อยากไปตามแพลนนี้ไหม</p>
         <p className="text-muted mt-1 text-xs leading-relaxed">
           ก๊อปทั้งทริปไปเป็นของตัวเอง — แก้วัน เพิ่มเพื่อน ปรับที่เที่ยวต่อได้เลย
           และเจ้าของแพลนได้แต้มเป็นกำลังใจ

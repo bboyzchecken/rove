@@ -23,10 +23,10 @@ import { cn } from '@/lib/utils';
  * actually in the plan?", which is what starts group arguments. Everyone may
  * add to their own list; only the owner deletes someone else's.
  */
-const KIND_META: Record<WishKind, { label: string; tone: 'primary' | 'sky' | 'neutral' }> = {
-  must: { label: 'ต้องไป', tone: 'primary' },
-  nice: { label: 'ไปได้ก็ดี', tone: 'sky' },
-  avoid: { label: 'ไม่เอา', tone: 'neutral' },
+const KIND_META: Record<WishKind, { label: string; tone: 'active' | 'feature' | 'outline' }> = {
+  must: { label: 'ต้องไป', tone: 'active' },
+  nice: { label: 'ไปได้ก็ดี', tone: 'feature' },
+  avoid: { label: 'ไม่เอา', tone: 'outline' },
 };
 
 const COVERAGE_META: Record<
@@ -109,7 +109,7 @@ export function WishlistBoard({ tripId }: { tripId: string }) {
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span
                       className={cn(
-                        'text-espresso text-sm font-semibold',
+                        'text-ink text-sm font-medium',
                         item.kind === 'avoid' && 'text-muted line-through',
                       )}
                     >
@@ -132,7 +132,7 @@ export function WishlistBoard({ tripId }: { tripId: string }) {
 
                   <div
                     className={cn(
-                      'mt-2 flex items-center gap-1.5 text-[11px] font-semibold',
+                      'mt-2 flex items-center gap-1.5 text-[11px] font-medium',
                       cov.className,
                     )}
                   >
@@ -245,8 +245,8 @@ function AddWishDialog({
                 key={option}
                 onClick={() => setKind(option)}
                 className={cn(
-                  'flex-1 rounded-full px-3 py-2 text-xs font-semibold transition',
-                  kind === option ? 'bg-espresso text-bg' : 'bg-surface text-muted',
+                  'flex-1 rounded-full px-3 py-2 text-xs font-medium transition',
+                  kind === option ? 'bg-ink text-bg' : 'bg-surface text-muted',
                 )}
               >
                 {KIND_META[option].label}
@@ -291,8 +291,8 @@ function FilterChip({
     <button
       onClick={onClick}
       className={cn(
-        'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition',
-        active ? 'bg-espresso text-bg' : 'bg-surface text-muted hover:bg-border',
+        'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition',
+        active ? 'bg-ink text-bg' : 'bg-surface text-muted hover:bg-border',
       )}
     >
       {children}

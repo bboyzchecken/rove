@@ -57,8 +57,8 @@ export function ItemComments({
             <div className="flex items-start gap-2">
               <CharacterAvatar characterId={who?.characterId ?? 'shiba'} size="xs" />
               <div className="min-w-0 flex-1">
-                <p className="text-espresso text-[11px] font-semibold">{who?.name ?? 'สมาชิก'}</p>
-                <p className="text-espresso text-xs leading-relaxed">{comment.body}</p>
+                <p className="text-ink text-[11px] font-medium">{who?.name ?? 'สมาชิก'}</p>
+                <p className="text-ink text-xs leading-relaxed">{comment.body}</p>
               </div>
               <button
                 aria-label={comment.resolved ? 'เปิดใหม่' : 'จบเรื่องนี้'}

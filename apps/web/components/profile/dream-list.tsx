@@ -19,7 +19,7 @@ import type { DreamItem } from '@/lib/data';
  * exists. The "เริ่มแพลนทริปนี้" button is the bridge into the entry flow, and
  * it carries the destination across so the city chip is already filled in.
  */
-const ACCENTS: DreamItem['accent'][] = ['primary', 'matcha', 'sky', 'sun', 'joyfull'];
+const ACCENTS: DreamItem['accent'][] = ['primary', 'green', 'blue', 'yellow', 'pink'];
 
 export function DreamList() {
   const router = useRouter();
@@ -40,10 +40,10 @@ export function DreamList() {
       ) : null}
 
       {dreams.map((dream) => (
-        <Card key={dream.id} accent={dream.accent} className="p-4">
+        <Card key={dream.id} accent="feature" className="p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-espresso text-sm font-semibold">{dream.title}</p>
+              <p className="text-ink text-sm font-medium">{dream.title}</p>
               <p className="text-muted mt-0.5 text-[11px]">{dream.destination}</p>
               {dream.note ? (
                 <p className="text-muted mt-1.5 text-xs leading-relaxed">{dream.note}</p>

@@ -43,7 +43,7 @@ export function PointsScreen() {
   return (
     <div className="space-y-7 px-4 py-5">
       <header>
-        <h1 className="font-display text-espresso text-2xl font-extrabold tracking-tight">
+        <h1 className="font-display text-ink text-2xl font-medium tracking-tight">
           ประวัติแต้ม
         </h1>
         <p className="text-muted mt-1 text-sm">แต้มทุกแต้มมาจากไหน และถูกใช้ไปกับอะไร</p>
@@ -57,7 +57,7 @@ export function PointsScreen() {
           title="ยังไม่มีรายการแต้ม"
           hint="เปิดทริปเป็นสาธารณะหรือชวนเพื่อนเข้าทริปแรก แล้วแต้มแรกจะมาโผล่ที่นี่"
           action={
-            <ButtonLink href="/trips" variant="espresso" size="sm">
+            <ButtonLink href="/trips" variant="primary" size="sm">
               ไปที่ทริปของฉัน
             </ButtonLink>
           }
@@ -67,7 +67,7 @@ export function PointsScreen() {
           {/* summary ---------------------------------------------------- */}
           <section>
             <SectionHeader label="สรุป" />
-            <Card accent="sun" className="p-5">
+            <Card accent="feature" className="p-5">
               <div className="grid grid-cols-3 gap-3 text-center">
                 <Figure label="ได้มาทั้งหมด" value={ledger.earned} tone="earn" />
                 <Figure label="ใช้ไปแล้ว" value={-spent} />
@@ -128,14 +128,14 @@ function LedgerRow({ entry }: { entry: PointsEntry }) {
       <span
         className={cn(
           'flex size-9 shrink-0 items-center justify-center rounded-full',
-          earned ? 'bg-matcha/40' : 'bg-surface',
+          earned ? 'bg-feature' : 'bg-surface',
         )}
       >
-        <Icon className="text-espresso size-4" strokeWidth={2.2} />
+        <Icon className="text-ink size-4" strokeWidth={2.2} />
       </span>
 
       <span className="min-w-0 flex-1">
-        <span className="text-espresso block text-sm font-semibold">{label}</span>
+        <span className="text-ink block text-sm font-medium">{label}</span>
         <span className="text-muted block truncate text-[11px]">
           {formatThaiDate(entry.occurredAt, { day: 'numeric', month: 'short', year: 'numeric' })}
           {entry.tripTitle ? ` · ${entry.tripTitle}` : ''}
@@ -143,7 +143,7 @@ function LedgerRow({ entry }: { entry: PointsEntry }) {
         </span>
       </span>
 
-      <span className={cn('nums shrink-0 text-sm font-bold', earned ? 'text-success' : 'text-muted')}>
+      <span className={cn('nums shrink-0 text-sm font-medium', earned ? 'text-success' : 'text-muted')}>
         {earned ? '+' : '−'}
         {Math.abs(entry.delta).toLocaleString('th-TH')}
       </span>
@@ -198,8 +198,8 @@ function Figure({ label, value, tone }: { label: string; value: number; tone?: '
       <p className="text-muted text-[11px]">{label}</p>
       <p
         className={cn(
-          'font-display nums mt-1 text-xl font-extrabold',
-          tone === 'earn' ? 'text-success' : 'text-espresso',
+          'font-display nums mt-1 text-xl font-medium',
+          tone === 'earn' ? 'text-success' : 'text-ink',
         )}
       >
         {value === 0 ? '0' : `${value > 0 ? '' : '−'}${Math.abs(value).toLocaleString('th-TH')}`}

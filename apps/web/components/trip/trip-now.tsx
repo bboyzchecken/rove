@@ -71,7 +71,7 @@ export function TripNowScreen({ tripId }: { tripId: string }) {
       <div className="flex items-center justify-between gap-3">
         <Link
           href={`/t/${tripId}` as never}
-          className="text-muted hover:text-espresso flex items-center gap-1 text-sm transition"
+          className="text-muted hover:text-ink flex items-center gap-1 text-sm transition"
         >
           <ChevronLeft className="size-4" />
           ห้องทริป
@@ -79,7 +79,7 @@ export function TripNowScreen({ tripId }: { tripId: string }) {
         <Badge tone="outline">โหมดวันเดินทาง</Badge>
       </div>
 
-      <h1 className="font-display text-espresso mt-3 text-xl font-extrabold tracking-tight">
+      <h1 className="font-display text-ink mt-3 text-xl font-medium tracking-tight">
         {frame.title}
       </h1>
 
@@ -100,15 +100,15 @@ export function TripNowScreen({ tripId }: { tripId: string }) {
           </p>
 
           {upcoming?.now ? (
-            <NowCard item={upcoming.now} label="ตอนนี้" accent="primary" />
+            <NowCard item={upcoming.now} label="ตอนนี้" accent="feature" />
           ) : null}
           {upcoming?.next ? (
-            <NowCard item={upcoming.next} label="ต่อไป" accent="matcha" />
+            <NowCard item={upcoming.next} label="ต่อไป" accent="gray" />
           ) : null}
 
           {upcoming && upcoming.rest.length > 0 ? (
             <section className="mt-5">
-              <p className="text-muted mb-1.5 text-xs font-semibold">ที่เหลือของวันนี้</p>
+              <p className="text-muted mb-1.5 text-xs font-medium">ที่เหลือของวันนี้</p>
               <Card className="divide-border divide-y">
                 {upcoming.rest.map((item) => (
                   <RestLine key={item.id} item={item} city={current.city} />
@@ -119,7 +119,7 @@ export function TripNowScreen({ tripId }: { tripId: string }) {
 
           {!upcoming?.now && !upcoming?.next && upcoming?.rest.length === 0 ? (
             <Card className="mt-4 p-5 text-center">
-              <p className="text-espresso text-sm font-semibold">วันนี้จบแล้ว</p>
+              <p className="text-ink text-sm font-medium">วันนี้จบแล้ว</p>
               <p className="text-muted mt-1 text-xs">พักผ่อนก่อน แล้วพรุ่งนี้ค่อยว่ากัน</p>
             </Card>
           ) : null}
@@ -148,12 +148,12 @@ function NowCard({
 }: {
   item: PlanItem;
   label: string;
-  accent: 'primary' | 'matcha';
+  accent: 'feature' | 'gray';
 }) {
   return (
     <Card accent={accent} className="mt-4 p-4">
-      <p className="text-muted text-xs font-semibold">{label}</p>
-      <p className="font-display text-espresso mt-1 text-lg font-extrabold">{item.title}</p>
+      <p className="text-muted text-xs font-medium">{label}</p>
+      <p className="font-display text-ink mt-1 text-lg font-medium">{item.title}</p>
       <p className="text-muted nums mt-0.5 text-sm">
         {item.start}
         {item.end ? `–${item.end}` : ''}
@@ -168,9 +168,9 @@ function NowCard({
 function RestLine({ item, city }: { item: PlanItem; city: string }) {
   return (
     <div className="flex items-center gap-3 p-3.5">
-      <span className="text-espresso nums w-12 shrink-0 text-xs font-medium">{item.start}</span>
+      <span className="text-ink nums w-12 shrink-0 text-xs font-medium">{item.start}</span>
       <div className="min-w-0 flex-1">
-        <p className="text-espresso truncate text-sm font-semibold">{item.title}</p>
+        <p className="text-ink truncate text-sm font-medium">{item.title}</p>
         {item.area ? <p className="text-muted truncate text-[11px]">{item.area}</p> : null}
       </div>
       <NavigateLink item={item} city={city} compact />
@@ -206,7 +206,7 @@ function NavigateLink({
         target="_blank"
         rel="noopener noreferrer"
         aria-label={`นำทางไป ${item.title}`}
-        className="text-muted hover:text-espresso hover:bg-surface shrink-0 rounded-full p-2 transition"
+        className="text-muted hover:text-ink hover:bg-surface shrink-0 rounded-full p-2 transition"
       >
         <Navigation className="size-4" />
       </a>
@@ -219,7 +219,7 @@ function NavigateLink({
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        'bg-espresso text-bg inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold transition hover:opacity-90',
+        'bg-ink text-bg inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium transition hover:opacity-90',
         className,
       )}
     >
@@ -251,7 +251,7 @@ function BeforeOrAfter({
 
     return (
       <Card className="mt-4 p-5">
-        <p className="text-espresso text-sm font-semibold">อีก {days} วันก็ได้ไปแล้ว</p>
+        <p className="text-ink text-sm font-medium">อีก {days} วันก็ได้ไปแล้ว</p>
         <p className="text-muted mt-1 text-xs">
           โหมดนี้จะเริ่มทำงานเองในวันแรกของทริป — เปิดค้างไว้ได้เลย
         </p>
@@ -263,7 +263,7 @@ function BeforeOrAfter({
             </p>
             <ul className="mt-1.5 space-y-1">
               {first.items.slice(0, 3).map((item) => (
-                <li key={item.id} className="text-espresso nums text-xs">
+                <li key={item.id} className="text-ink nums text-xs">
                   {item.start} {item.title}
                 </li>
               ))}
@@ -276,7 +276,7 @@ function BeforeOrAfter({
 
   return (
     <Card className="mt-4 p-5 text-center">
-      <p className="text-espresso text-sm font-semibold">ทริปนี้จบแล้ว</p>
+      <p className="text-ink text-sm font-medium">ทริปนี้จบแล้ว</p>
       <p className="text-muted mt-1 text-xs">ไปดูบันทึกทริปกันดีกว่า</p>
       <ButtonLink href={`/recap/${tripId}` as never} size="sm" className="mt-3">
         เปิดบันทึกทริป

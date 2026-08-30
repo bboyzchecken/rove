@@ -21,7 +21,7 @@ export default function MaintenancePage() {
     <StatusPage
       image="/brand/status/status-maintenance.webp"
       code="503"
-      tone="sun"
+      tone="warning"
       title="ปิดปรับปรุงแป๊บนึง"
       hint="กำลังอัปเดตระบบอยู่ ปกติใช้เวลาไม่เกิน 15 นาที — ทริป แพลน และรายจ่ายที่บันทึกไว้ยังอยู่ครบทุกอย่าง ไม่ต้องกรอกใหม่"
       actions={
