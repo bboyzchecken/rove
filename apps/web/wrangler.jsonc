@@ -1,0 +1,44 @@
+/**
+ * Cloudflare Worker that serves the UAT copy of the app at demo.rovetravel.site.
+ *
+ * Why a Worker and not Pages: Cloudflare Pages only serves a *static* Next
+ * export now, and this app is not one — 27 of its routes are server-rendered
+ * on demand and `proxy.ts` is a real middleware. Server-side Next on Cloudflare
+ * goes through the OpenNext adapter, which targets Workers.
+ *
+ * There is deliberately no production Worker here. The apex (rovetravel.site)
+ * is a static holding page in `apps/coming-soon`, deployed to Pages, so that it
+ * cannot be taken down by anything that goes wrong in this build.
+ *
+ * NOTE ON ENV VARS: nothing below sets a NEXT_PUBLIC_* value, and it would not
+ * work if it did — those are inlined by `next build`, long before this file is
+ * read. They belong in the build environment (Workers Builds → Settings →
+ * Build → Variables). `vars` here is for values read at *request* time only.
+ *
+ * The one that matters most, NEXT_PUBLIC_DATA_MODE, needs no setting at all:
+ * lib/data/mode.ts treats anything that is not the literal "live" as mock, so
+ * an unset variable is a mock build. Mock is what UAT wants and what a Worker
+ * with no API behind it can actually serve.
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "rove-uat",
+  "main": ".open-next/worker.js",
+
+  /* nodejs_compat gives the Worker the Node APIs Next expects.
+   * global_fetch_strictly_public makes fetch() to our own hostname go back out
+   * through the internet instead of short-circuiting inside the Worker, which
+   * is what Next assumes when a server component fetches its own route. */
+  "compatibility_date": "2025-09-23",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+
+  /* Logs in the dashboard. Without this a 500 in UAT is invisible. */
+  "observability": {
+    "enabled": true
+  }
+}

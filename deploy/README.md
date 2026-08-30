@@ -1,5 +1,28 @@
 # deploy/
 
+## Live right now: Cloudflare
+
+The AWS account is still waiting on approval, so the front end ships to
+Cloudflare in the meantime — **[CLOUDFLARE.md](CLOUDFLARE.md)**. No AWS, no
+database, no API, and nothing to pay:
+
+```
+      rovetravel.site  ─→ Pages   → branch `site`  (static holding page, no build)
+ demo.rovetravel.site  ─→ Workers → branch `uat`   (apps/web in mock mode)
+```
+
+`site` is an orphan branch — the holding page and nothing else, so an app commit
+never redeploys the front door and vice versa.
+
+That is a front end and only a front end. Nothing it serves is saved anywhere
+except in the visitor's own browser. Everything below is still where production
+is going, and the DNS move Cloudflare needs is the one AWS_DEPLOY.md asks for
+anyway.
+
+---
+
+## Where production is going: AWS
+
 Production runs on **AWS ECS Fargate behind an ALB, with autoscaling** —
 provisioned by Terraform, deployed by GitHub Actions.
 
