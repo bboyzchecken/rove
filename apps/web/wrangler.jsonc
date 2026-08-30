@@ -1,14 +1,27 @@
 /**
- * Cloudflare Worker that serves the UAT copy of the app at demo.rovetravel.site.
+ * Cloudflare Worker for the DOODLE half of the brand comparison.
+ *
+ * This file is the only thing that differs between `uat` and `uat-doodle`, and
+ * the only thing that may differ: everything else on this branch is the brand
+ * work itself. The name has to be its own or the two Workers overwrite each
+ * other — `wrangler deploy` addresses a Worker by the name in here, not by
+ * which branch it was built from.
+ *
+ *   uat         → rove-uat          the current cozy terracotta brand
+ *   uat-doodle  → rove-uat-doodle   doodle v3, this branch
+ *
+ * Both run in mock mode, so the two can be opened side by side and judged on
+ * the same seeded trip. Neither is on main — the palette is still a live
+ * question and the point of this setup is to keep it one.
  *
  * Why a Worker and not Pages: Cloudflare Pages only serves a *static* Next
  * export now, and this app is not one — 27 of its routes are server-rendered
  * on demand and `proxy.ts` is a real middleware. Server-side Next on Cloudflare
  * goes through the OpenNext adapter, which targets Workers.
  *
- * There is deliberately no production Worker here. The apex (rovetravel.site)
- * is a static holding page in `apps/coming-soon`, deployed to Pages, so that it
- * cannot be taken down by anything that goes wrong in this build.
+ * The apex (rovetravel.site) is a static holding page on the orphan `site`
+ * branch, served by Pages, so that it cannot be taken down by anything that
+ * goes wrong in this build.
  *
  * NOTE ON ENV VARS: nothing below sets a NEXT_PUBLIC_* value, and it would not
  * work if it did — those are inlined by `next build`, long before this file is
@@ -22,7 +35,7 @@
  */
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "rove-uat",
+  "name": "rove-uat-doodle",
   "main": ".open-next/worker.js",
 
   /* nodejs_compat gives the Worker the Node APIs Next expects.
