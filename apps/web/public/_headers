@@ -1,0 +1,22 @@
+# Cache-Control for the assets Cloudflare serves straight off the edge, without
+# waking the Worker. Read by the ASSETS binding configured in wrangler.jsonc.
+#
+# This file is inert everywhere else — the docker/ECS builds serve `public/`
+# through Next, which ignores it — so it costs nothing to keep in the repo.
+
+# Everything under /_next/static is content-hashed by the build: a changed file
+# gets a changed name, so the old name can be cached forever and never checked.
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Brand art and character avatars are hand-named, so "forever" would strand a
+# fix behind whatever browsers had already cached. A day, revalidated after.
+/brand/*
+  Cache-Control: public, max-age=86400, must-revalidate
+/characters/*
+  Cache-Control: public, max-age=86400, must-revalidate
+
+# The service worker must never be served stale — a cached sw.js pins the app
+# to the version that installed it.
+/sw.js
+  Cache-Control: public, max-age=0, must-revalidate

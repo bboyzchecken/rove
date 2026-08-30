@@ -48,3 +48,8 @@ deploy/terraform/*.tfvars
 deploy/terraform/backend.hcl
 deploy/terraform/crash.log
 deploy/terraform/tfplan
+
+# cloudflare (OpenNext build output + wrangler local state)
+apps/web/.open-next/
+apps/web/.wrangler/
+apps/web/cloudflare-env.d.ts
