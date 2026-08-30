@@ -91,7 +91,7 @@ export function DocumentsScreen({ tripId }: { tripId: string }) {
       ) : null}
 
       {!isLoading && documents.length === 0 ? (
-        <Card accent="green" className="p-8 text-center">
+        <Card accent="feature" className="p-8 text-center">
           <FileText className="text-ink mx-auto size-8" strokeWidth={2} />
           <p className="text-ink mt-3 text-sm font-medium">ยังไม่มีเอกสารในทริปนี้</p>
           <p className="text-muted mx-auto mt-1 max-w-xs text-xs leading-relaxed">
@@ -263,7 +263,7 @@ function DocumentPreview({ doc, onClose }: { doc: TripDocument; onClose: () => v
           />
         </div>
       ) : (
-        <Card accent="blue" className="p-6 text-center">
+        <Card accent="gray" className="p-6 text-center">
           <FileText className="text-ink mx-auto size-8" strokeWidth={2} />
           <p className="text-ink mt-3 text-sm font-medium">
             {doc.contentType === 'application/pdf' ? 'ไฟล์ PDF' : 'ไฟล์เอกสาร'}

@@ -32,7 +32,7 @@ export function PlanScreen({ tripId }: { tripId: string }) {
   return (
     <div className="space-y-6">
       {frozen ? (
-        <Card accent="yellow" className="flex items-center gap-3 p-3.5">
+        <Card accent="gray" className="flex items-center gap-3 p-3.5">
           <Lock className="text-ink size-4 shrink-0" />
           <p className="text-ink flex-1 text-xs leading-relaxed">
             แพลนถูกสรุปแล้ว — ไทม์ไลน์ล็อกอยู่จนกว่าเจ้าของทริปจะปลดล็อกที่หน้าเทียบแพลน

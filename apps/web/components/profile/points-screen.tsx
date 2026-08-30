@@ -57,7 +57,7 @@ export function PointsScreen() {
           title="ยังไม่มีรายการแต้ม"
           hint="เปิดทริปเป็นสาธารณะหรือชวนเพื่อนเข้าทริปแรก แล้วแต้มแรกจะมาโผล่ที่นี่"
           action={
-            <ButtonLink href="/trips" variant="ink" size="sm">
+            <ButtonLink href="/trips" variant="primary" size="sm">
               ไปที่ทริปของฉัน
             </ButtonLink>
           }
@@ -67,7 +67,7 @@ export function PointsScreen() {
           {/* summary ---------------------------------------------------- */}
           <section>
             <SectionHeader label="สรุป" />
-            <Card accent="yellow" className="p-5">
+            <Card accent="feature" className="p-5">
               <div className="grid grid-cols-3 gap-3 text-center">
                 <Figure label="ได้มาทั้งหมด" value={ledger.earned} tone="earn" />
                 <Figure label="ใช้ไปแล้ว" value={-spent} />
@@ -128,7 +128,7 @@ function LedgerRow({ entry }: { entry: PointsEntry }) {
       <span
         className={cn(
           'flex size-9 shrink-0 items-center justify-center rounded-full',
-          earned ? 'bg-green/40' : 'bg-surface',
+          earned ? 'bg-feature' : 'bg-surface',
         )}
       >
         <Icon className="text-ink size-4" strokeWidth={2.2} />

@@ -88,7 +88,7 @@ export function InviteScreen({ token }: { token: string }) {
         กดเข้าร่วมแล้วใส่วันว่างของตัวเอง — เดี๋ยว ROVE หาวันที่ทุกคนตรงกันให้เอง
       </p>
 
-      <Card accent="blue" className="mt-5 space-y-2.5 p-4">
+      <Card accent="gray" className="mt-5 space-y-2.5 p-4">
         <p className="text-ink flex items-center gap-2 text-sm">
           <Users className="size-4 shrink-0" /> เข้าห้องเดียวกับเพื่อนที่ชวนมา
         </p>

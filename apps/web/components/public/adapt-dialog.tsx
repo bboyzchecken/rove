@@ -164,7 +164,7 @@ function AdaptSummary({ diff }: { diff: AdaptDiff }) {
 }
 
 const CHANGE_META: Record<AdaptChange['kind'], { icon: typeof Plus; tone: string }> = {
-  day_added: { icon: CalendarPlus, tone: 'text-green' },
+  day_added: { icon: CalendarPlus, tone: 'text-success' },
   day_removed: { icon: Minus, tone: 'text-muted' },
   item_removed: { icon: Minus, tone: 'text-muted' },
   item_moved: { icon: Wand2, tone: 'text-primary' },

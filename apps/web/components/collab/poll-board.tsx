@@ -48,7 +48,7 @@ export function PollBoard({ tripId }: { tripId: string }) {
       </div>
 
       {polls.length === 0 ? (
-        <Card accent="yellow" className="p-5 text-center">
+        <Card accent="gray" className="p-5 text-center">
           <BarChart3 className="text-ink mx-auto size-7" strokeWidth={2} />
           <p className="text-ink mt-2 text-sm font-medium">ยังไม่มีโพลในทริปนี้</p>
           <p className="text-muted mx-auto mt-1 max-w-xs text-xs leading-relaxed">
@@ -97,7 +97,7 @@ function PollCard({
   const leader = Math.max(...poll.options.map((o) => o.votes), 0);
 
   return (
-    <Card accent={poll.closed ? 'none' : 'blue'} className="p-4">
+    <Card accent={poll.closed ? 'gray' : 'feature'} className="p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-ink text-sm font-medium">{poll.question}</p>
@@ -180,7 +180,7 @@ function PollCard({
                 ))}
               </span>
 
-              <Progress value={share} tone={winning ? 'ink' : 'primary'} className="mt-1.5" />
+              <Progress value={share} tone={winning ? 'ink' : 'feature'} className="mt-1.5" />
             </button>
           );
         })}

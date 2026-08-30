@@ -47,7 +47,7 @@ export function ReceiptView({ orderId }: { orderId: string }) {
       <div className="px-4 py-12 text-center">
         <p className="font-display text-ink text-lg font-medium">ไม่พบใบเสร็จนี้</p>
         <p className="text-muted mt-1 text-sm">ลิงก์อาจเก่าไป หรือเป็นใบเสร็จของบัญชีอื่น</p>
-        <ButtonLink href="/billing" size="sm" variant="ink" className="mt-4">
+        <ButtonLink href="/billing" size="sm" variant="primary" className="mt-4">
           กลับไปหน้าบิล
         </ButtonLink>
       </div>
@@ -179,7 +179,7 @@ export function ReceiptView({ orderId }: { orderId: string }) {
       </Card>
 
       {order.simulated ? (
-        <Card accent="yellow" className="p-4">
+        <Card accent="gray" className="p-4">
           <p className="text-ink text-xs leading-relaxed">
             รายการนี้ยังไม่มีการตัดเงินจริง — ROVE ยังไม่ได้เปิดระบบชำระเงิน
             บันทึกไว้เป็นประวัติเพื่อให้เห็นสิทธิ์ที่ได้รับเท่านั้น

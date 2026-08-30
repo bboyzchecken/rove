@@ -54,7 +54,7 @@ export function CreatorScreen({ handle, signedIn }: { handle: string; signedIn: 
         </ButtonLink>
       }
     >
-      <Card accent="pink" className="mt-6 p-5">
+      <Card accent="gray" className="mt-6 p-5">
         <div className="flex items-center gap-4">
           <CharacterAvatar characterId={creator.characterId} size="lg" />
           <div>
@@ -112,7 +112,7 @@ export function CreatorScreen({ handle, signedIn }: { handle: string; signedIn: 
         )}
       </section>
 
-      <Card accent="yellow" className="mt-6 p-4">
+      <Card accent="gray" className="mt-6 p-4">
         <p className="text-ink flex items-center gap-1.5 text-sm font-medium">
           <Sparkles className="size-4" />
           อยากมีหน้าแบบนี้ของตัวเองไหม

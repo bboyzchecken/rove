@@ -18,26 +18,42 @@
   --color-transparent: transparent;
   --color-current: currentColor;
 
-  /* --- Core palette (§2.1) --- */
-  --color-yellow: hsl(var(--brand-yellow));
-  --color-blue: hsl(var(--brand-blue));
-  --color-pink: hsl(var(--brand-pink));
-  --color-green: hsl(var(--brand-green));
-  --color-cream: hsl(var(--brand-cream));
+  /* --- §2.1 Neutrals --- */
   --color-ink: hsl(var(--brand-ink));
   --color-white: hsl(var(--brand-white));
-  /* Hero canvas only — see §2.2. Never a tag fill, never body text. */
-  --color-canvas: hsl(var(--brand-canvas));
+  --color-gray: hsl(var(--brand-gray));
 
-  /* --- Type on colour blocks (§2.2) --- */
-  --color-yellow-deep: hsl(var(--brand-yellow-deep));
-  --color-yellow-mid: hsl(var(--brand-yellow-mid));
-  --color-blue-deep: hsl(var(--brand-blue-deep));
-  --color-blue-mid: hsl(var(--brand-blue-mid));
-  --color-pink-deep: hsl(var(--brand-pink-deep));
-  --color-pink-mid: hsl(var(--brand-pink-mid));
-  --color-green-deep: hsl(var(--brand-green-deep));
-  --color-green-mid: hsl(var(--brand-green-mid));
+  /* --- §2.5 The active feature ------------------------------------------
+   * THE PAIR NEARLY EVERY COMPONENT SHOULD USE.
+   *
+   * `bg-feature` and `text-feature-solid` resolve against whatever
+   * `data-feature` is in scope, so one `Card` renders pink inside Wishlist
+   * and orange inside Documents without either screen naming a hue. That is
+   * §2.5 ("one feature colour per screen") enforced by the cascade instead of
+   * by code review.
+   *
+   * `-light` is for areas, `-solid` for small accents — §2.3, and the reason
+   * they are two tokens rather than one with an opacity modifier. */
+  --color-feature: hsl(var(--feature-light));
+  --color-feature-solid: hsl(var(--feature-solid));
+
+  /* --- §2.2 The six pairs, by name ---------------------------------------
+   * Reach for these ONLY where §2.5 permits several features at once: the
+   * trip dashboard where each feature is its own entry card, a legend, and
+   * the marketing hero's doodle overlay. Anywhere else, `bg-feature` is the
+   * correct answer and naming a hue here is the bug §2.5 describes. */
+  --color-blue-light: hsl(var(--brand-blue-light));
+  --color-blue-solid: hsl(var(--brand-blue-solid));
+  --color-pink-light: hsl(var(--brand-pink-light));
+  --color-pink-solid: hsl(var(--brand-pink-solid));
+  --color-yellow-light: hsl(var(--brand-yellow-light));
+  --color-yellow-solid: hsl(var(--brand-yellow-solid));
+  --color-green-light: hsl(var(--brand-green-light));
+  --color-green-solid: hsl(var(--brand-green-solid));
+  --color-orange-light: hsl(var(--brand-orange-light));
+  --color-orange-solid: hsl(var(--brand-orange-solid));
+  --color-purple-light: hsl(var(--brand-purple-light));
+  --color-purple-solid: hsl(var(--brand-purple-solid));
 
   /* --- Surfaces --- */
   --color-bg: hsl(var(--brand-bg));
@@ -112,15 +128,37 @@ label[for] {
 
 @layer components {
 
-/* §3.1 — the signature hero treatment. Lines nearly touch (0.98), the block
- * is short and ragged-right, and 700 is allowed here and nowhere else. The
- * caller breaks the lines by hand: ~10 characters each, so the headline reads
- * as a stack rather than a paragraph. */
+/* §3.1 — the signature hero treatment. A short, ragged-right block of tight
+ * lines, and 700 is allowed here and nowhere else. The caller breaks the lines
+ * by hand: ~10 characters each, so the headline reads as a stack rather than a
+ * paragraph.
+ *
+ * THE NUMBERS ARE THAI NUMBERS, NOT LATIN ONES. §3.1's 0.98/-0.03em describe
+ * a Latin grotesk, and this hero is set in IBM Plex Sans Thai — measured in
+ * the browser at 700, the face reports these ink extents per 1em:
+ *
+ *   วางแพลนเที่ยว   ascent 1.04   descent 0.02
+ *   กันทั้งกลุ่ม      ascent 1.11   descent 0.35   ← ั้ stacked over, ุ under
+ *
+ * So two adjacent lines need 1.13em between baselines before a ไม้โท stops
+ * landing inside the line above it. At 0.98 they overlapped by a third of an
+ * em: the tone marks of one line sat in the counters of the one above, which
+ * is what made the stack read as a texture rather than as three lines. 1.2 is
+ * the tightest leading that keeps every mark in its own line and still reads
+ * as a stack.
+ *
+ * Tracking is 0 for the same reason, and it matters more. Thai does not put
+ * spaces between words — the reader segments วาง|แพลน|เที่ยว purely from the
+ * shapes, so the sidebearings are the only word boundary there is. -0.03em is
+ * 1.3px of it gone at 44px and nearly 3px at 96px, which is exactly the
+ * "everything is glued together" the hero was getting. Latin runs in Space
+ * Grotesk lose a little of their tightness at 0; a Thai-first product trades
+ * that away without thinking twice. */
 .t-hero {
   font-family: var(--brand-font-display);
   font-size: clamp(2.75rem, 7vw, 6rem); /* 44 → 96px */
-  line-height: 0.98;
-  letter-spacing: -0.03em;
+  line-height: 1.2;
+  letter-spacing: 0;
   font-weight: 700;
   text-align: left;
   /* Deliberately no `text-wrap: balance` and no centring: §3.1 wants the
@@ -128,38 +166,59 @@ label[for] {
    * them. Normal wrapping stays on as a safety net for narrow screens. */
 }
 
-/* §3.2 knockout — exactly one word per hero, inverted out of the canvas.
+/* §3 knockout — exactly one word per hero, inverted out of the white page.
+ *
+ * THE COLOURS SWAPPED IN v3, AND THAT IS THE POINT. v2's hero was a full-bleed
+ * cobalt canvas carrying white type, so its knockout was a white block with
+ * ink text. v3 deletes that canvas: the hero is the white page like every
+ * other screen, the headline is black, and the knockout is the inversion of
+ * *that* — a black block with white text.
+ *
+ * §3 also calls this "the only place white text appears", which is the same
+ * rule §2.4 states from the other side: white text only on black. One word,
+ * on the word carrying the promise.
  *
  * `inline-block` with its own line-height, rather than a plain inline span:
  * an inline background is sized by the font's content box, and IBM Plex Sans
  * Thai's is roughly 1.5em tall to make room for stacked vowels and tone
- * marks. At 90px that painted a white slab half again as tall as the word.
- * 1.12 is the floor that still clears a ไม้โท over a สระอี. */
+ * marks. At 90px that painted a slab half again as tall as the word.
+ *
+ * 1.12 is the floor that still clears a ไม้โท over a สระอี — the same 1.11em
+ * ascent `.t-hero` above is sized around. At 0.92 the slab was shorter than
+ * its own word, so a stacked mark broke out through the top edge and lost its
+ * counter against the page. With the 0.12em of padding the box now stands
+ * 1.24em, which covers the tallest stack the face can make. */
 .knockout {
   display: inline-block;
-  background: hsl(var(--brand-white));
-  color: hsl(var(--brand-ink));
-  line-height: 0.92;
+  background: hsl(var(--brand-ink));
+  color: hsl(var(--brand-white));
+  line-height: 1.12;
   padding: 0.08em 0.1em 0.04em;
-  border-radius: 4px;
+  border-radius: 4px; /* §4 — the one radius that is not a pill or a card */
   /* The knockout sits on the headline's own baseline grid; without this the
    * inline-block would drop the whole line by its descender. */
   vertical-align: baseline;
 }
 
+/* Section headings. Same Thai correction as `.t-hero`, and these need it more
+ * than the hero does: a heading here wraps on its own rather than being broken
+ * by hand, so any two of its lines can be the ones with a ุ under and a ั้
+ * over. 1.35 clears that pair; 1.2 did not. Tracking goes to 0 rather than to
+ * -0.02em, because at 28px the sidebearing a Thai reader segments words with
+ * is only a few pixels wide to begin with. */
 .t-h2 {
   font-family: var(--brand-font-display);
   font-size: clamp(1.75rem, 3.5vw, 2rem); /* 28 → 32px */
-  line-height: 1.2;
-  letter-spacing: -0.02em;
+  line-height: 1.35;
+  letter-spacing: 0;
   font-weight: 500;
 }
 
 .t-h3 {
   font-family: var(--brand-font-display);
   font-size: 1.25rem; /* 20px */
-  line-height: 1.3;
-  letter-spacing: -0.02em;
+  line-height: 1.45;
+  letter-spacing: 0;
   font-weight: 500;
 }
 
@@ -181,17 +240,30 @@ label[for] {
   font-family: var(--brand-font-display);
   font-size: 0.6875rem; /* 11px */
   line-height: 1.4;
-  letter-spacing: 0.08em;
+  /* No tracking, for the reason `.t-hero` spells out at length: Thai puts no
+   * spaces between words, so the sidebearings ARE the word boundary, and
+   * opening them up is what glues a label into a single shape. §3 only ever
+   * permitted letterspacing on a label; it never required it. */
+  letter-spacing: 0;
   font-weight: 500;
   text-transform: none;
   color: hsl(var(--brand-muted));
 }
 
 /* The content-area highlight: a key phrase in a flat colour block. Once per
- * section, never three in one headline. The hero uses `.knockout` instead. */
+ * section, never three in one headline. The hero uses `.knockout` instead.
+ *
+ * It fills with the section's OWN feature colour rather than a fixed hue, so
+ * a highlighted phrase inside Wishlist is pink and the same markup inside
+ * Documents is orange, with no class change. Black text on it either way —
+ * §2.4, which every one of the six light colours passes at 13:1 or better. */
 .hl {
+  background: hsl(var(--feature-light));
+  color: hsl(var(--brand-ink));
   padding: 0 0.5rem;
   border-radius: 6px;
+  /* Without this a highlight that wraps loses its padding and its corners on
+   * every line but the first — which is most of them, in Thai. */
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
@@ -215,8 +287,14 @@ label[for] {
  * Every doodle is stroke-only, ink by default, round caps and joins. Setting
  * it here rather than per-path means a doodle cannot be authored wrong: the
  * SVG components carry geometry only, and `stroke: currentColor` lets any
- * caller re-colour its marks with `text-*` — pink, green, yellow or white on
- * a hero canvas, ink on white or cream (§5.1). */
+ * caller re-colour its marks with `text-*`.
+ *
+ * §5.1.2 fixes which colours those may be, and v3 narrowed it: black on white,
+ * on the gray, and on all six light surfaces — which is everywhere in the
+ * product. The solid accents are allowed on the marketing hero and nowhere
+ * else. That is the same reasoning as §2.3's size rule: a solid at doodle
+ * scale is a small loud mark, but a page whose linework is all pastel loses
+ * the black-drawn-on look the brand is remembered by. */
 .doodle {
   fill: none;
   stroke: currentColor;

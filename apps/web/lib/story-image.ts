@@ -43,11 +43,19 @@ export function drawStoryImage(input: StoryInput): HTMLCanvasElement {
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('เบราว์เซอร์นี้สร้างรูปสรุปทริปไม่ได้');
 
-  const primary = token('--brand-primary', 'hsl(208 56% 51%)');
-  const ink = token('--brand-ink', 'hsl(0 0% 6%)');
-  const muted = token('--brand-muted', 'hsl(48 3% 36%)');
-  const surface = token('--brand-surface', 'hsl(0 0% 100%)');
-  const bg = token('--brand-bg', 'hsl(47 100% 97%)');
+  // Read from `:root`, so the card takes the NEUTRAL palette even when it is
+  // drawn from inside a feature-scoped screen — a story image pasted into a
+  // chat has no room to be in, the same reason the OG card and the app icon
+  // are ink (§2.5).
+  //
+  // The fallbacks are v3's own values rather than v2's cobalt-and-cream: they
+  // only fire if a token read fails, and a fallback that quietly restores the
+  // old brand is worse than no fallback at all.
+  const primary = token('--brand-primary', 'hsl(0 0% 0%)');
+  const ink = token('--brand-ink', 'hsl(0 0% 0%)');
+  const muted = token('--brand-muted', 'hsl(0 0% 32.2%)');
+  const surface = token('--brand-surface', 'hsl(0 0% 96.9%)');
+  const bg = token('--brand-bg', 'hsl(0 0% 100%)');
 
   // Canvas cannot use the `--font-*` variables — those are class names on the
   // document, not families. The families are named here and only here, and

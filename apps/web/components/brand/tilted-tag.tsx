@@ -23,12 +23,30 @@ import { cn } from '@/lib/utils';
  * Points 1–4 belong to the caller placing them; this component owns the shape
  * and the colour pairs, which are the parts that must not drift.
  */
+/**
+ * The hero is one of the three places §2.5 lets several feature colours sit
+ * together, so a tag cluster may name hues — and it should, because naming
+ * them is the point: a marketing hero scattered with the six pastels is where
+ * a first-time visitor meets the palette they will later navigate by.
+ *
+ * The tones are the FEATURES, not the hues, for the same reason the scopes in
+ * brand.css are. A tag that says "รายจ่าย" should take `documents` and get
+ * orange because that is where the feature lives, so a future palette change
+ * moves the hero with it rather than stranding it on a colour that no longer
+ * means anything.
+ *
+ * Every one carries black text (§2.4) — including the anchor, where black is
+ * on white rather than the other way round.
+ */
 const TONE = {
-  yellow: 'bg-yellow text-yellow-deep',
-  pink: 'bg-pink text-pink-deep',
-  green: 'bg-green text-green-deep',
-  blue: 'bg-blue text-white',
-  /** The anchor. One per cluster (§4.2.5). */
+  itinerary: 'bg-blue-light text-ink',
+  wishlist: 'bg-pink-light text-ink',
+  countdown: 'bg-yellow-light text-ink',
+  journal: 'bg-green-light text-ink',
+  documents: 'bg-orange-light text-ink',
+  memo: 'bg-purple-light text-ink',
+  /** The anchor. One per cluster (§4.2.5), and the only white text on the
+   *  page — legal because it is on black (§2.4). */
   ink: 'bg-ink text-white',
 } as const;
 

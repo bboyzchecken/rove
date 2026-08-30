@@ -60,6 +60,13 @@ export interface AnalyticsEvents {
 
   trip_recap_viewed: { has_decisions: boolean };
 
+  // M26 follow-up — the moment a finished trip is about to be recycled into the
+  // next one instead of a new room being opened. `shown` against `started` is
+  // the only read we get on whether the argument in NextTripCard lands, and the
+  // surface split says which of the two moments does the work.
+  next_trip_nudge_shown: { surface: 'room' | 'recap' };
+  next_trip_started: { surface: 'room' | 'recap' };
+
   export: { format: 'pdf' | 'ics' | 'json' | 'html' };
   share_link_created: { visibility: 'link' | 'public' };
   trip_published: { has_points_incentive: boolean };

@@ -58,7 +58,7 @@ export function LegalPage({
       </div>
 
       {/* This is the part a reader must not miss, so it is not a footnote. */}
-      <Card accent="yellow" className="mt-5 p-4">
+      <Card accent="gray" className="mt-5 p-4">
         <div className="flex items-start gap-2.5">
           <TriangleAlert className="mt-0.5 size-4 shrink-0" />
           <p className="text-xs leading-relaxed">

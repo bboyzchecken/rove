@@ -34,7 +34,7 @@ export function AiCreditPanel({ tripId, onStart }: { tripId: string; onStart: ()
   const perPerson = credits?.passPerPersonThb ?? passPrice;
 
   return (
-    <Card accent={hasPass || freeLeft > 0 ? 'green' : 'yellow'} className="p-4 sm:p-5">
+    <Card accent={hasPass || freeLeft > 0 ? 'feature' : 'warning'} className="p-4 sm:p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2">

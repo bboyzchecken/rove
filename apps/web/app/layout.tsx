@@ -63,8 +63,10 @@ export const viewport: Viewport = {
   initialScale: 1,
   // Mobile-first: the trip room is used on a phone.
   maximumScale: 5,
-  // Cream, not white — the browser chrome should meet the page, not frame it.
-  themeColor: '#FFFCF1',
+  // §2.1's page white, so the browser chrome meets the page rather than
+  // framing it. This was the v2 cream; leaving it would have put a warm strip
+  // above every white screen on Android.
+  themeColor: '#FFFFFF',
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

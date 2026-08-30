@@ -103,7 +103,7 @@ export function AdminScreen() {
               </div>
               <Progress
                 value={costRatio}
-                tone={costRatio >= 0.8 ? 'primary' : 'ink'}
+                tone={costRatio >= 0.8 ? 'feature' : 'ink'}
                 className="mt-3"
               />
               <p className="text-muted mt-2 text-[11px]">

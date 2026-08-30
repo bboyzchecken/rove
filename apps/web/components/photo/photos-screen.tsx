@@ -82,8 +82,8 @@ export function PhotosScreen({ tripId }: { tripId: string }) {
       </div>
 
       {error ? (
-        <Card accent="primary" className="p-3.5">
-          <p className="text-ink text-xs">{error}</p>
+        <Card accent="gray" className="p-3.5">
+          <p className="text-danger text-xs">{error}</p>
         </Card>
       ) : null}
 
@@ -130,7 +130,7 @@ export function PhotosScreen({ tripId }: { tripId: string }) {
       ) : null}
 
       {!isLoading && photos.length === 0 ? (
-        <Card accent="blue" className="p-8 text-center">
+        <Card accent="feature" className="p-8 text-center">
           <Camera className="text-ink mx-auto size-8" strokeWidth={2} />
           <p className="text-ink mt-3 text-sm font-medium">ยังไม่มีรูปในทริปนี้</p>
           <p className="text-muted mx-auto mt-1 max-w-xs text-xs leading-relaxed">

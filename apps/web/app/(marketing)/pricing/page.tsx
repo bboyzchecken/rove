@@ -57,11 +57,11 @@ const FAQ = [
  * is the refund, which is the one people disbelieve.
  */
 const HERO_TAGS = [
-  { label: 'ฟรีทั้งห้อง', tone: 'green' },
+  { label: 'ฟรีทั้งห้อง', tone: 'journal' },
   { label: 'คืนเต็มจำนวน', tone: 'ink' },
-  { label: 'ไม่มีรายเดือน', tone: 'green' },
-  { label: 'จ่ายเป็นทริป', tone: 'yellow' },
-  { label: 'ไม่ต้องใส่บัตร', tone: 'yellow' },
+  { label: 'ไม่มีรายเดือน', tone: 'documents' },
+  { label: 'จ่ายเป็นทริป', tone: 'countdown' },
+  { label: 'ไม่ต้องใส่บัตร', tone: 'itinerary' },
 ] as const;
 
 export default function PricingPage() {
@@ -69,7 +69,6 @@ export default function PricingPage() {
     <PublicShell
       width="wide"
       bleed
-      chrome="canvas"
       actions={
         <Link href="/new" className={heroNavCtaClass}>
           เริ่มวางแผน
@@ -95,9 +94,9 @@ export default function PricingPage() {
         lead={`วางแผนกับเพื่อนได้ฟรีทั้งห้อง ให้ AI ร่างให้ ${FREE_DRAFTS_PER_TRIP} ครั้งต่อทริป · อยากร่างต่อไม่อั้นก็ปลดล็อกทริปนั้นครั้งเดียว แล้วถ้าคุณจองผ่าน ROVE เราคืนให้เต็มจำนวน`}
         tags={HERO_TAGS}
         anchor={StarBurst}
-        anchorTone="text-yellow"
+        anchorTone="text-yellow-light"
         marks={
-          <Sparkle className="text-green pointer-events-none absolute top-[34%] -right-14 z-20 hidden size-16 sm:block" />
+          <Sparkle className="text-green-solid pointer-events-none absolute top-[34%] -right-14 z-20 hidden size-16 sm:block" />
         }
         arrow
         actions={

@@ -55,7 +55,7 @@ export function BudgetScreen({ tripId }: { tripId: string }) {
           </button>
         </div>
 
-        <Card accent="primary" className="p-5">
+        <Card accent="feature" className="p-5">
           <div className="flex items-end justify-between gap-4">
             <div>
               <p className="font-display text-ink nums text-3xl font-medium tracking-tight">
@@ -76,7 +76,7 @@ export function BudgetScreen({ tripId }: { tripId: string }) {
 
           <Progress
             value={budget.budgetUsed}
-            tone={overBudget ? 'primary' : 'ink'}
+            tone={overBudget ? 'feature' : 'ink'}
             className="mt-4"
           />
           <p className="text-muted mt-2 text-xs">
@@ -107,7 +107,7 @@ export function BudgetScreen({ tripId }: { tripId: string }) {
                   <span className="text-ink truncate text-sm font-medium">
                     {line.category}
                   </span>
-                  {line.prepaid ? <Badge tone="pink">จ่ายแล้ว</Badge> : null}
+                  {line.prepaid ? <Badge tone="feature">จ่ายแล้ว</Badge> : null}
                 </div>
                 <div className="w-24 text-right">
                   <p className="text-ink nums text-xs">
@@ -141,7 +141,7 @@ export function BudgetScreen({ tripId }: { tripId: string }) {
       <section>
         <SectionHeader label="ที่ควรรู้" />
         <div className="grid gap-3 sm:grid-cols-2">
-          <Card accent="pink" className="p-4">
+          <Card accent="gray" className="p-4">
             <Stat
               value={formatMoney(toThb(budget.prepaidJpy / Math.max(1, trip.partySize)), 'THB')}
               label="จ่ายล่วงหน้าไปแล้ว (ที่พัก)"
@@ -149,7 +149,7 @@ export function BudgetScreen({ tripId }: { tripId: string }) {
             />
           </Card>
 
-          <Card accent="yellow" className="p-4">
+          <Card accent="gray" className="border-feature-solid border-l-4 p-4">
             <div className="flex items-start gap-2">
               <TriangleAlert className="text-warning mt-0.5 size-4 shrink-0" />
               <div>

@@ -37,10 +37,10 @@ const KINDS: { key: BookingKind; label: string }[] = [
 
 const STATUS_META: Record<
   BookingStatus,
-  { label: string; tone: 'neutral' | 'green' | 'outline' }
+  { label: string; tone: 'neutral' | 'feature' | 'outline' }
 > = {
   idea: { label: 'ยังไม่จอง', tone: 'outline' },
-  booked: { label: 'จองแล้ว', tone: 'green' },
+  booked: { label: 'จองแล้ว', tone: 'feature' },
   cancelled: { label: 'ยกเลิกแล้ว', tone: 'neutral' },
 };
 

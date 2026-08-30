@@ -36,26 +36,22 @@ export function PlatformStatsSection({ className }: { className?: string }) {
       <SectionHeader label="ตัวเลขจริงจากคนที่ใช้อยู่" />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Figure
-          accent="green"
           value={stats.planners}
           label="คนวางแพลนกับ ROVE"
           hint="นับเฉพาะคนที่เปิดทริปจริง"
         />
         <Figure
-          accent="blue"
           value={stats.publicTrips}
           label="แพลนที่เปิดให้ตามรอย"
           hint="เจ้าของกดเปิดสาธารณะเอง"
         />
         <Figure
-          accent="yellow"
           value={stats.clones}
           label="ครั้งที่มีคนก๊อปแพลนไปใช้"
           hint="ก๊อปแล้วแก้ต่อเป็นของตัวเอง"
         />
         {showRating ? (
           <Figure
-            accent="pink"
             value={stats.averageRating}
             decimals={1}
             label={`คะแนนเฉลี่ยจาก ${stats.reviews.toLocaleString('th-TH')} รีวิว`}
@@ -63,7 +59,6 @@ export function PlatformStatsSection({ className }: { className?: string }) {
           />
         ) : (
           <Figure
-            accent="pink"
             value={stats.reviews}
             label="รีวิวจากคนที่ไปมาแล้ว"
             hint="เขียนหลังจบทริปเท่านั้น"
@@ -78,17 +73,15 @@ function Figure({
   value,
   label,
   hint,
-  accent,
   decimals = 0,
 }: {
   value: number;
   label: string;
   hint: string;
-  accent: 'green' | 'blue' | 'yellow' | 'pink';
   decimals?: number;
 }) {
   return (
-    <Card accent={accent} className="p-5">
+    <Card accent="gray" className="p-5">
       <p className="font-display text-ink nums text-3xl leading-none font-medium">
         {value.toLocaleString('th-TH', {
           minimumFractionDigits: decimals,

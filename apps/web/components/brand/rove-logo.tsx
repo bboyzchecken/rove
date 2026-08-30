@@ -3,18 +3,30 @@ import { cn } from '@/lib/utils';
 import { RoveMark } from './rove-mark';
 
 /**
- * The wordmark: `rove` set lowercase with the period in blue
- * (ROVE_BRAND_SPEC §5 Nav).
+ * The wordmark: `rove` set lowercase, with the period in the CURRENT SECTION'S
+ * solid accent colour (ROVE_BRAND_SPEC v3 §6 Nav).
  *
  * It used to be `R✳VE` — capitals with the compass mark standing in for the
  * O. That belonged to a brand whose personality lived in the logo. This one's
- * lives in the doodle linework (§4), so the wordmark's job is to get quiet and
+ * lives in the doodle linework (§5), so the wordmark's job is to get quiet and
  * stay out of the way: lowercase, one weight, tight tracking, and a single
- * blue period doing the only colouring.
+ * coloured period doing all of the colouring.
+ *
+ * THE PERIOD IS THE SMALLEST INSTANCE OF THE WHOLE v3 IDEA.
+ * §6 asks for it to take the section's accent, so it re-colours as you move
+ * between rooms — pink in Wishlist, orange in Documents — while the four
+ * letters beside it never move. It is the same colour-tells-you-where-you-are
+ * mapping as a section banner, at 4px, on a mark the user sees on every single
+ * screen. `text-feature-solid` gets that for free from `data-feature`; the dot
+ * needs no prop and cannot fall out of sync with the page.
+ *
+ * On a neutral screen `--feature-solid` resolves to ink, so the period simply
+ * disappears into the wordmark. That is the correct look for a screen with no
+ * feature rather than a fallback worth designing around.
  *
  * Still type rather than an image, so it stays sharp at every size and takes
- * the theme: `light` on cream, `dark` on an ink block, `mono` for print and
- * stamps where the blue would not survive.
+ * the theme: `light` on the white page, `dark` on an ink block, `mono` for
+ * print and stamps where the accent would not survive.
  */
 const SIZES = {
   sm: 'text-lg',
@@ -23,16 +35,16 @@ const SIZES = {
   xl: 'text-6xl',
 } as const;
 
-/* `dark` uses `text-bg` rather than `text-cream` so it survives the admin
+/* `dark` uses `text-bg` rather than `text-white` so it survives the admin
  * surface, where ink and the page trade places and only that pair is
  * redeclared.
  *
- * `canvas` is the hero: §7 Nav puts a white wordmark on the blue canvas and
- * turns the period yellow, because cobalt-on-cobalt would erase it. */
+ * v2's `canvas` tone is gone with the canvas itself — v3 has no full-bleed
+ * coloured hero for a white wordmark to sit on. Every surface the logo appears
+ * on now is white, gray, or ink. */
 const TONES = {
-  light: { body: 'text-ink', dot: 'text-blue' },
-  dark: { body: 'text-bg', dot: 'text-blue' },
-  canvas: { body: 'text-white', dot: 'text-yellow' },
+  light: { body: 'text-ink', dot: 'text-feature-solid' },
+  dark: { body: 'text-bg', dot: 'text-feature-solid' },
   mono: { body: 'text-ink', dot: 'text-ink' },
 } as const;
 
@@ -71,10 +83,12 @@ export function RoveLogo({
 /**
  * Square app-icon lockup — favicon, PWA tile, the avatar in a share card.
  *
- * The compass mark survives the rebrand here and only here. A wordmark does
- * not reduce to 16px, and a doodle at that size closes up into a blot: §4.1
- * puts the stroke floor at 2.5px, which on a favicon is a sixth of the whole
- * tile. So the geometry stays for the one job it is still the best answer to.
+ * The compass mark survives the rebrand here and only here, and in ink rather
+ * than an accent: a favicon has no `data-feature` to read and no room to be
+ * in. A wordmark does not reduce to 16px, and a doodle at that size closes up
+ * into a blot — §5.1 puts the stroke at 3–4px, which on a favicon is a quarter
+ * of the whole tile. So the geometry stays for the one job it is still the
+ * best answer to.
  */
 export function RoveIcon({ className }: { className?: string }) {
   return (
@@ -82,7 +96,7 @@ export function RoveIcon({ className }: { className?: string }) {
       className={cn('bg-bg inline-flex items-center justify-center rounded-full', className)}
       aria-hidden="true"
     >
-      <RoveMark className="text-blue size-[58%]" />
+      <RoveMark className="text-ink size-[58%]" />
     </span>
   );
 }

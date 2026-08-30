@@ -35,7 +35,7 @@ export function AgentHandoffCard({ tripId }: { tripId: string }) {
 
   return (
     <>
-      <Card accent="blue" className="p-4">
+      <Card accent="feature" className="p-4">
         <p className="text-ink flex items-center gap-2 text-sm font-medium">
           <Headset className="size-4" />
           อยากให้คนช่วยจัดให้เลยไหม

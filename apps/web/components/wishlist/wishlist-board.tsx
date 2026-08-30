@@ -23,10 +23,10 @@ import { cn } from '@/lib/utils';
  * actually in the plan?", which is what starts group arguments. Everyone may
  * add to their own list; only the owner deletes someone else's.
  */
-const KIND_META: Record<WishKind, { label: string; tone: 'primary' | 'blue' | 'neutral' }> = {
-  must: { label: 'ต้องไป', tone: 'primary' },
-  nice: { label: 'ไปได้ก็ดี', tone: 'blue' },
-  avoid: { label: 'ไม่เอา', tone: 'neutral' },
+const KIND_META: Record<WishKind, { label: string; tone: 'active' | 'feature' | 'outline' }> = {
+  must: { label: 'ต้องไป', tone: 'active' },
+  nice: { label: 'ไปได้ก็ดี', tone: 'feature' },
+  avoid: { label: 'ไม่เอา', tone: 'outline' },
 };
 
 const COVERAGE_META: Record<

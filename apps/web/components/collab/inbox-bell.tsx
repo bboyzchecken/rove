@@ -116,7 +116,7 @@ function NotificationRow({
 
   const body = (
     <Card
-      accent={notification.read ? 'none' : 'blue'}
+      accent={notification.read ? 'none' : 'feature'}
       className="flex items-start gap-3 p-3 text-left"
     >
       <span className="bg-bg/70 flex size-8 shrink-0 items-center justify-center rounded-full">

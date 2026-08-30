@@ -59,7 +59,7 @@ export function AdminLoginScreen() {
         </div>
 
         {reason ? (
-          <Card accent="primary" className="p-4" role="alert">
+          <Card accent="gray" className="p-4" role="alert">
             <p className="text-ink text-sm font-medium">{reason}</p>
           </Card>
         ) : null}

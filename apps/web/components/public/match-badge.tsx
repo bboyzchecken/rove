@@ -19,11 +19,14 @@ export function MatchBadge({
   className?: string;
   compact?: boolean;
 }) {
+  // A three-step scale, so it uses the two halves of the room's pair and then
+  // falls back to gray — §2.3's solid for the score worth acting on, the light
+  // fill for a decent one, neutral for the rest. Black type throughout (§2.4).
   const tone =
     match.score >= 80
-      ? 'bg-green/15 text-green'
+      ? 'bg-feature-solid text-ink'
       : match.score >= 60
-        ? 'bg-primary/12 text-primary'
+        ? 'bg-feature text-ink'
         : 'bg-surface text-muted';
 
   return (

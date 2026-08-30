@@ -55,7 +55,7 @@ export function LoginScreen() {
         {/* One mark, in the margin (§5.3). The door to the product is a task
             screen, not a marketing page — §1 keeps it fully calm, so there is
             no canvas, no tilt and no overlay here. */}
-        <Sparkle className="text-pink pointer-events-none absolute -top-2 -right-6 hidden size-12 sm:block" />
+        <Sparkle className="text-ink pointer-events-none absolute -top-2 -right-6 hidden size-12 sm:block" />
         <div className="text-center">
           <div>
             <h1 className="t-h2 text-ink">เข้าสู่ระบบเพื่อเริ่มวางแพลน</h1>

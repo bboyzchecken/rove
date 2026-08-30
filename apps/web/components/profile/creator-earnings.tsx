@@ -36,7 +36,7 @@ export function CreatorEarningsCard() {
     <section>
       <SectionHeader label="รายได้จากแพลนสาธารณะ" />
 
-      <Card accent="green" className="p-4">
+      <Card accent="gray" className="p-4">
         <p className="text-ink flex items-center gap-2 text-sm font-medium">
           <TrendingUp className="size-4" />
           ส่วนแบ่ง {statement.sharePercent}% จากค่าคอมที่พาร์ตเนอร์จ่าย

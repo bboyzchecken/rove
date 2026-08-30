@@ -5,17 +5,30 @@ import { cn } from '@/lib/utils';
  *
  * The admin surface spends its accent colours on status and nothing else
  * (§4.2), and this is where that rule is written down: green = done, yellow =
- * waiting, pink = information, danger = careful, plain = nothing to say.
+ * waiting, purple = information, danger = careful, plain = nothing to say.
  *
  * The tone is a prop rather than derived from the label, because the same word
  * means different things on different screens — "new" is neutral on a lead
  * queue and alarming on a moderation queue.
+ *
+ * TINTED FILL, COLOURED TYPE — the dark-surface inversion of the product's
+ * black-on-pastel chips.
+ *
+ * §2.4's "black text on every colour" is a rule about the product's white
+ * page: it holds because all twelve colours are pastels sitting on white. The
+ * admin surface redeclares those same tokens as desaturated mid-tones on a
+ * near-black page (see brand.css), where `--brand-ink` has inverted to
+ * near-white — so a filled pastel pill carrying `text-ink` would be light
+ * type on a light fill, which is the one combination that fails everywhere.
+ *
+ * The admin reading of the same rule is therefore the mirror of it: the fill
+ * drops to a wash of the hue and the hue itself becomes the type.
  */
 const TONE = {
-  ok: 'bg-green/60 text-ink',
-  wait: 'bg-yellow/60 text-ink',
-  info: 'bg-pink/60 text-ink',
-  danger: 'bg-danger/25 text-danger',
+  ok: 'bg-green-solid/15 text-green-light',
+  wait: 'bg-yellow-solid/15 text-yellow-light',
+  info: 'bg-purple-solid/15 text-purple-light',
+  danger: 'bg-danger/15 text-danger',
   plain: 'bg-bg text-muted',
 } as const;
 

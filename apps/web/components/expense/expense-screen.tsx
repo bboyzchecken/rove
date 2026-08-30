@@ -38,7 +38,7 @@ export function ExpenseScreen({ tripId }: { tripId: string }) {
     <div className="space-y-7">
       <section>
         <SectionHeader label="ใช้ไปแล้วจริงๆ" />
-        <Card accent="primary" className="p-5">
+        <Card accent="feature" className="p-5">
           <div className="grid grid-cols-3 gap-4">
             <Stat value={formatMoney(summary.totalThb, 'THB')} label="รวมทั้งทริป" />
             <Stat value={formatMoney(summary.sharedTotalThb, 'THB')} label="ของกลาง" />
@@ -96,7 +96,7 @@ export function ExpenseScreen({ tripId }: { tripId: string }) {
 
       <section>
         <SectionHeader label="น้องหารสรุปให้" />
-        <Card accent="green" className="p-4">
+        <Card accent="gray" className="p-4">
           {summary.settlements.length === 0 ? (
             <p className="text-ink text-sm">ตอนนี้ไม่มีใครติดใคร — เคลียร์กันหมดแล้ว 🎉</p>
           ) : (

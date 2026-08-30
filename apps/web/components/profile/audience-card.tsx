@@ -38,7 +38,7 @@ export function AudienceCard() {
     <section>
       <SectionHeader label="คนตามรอยฉัน" />
 
-      <Card accent="blue" className="p-4">
+      <Card accent="gray" className="p-4">
         <p className="text-ink flex items-center gap-2 text-sm font-medium">
           <Users className="size-4" />
           แพลนสาธารณะ {audience.publicTrips.toLocaleString('th-TH')} ใบ

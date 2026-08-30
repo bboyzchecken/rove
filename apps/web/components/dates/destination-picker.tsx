@@ -78,17 +78,17 @@ export function DestinationPicker({
                       </h3>
                       <p className="text-muted text-xs">{dest.subtitle}</p>
                     </div>
-                    <Badge tone={isPicked ? 'solid' : 'neutral'} size="md">
+                    <Badge tone={isPicked ? 'active' : 'neutral'} size="md">
                       {isPicked ? 'เลือกแล้ว' : `เหมาะ ${dest.fit}%`}
                     </Badge>
                   </div>
 
                   <div className="mt-3 flex flex-wrap gap-1.5">
-                    <Badge tone="primary">{dest.pill}</Badge>
-                    <Badge tone="blue">
+                    <Badge tone="ink">{dest.pill}</Badge>
+                    <Badge tone="feature">
                       <Thermometer className="size-3" /> {dest.weather.low}–{dest.weather.high}°C
                     </Badge>
-                    <Badge tone="green">
+                    <Badge tone="feature">
                       <Plane className="size-3" /> บิน {dest.flightHours} ชม.
                     </Badge>
                   </div>
@@ -120,7 +120,7 @@ export function DestinationPicker({
       )}
 
       {selected ? (
-        <Card accent="solid" className="flex flex-wrap items-center justify-between gap-3 p-4">
+        <Card accent="ink" className="flex flex-wrap items-center justify-between gap-3 p-4">
           <div>
             <p className="font-display text-base font-medium">
               {selected.flag} เริ่มวางแผน {selected.name}

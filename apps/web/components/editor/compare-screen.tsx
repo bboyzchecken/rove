@@ -70,7 +70,7 @@ export function CompareScreen({ tripId }: { tripId: string }) {
 
         {isOwner ? (
           <Button
-            variant={frozen ? 'soft' : 'ink'}
+            variant={frozen ? 'soft' : 'primary'}
             size="sm"
             onClick={() => freeze.mutate(!frozen)}
             disabled={freeze.isPending}
@@ -82,7 +82,7 @@ export function CompareScreen({ tripId }: { tripId: string }) {
       </div>
 
       {frozen ? (
-        <Card accent="yellow" className="flex items-center gap-3 p-4">
+        <Card accent="gray" className="flex items-center gap-3 p-4">
           <Lock className="text-ink size-4 shrink-0" />
           <p className="text-ink text-sm">
             แพลนถูกสรุปแล้ว — แก้ไทม์ไลน์และสลับแพลนไม่ได้จนกว่าเจ้าของทริปจะปลดล็อก
@@ -97,7 +97,7 @@ export function CompareScreen({ tripId }: { tripId: string }) {
             {conflicts.map((conflict, i) => (
               <Card
                 key={`${conflict.kind}-${i}`}
-                accent={conflict.severity === 'error' ? 'primary' : 'yellow'}
+                accent={conflict.severity === 'error' ? 'warning' : 'gray'}
                 className="flex items-start gap-3 p-3.5"
               >
                 <AlertTriangle className="text-ink mt-0.5 size-4 shrink-0" />
@@ -151,8 +151,8 @@ export function CompareScreen({ tripId }: { tripId: string }) {
           </Card>
         ) : null}
         {generation.error ? (
-          <Card accent="primary" className="mt-3 p-3.5">
-            <p className="text-ink text-xs">{generation.error}</p>
+          <Card accent="gray" className="mt-3 p-3.5">
+            <p className="text-danger text-xs">{generation.error}</p>
           </Card>
         ) : null}
       </section>
@@ -276,7 +276,7 @@ function VariantCard({
   };
 
   return (
-    <Card accent={variant.source === 'ai' ? 'blue' : 'pink'} className="p-4">
+    <Card accent={variant.source === 'ai' ? 'feature' : 'gray'} className="p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-ink text-sm font-medium">

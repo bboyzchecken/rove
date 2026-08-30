@@ -10,6 +10,7 @@ import { RoveLogo } from '@/components/brand/rove-logo';
 import { InboxBell } from '@/components/collab/inbox-bell';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
 import { useMe } from '@/features/auth/queries';
+import { pathFeature } from '@/lib/feature';
 import { cn } from '@/lib/utils';
 
 /**
@@ -76,7 +77,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-dvh pb-20 md:pb-0">
+    // §2.5's feature colour for the top-level app routes that have one —
+    // /dreams, /billing, /points, /recap. Most do not and resolve to `none`,
+    // which is the neutral gray: §1 wants a white page with pastel rooms in
+    // it, not a product where every screen is painted.
+    //
+    // The trip room re-declares this on its own wrapper, and the nested
+    // declaration wins for its subtree. So /t/:id/wishlist is pink even though
+    // this shell put `none` on the element above it.
+    <div data-feature={pathFeature(pathname)} className="min-h-dvh pb-20 md:pb-0">
       <ModeBanner />
 
       <header className="bg-bg/85 sticky top-0 z-30 backdrop-blur-md">
@@ -127,7 +136,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   className="flex flex-col items-center gap-1 px-2"
                   aria-label={item.label}
                 >
-                  <span className="bg-primary text-primary-fg shadow-float flex size-9 items-center justify-center rounded-full">
+                  <span className="bg-primary text-primary-fg flex size-9 items-center justify-center rounded-full">
                     <Icon className="size-5" strokeWidth={2.5} />
                   </span>
                   <span className="text-muted text-[10px] font-medium">{item.label}</span>

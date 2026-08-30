@@ -101,11 +101,11 @@ export function InviteDialog({
         </Card>
 
         <div className="flex flex-wrap gap-1.5">
-          <Badge tone="blue">
+          <Badge tone="feature">
             <Link2 className="size-3" /> ใครมีลิงก์ก็เข้าได้
           </Badge>
           {lineIsStubbed ? (
-            <Badge tone="yellow">
+            <Badge tone="warning">
               <MessageCircle className="size-3" /> ยังไม่ส่งแจ้งเตือนเข้า LINE — ส่งลิงก์เอง
             </Badge>
           ) : null}

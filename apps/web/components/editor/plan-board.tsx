@@ -65,12 +65,27 @@ import { cn } from '@/lib/utils';
  * Itinerary editor (M5 — W5.1 timeline, W5.4 drag reorder, W5.5 delete,
  * W5.6 map view) with the AI rationale panel (W4.2) alongside it.
  */
+/**
+ * Item types on the timeline.
+ *
+ * v2 gave each type its own hue, and under v3 that is six feature colours on
+ * one screen — §8's "pastel rainbow", and worse than merely off-brand, because
+ * a blue dot on the plan would have meant "transport" here while blue means
+ * "Itinerary" everywhere else. Two colour languages on the same pixel.
+ *
+ * So the dot stops carrying the type and starts carrying emphasis, which is
+ * what §2.3's two-step pair can honestly express: the room's solid accent for
+ * the things you go and do, ink for a flight, which is the one item on a
+ * timeline you cannot be late for. The type itself is named by `label`, in
+ * words, which is the thing that was always doing the real work — the dots
+ * were only ever legible to someone who had already learned six hues.
+ */
 const TYPE_META: Record<ItemType, { dot: string; label: string }> = {
-  poi: { dot: 'bg-primary', label: 'สถานที่' },
-  meal: { dot: 'bg-yellow', label: 'มื้ออาหาร' },
-  transport: { dot: 'bg-blue', label: 'เดินทาง' },
-  stay: { dot: 'bg-pink', label: 'ที่พัก' },
-  free: { dot: 'bg-green', label: 'เวลาว่าง' },
+  poi: { dot: 'bg-feature-solid', label: 'สถานที่' },
+  meal: { dot: 'bg-feature-solid', label: 'มื้ออาหาร' },
+  transport: { dot: 'bg-feature-solid', label: 'เดินทาง' },
+  stay: { dot: 'bg-feature-solid', label: 'ที่พัก' },
+  free: { dot: 'bg-feature', label: 'เวลาว่าง' },
   flight: { dot: 'bg-ink', label: 'เที่ยวบิน' },
 };
 
@@ -186,7 +201,7 @@ export function PlanBoard({ tripId, fxRate }: { tripId: string; fxRate: number }
                 </p>
               </div>
               {day.weather ? (
-                <div className="bg-blue/25 flex items-center gap-2 rounded-full px-3 py-1.5">
+                <div className="bg-feature flex items-center gap-2 rounded-full px-3 py-1.5">
                   <span>{day.weather.icon}</span>
                   <span className="text-ink text-xs font-medium">
                     {day.weather.high}° / {day.weather.low}°
@@ -199,14 +214,14 @@ export function PlanBoard({ tripId, fxRate }: { tripId: string; fxRate: number }
             <div className="mt-3 flex flex-wrap gap-1.5">
               <Button
                 size="sm"
-                variant={view === 'timeline' ? 'ink' : 'soft'}
+                variant={view === 'timeline' ? 'primary' : 'soft'}
                 onClick={() => setView('timeline')}
               >
                 ไทม์ไลน์
               </Button>
               <Button
                 size="sm"
-                variant={view === 'map' ? 'ink' : 'soft'}
+                variant={view === 'map' ? 'primary' : 'soft'}
                 onClick={() => setView('map')}
               >
                 <MapIcon className="size-3.5" /> แผนที่
@@ -245,7 +260,7 @@ export function PlanBoard({ tripId, fxRate }: { tripId: string; fxRate: number }
 
           {/* rationale -------------------------------------------------- */}
           {showWhy ? (
-            <Card accent="yellow" className="animate-rove-rise p-4">
+            <Card accent="feature" className="animate-rove-rise p-4">
               <p className="section-label mb-2">เหตุผลที่ ROVE จัดแบบนี้</p>
               <ul className="space-y-2">
                 {rationalesFor(day.items, members).map((reason) => (
@@ -467,7 +482,7 @@ function SortableTimelineCard({
         <span className="bg-surface mt-1 w-px flex-1" />
       </div>
 
-      <Card className={cn('mb-2 min-w-0 flex-1 p-3.5', isDragging && 'shadow-float')}>
+      <Card className={cn('mb-2 min-w-0 flex-1 p-3.5', isDragging && 'ring-ink ring-2')}>
         <div className="flex items-start gap-2">
           <button onClick={onEdit} className="min-w-0 flex-1 text-left">
             <p className="text-ink text-sm font-medium">{item.title}</p>
@@ -486,14 +501,14 @@ function SortableTimelineCard({
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <Badge>{meta.label}</Badge>
           {item.costJpy ? (
-            <Badge tone="primary">
+            <Badge tone="ink">
               ¥{item.costJpy.toLocaleString('en-US')} ·{' '}
               {formatMoney(Math.round(item.costJpy * fxRate), 'THB')}
             </Badge>
           ) : null}
-          {item.openHours ? <Badge tone="blue">เปิด {item.openHours}</Badge> : null}
+          {item.openHours ? <Badge tone="feature">เปิด {item.openHours}</Badge> : null}
           {item.booked ? (
-            <Badge tone="green">
+            <Badge tone="feature">
               <Ticket className="size-3" /> จองแล้ว
             </Badge>
           ) : item.bookable ? (

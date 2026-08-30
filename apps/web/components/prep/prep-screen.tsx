@@ -33,13 +33,13 @@ import { cn } from '@/lib/utils';
  */
 const CATEGORY_META: Record<
   PrepCategory,
-  { label: string; tone: 'primary' | 'blue' | 'green' | 'yellow' | 'pink' | 'neutral' }
+  { label: string; tone: 'feature' | 'neutral' }
 > = {
-  document: { label: 'เอกสาร', tone: 'primary' },
-  packing: { label: 'ของที่ต้องเอาไป', tone: 'blue' },
-  booking: { label: 'ต้องจอง', tone: 'green' },
-  money: { label: 'เรื่องเงิน', tone: 'yellow' },
-  health: { label: 'สุขภาพ', tone: 'pink' },
+  document: { label: 'เอกสาร', tone: 'feature' },
+  packing: { label: 'ของที่ต้องเอาไป', tone: 'feature' },
+  booking: { label: 'ต้องจอง', tone: 'feature' },
+  money: { label: 'เรื่องเงิน', tone: 'feature' },
+  health: { label: 'สุขภาพ', tone: 'feature' },
   other: { label: 'อื่นๆ', tone: 'neutral' },
 };
 
@@ -82,7 +82,7 @@ export function PrepScreen({ tripId }: { tripId: string }) {
         </>
       ) : (
         <>
-          <Card accent="green" className="p-4">
+          <Card accent="feature" className="p-4">
             <div className="mb-2 flex items-center justify-between">
               <p className="font-display text-ink font-medium">เตรียมตัวไปแล้ว</p>
               <span className="text-muted nums text-xs font-medium">

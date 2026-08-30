@@ -82,7 +82,7 @@ export function ExpenseBoard({ tripId, fxRate }: { tripId: string; fxRate: numbe
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <p className="text-ink truncate text-sm font-medium">{entry.title}</p>
-                    {entry.scope === 'personal' ? <Badge tone="pink">ส่วนตัว</Badge> : null}
+                    {entry.scope === 'personal' ? <Badge tone="feature">ส่วนตัว</Badge> : null}
                   </div>
                   <p className="text-muted mt-0.5 text-[11px]">
                     {nameOf(entry.paidBy)} จ่าย · {formatThaiDate(entry.date, { year: undefined })}{' '}

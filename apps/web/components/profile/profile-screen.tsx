@@ -52,7 +52,7 @@ export function ProfileScreen() {
       </div>
 
       {/* points -------------------------------------------------------- */}
-      <Card accent="yellow" className="p-4">
+      <Card accent="gray" className="p-4">
         <div className="flex items-center justify-between">
           <div>
             <p className="section-label">แต้ม ROVE</p>
@@ -112,14 +112,14 @@ export function ProfileScreen() {
       {/* dreams -------------------------------------------------------- */}
       <section>
         <SectionHeader label="ที่อยากไปสักวัน" />
-        <Card accent="pink" className="flex flex-wrap items-center justify-between gap-3 p-4">
+        <Card accent="wishlist" className="flex flex-wrap items-center justify-between gap-3 p-4">
           <div>
             <p className="font-display text-ink font-medium">
               เก็บไว้แล้ว {dreams.length} อย่าง
             </p>
             <p className="text-muted mt-0.5 text-xs">รายการส่วนตัว เพื่อนในทริปไม่เห็น</p>
           </div>
-          <ButtonLink href="/dreams" size="sm" variant="ink">
+          <ButtonLink href="/dreams" size="sm" variant="primary">
             เปิดรายการ
           </ButtonLink>
         </Card>

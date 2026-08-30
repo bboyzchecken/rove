@@ -278,7 +278,7 @@ export function RouteBuilder({
       {warnings.map((warning) => (
         <Card
           key={warning.id}
-          accent={warning.level === 'warn' ? 'yellow' : 'blue'}
+          accent={warning.level === 'warn' ? 'warning' : 'gray'}
           className="flex items-start gap-2 p-3.5"
         >
           {warning.level === 'warn' ? (
@@ -301,7 +301,7 @@ export function RouteSummary({ route, className }: { route: TripRoute; className
   if (route.stops.length === 0) return null;
 
   return (
-    <Card accent="green" className={cn('p-4', className)}>
+    <Card accent="feature" className={cn('p-4', className)}>
       <div className="mb-2 flex items-center justify-between">
         <p className="section-label">ทริปนี้จะเป็นแบบนี้</p>
         <span className="text-ink nums text-xs font-medium">
@@ -332,7 +332,7 @@ export function RouteSummary({ route, className }: { route: TripRoute; className
       {route.countries.length > 1 ? (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {route.countries.map((country) => (
-            <Badge key={country.code} tone="blue">
+            <Badge key={country.code} tone="feature">
               {flagOf(country.code)} {country.name} {country.nights} คืน
             </Badge>
           ))}

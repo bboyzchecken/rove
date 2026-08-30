@@ -177,7 +177,7 @@ export function ShareDialog({
           </div>
         </div>
 
-        <Badge tone="blue">ค่าใช้จ่ายและยอดหารกันไม่เคยอยู่ในลิงก์ที่แชร์</Badge>
+        <Badge tone="feature">ค่าใช้จ่ายและยอดหารกันไม่เคยอยู่ในลิงก์ที่แชร์</Badge>
       </div>
     </Sheet>
   );

@@ -24,9 +24,12 @@ import { cn } from '@/lib/utils';
  * geometry and nothing else, so a doodle cannot be authored with a fill by
  * mistake, and every mark keeps the same line weight at every size.
  *
- * COLOUR (§5.1)
- * On a hero canvas: pink, green, yellow or white. On white or cream: ink.
- * Set it with `className="text-pink"` — never hardcode a stroke.
+ * COLOUR (§5.1.2)
+ * Black on white, on the gray, and on all six light surfaces — which is
+ * everywhere in the product. The marketing hero is the single exception: a
+ * doodle there may take one of the solid accents, and only there. Set it with
+ * `className="text-feature-solid"` or, on the hero, a named
+ * `text-pink-solid` — never hardcode a `stroke`.
  *
  * SIZE (§5.1.7)
  * Scale is meant to vary wildly. One anchor mark at 200px+ carries a hero and

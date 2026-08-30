@@ -51,7 +51,7 @@ export function RouteCard({ tripId, editable }: { tripId: string; editable: bool
       </div>
 
       {flights.length === 0 ? (
-        <Card accent="blue" className="flex flex-wrap items-center justify-between gap-3 p-4">
+        <Card accent="feature" className="flex flex-wrap items-center justify-between gap-3 p-4">
           <div>
             <p className="font-display text-ink font-medium">ยังไม่ได้ใส่เที่ยวบิน</p>
             <p className="text-muted mt-0.5 text-xs">
@@ -191,7 +191,7 @@ function RouteEditor({
         {route.countries.length > 1 ? (
           <div className="flex flex-wrap gap-1.5">
             {route.countries.map((country) => (
-              <Badge key={country.code} tone="blue">
+              <Badge key={country.code} tone="feature">
                 {flagOf(country.code)} {country.name}
               </Badge>
             ))}

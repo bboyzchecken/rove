@@ -253,8 +253,8 @@ export function NewTripFlow() {
                 }}
                 className="h-full text-left"
               >
-                <Card className="hover:shadow-float flex h-full items-center gap-3.5 p-4 transition sm:flex-col sm:items-start sm:gap-3 sm:p-5">
-                  <span className="bg-primary/12 text-primary flex size-11 shrink-0 items-center justify-center rounded-2xl">
+                <Card className="hover:bg-surface flex h-full items-center gap-3.5 p-4 transition sm:flex-col sm:items-start sm:gap-3 sm:p-5">
+                  <span className="bg-feature text-ink flex size-11 shrink-0 items-center justify-center rounded-2xl">
                     <option.icon className="size-5" strokeWidth={2.2} />
                   </span>
                   <div className="flex-1 sm:flex-none">
@@ -327,7 +327,7 @@ export function NewTripFlow() {
                         it. Phones skip it: there the summary is just the next
                         block down, and a placeholder would only be noise. */}
                     {route.stops.length === 0 ? (
-                      <Card accent="blue" className="hidden p-4 lg:block">
+                      <Card accent="gray" className="hidden p-4 lg:block">
                         <p className="text-ink text-xs leading-relaxed">
                           เลือกสนามบินปลายทางแล้ว สรุปทริป — วันเดินทาง จำนวนคืน และประเทศ —
                           จะขึ้นตรงนี้ให้เห็นระหว่างกรอก
@@ -374,7 +374,7 @@ export function NewTripFlow() {
                         {parsing ? 'กำลังอ่าน…' : 'ใส่ตัวอย่างให้ดู'}
                       </Button>
                       {ticketNote ? (
-                        <Card accent="yellow" className="p-3">
+                        <Card accent="feature" className="p-3">
                           <p className="text-ink text-xs">{ticketNote}</p>
                         </Card>
                       ) : null}
@@ -411,7 +411,7 @@ export function NewTripFlow() {
                     {nights + 1} วัน {nights} คืน · {thaiRangeLabel(startDate, endDate)}
                   </p>
 
-                  <Card accent="blue" className="p-4">
+                  <Card accent="gray" className="p-4">
                     <p className="text-ink text-xs leading-relaxed">
                       ยังไม่ต้องเลือกปลายทางตอนนี้ — สร้างห้องแล้ว ROVE จะแนะนำที่ที่เหมาะกับ{' '}
                       {nights + 1} วันนี้ให้ พอจองตั๋วได้แล้วค่อยใส่เที่ยวบินทีหลัง
@@ -428,7 +428,7 @@ export function NewTripFlow() {
 
               {/* --- coordinate door -------------------------------------- */}
               {coordinating ? (
-                <Card accent="blue" className="p-4">
+                <Card accent="gray" className="p-4">
                   <p className="text-ink text-xs leading-relaxed">
                     สร้างห้องก่อนโดยยังไม่ต้องมีวัน — ทุกคนเข้ามาแตะวันที่ตัวเองว่าง แล้ว ROVE
                     จะหาช่วงที่ซ้อนกันมากที่สุดให้ พร้อมแนะนำปลายทางที่เหมาะกับจำนวนวันนั้น
@@ -522,7 +522,7 @@ export function NewTripFlow() {
           <Card className="mt-5 max-w-3xl p-4 md:mt-7 md:p-5">
             <p className="section-label mb-2">สรุปทริปที่จะสร้าง</p>
             <div className="flex flex-wrap gap-1.5">
-              <Badge tone="primary">
+              <Badge tone="ink">
                 {coordinating
                   ? 'ยังไม่กำหนดวัน'
                   : routing
@@ -531,12 +531,12 @@ export function NewTripFlow() {
               </Badge>
               {routing
                 ? route.stops.map((stop) => (
-                    <Badge key={stop.airport} tone="blue">
+                    <Badge key={stop.airport} tone="feature">
                       {stop.city} {stop.nights} คืน
                     </Badge>
                   ))
                 : null}
-              <Badge tone="green">{party} คน</Badge>
+              <Badge tone="feature">{party} คน</Badge>
             </div>
             {coordinating ? (
               <p className="text-muted mt-2 text-[11px]">
@@ -551,7 +551,7 @@ export function NewTripFlow() {
           </Card>
 
           {error ? (
-            <Card accent="primary" className="mt-3 max-w-3xl p-3">
+            <Card accent="gray" className="mt-3 max-w-3xl p-3">
               <p className="text-ink text-xs">{error}</p>
             </Card>
           ) : null}

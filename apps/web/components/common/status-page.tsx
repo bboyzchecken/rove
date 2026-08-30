@@ -23,7 +23,7 @@ export function StatusPage({
   image: string;
   /** HTTP-ish code shown as a chip — omit for states that have no code. */
   code?: string;
-  tone?: 'neutral' | 'primary' | 'yellow';
+  tone?: 'neutral' | 'ink' | 'warning';
   title: string;
   hint: React.ReactNode;
   actions?: React.ReactNode;

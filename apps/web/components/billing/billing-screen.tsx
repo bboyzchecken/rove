@@ -59,7 +59,7 @@ export function BillingScreen() {
       {/* plan ----------------------------------------------------------- */}
       <section>
         <SectionHeader label="แพ็กเกจปัจจุบัน" />
-        <Card accent="primary" className="p-5">
+        <Card accent="feature" className="p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="font-display text-ink text-lg font-medium">
@@ -69,7 +69,7 @@ export function BillingScreen() {
                 {subscription ? subscriptionStatusLine(subscription) : '—'}
               </p>
             </div>
-            <Badge tone={subscription?.status === 'active' ? 'green' : 'outline'} size="md">
+            <Badge tone={subscription?.status === 'active' ? 'feature' : 'outline'} size="md">
               {subscription?.status === 'active' ? 'กำลังใช้งาน' : 'ไม่มีค่ารายเดือน'}
             </Badge>
           </div>
@@ -131,7 +131,7 @@ export function BillingScreen() {
               title="ยังไม่เคยซื้ออะไรเลย"
               hint="ทุกทริปร่างด้วย AI ได้ฟรีอยู่แล้ว ถ้าซื้อสิทธิ์เพิ่มเมื่อไหร่ ใบเสร็จจะมาอยู่ตรงนี้"
               action={
-                <ButtonLink href="/trips" size="sm" variant="ink">
+                <ButtonLink href="/trips" size="sm" variant="primary">
                   ไปที่ทริปของฉัน
                 </ButtonLink>
               }
@@ -179,7 +179,7 @@ function OrderRow({ order }: { order: Order }) {
       <span
         className={cn(
           'flex size-9 shrink-0 items-center justify-center rounded-full',
-          order.method === 'points' ? 'bg-yellow/55' : 'bg-surface',
+          order.method === 'points' ? 'bg-orange-light' : 'bg-surface',
         )}
         aria-hidden="true"
       >

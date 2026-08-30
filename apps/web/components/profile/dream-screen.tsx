@@ -29,7 +29,7 @@ export function DreamScreen() {
 
       <DreamList />
 
-      <Card accent="blue" className="p-4">
+      <Card accent="feature" className="p-4">
         <p className="text-ink text-xs leading-relaxed">
           รายการนี้เป็นของคุณคนเดียว เพื่อนในทริปไม่เห็น — ต่างจาก &ldquo;ที่อยากไป&rdquo;
           ในห้องทริป ที่ทุกคนเห็นและ AI เอาไปใช้ร่างแพลน

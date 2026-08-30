@@ -186,7 +186,7 @@ export function AiGenerateDialog({
             unmounted by the event it is confirming — and the receipt would be
             gone before anyone read its number. */}
         {purchaseNote && !job ? (
-          <Card accent="green" className="mb-4 p-3.5">
+          <Card accent="feature" className="mb-4 p-3.5">
             <p className="text-ink text-xs leading-relaxed">{purchaseNote}</p>
             {receipt ? (
               <Link
@@ -239,7 +239,7 @@ export function AiGenerateDialog({
             </label>
 
             {aiIsStubbed ? (
-              <Badge tone="yellow" size="md">
+              <Badge tone="warning" size="md">
                 ตอนนี้ใช้ร่างตัวอย่าง ยังไม่ได้เรียกโมเดลจริง
               </Badge>
             ) : null}
@@ -261,7 +261,7 @@ export function AiGenerateDialog({
             {/* The offer, stated once and in full: price, who it covers, what
                 comes back — in that order, because the last one is the part
                 that decides it (W26.2 / W26.3). */}
-            <Card accent="primary" className="p-4">
+            <Card accent="gray" className="p-4">
               <div className="flex items-baseline justify-between gap-3">
                 <p className="font-display text-ink text-lg font-medium">Trip Pass</p>
                 <p className="font-display text-ink nums text-2xl font-medium">
@@ -339,7 +339,7 @@ export function AiGenerateDialog({
               คืนเป็นเครดิตเต็มจำนวนเมื่อมีการจองผ่าน ROVE จากทริปนี้ · คืนหนึ่งครั้งต่อทริป
             </p>
 
-            <Card accent="green" className="mt-3 p-4">
+            <Card accent="feature" className="mt-3 p-4">
               <div className="flex items-start gap-3">
                 <Gift className="text-ink mt-0.5 size-5 shrink-0" />
                 <div>
@@ -358,7 +358,7 @@ export function AiGenerateDialog({
         {/* ----------------------------------------------------- progress */}
         {job && !draft.isDone ? (
           <>
-            <Badge tone={(freeAtStart ?? 0) > 0 ? 'green' : 'primary'} size="md" className="mb-3">
+            <Badge tone={(freeAtStart ?? 0) > 0 ? 'feature' : 'ink'} size="md" className="mb-3">
               {(freeAtStart ?? 0) > 0
                 ? `ร่างรอบนี้ใช้สิทธิ์ฟรี · เหลืออีก ${freeLeft} ครั้ง`
                 : 'ร่างรอบนี้ใช้สิทธิ์ที่ซื้อไว้'}
@@ -383,7 +383,7 @@ export function AiGenerateDialog({
         {/* --------------------------------------------------------- done */}
         {draft.isDone && job?.result ? (
           <div className="animate-rove-rise mt-1">
-            <Badge tone="green" size="md" className="mb-3">
+            <Badge tone="feature" size="md" className="mb-3">
               <Check className="size-3.5" /> ร่างเสร็จแล้ว
             </Badge>
 

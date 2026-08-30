@@ -149,7 +149,7 @@ export function PublicTripView({
       </div>
 
       {perPersonJpy > 0 ? (
-        <Card accent="primary" className="mt-4 p-4">
+        <Card accent="gray" className="mt-4 p-4">
           <p className="text-muted text-xs">ค่าใช้จ่ายโดยประมาณต่อคน (เฉพาะที่อยู่ในแพลน)</p>
           <p className="font-display text-ink nums mt-1 text-2xl font-medium">
             {formatMoney(Math.round(perPersonJpy * trip.fxRate), 'THB')}
@@ -217,7 +217,7 @@ export function PublicTripView({
         ค่าใช้จ่ายจริงและยอดที่หารกันในกลุ่มไม่ถูกแชร์ในลิงก์นี้
       </p>
 
-      <Card accent="yellow" className="mt-4 p-4">
+      <Card accent="gray" className="mt-4 p-4">
         <p className="text-ink text-sm font-medium">อยากไปตามแพลนนี้ไหม</p>
         <p className="text-muted mt-1 text-xs leading-relaxed">
           ก๊อปทั้งทริปไปเป็นของตัวเอง — แก้วัน เพิ่มเพื่อน ปรับที่เที่ยวต่อได้เลย

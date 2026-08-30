@@ -72,7 +72,7 @@ export function TripHeader({ tripId }: { tripId: string }) {
           <button
             type="button"
             onClick={() => setPicking(true)}
-            className="bg-bg/90 text-ink shadow-float-sm absolute right-2 bottom-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium"
+            className="bg-ink text-white absolute right-2 bottom-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium"
           >
             <ImageUp className="size-3.5" /> เปลี่ยนรูปปก
           </button>
@@ -82,11 +82,15 @@ export function TripHeader({ tripId }: { tripId: string }) {
       <div className="mt-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-            <Badge tone="solid" size="md">
+            <Badge tone="ink" size="md">
               {STATUS_LABEL[trip.status] ?? 'กำลังวางแพลน'}
             </Badge>
             {hasDates ? (
-              <Badge tone="yellow" size="md">
+              // The room's own colour, not `warning`: this is how long the
+              // trip is, which is a fact rather than something to check. The
+              // header rides every tab, so `feature` also makes it re-colour
+              // with the room — one more surface teaching §2.2's mapping.
+              <Badge tone="feature" size="md">
                 {trip.nights + 1} วัน {trip.nights} คืน
               </Badge>
             ) : (

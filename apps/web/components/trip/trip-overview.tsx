@@ -6,6 +6,7 @@ import { CalendarSearch, Check, ChevronRight, Share2, Sparkles, UserPlus } from 
 
 import { SectionHeader, Stat } from '@/components/common/section';
 import { InviteDialog } from '@/components/trip/invite-dialog';
+import { NextTripCard } from '@/components/trip/next-trip-card';
 import { RouteCard } from '@/components/trip/route-card';
 import { TripFrameDialog } from '@/components/trip/trip-frame-dialog';
 import { Badge } from '@/components/ui/badge';
@@ -17,7 +18,7 @@ import { ShareDialog } from '@/components/trip/share-dialog';
 import { useMe } from '@/features/auth/queries';
 import { useBudget } from '@/features/plan/queries';
 import { useTripOverview } from '@/features/trip/queries';
-import { thaiRangeLabel } from '@/lib/data/domain';
+import { thaiRangeLabel, toIsoDate } from '@/lib/data/domain';
 import { formatMoney } from '@/lib/format';
 
 /**
@@ -61,10 +62,30 @@ export function TripOverview({ tripId }: { tripId: string }) {
   const pending = members.filter((m) => !m.hasWishlist);
   const hasDates = Boolean(trip.startDate && trip.endDate);
 
+  /**
+   * A room whose trip is over but which somebody is still working in.
+   *
+   * Both halves matter. The end date alone only says the holiday happened —
+   * people come back to a finished room to read it, and a card asking them to
+   * start a new trip in the middle of that is noise. An edit made *after* the
+   * last day is the actual signal: the frame is being reshaped for a holiday
+   * that has not happened yet, which is the moment before a trip gets recycled
+   * rather than reopened (see NextTripCard).
+   *
+   * The activity feed is compared by date rather than by instant because the
+   * trip's own dates are days, not timestamps — an edit on the evening of the
+   * last day is still part of that trip.
+   */
+  const ended = hasDates && trip.endDate < toIsoDate(new Date());
+  const editedSinceEnd = activity.some((event) => event.createdAt.slice(0, 10) > trip.endDate);
+
   return (
     <div className="space-y-7 pt-1">
+      {/* ------------------------------------------- finished, still edited */}
+      {ended && editedSinceEnd ? <NextTripCard tripId={tripId} surface="room" /> : null}
+
       {/* ---------------------------------------------------- checklist */}
-      <Card accent="yellow" className="p-4">
+      <Card accent="feature" className="p-4">
         <div className="mb-3 flex items-center justify-between">
           <p className="font-display text-ink font-medium">เตรียมห้องทริปให้พร้อม</p>
           <span className="text-muted nums text-xs font-medium">
@@ -117,7 +138,7 @@ export function TripOverview({ tripId }: { tripId: string }) {
 
       {/* ------------------------------------------- dates not locked yet */}
       {!hasDates && !locked ? (
-        <Card accent="primary" className="flex flex-wrap items-center justify-between gap-3 p-4">
+        <Card accent="gray" className="flex flex-wrap items-center justify-between gap-3 p-4">
           <div>
             <p className="font-display text-ink font-medium">ยังไม่มีวันเดินทาง</p>
             <p className="text-muted mt-0.5 text-xs">
@@ -141,7 +162,7 @@ export function TripOverview({ tripId }: { tripId: string }) {
           }
         />
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          <Card accent="blue" className="p-4">
+          <Card accent="gray" className="p-4">
             <Stat
               value={hasDates ? `${trip.nights + 1} วัน` : '—'}
               label={
@@ -153,10 +174,10 @@ export function TripOverview({ tripId }: { tripId: string }) {
               }
             />
           </Card>
-          <Card accent="pink" className="p-4">
+          <Card accent="gray" className="p-4">
             <Stat value={`${trip.partySize} คน`} label="เดินทางด้วยกัน" />
           </Card>
-          <Card accent="green" className="p-4">
+          <Card accent="gray" className="p-4">
             {/* Countries, not cities: on a two-country route that is the number
                 that changes how the plan is drafted (M1 — A1.3). */}
             <Stat
@@ -171,7 +192,7 @@ export function TripOverview({ tripId }: { tripId: string }) {
               }
             />
           </Card>
-          <Card accent="yellow" className="p-4">
+          <Card accent="gray" className="p-4">
             <Stat
               value={formatMoney(trip.budgetPerPersonThb, 'THB')}
               label="งบต่อคนที่ตั้งไว้"
@@ -213,7 +234,7 @@ export function TripOverview({ tripId }: { tripId: string }) {
                 </p>
               </div>
               {member.hasWishlist ? (
-                <Badge tone="green">พร้อม</Badge>
+                <Badge tone="feature">พร้อม</Badge>
               ) : (
                 <Badge tone="outline">รออยู่</Badge>
               )}
@@ -233,7 +254,7 @@ export function TripOverview({ tripId }: { tripId: string }) {
         <SectionHeader label="สถานะตอนนี้" />
         <div className="grid gap-3 sm:grid-cols-2">
           <Link href={`/t/${tripId}/wishlist`}>
-            <Card accent="green" className="h-full p-4">
+            <Card accent="wishlist" className="h-full p-4">
               <div className="flex items-center justify-between">
                 <p className="font-display text-ink font-medium">ที่อยากไปเข้าแพลนแล้ว</p>
                 <ChevronRight className="text-muted size-4" />
@@ -250,7 +271,7 @@ export function TripOverview({ tripId }: { tripId: string }) {
           </Link>
 
           <Link href={`/t/${tripId}/budget`}>
-            <Card accent="primary" className="h-full p-4">
+            <Card accent="documents" className="h-full p-4">
               <div className="flex items-center justify-between">
                 <p className="font-display text-ink font-medium">งบประมาณการต่อคน</p>
                 <ChevronRight className="text-muted size-4" />

@@ -126,7 +126,7 @@ export function DateBoard({ tripId }: { tripId: string }) {
 
       {/* ------------------------------------------------------ locked ---- */}
       {locked ? (
-        <Card accent="none" className="bg-ink text-bg p-4">
+        <Card accent="ink" className="p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="flex items-center gap-1.5 text-sm opacity-80">
@@ -261,7 +261,7 @@ export function DateBoard({ tripId }: { tripId: string }) {
           {/* --------------------------------------------- selection bar -- */}
           {mode === 'range' && range && rangeMembers ? (
             <Card
-              accent="primary"
+              accent="feature"
               className="flex flex-wrap items-center justify-between gap-3 p-4"
             >
               <div>
@@ -331,8 +331,8 @@ export function DateBoard({ tripId }: { tripId: string }) {
                             {thaiRangeLabel(window.startDate, window.endDate)}
                           </span>
                           <span className="flex items-center gap-1.5">
-                            {window.everyone ? <Badge tone="solid">ทุกคนว่าง</Badge> : null}
-                            <Badge tone="green">{window.days} วัน</Badge>
+                            {window.everyone ? <Badge tone="active">ทุกคนว่าง</Badge> : null}
+                            <Badge tone="feature">{window.days} วัน</Badge>
                           </span>
                         </div>
                         <p className="text-muted mt-1 text-xs">{window.reason}</p>
@@ -401,7 +401,7 @@ export function DateBoard({ tripId }: { tripId: string }) {
                         {submitted ? `ใส่วันว่างแล้ว · ${count} วัน` : 'ยังไม่ได้ใส่วันว่าง'}
                       </p>
                     </div>
-                    <Badge tone={submitted ? 'green' : 'outline'}>
+                    <Badge tone={submitted ? 'feature' : 'outline'}>
                       {submitted ? 'พร้อม' : 'รออยู่'}
                     </Badge>
                   </div>
@@ -410,7 +410,7 @@ export function DateBoard({ tripId }: { tripId: string }) {
             </Card>
           </section>
 
-          <Card accent="yellow" className="p-4">
+          <Card accent="feature" className="p-4">
             <p className="text-ink text-xs leading-relaxed">
               <strong>พอล็อควันแล้ว</strong> ระบบจะแนะนำปลายทางที่เหมาะกับจำนวนวัน ฤดูกาล
               และงบของกลุ่ม — แล้วค่อยไปต่อที่ &ldquo;ที่อยากไป&rdquo; เพื่อให้ AI ร่างแพลนได้

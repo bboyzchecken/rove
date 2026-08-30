@@ -31,28 +31,55 @@ import { CHARACTERS } from '@/lib/catalog/characters';
  * Landing page (M1 — W1.1). Three entry cards, each of which must reach a
  * created trip within three screens (X1.1).
  *
- * The page is the two modes in ROVE_BRAND_SPEC §1, in order, and the contrast
- * between them is the design:
+ * The page is the two modes in ROVE_BRAND_SPEC v3 §1, in order, and the
+ * contrast between them is still the design — but v3 changes what the loud
+ * half is made of:
  *
- *   Hero     a full-bleed `--brand-canvas` band. Oversized white 700 display
- *            broken by hand, one knockout word, five tilted tags overlapping
- *            the letters, four doodles at wildly different scales. Loud, and
- *            committed to it.
- *   Content  everything below. Cream → white → cream (§7 Sections), ink type
- *            at normal scale, flat untilted tags, one doodle per section in
- *            the margin. Calm, and committed to that.
+ *   Hero     the same white page as everything else, carrying oversized BLACK
+ *            700 display broken by hand, two tilted pastel tags clipping the
+ *            letters on the right, and four doodles at wildly different
+ *            scales. Loud because of the drawing and the scale, not because of
+ *            a colour field.
+ *   Content  everything below. White with §6's gray blocks on it, ink type at
+ *            normal scale, flat untilted chips, one doodle per section in the
+ *            margin. Calm, and committed to that.
  *
- * The two never blend. No tilt below the hero, no doodle overlay on a content
- * screen, and no saturated full-width band after the hero — §7 lets colour
- * return full-bleed only for a mid-page CTA or the footer, and this page uses
- * neither.
+ * v2 got its hero from a full-bleed cobalt band. §2.1 makes white the page on
+ * every screen and §2.4 allows white type only on black, so that band is gone
+ * — and the page is better for it, because the hero now demonstrates the thing
+ * it is selling: a white page with pastel rooms in it.
+ *
+ * WHERE THE SIX COLOURS APPEAR, AND WHY IT IS NOT A RAINBOW
+ * §2.5 forbids mixing feature colours on a screen and then names marketing as
+ * an exception. This page uses that licence exactly twice — the three entry
+ * cards and the six-card feature grid — and in both the colour is the FEATURE
+ * MAP being taught, in the order a visitor will meet it. Everywhere else on
+ * the page (the destination chips, the numbered steps, the stat grid) is
+ * deliberately uncoloured, because those are not features and a colour that
+ * means nothing is what v2's UAT reacted to.
+ *
+ * The hero carries no knockout slab. §3 offers one, but a black block around
+ * "ที่เดียว" cut the promise out of the stack rather than landing it — the line
+ * reads harder as one unbroken run of display type, with the hand-made break
+ * and the period doing the emphasis instead.
+ *
+ * The two modes never blend. No tilt below the hero, no doodle overlay on a
+ * content screen, and no full-bleed colour band anywhere.
  */
 
 /**
- * Colour follows §2.4's lock rather than the order the cards happen to be in:
- * a known flight is a booking (blue), known dates are the trip itself
- * (yellow), and not knowing yet is a thing you sort out with other people
- * (pink).
+ * The three ways into a trip.
+ *
+ * Colour follows §2.2's feature map, which under v3 is a stronger claim than
+ * v2's thematic lock: each of these cards is a doorway into a specific room, so
+ * it wears that room's colour and the visitor has already learned one third of
+ * the palette before they sign up. A known flight is a fixed point on the route
+ * (Itinerary, blue); known dates are the countdown (yellow); not knowing yet is
+ * the thing the group votes on (Wishlist, pink).
+ *
+ * Black text on all three (§2.4) — including the blue, which v2 set in white
+ * because its blue was a dark cobalt. This one is a pastel and white on it is
+ * 1.22:1.
  */
 const ENTRIES = [
   {
@@ -60,21 +87,21 @@ const ENTRIES = [
     icon: Plane,
     title: 'รู้เที่ยวบินแล้ว',
     hint: 'ใส่สนามบินกับวันบิน — BKK→NRT 4 ธ.ค. ถึง 08:05 — ที่เหลือ ROVE จัดให้',
-    chip: 'bg-canvas text-white',
+    chip: 'bg-blue-light text-ink',
   },
   {
     key: 'date',
     icon: CalendarDays,
     title: 'รู้วันแล้ว',
     hint: 'ลาไว้แล้ว เหลือแค่ไม่รู้จะไปไหน',
-    chip: 'bg-yellow text-yellow-deep',
+    chip: 'bg-yellow-light text-ink',
   },
   {
     key: 'coordinate',
     icon: CalendarSearch,
     title: 'ยังไม่รู้วัน',
     hint: 'ให้ทุกคนแตะวันว่าง แล้วหาช่วงที่ตรงกันก่อน',
-    chip: 'bg-pink text-pink-deep',
+    chip: 'bg-pink-light text-ink',
   },
 ] as const;
 
@@ -85,42 +112,52 @@ const STEPS = [
   { n: '4', title: 'แก้ด้วยกัน แล้วไปเที่ยว', text: 'ลากสลับได้ คุยกันในแพลน หารเงินกันจบในแอป' },
 ];
 
+/**
+ * The feature grid, and the one screen in the product where all six colours
+ * are meant to be seen at once.
+ *
+ * §2.5 names three exceptions to "one feature colour per screen", and this is
+ * the marketing form of the "legend listing all features" one: six cards, six
+ * rooms, six colours, in the order a visitor will meet them. v2's version
+ * reused pink twice and yellow twice and skipped two features entirely, which
+ * is what a decorative palette produces — this one is the map itself.
+ */
 const FEATURES = [
   {
     emoji: '🧭',
     title: 'Coverage board',
     text: 'บอกตรงๆ ว่าของใครยังไม่ได้เข้าแพลน จะได้ไม่มีใครน้อยใจทีหลัง',
-    chip: 'bg-pink text-pink-deep',
+    chip: 'bg-pink-light text-ink',
   },
   {
     emoji: '🤖',
     title: 'AI ที่บอกเหตุผล',
     text: 'ร่างฟรี 2 ครั้งต่อทริป บอกด้วยว่าทำไมถึงจัดแบบนี้ และถามกลับเมื่อไม่แน่ใจ',
-    chip: 'bg-canvas text-white',
+    chip: 'bg-blue-light text-ink',
   },
   {
     emoji: '🧾',
     title: 'น้องหาร',
     text: 'แยกของกลางกับของส่วนตัว บอกเลยว่าใครจ่ายไปเท่าไหร่ ใครต้องคืนใครกี่บาท',
-    chip: 'bg-green text-green-deep',
+    chip: 'bg-orange-light text-ink',
   },
   {
     emoji: '🐨',
     title: 'ตัวละครประจำตัว',
     text: 'เลือกได้ 20 ตัว ใช้แทนรูปโปรไฟล์ทั้งแอป เห็นปุ๊บรู้ปั๊บว่าใครเป็นใคร',
-    chip: 'bg-pink text-pink-deep',
+    chip: 'bg-purple-light text-ink',
   },
   {
     emoji: '⭐',
     title: 'ชวนเพื่อนแล้วได้แต้ม',
     text: 'แต้มจากการชวนเพื่อนและจากทริปที่เปิดสาธารณะ เอามาแลกเป็นการร่างของ AI ได้',
-    chip: 'bg-yellow text-yellow-deep',
+    chip: 'bg-yellow-light text-ink',
   },
   {
     emoji: '📊',
     title: 'สรุปทั้งปีของตัวเอง',
     text: 'ปีนี้ไปมากี่ทริป กี่วัน กี่ประเทศ ใช้เงินไปเท่าไหร่ — รวมมาให้ในที่เดียว',
-    chip: 'bg-yellow text-yellow-deep',
+    chip: 'bg-green-light text-ink',
   },
 ] as const;
 
@@ -129,30 +166,40 @@ const FEATURES = [
  * which drop on a phone is `HeroCanvas`'s business — a page choosing its own
  * coordinates is what put a tag across the knockout the first time.
  *
- * The colour mix is §4.2.5: two accents plus one ink anchor. The two accents
- * are picked so §2.4's lock still holds — dates and the trip are yellow,
- * other people are pink, and the one "serious" tag is ink.
+ * Two tags, both on the right. `HeroCanvas`'s first two slots are the
+ * right-anchored ones, so the length of this list is what keeps the left of
+ * the headline clear: the Thai lines are long and ragged, and a pill hanging
+ * off their left edge landed mid-word rather than on a letter's edge, which
+ * is the graze §4.2.4 asks for. `countdown` for the dates tag, because that is
+ * the room "หาวันว่าง" opens, and ink for the anchor §4.2.5 asks every cluster
+ * to have.
  */
 const HERO_TAGS = [
-  { label: 'หาวันว่าง', tone: 'yellow' },
+  { label: 'หาวันว่าง', tone: 'countdown' },
   { label: 'AI ร่างให้', tone: 'ink' },
-  { label: 'คุยกันในแพลน', tone: 'pink' },
-  { label: 'ชวนเพื่อน', tone: 'pink' },
-  { label: 'แพลนรายวัน', tone: 'yellow' },
 ] as const;
 
-/** Destinations are not a fixed list — these are just what the demo shows. */
-const DESTINATIONS: { label: string; tone: 'yellow' | 'blue' | 'green' | 'pink' }[] = [
-  { label: 'โตเกียว', tone: 'yellow' },
-  { label: 'โซล', tone: 'blue' },
-  { label: 'ไทเป', tone: 'green' },
-  { label: 'ดานัง', tone: 'pink' },
-  { label: 'บาหลี', tone: 'yellow' },
-  { label: 'ลิสบอน', tone: 'green' },
-  { label: 'เรคยาวิก', tone: 'blue' },
-  { label: 'เมลเบิร์น', tone: 'pink' },
-  { label: 'เม็กซิโกซิตี', tone: 'yellow' },
-  { label: 'มาร์ราเกช', tone: 'green' },
+/**
+ * Destinations are not a fixed list — these are just what the demo shows.
+ *
+ * They no longer carry a colour each. Under v3 a colour means a feature, and
+ * Tokyo is not a feature: cycling four pastels down a row of city names is
+ * decoration, which reads as §8's "pastel rainbow on one screen" and teaches
+ * the visitor that ROVE's colours mean nothing in particular — the exact habit
+ * this rebrand removes. The row is one calm band of chips, and the colour on
+ * this page is spent on the hero above it.
+ */
+const DESTINATIONS = [
+  'โตเกียว',
+  'โซล',
+  'ไทเป',
+  'ดานัง',
+  'บาหลี',
+  'ลิสบอน',
+  'เรคยาวิก',
+  'เมลเบิร์น',
+  'เม็กซิโกซิตี',
+  'มาร์ราเกช',
 ];
 
 export default function LandingPage() {
@@ -160,10 +207,10 @@ export default function LandingPage() {
     <PublicShell
       width="wide"
       bleed
-      // §7 Nav — the header floats on the hero canvas rather than sitting in a
-      // cream strip above it, which is what lets the colour run full-bleed to
-      // the top of the viewport.
-      chrome="canvas"
+      // §6 Nav — white, black wordmark, black pill on the right. The header
+      // used to float over the hero so the cobalt could run to the top of the
+      // viewport; with the hero white there is nothing to float over, and it
+      // takes an ordinary row again.
       actions={
         <>
           <Link href="/explore" className={`${heroNavLinkClass} hidden sm:inline`}>
@@ -186,30 +233,28 @@ export default function LandingPage() {
       <HeroCanvas
         eyebrow="ท่องเที่ยวไปโดยไม่มีเส้นทางตายตัว"
         /* Lines are broken by hand into a short stack (§3.1) — each `block` is
-           one line, ragged right, never centred. The knockout lands on the
-           phrase carrying the promise and takes the period §3.2 offers for
-           the extra beat. Exactly one per hero. */
+           one line, ragged right, never centred. The last line carries the
+           promise and keeps the period §3.2 offers for the extra beat; the
+           weight and the break do that work, without a knockout slab. */
         headline={
           <>
             <span className="block">วางแพลนเที่ยว</span>
             <span className="block">กันทั้งกลุ่ม</span>
-            <span className="block">
-              จบใน<span className="knockout">ที่เดียว.</span>
-            </span>
+            <span className="block">จบในที่เดียว.</span>
           </>
         }
         lead="ทุกคนหย่อนที่อยากไปลงห้องเดียวกัน AI ร่างแพลนรายวันพร้อมงบและเหตุผลให้ แล้วค่อยแก้ด้วยกัน จบทริปแล้วหารเงินกันในแอปได้เลย"
         tags={HERO_TAGS}
         anchor={Flower}
-        anchorTone="text-pink"
+        anchorTone="text-pink-light"
         marks={
           <>
             {/* Dropped on a phone, where the anchor already owns this corner
                 and the two marks read as one smudge (§10). */}
-            <StarBurst className="text-green pointer-events-none absolute top-[30%] -right-16 z-20 hidden size-24 sm:block" />
-            {/* Left of the knockout, never under it — §4.2.7 keeps that word
-                clean, and a mark clipping its corner reads as a smudge. */}
-            <Sparkle className="text-yellow pointer-events-none absolute -bottom-6 left-[6%] z-20 hidden size-12 lg:block" />
+            <StarBurst className="text-green-solid pointer-events-none absolute top-[30%] -right-16 z-20 hidden size-24 sm:block" />
+            {/* Under the start of the last line, clear of the type — a mark
+                clipping a letter's corner reads as a smudge, not a doodle. */}
+            <Sparkle className="text-yellow-solid pointer-events-none absolute -bottom-6 left-[6%] z-20 hidden size-12 lg:block" />
           </>
         }
         arrow
@@ -285,14 +330,11 @@ export default function LandingPage() {
           className="mt-8 w-full"
         />
 
-        {/* Pills are where the palette runs at full strength (§7 Tags): small
-            enough that four saturated colours in a row cost nothing against
-            §2.3, which is exactly why the cards elsewhere do not. Flat and
-            untilted — tilting is a hero-only device. */}
+        {/* Flat and untilted — tilting is a hero-only device. */}
         <div className="mt-8 flex flex-wrap items-center gap-2">
-          {DESTINATIONS.map((d) => (
-            <Badge key={d.label} tone={d.tone} size="md">
-              {d.label}
+          {DESTINATIONS.map((label) => (
+            <Badge key={label} size="md">
+              {label}
             </Badge>
           ))}
           <Badge tone="outline" size="md">
@@ -319,7 +361,7 @@ export default function LandingPage() {
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {STEPS.map((step) => (
               <div key={step.n}>
-                <span className="bg-yellow text-yellow-deep font-display flex size-9 items-center justify-center rounded-full text-sm font-medium">
+                <span className="bg-ink text-white font-display flex size-9 items-center justify-center rounded-full text-sm font-medium">
                   {step.n}
                 </span>
                 <p className="t-h3 text-ink mt-3">{step.title}</p>
@@ -368,24 +410,30 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ----------------------------------------------------- character (white)
-          The one full-strength colour block in the content half of the page,
-          and pink because §2.4 gives pink to people. */}
-      <section className="bg-surface border-border border-t">
+      {/* ----------------------------------------------------- character
+          The one full-strength colour block in the content half of the page.
+          Pink because characters are how you appear to the group, and Wishlist
+          is the feature about people wanting things together — the closest
+          room this block belongs to. §2.2's pairs replaced v2's thematic
+          "pink = people", so the colour has to be argued from a feature now
+          rather than from a mood. */}
+      <section className="border-border border-t bg-white">
         <div className={`${SHELL_SECTION} py-16`}>
-          <Card accent="pink" className="relative overflow-hidden p-6 sm:p-8">
-            <Heart className="text-pink-deep/25 pointer-events-none absolute -top-3 -right-3 size-24" />
+          <Card accent="wishlist" className="relative overflow-hidden p-6 sm:p-8">
+            {/* Solid pink at doodle scale, over the light pink fill — §2.3's
+                small-and-loud against big-and-calm. */}
+            <Heart className="text-pink-solid pointer-events-none absolute -top-3 -right-3 size-24" />
             <div className="relative flex flex-wrap items-center justify-between gap-6">
               <div className="max-w-md">
                 {/* No circle-around on the number. Ringing "20 แบบ" drew a box
                     around it, and a number in a box reads as a cap — the
                     opposite of what the sentence is offering. */}
                 <p className="t-h2">เลือกตัวละครของตัวเองได้ 20 แบบ</p>
-                <p className="text-pink-mid t-small mt-3">
+                <p className="text-ink t-small mt-3">
                   ไม่ต้องอัปรูป ไม่ต้องคิดชื่อเล่น — เลือกตัวที่ใช่ แล้วมันจะตามคุณไปทุกทริป
                   ทั้งในรายชื่อสมาชิก คอมเมนต์ และบิลที่หารกัน
                 </p>
-                <ButtonLink href="/profile" variant="ink" size="sm" className="mt-5">
+                <ButtonLink href="/profile" variant="primary" size="sm" className="mt-5">
                   ดูตัวละครทั้งหมด
                 </ButtonLink>
               </div>

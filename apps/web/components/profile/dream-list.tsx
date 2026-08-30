@@ -40,7 +40,7 @@ export function DreamList() {
       ) : null}
 
       {dreams.map((dream) => (
-        <Card key={dream.id} accent={dream.accent} className="p-4">
+        <Card key={dream.id} accent="feature" className="p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-ink text-sm font-medium">{dream.title}</p>

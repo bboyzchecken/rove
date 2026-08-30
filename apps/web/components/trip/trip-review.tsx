@@ -129,7 +129,7 @@ function ReviewForm({
           {save.isPending ? 'กำลังบันทึก…' : mine ? 'อัปเดตรีวิว' : 'บันทึกรีวิว'}
         </Button>
         {save.isSuccess && !save.isPending ? (
-          <span className="text-green text-xs">บันทึกแล้ว</span>
+          <span className="text-success text-xs">บันทึกแล้ว</span>
         ) : null}
         {save.isError ? (
           <span className="text-warning text-xs">บันทึกไม่สำเร็จ — ลองใหม่</span>
@@ -190,7 +190,7 @@ export function Stars({ value }: { value: number }) {
   return (
     <span className="flex items-center gap-0.5" aria-label={`${value} จาก 5 ดาว`}>
       {[1, 2, 3, 4, 5].map((n) => (
-        <Star key={n} className={cn('size-3', n <= value ? 'fill-yellow text-yellow' : 'text-border')} />
+        <Star key={n} className={cn('size-3', n <= value ? 'fill-ink text-ink' : 'text-border')} />
       ))}
     </span>
   );
@@ -208,7 +208,7 @@ function StarPicker({ value, onChange }: { value: number; onChange: (n: number) 
           onClick={() => onChange(n)}
           className="hover:bg-surface rounded-full p-1 transition"
         >
-          <Star className={cn('size-6', n <= value ? 'fill-yellow text-yellow' : 'text-border')} />
+          <Star className={cn('size-6', n <= value ? 'fill-ink text-ink' : 'text-border')} />
         </button>
       ))}
     </div>

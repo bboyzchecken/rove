@@ -100,10 +100,10 @@ export function TripNowScreen({ tripId }: { tripId: string }) {
           </p>
 
           {upcoming?.now ? (
-            <NowCard item={upcoming.now} label="ตอนนี้" accent="primary" />
+            <NowCard item={upcoming.now} label="ตอนนี้" accent="feature" />
           ) : null}
           {upcoming?.next ? (
-            <NowCard item={upcoming.next} label="ต่อไป" accent="green" />
+            <NowCard item={upcoming.next} label="ต่อไป" accent="gray" />
           ) : null}
 
           {upcoming && upcoming.rest.length > 0 ? (
@@ -148,7 +148,7 @@ function NowCard({
 }: {
   item: PlanItem;
   label: string;
-  accent: 'primary' | 'green';
+  accent: 'feature' | 'gray';
 }) {
   return (
     <Card accent={accent} className="mt-4 p-4">

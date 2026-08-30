@@ -60,30 +60,19 @@ export function PublicShell({
    * sections so they still line up with the header.
    */
   bleed = false,
-  /**
-   * `canvas` floats the header over a full-bleed hero instead of sitting above
-   * it (ROVE_BRAND_SPEC §7 Nav: transparent over the canvas, white wordmark).
-   * The page underneath must leave `HEADER_HEIGHT` of room at the top of its
-   * first section — `HERO_TOP` is that measurement, exported so the two cannot
-   * drift apart.
-   */
-  chrome = 'default',
   actions,
   children,
 }: {
   width?: ShellWidth;
   center?: boolean;
   bleed?: boolean;
-  chrome?: 'default' | 'canvas';
   /** The page's own call to action, right of the language switch. */
   actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const onCanvas = chrome === 'canvas';
-
   return (
-    <div className={cn('flex min-h-dvh flex-col', onCanvas && 'relative')}>
-      <SiteHeader actions={actions} onCanvas={onCanvas} />
+    <div className="flex min-h-dvh flex-col">
+      <SiteHeader actions={actions} />
 
       <main
         className={cn(
@@ -104,13 +93,17 @@ export function PublicShell({
 export const SHELL_SECTION = `mx-auto ${WIDTH.wide} ${GUTTER}`;
 
 /**
- * The room a `chrome="canvas"` hero must leave for the floating header.
- * Exported rather than written as a literal on the page, so the clearance and
- * `HEADER_HEIGHT` cannot drift apart.
+ * Top spacing for a hero's first section.
+ *
+ * v2 exported this as `pt-14` because the header floated *over* a full-bleed
+ * cobalt hero and the content had to clear it. v3 has no coloured hero to
+ * float over — the header and the hero are the same white page — so the header
+ * takes an ordinary row again and the hero only needs a little air under it.
+ * The constant stays so the marketing pages keep one place to change it.
  */
-export const HERO_TOP = 'pt-14';
+export const HERO_TOP = 'pt-2';
 
-function SiteHeader({ actions, onCanvas }: { actions?: React.ReactNode; onCanvas?: boolean }) {
+function SiteHeader({ actions }: { actions?: React.ReactNode }) {
   return (
     <header
       className={cn(
@@ -118,14 +111,13 @@ function SiteHeader({ actions, onCanvas }: { actions?: React.ReactNode; onCanvas
         HEADER_HEIGHT,
         WIDTH.wide,
         GUTTER,
-        // Over a hero canvas the header does not take a row of its own — it
-        // floats on the colour, which is what makes the canvas read as
-        // full-bleed rather than as a band below a cream strip.
-        onCanvas && 'absolute inset-x-0 top-0 z-30',
       )}
     >
       <Link href="/" aria-label={`${env.brandName} — หน้าแรกของเว็บ`}>
-        <RoveLogo size="sm" tone={onCanvas ? 'canvas' : 'light'} />
+        {/* §6 Nav: black wordmark on white. The period picks up whatever
+            `data-feature` is in scope, which on marketing is none — so it
+            resolves to ink and reads as part of the word. */}
+        <RoveLogo size="sm" />
       </Link>
 
       <div className="flex items-center gap-2">

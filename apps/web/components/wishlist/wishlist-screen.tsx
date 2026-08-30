@@ -24,7 +24,7 @@ export function WishlistScreen({ tripId }: { tripId: string }) {
 
       <section>
         <SectionHeader label="สรุปว่าของใครเข้าแพลนแล้วบ้าง" />
-        <Card accent="green" className="p-4">
+        <Card accent="feature" className="p-4">
           <div className="grid grid-cols-3 gap-4">
             <Stat value={`${coverage?.percent ?? 0}%`} label="เข้าแพลนแล้ว" />
             <Stat
@@ -56,7 +56,7 @@ export function WishlistScreen({ tripId }: { tripId: string }) {
         </Card>
 
         {pending.length > 0 ? (
-          <Card accent="yellow" className="mt-3 flex items-center gap-3 p-3.5">
+          <Card accent="gray" className="mt-3 flex items-center gap-3 p-3.5">
             <CharacterAvatar characterId={pending[0]!.characterId} size="sm" />
             <p className="text-ink flex-1 text-xs leading-relaxed">
               <span className="font-medium">{pending.map((m) => m.name).join(', ')}</span>{' '}

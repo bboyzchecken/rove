@@ -31,11 +31,11 @@ const PAGE_SIZE = 12;
 
 /** §4.2.5 — two accents plus the ink anchor. Real categories, not slogans. */
 const HERO_TAGS = [
-  { label: 'ก๊อปได้เลย', tone: 'green' },
+  { label: 'ก๊อปได้เลย', tone: 'itinerary' },
   { label: 'ทริปจริง', tone: 'ink' },
-  { label: 'เจ้าของเปิดเอง', tone: 'pink' },
-  { label: 'แก้ต่อได้', tone: 'green' },
-  { label: 'มีรีวิว', tone: 'pink' },
+  { label: 'เจ้าของเปิดเอง', tone: 'wishlist' },
+  { label: 'แก้ต่อได้', tone: 'memo' },
+  { label: 'มีรีวิว', tone: 'journal' },
 ] as const;
 
 const QUICK_FILTERS = [
@@ -98,9 +98,9 @@ export function ExploreScreen({ signedIn }: { signedIn: boolean }) {
           lead="ทุกแพลนคือทริปจริงที่เจ้าของเปิดสาธารณะ — กดก๊อปไปเป็นของตัวเองแล้วแก้ต่อได้เลย"
           tags={HERO_TAGS}
           anchor={Spiral}
-          anchorTone="text-green"
+          anchorTone="text-green-light"
           marks={
-            <Flower className="text-yellow pointer-events-none absolute top-[26%] -right-14 z-20 hidden size-20 sm:block" />
+            <Flower className="text-yellow-solid pointer-events-none absolute top-[26%] -right-14 z-20 hidden size-20 sm:block" />
           }
         />
       }

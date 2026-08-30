@@ -86,7 +86,7 @@ export function DiscussionScreen({ tripId }: { tripId: string }) {
                       <span className="text-muted text-[11px]">
                         {new Date(comment.createdAt).toLocaleDateString('th-TH')}
                       </span>
-                      {comment.resolved ? <Badge tone="green">จบแล้ว</Badge> : null}
+                      {comment.resolved ? <Badge tone="feature">จบแล้ว</Badge> : null}
                     </div>
                     <p className="text-ink mt-1 text-sm leading-relaxed">{comment.body}</p>
                   </div>

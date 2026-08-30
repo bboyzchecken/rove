@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 
 import { SectionHeader, Stat } from '@/components/common/section';
+import { NextTripCard } from '@/components/trip/next-trip-card';
 import { TripCover } from '@/components/trip/trip-cover';
 import { TripReviewCard } from '@/components/trip/trip-review';
 import { Badge } from '@/components/ui/badge';
@@ -53,7 +54,26 @@ const DECISION_ICON: Record<RecapDecisionKind, typeof CalendarCheck> = {
   vote: ThumbsUp,
 };
 
-const SPEND_ACCENT = ['bg-primary', 'bg-green', 'bg-blue', 'bg-yellow', 'bg-pink'] as const;
+/**
+ * The spend breakdown's bars.
+ *
+ * Five categories, and v2 gave them five hues — which under v3 would be five
+ * feature identities on a screen that belongs to Journal, and would tell the
+ * reader that "ที่พัก" is somehow the Wishlist of spending. A category is not a
+ * feature.
+ *
+ * One hue at four depths instead, plus ink for the largest. The bars are
+ * already sorted by amount, so the ramp is not decoration — it runs the same
+ * direction as the data, and a reader can rank the categories from the bars
+ * alone in a way five unrelated pastels never allowed.
+ */
+const SPEND_ACCENT = [
+  'bg-ink',
+  'bg-feature-solid',
+  'bg-feature',
+  'bg-feature/60',
+  'bg-feature/35',
+] as const;
 
 export function TripRecapScreen({ tripId }: { tripId: string }) {
   const { data: recap, isLoading } = useTripRecap(tripId);
@@ -115,7 +135,7 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
           <div className="mb-1.5 flex flex-wrap items-center gap-2">
             <Badge tone="neutral">จบทริปแล้ว</Badge>
             {isPublic ? (
-              <Badge tone="green">
+              <Badge tone="feature">
                 <Globe className="size-3" /> เปิดสาธารณะ
               </Badge>
             ) : null}
@@ -147,7 +167,7 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
       {/* ------------------------------------------------------ publish */}
       <section className="px-4">
         {isPublic ? (
-          <Card accent="green" className="p-4">
+          <Card accent="feature" className="p-4">
             <p className="font-display text-ink font-medium">ทริปนี้เปิดสาธารณะอยู่</p>
             <p className="text-muted mt-1 text-xs">
               ทุกครั้งที่มีคนก๊อปแพลนนี้ไปแล้วจองตาม คุณได้แต้มเพิ่ม —
@@ -172,7 +192,7 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
             </p>
           </Card>
         ) : recap.canPublish ? (
-          <Card accent="yellow" className="p-4">
+          <Card accent="gray" className="p-4">
             <div className="flex items-start gap-3">
               <span className="bg-bg text-primary flex size-9 shrink-0 items-center justify-center rounded-2xl">
                 <Sparkles className="size-4" />
@@ -313,6 +333,17 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
           </Card>
         </section>
       ) : null}
+
+      {/* ----------------------------------------------------- next trip
+          The last thing read on a finished trip is how the next one starts.
+          It sits below publishing on purpose: the card above turns this trip
+          into something other people can use, and this one turns it into the
+          starting point of your own next one — and both are arguments for
+          leaving the trip finished rather than editing it into the next
+          holiday. See NextTripCard for why that argument is worth making. */}
+      <section className="px-4">
+        <NextTripCard tripId={tripId} surface="recap" />
+      </section>
     </div>
   );
 }

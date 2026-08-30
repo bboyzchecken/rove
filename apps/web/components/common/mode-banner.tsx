@@ -34,7 +34,7 @@ export function ModeBanner() {
   }
 
   return (
-    <div className="bg-yellow/55 text-ink flex items-center justify-center gap-3 px-4 py-1.5 text-[11px]">
+    <div className="bg-orange-light text-ink flex items-center justify-center gap-3 px-4 py-1.5 text-[11px]">
       <span className="flex items-center gap-1.5 font-medium">
         <FlaskConical className="size-3.5" /> {dataModeLabel}
       </span>

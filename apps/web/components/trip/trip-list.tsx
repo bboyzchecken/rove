@@ -22,10 +22,13 @@ import { formatMoney } from '@/lib/format';
  * trips in flight, "ทริปนี้" is a guess. The list names them, and the room is
  * one tap deeper.
  */
-const STATUS: Record<string, { label: string; tone: 'solid' | 'green' | 'yellow' | 'neutral' }> = {
-  planning: { label: 'กำลังวางแพลน', tone: 'solid' },
-  ready: { label: 'พร้อมเดินทาง', tone: 'green' },
-  ongoing: { label: 'กำลังเที่ยว', tone: 'yellow' },
+const STATUS: Record<
+  string,
+  { label: string; tone: 'outline' | 'feature' | 'active' | 'neutral' }
+> = {
+  planning: { label: 'กำลังวางแพลน', tone: 'outline' },
+  ready: { label: 'พร้อมเดินทาง', tone: 'feature' },
+  ongoing: { label: 'กำลังเที่ยว', tone: 'active' },
   done: { label: 'จบทริปแล้ว', tone: 'neutral' },
 };
 
