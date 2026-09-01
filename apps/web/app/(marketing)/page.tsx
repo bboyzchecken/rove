@@ -1,14 +1,7 @@
-import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, CalendarDays, CalendarSearch, Plane } from 'lucide-react';
 
-import {
-  DottedPath,
-  Flower,
-  Heart,
-  Sparkle,
-  StarBurst,
-} from '@/components/brand/doodle';
+import { DottedPath, Flower, Sparkle, StarBurst } from '@/components/brand/doodle';
 import {
   HeroCanvas,
   heroButtonClass,
@@ -73,9 +66,16 @@ import { CHARACTERS } from '@/lib/catalog/characters';
  * Colour follows §2.2's feature map, which under v3 is a stronger claim than
  * v2's thematic lock: each of these cards is a doorway into a specific room, so
  * it wears that room's colour and the visitor has already learned one third of
- * the palette before they sign up. A known flight is a fixed point on the route
- * (Itinerary, blue); known dates are the countdown (yellow); not knowing yet is
- * the thing the group votes on (Wishlist, pink).
+ * the palette before they sign up. Known dates are the countdown (yellow); a
+ * known flight is a fixed point on the route (Itinerary, blue); not knowing yet
+ * is the thing the group votes on (Wishlist, pink).
+ *
+ * THE ORDER IS NOT FREE. The lead sentence above the grid offers the three
+ * starting points in words before the cards repeat them in colour, so the two
+ * lists have to run in the same order — "รู้แค่วันก็ได้ รู้แค่ตั๋วก็ได้ หรือยังไม่รู้อะไร
+ * เลยก็ได้". Feedback #1 caught this list running ticket-first under a lead that
+ * says dates-first, which makes a reader re-map one line against the other
+ * mid-sentence. Change one and you must change the other.
  *
  * Black text on all three (§2.4) — including the blue, which v2 set in white
  * because its blue was a dark cobalt. This one is a pastel and white on it is
@@ -83,18 +83,18 @@ import { CHARACTERS } from '@/lib/catalog/characters';
  */
 const ENTRIES = [
   {
-    key: 'route',
-    icon: Plane,
-    title: 'รู้เที่ยวบินแล้ว',
-    hint: 'ใส่สนามบินกับวันบิน — BKK→NRT 4 ธ.ค. ถึง 08:05 — ที่เหลือ ROVE จัดให้',
-    chip: 'bg-blue-light text-ink',
-  },
-  {
     key: 'date',
     icon: CalendarDays,
     title: 'รู้วันแล้ว',
     hint: 'ลาไว้แล้ว เหลือแค่ไม่รู้จะไปไหน',
     chip: 'bg-yellow-light text-ink',
+  },
+  {
+    key: 'route',
+    icon: Plane,
+    title: 'รู้เที่ยวบินแล้ว',
+    hint: 'ใส่สนามบินกับวันบิน — BKK→NRT 4 ธ.ค. ถึง 08:05 — ที่เหลือ ROVE จัดให้',
+    chip: 'bg-blue-light text-ink',
   },
   {
     key: 'coordinate',
@@ -105,11 +105,48 @@ const ENTRIES = [
   },
 ] as const;
 
+/**
+ * The four steps, and the second place on this page where the feature map is
+ * taught rather than decorated (§2.5's marketing exception, same licence the
+ * entry cards and the feature grid use).
+ *
+ * The numbers were four identical black discs, which is what Feedback #1
+ * reacted to: four of the same mark in a row reads as footnote numbering, not
+ * as a route through the product. Each disc now wears the colour of the room
+ * that step actually opens, so the sequence teaches four sixths of the palette
+ * on the way past.
+ *
+ * Not a rainbow, and not free choice: pink is the wishlist room people gather
+ * in, purple is memo — the things each person drops in, blue is the itinerary
+ * that comes back out, orange is Documents & Finance where the trip settles up.
+ * Light surfaces with `text-ink` on them, because §2.4 rules out white type on
+ * a pastel and these discs are pastel now.
+ *
+ * The copy is deliberately shorter than it was. Feedback #1 cut "ทุกคนเห็นอัน
+ * เดียวกัน" off step 1 and the "ต้องไป / ไปได้ก็ดี / ไม่เอา" enumeration off step
+ * 2 — the steps are a route, not the manual, and the detail belongs to the
+ * screens themselves. Do not put it back.
+ */
 const STEPS = [
-  { n: '1', title: 'เปิดห้องทริป', text: 'ชวนเพื่อนเข้ามาด้วยลิงก์เดียว ทุกคนเห็นอันเดียวกัน' },
-  { n: '2', title: 'ทุกคนหย่อนที่อยากไป', text: 'ต้องไป / ไปได้ก็ดี / ไม่เอา — ไม่ต้องรอใครสรุป' },
-  { n: '3', title: 'ให้ AI ร่างให้', text: 'จัดวันให้ตามโซน เวลาเปิด-ปิด และพยากรณ์อากาศ' },
-  { n: '4', title: 'แก้ด้วยกัน แล้วไปเที่ยว', text: 'ลากสลับได้ คุยกันในแพลน หารเงินกันจบในแอป' },
+  { n: '1', title: 'เปิดห้องทริป', text: 'ชวนเพื่อนในลิงก์เดียว', chip: 'bg-pink-light text-ink' },
+  {
+    n: '2',
+    title: 'หย่อนสถานที่ที่อยากไป',
+    text: 'ไม่ต้องรอใคร',
+    chip: 'bg-purple-light text-ink',
+  },
+  {
+    n: '3',
+    title: 'ให้ AI ร่างให้',
+    text: 'ผู้ช่วยประจำทริป จัดวัน เช็คสถานที่ และสภาพอากาศ',
+    chip: 'bg-blue-light text-ink',
+  },
+  {
+    n: '4',
+    title: 'แก้ด้วยกัน เที่ยวด้วยกัน',
+    text: 'ปรับสลับทริป เปลี่ยนแผนตามสะดวก หารเงินจบในทริป',
+    chip: 'bg-orange-light text-ink',
+  },
 ];
 
 /**
@@ -281,7 +318,13 @@ export default function LandingPage() {
         <div className={`${SHELL_SECTION} py-16`}>
           <SectionIntro
             title="เริ่มจากสิ่งที่คุณรู้อยู่แล้ว"
-            lead="รู้แค่วันก็ได้ รู้แค่ตั๋วก็ได้ หรือยังไม่รู้อะไรเลยก็ได้ — ไม่เกินสามหน้าจอก็มีห้องทริปให้เพื่อนเข้ามาแล้ว"
+            /* The half after the dash used to be "ไม่เกินสามหน้าจอก็มีห้องทริปให้
+               เพื่อนเข้ามาแล้ว", which made one sentence carry two claims — where
+               you can start, and how fast you get there — and answered the
+               second with a group of friends nobody had mentioned yet. The
+               section is about the first claim, so it now only makes that one.
+               The card order below follows this list; see ENTRIES. */
+            lead="รู้แค่วันก็ได้ รู้แค่ตั๋วก็ได้ หรือยังไม่รู้อะไรเลยก็ได้ — เริ่มจากตรงไหนก็เปิดทริปได้"
           />
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
             {ENTRIES.map((entry) => (
@@ -312,22 +355,20 @@ export default function LandingPage() {
           This was a bare row of pills under an 11px label, sitting between the
           hero and the entry cards with nothing to say what it was — it read as
           a leftover rather than a section. It now carries the heading it
-          needed and the illustration that actually matches it: landmarks from
-          five continents strung along a dotted route is a picture of "anywhere
-          in the world", which is the claim the pills are the evidence for. */}
+          needed, and the pills sit directly under the sentence that makes them
+          evidence rather than a full-width illustration away from it.
+
+          The illustration is gone (Feedback #1). A drawing of landmarks is a
+          claim about the world, and the section's own lead says the row below
+          is "ตัวอย่างจากทริปที่คนเปิดสาธารณะไว้" — real trips people published.
+          Drawn landmarks were standing where that evidence belongs. Phase 3
+          puts the evidence itself here: a mosaic of published trips sized by
+          how many people looked at them. Until then the section is heading,
+          lead and pills, which is short but honest. */}
       <section className={`${SHELL_SECTION} py-16`}>
         <SectionIntro
           title="จะไปมุมไหนของโลก ก็วางแพลนที่นี่ได้"
           lead="ROVE ไม่ได้ผูกกับประเทศไหนเป็นพิเศษ ที่เห็นข้างล่างเป็นแค่ตัวอย่างจากทริปที่คนเปิดสาธารณะไว้"
-        />
-
-        <Image
-          src="/brand/hero-landing.webp"
-          alt="แลนด์มาร์กจากหลายทวีปเรียงกัน มีเส้นทางจุดไข่ปลาลากผ่านหมุดสถานที่ และกลุ่มเพื่อนสะพายเป้เดินอยู่ด้านหน้า"
-          width={1440}
-          height={816}
-          priority
-          className="mt-8 w-full"
         />
 
         {/* Flat and untilted — tilting is a hero-only device. */}
@@ -352,7 +393,17 @@ export default function LandingPage() {
         <div className={`${SHELL_SECTION} relative py-16`}>
           <SectionIntro
             title="แชทเลื่อนหาย แต่แพลนไม่ควรหายไปด้วย"
-            lead="ที่อยากไปของแต่ละคน วันว่างที่ไม่ตรงกัน บิลที่ยังไม่ได้หาร — ทั้งหมดอยู่ในห้องเดียว และไม่มีใครต้องรับหน้าที่สรุป"
+            /* Broken by hand, not left to wrap. The line is a list of three
+               problems followed by the answer to all three, and where the
+               answer starts is the whole rhetorical turn — letting the column
+               width decide moves that turn on every screen size. */
+            lead={
+              <>
+                สถานที่ที่อยากไป วันว่างที่ไม่ตรงกัน บิลที่ยังไม่ได้หาร
+                <br />
+                ทั้งหมดอยู่ในหน้าเดียว และไม่ต้องมีใครรับหน้าที่สรุป
+              </>
+            }
             underline
           />
           {/* The dotted path is the journey mark (§5.2) — this is the one
@@ -361,7 +412,9 @@ export default function LandingPage() {
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {STEPS.map((step) => (
               <div key={step.n}>
-                <span className="bg-ink text-white font-display flex size-9 items-center justify-center rounded-full text-sm font-medium">
+                <span
+                  className={`font-display flex size-9 items-center justify-center rounded-full text-sm font-medium ${step.chip}`}
+                >
                   {step.n}
                 </span>
                 <p className="t-h3 text-ink mt-3">{step.title}</p>
@@ -392,8 +445,11 @@ export default function LandingPage() {
       {/* ------------------------------------------------------ features (cream) */}
       <section className={`${SHELL_SECTION} py-16`}>
         <SectionIntro
-          title="สิ่งที่แอปวางแพลนอื่นไม่ค่อยมี"
-          lead="ส่วนใหญ่ช่วยเก็บรายการที่อยากไป แต่ไม่ได้ช่วยตอนที่กลุ่มต้องตัดสินใจ หรือตอนที่ต้องเคลียร์เงินกันทีหลัง"
+          /* Was "สิ่งที่แอปวางแพลนอื่นไม่ค่อยมี" — a heading that spends its first
+             three words on the competition and only reaches ROVE by implication.
+             This one leads with what we have and lets the comparison follow. */
+          title="สิ่งที่เรามี ไม่เหมือนที่อื่น"
+          lead="ส่วนใหญ่ช่วยเก็บรายการที่อยากไป แต่ไม่ได้ช่วยตอนที่ต้องตัดสินใจ และตอนที่ต้องเคลียร์เงินกันทีหลัง"
         />
         <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => (
@@ -411,30 +467,46 @@ export default function LandingPage() {
       </section>
 
       {/* ----------------------------------------------------- character
-          The one full-strength colour block in the content half of the page.
-          Pink because characters are how you appear to the group, and Wishlist
-          is the feature about people wanting things together — the closest
-          room this block belongs to. §2.2's pairs replaced v2's thematic
-          "pink = people", so the colour has to be argued from a feature now
-          rather than from a mood. */}
+          This was the one full-strength colour block in the content half of the
+          page — a light-pink card carrying a solid-pink heart at doodle scale.
+          Feedback #1 asked for the fill gone and a plain gray-bordered card in
+          its place, and it is the right call for a reason beyond taste: the
+          block sits last on the page and now ends with the only sign-up CTA
+          outside the nav, so the eye should land on the black pill, not on a
+          pink field competing with it. §2.3's small-and-loud has nothing to be
+          loud against once the surface is white, so the heart goes too. */}
       <section className="border-border border-t bg-white">
         <div className={`${SHELL_SECTION} py-16`}>
-          <Card accent="wishlist" className="relative overflow-hidden p-6 sm:p-8">
-            {/* Solid pink at doodle scale, over the light pink fill — §2.3's
-                small-and-loud against big-and-calm. */}
-            <Heart className="text-pink-solid pointer-events-none absolute -top-3 -right-3 size-24" />
+          <Card className="relative overflow-hidden p-6 sm:p-8">
             <div className="relative flex flex-wrap items-center justify-between gap-6">
               <div className="max-w-md">
                 {/* No circle-around on the number. Ringing "20 แบบ" drew a box
                     around it, and a number in a box reads as a cap — the
                     opposite of what the sentence is offering. */}
                 <p className="t-h2">เลือกตัวละครของตัวเองได้ 20 แบบ</p>
+                {/*
+                  "ไม่ต้องคิดชื่อเล่น" was here and it was simply untrue: the
+                  profile sheet asks for ชื่อที่แสดง and always has. The line
+                  promised the opposite of what the product does, so it is
+                  replaced by the invitation to use the field.
+                */}
                 <p className="text-ink t-small mt-3">
-                  ไม่ต้องอัปรูป ไม่ต้องคิดชื่อเล่น — เลือกตัวที่ใช่ แล้วมันจะตามคุณไปทุกทริป
+                  ไม่ต้องอัปรูป — ใส่ชื่อที่อยากให้เพื่อนเห็น แล้วเลือกตัวที่ใช่ มันจะตามคุณไปทุกทริป
                   ทั้งในรายชื่อสมาชิก คอมเมนต์ และบิลที่หารกัน
                 </p>
-                <ButtonLink href="/profile" variant="primary" size="sm" className="mt-5">
-                  ดูตัวละครทั้งหมด
+                {/*
+                  Was "ดูตัวละครทั้งหมด" pointing at /profile, which is behind
+                  the sign-in wall — so every reader of this page, none of whom
+                  has an account yet, was bounced to /login with a `next` they
+                  never asked for. The button now says what that bounce was
+                  really asking for.
+
+                  /login and not a /signup route: there is no separate sign-up
+                  in ROVE. The API creates the account on the first successful
+                  OAuth login, so this one door covers both (see LoginScreen).
+                */}
+                <ButtonLink href="/login" variant="primary" size="sm" className="mt-5">
+                  GO GET ACCOUNT
                 </ButtonLink>
               </div>
               <div className="flex max-w-xs flex-wrap gap-1.5">
