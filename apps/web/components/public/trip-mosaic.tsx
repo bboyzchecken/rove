@@ -5,7 +5,6 @@ import Link from 'next/link';
 
 import { CharacterAvatar } from '@/components/ui/character-avatar';
 import { useExplore } from '@/features/public/queries';
-import { flagOf } from '@/lib/data/airports';
 import type { ExploreTrip } from '@/lib/data/types';
 import { COVER_HEIGHT, COVER_WIDTH } from '@/lib/covers';
 import { cn } from '@/lib/utils';
@@ -100,8 +99,18 @@ const GROUNDS = [
  * A hand-kept map would cover exactly the countries we seeded and then fail
  * silently the first time somebody publishes a trip to one we did not think
  * of. `Intl.DisplayNames` knows every region code and returns the code itself
- * for anything it cannot name, so an unknown country degrades to "XK" beside
- * its flag rather than to an empty tile.
+ * for anything it cannot name, so an unknown country degrades to its own code
+ * rather than to an empty tile.
+ *
+ * NO FLAG BESIDE IT. The first version of this put `flagOf(country)` in front
+ * of the name and it was wrong twice over. Windows ships no flag glyphs, so a
+ * regional-indicator pair falls back to two boxed letters — the tiles read
+ * "JP ญี่ปุ่น", "KR เกาหลีใต้" on the platform this was reviewed on. That is
+ * exactly the OS-dependent emoji problem that moved the feature grid off emoji
+ * and onto lucide in the first place, so shipping it here contradicted the
+ * decision one section above. And even where flags do render, the name is
+ * already in the reader's language directly beside it: the flag was repeating
+ * the only word on the tile that was never ambiguous.
  */
 const REGION = new Intl.DisplayNames(['th'], { type: 'region' });
 
@@ -126,19 +135,42 @@ export function TripMosaicSection({ className }: { className?: string }) {
   return (
     <div className={cn('grid auto-rows-[132px] grid-cols-2 gap-3 sm:grid-cols-4', className)}>
       {trips.map((trip, i) => (
-        <Tile key={trip.slug} trip={trip} span={SPANS[i]} ground={GROUNDS[i % GROUNDS.length]!} />
+        <Tile
+          key={trip.slug}
+          trip={trip}
+          span={SPANS[i]}
+          ground={GROUNDS[i % GROUNDS.length]!}
+          // Only the 2x2 leader is tall enough to hold a 3:2 cover. See Tile.
+          photo={i === 0}
+        />
       ))}
     </div>
   );
 }
 
-function Tile({ trip, span, ground }: { trip: ExploreTrip; span?: string; ground: string }) {
-  // The leader carries the picture and the owner; the small tiles carry the
-  // line of facts alone. Feedback #1 spelled the split out — big tiles are
-  // "Photo / Country / กี่วัน งบ โปรไฟล์เจ้าของ" and small ones "Country / วัน
-  // งบ" — and it is the right call: a 3:2 cover inside a 1x1 tile is a stamp,
-  // and a stamp of a drawing is not evidence of anything.
-  const lead = Boolean(span);
+function Tile({
+  trip,
+  span,
+  ground,
+  photo,
+}: {
+  trip: ExploreTrip;
+  span?: string;
+  ground: string;
+  photo?: boolean;
+}) {
+  // Three tile sizes, two tiers of content, and the picture belongs to exactly
+  // one tile. Feedback #1 asked for "Photo / Country / กี่วัน งบ โปรไฟล์เจ้าของ"
+  // on the big one and "Country / วัน งบ" on the small — this layout has a
+  // middle size the note did not, so the owner (cheap, one line) extends to it
+  // and the photo does not.
+  //
+  // The photo does not, because it CANNOT: a 2x1 tile is 132px tall, the two
+  // lines of text take most of it, and `flex-1` handed the cover the dozen
+  // pixels left over. It rendered as a faint smear in the corner — worse than
+  // no picture, since a reader sees something went wrong rather than seeing a
+  // deliberately spare tile.
+  const withOwner = Boolean(span);
 
   return (
     <Link
@@ -149,7 +181,7 @@ function Tile({ trip, span, ground }: { trip: ExploreTrip; span?: string; ground
         span,
       )}
     >
-      {lead ? (
+      {photo ? (
         // `object-contain`, never `cover`: the artwork is 3:2 and §15 says it
         // is never re-cropped. The tile's own pastel is the leftover space.
         <Image
@@ -161,12 +193,10 @@ function Tile({ trip, span, ground }: { trip: ExploreTrip; span?: string; ground
         />
       ) : null}
 
-      <div className={cn('flex flex-col', lead && 'mt-2')}>
+      <div className={cn('flex flex-col', photo && 'mt-2')}>
         {/* Black on every pastel (§2.4) — the grounds above are all light
             halves of the pairs, so ink is legible on all six. */}
-        <p className="t-h3 text-ink line-clamp-1">
-          {flagOf(trip.country)} {countryName(trip.country)}
-        </p>
+        <p className="t-h3 text-ink line-clamp-1">{countryName(trip.country)}</p>
         <p className="text-ink/70 t-small mt-0.5 line-clamp-1">
           {trip.days} วัน
           {trip.budgetPerPersonThb > 0
@@ -174,7 +204,7 @@ function Tile({ trip, span, ground }: { trip: ExploreTrip; span?: string; ground
             : ''}
         </p>
 
-        {lead ? (
+        {withOwner ? (
           <span className="text-ink/70 mt-2 flex items-center gap-1.5 text-xs">
             <CharacterAvatar characterId={trip.creator.characterId} size="xs" />
             <span className="line-clamp-1">{trip.creator.name}</span>
