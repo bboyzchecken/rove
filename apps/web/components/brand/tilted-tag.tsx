@@ -52,6 +52,17 @@ const TONE = {
 
 export type TiltedTagTone = keyof typeof TONE;
 
+/**
+ * The same colour pairs, for the one caller that needs them without the tilt.
+ *
+ * `HeroCanvas` renders the cluster twice: tilted over the headline at `lg`,
+ * and as a flat wrapped row under the lead below it, where there is no gutter
+ * for a pill to hang into. Both are the same tags in the same tones, so the
+ * map has to be shared — a second hand-written copy is how a tone ends up
+ * meaning orange in one breakpoint and yellow in the other.
+ */
+export const TAG_TONE = TONE;
+
 export function TiltedTag({
   tone = 'ink',
   rotate,

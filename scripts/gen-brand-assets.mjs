@@ -97,13 +97,17 @@ const characters = ANIMALS.map(([slug, desc, accent], i) => ({
   prompt: `A cute mascot avatar of ${desc}, front facing, head and shoulders, centered, filling most of the frame with a small even margin, minimal face made of two small dot eyes and a tiny smile. The entire background is one flat solid colour ${TILE[accent]} filling the whole square edge to edge, no vignette, no border, no circle, no shadow. ${STYLE}`,
 }));
 
+/*
+ * `hero-landing` used to head this list — a wide banner of four backpackers
+ * walking past landmarks from five continents, drawn for the landing page's
+ * "จะไปมุมไหนของโลก" section. Feedback #1 cut it: that section's own lead calls
+ * the row below it examples from trips people actually published, and a
+ * drawing of landmarks was standing in the place that evidence belongs. It is
+ * being replaced by a mosaic of real published trips, so the prompt is gone
+ * rather than commented out — regenerating it would only put the picture back
+ * into a slot that now has a better occupant.
+ */
 const scenes = [
-  {
-    name: 'hero-landing',
-    width: 1440,
-    height: 816,
-    prompt: `A wide banner illustration of friends travelling the world together: a diverse group of four young travellers with backpacks and a rolling suitcase walking to the right across the lower third, and behind them a light playful skyline mixing landmarks from different continents — a pagoda roof, a European clock tower, a desert arch, a tropical palm, a snowy peak — spaced apart. A dotted travel route curves through the scene with a few small map pins and a tiny plane. Bright, graphic, optimistic. Flat cream #FFFCF1 background, edge to edge. ${STYLE}`,
-  },
   {
     name: 'cover-japan',
     width: 1200,

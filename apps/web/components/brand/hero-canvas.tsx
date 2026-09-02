@@ -1,5 +1,5 @@
 import { SquiggleArrow } from '@/components/brand/doodle';
-import { TiltedTag, type TiltedTagTone } from '@/components/brand/tilted-tag';
+import { TAG_TONE, TiltedTag, type TiltedTagTone } from '@/components/brand/tilted-tag';
 import { HERO_TOP, SHELL_SECTION } from '@/components/common/public-shell';
 import { cn } from '@/lib/utils';
 
@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils';
  *   10  headline        black 700, lines broken by hand
  *   10  knockout        one word, black block with white text (`.knockout`)
  *   20  small doodles   two marks in the gaps
- *   30  tilted tags     four to five pastel pills clipping letter edges
+ *   30  tilted tags     up to six pastel pills clipping letter edges (lg+)
  *   10  CTA             black pill, with the curl arrow outside it
  *
  * The headline sitting between the anchor (0) and the small marks (20) is the
@@ -65,23 +65,29 @@ import { cn } from '@/lib/utils';
  * Rotations are baked in, all different and none 0 (§4.2.2), so a caller
  * cannot accidentally repeat an angle or line two tags up (§4.2.3).
  *
- * `wide` means desktop-only, and every slot but the first carries it, because
- * A TAG NEEDS SOMEWHERE TO HANG AND A PHONE HAS NOWHERE. Each slot pins to an
- * edge of the headline and slides most of itself back out of it; that only
- * reads as a tag clipping a letter if there is page gutter on the far side to
- * spill into. At 1440px the headline box starts 219px in and there is room.
- * At 390px the box starts at the 16px gutter, so the same rule threw the two
- * left-hand pills of the pricing hero out to x=-61 and x=-63 — half a word of
- * each, sliced off by the viewport. §10 says a tag never covers more than one
- * letter on a phone; a tag the phone has cut in half is worse than a tag the
- * phone never drew. So a phone gets the one right-anchored slot, which has
- * the ragged right edge to hang over, and the cluster returns at `lg`.
+ * THE WHOLE CLUSTER IS `lg` AND UP, because A TAG NEEDS SOMEWHERE TO HANG AND
+ * A PHONE HAS NOWHERE. Each slot pins to an edge of the headline and slides
+ * most of itself back out of it; that only reads as a tag clipping a letter if
+ * there is page gutter on the far side to spill into. At 1440px the headline
+ * box starts 219px in and there is room. At 390px the box starts at the 16px
+ * gutter, so the same rule threw the two left-hand pills of the pricing hero
+ * out to x=-61 and x=-63 — half a word of each, sliced off by the viewport.
+ * §10 says a tag never covers more than one letter on a phone; a tag the phone
+ * has cut in half is worse than a tag the phone never drew.
+ *
+ * This used to be a per-slot `wide` flag that kept exactly one right-anchored
+ * tag on a phone and dropped the rest. That was the right call when a hero
+ * carried two tags and they were decoration. It stopped being right when
+ * Feedback #1 turned the cluster into the page's introduction to all six
+ * feature colours: one visible pill out of six, on the platform most readers
+ * are on, teaches a sixth of the palette and looks like a stray. So below `lg`
+ * the tags move out of the overlay entirely and become a flat wrapped row
+ * under the lead — same words, same tones, no tilt, nothing clipped. See
+ * the render below.
  */
 const SLOTS = [
-  /* Slot 0 is the one tag a phone shows, and both of its numbers had to come
-   * down, because it pins to the top right — where the *longest* line ends,
-   * so whatever it covers is a whole letter rather than the white space after
-   * a short one.
+  /* Slot 0 pins to the top right — where the *longest* line ends, so whatever
+   * it covers is a whole letter rather than the white space after a short one.
    *
    * 86 and not 74: at 74 it left 18px of pill on the type, two thirds of a ว
    * at 44px, with nothing left to read it by. 14% is the graze §4.2.4 asks
@@ -95,11 +101,18 @@ const SLOTS = [
    * is 158px tall on a phone and 346px at desktop, and a percentage that
    * grazes one clears the other entirely. -24px leaves ~4px of pill over the
    * marks at every size: it still clips the line, it no longer reads it. */
-  { at: '-top-6 right-0', shiftX: 86, rotate: -9, wide: false },
-  { at: 'top-[13%] right-0', shiftX: 92, rotate: 5, wide: true },
-  { at: 'top-[4%] left-0', shiftX: -82, rotate: 7, wide: true },
-  { at: 'top-[34%] left-0', shiftX: -88, rotate: -12, wide: true },
-  { at: 'top-[78%] left-0', shiftX: -80, rotate: 11, wide: true },
+  { at: '-top-6 right-0', shiftX: 86, rotate: -9 },
+  { at: 'top-[13%] right-0', shiftX: 92, rotate: 5 },
+  { at: 'top-[4%] left-0', shiftX: -82, rotate: 7 },
+  { at: 'top-[34%] left-0', shiftX: -88, rotate: -12 },
+  { at: 'top-[78%] left-0', shiftX: -80, rotate: 11 },
+  /* The sixth, added when Feedback #1 asked for one tag per feature colour.
+   * Right-hand side, because the first five run 2 right / 3 left and a sixth
+   * on the left would stack four pills down one edge. Between slot 1 (13%) and
+   * the 90% floor the comment above keeps clear of body copy, far enough from
+   * both to avoid the shared baseline §4.2.3 rules out. -6° is the only angle
+   * in range not already spoken for. */
+  { at: 'top-[58%] right-0', shiftX: 88, rotate: -6 },
 ] as const;
 
 export interface HeroTag {
@@ -214,7 +227,11 @@ export function HeroCanvas({
 
             {marks}
 
-            <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-30">
+            {/* The overlay cluster — `lg` and up only. See SLOTS. */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 z-30 hidden lg:block"
+            >
               {placed.map((tag, i) => {
                 const slot = SLOTS[i]!;
                 return (
@@ -223,7 +240,7 @@ export function HeroCanvas({
                     tone={tag.tone}
                     rotate={slot.rotate}
                     shiftX={slot.shiftX}
-                    className={cn('absolute', slot.at, slot.wide && 'hidden lg:inline-block')}
+                    className={cn('absolute', slot.at)}
                   >
                     {tag.label}
                   </TiltedTag>
@@ -233,6 +250,38 @@ export function HeroCanvas({
           </div>
 
           {lead ? <p className="t-body text-ink mt-7 max-w-md">{lead}</p> : null}
+
+          {/*
+            The same tags below `lg`, as a row rather than an overlay.
+
+            Flat and untilted on purpose. §7 makes tilt a hero-only device and
+            this is still the hero, so the rule permits it — but tilt exists to
+            make a pill read as dropped onto the type, and a pill sitting in
+            its own row has no type to be dropped onto. Angled here it would
+            just look crooked. Squared up, it reads as what it now is: the
+            list of what the product does, in the colours those features wear
+            for the rest of the site.
+
+            Not `aria-hidden`, unlike the overlay. The overlay is decoration
+            duplicating nothing — but below `lg` this row is the only place
+            these words exist, so hiding it would delete six of the page's
+            claims from every screen reader on a phone.
+          */}
+          {placed.length ? (
+            <ul className="mt-6 flex flex-wrap gap-2 lg:hidden">
+              {placed.map((tag) => (
+                <li
+                  key={tag.label}
+                  className={cn(
+                    'font-display rounded-full px-3.5 py-1.5 text-[12px] font-medium whitespace-nowrap',
+                    TAG_TONE[tag.tone],
+                  )}
+                >
+                  {tag.label}
+                </li>
+              ))}
+            </ul>
+          ) : null}
 
           {actions ? (
             <div className="relative mt-9 inline-flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">

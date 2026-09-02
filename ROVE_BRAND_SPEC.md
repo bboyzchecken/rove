@@ -143,9 +143,28 @@ Knockout highlight         border-radius: 4px
 
 **No shadows anywhere.** No `box-shadow`, no glow, no blur. Separation comes from color and spacing. This is the single most important rule for keeping the style crisp — one drop shadow and it reads as generic SaaS.
 
+### 4.1 Hero tilted tags — where the rules actually live
+
+This document has never carried them, but the code cites them as "§4.2.1" through "§4.2.7". Those numbers resolve to nothing here. The rules they name — how many pills per hero, the angles, never covering a whole word, one ink tag anchoring the cluster — are written at the top of [`components/brand/tilted-tag.tsx`](apps/web/components/brand/tilted-tag.tsx), and the placement geometry is in [`components/brand/hero-canvas.tsx`](apps/web/components/brand/hero-canvas.tsx). Read those before changing a hero; do not go looking for a §4.2 in this file.
+
+**Two deliberate divergences from those comments, both on the landing page (Feedback #1):**
+
+- **Six tags, one per feature color, and no ink tag.** The comment asks every cluster to carry a black pill as its anchor. Six feature colors plus black is seven, and the same comment calls more than six cluttered — asked for the six chosen colors, the complete map won over the anchor. `/pricing` and `/explore` still follow the original rule.
+- **Below `lg` the cluster is not an overlay.** It becomes a flat, untilted row under the lead, on every page that uses `HeroCanvas`. A tag hangs off the headline into the page gutter and a phone has no gutter, so the old behaviour showed one tag and dropped the rest — acceptable for two decorative pills, wrong for six load-bearing ones.
+
 ---
 
 ## 5. Doodle line style
+
+> **The landing page is currently an exception to all of §5 — 2 ก.ย. 2569, Feedback #1.**
+>
+> `/` carries **no doodles at all**. The flower anchor, the starburst, the sparkle, the curl arrow, the dotted path and the heading underline were all removed from it: *"เริ่มต้นก่อนจะได้ mascot or ลายเส้นประจำ / เอาออกก่อนได้ ให้ได้สีแค่ที่ต้องการก่อน"*. The marks were a guess at a hand nobody had chosen yet, and six of them on the first page a stranger sees made that guess look like a decision.
+>
+> **Every other surface still follows this section** — `/pricing`, `/explore`, `/login`, empty states, status and legal pages, eleven files in all. §5 is live for them and is not being rewritten.
+>
+> **What ends the exception:** a mascot or a settled signature line style. When that exists, decide deliberately whether the landing hero gets marks again — do not simply restore the old six because this note says they were removed.
+>
+> Until then the landing hero's emphasis rests entirely on display type scale and its six tilted tags. That is a thinner margin than the rest of the site has, and it is worth knowing before trimming either.
 
 ### 5.1 Hard rules
 
@@ -169,18 +188,22 @@ Build the whole site from this fixed set. Do not invent new marks ad hoc.
 | **Sparkle** | Small 4-point cross-star, clustered ×2–3 | Wishlist, AI features |
 | **Starburst** | 6–8 uneven spiky points | Trip countdown |
 | **Spiral** | Loose open spiral, 2–3 turns | Trip countdown, loading states |
-| **Flower** | 6–8 long rounded petals, small circle center | Journal, hero anchor |
+| **Flower** | 6–8 long rounded petals, small circle center | Journal |
 | **Underline scribble** | 2–3 overlapping loose strokes | Journal, under headings |
 | **Circle-around** | Rough open ellipse around a word or icon | Documents — flagging one item |
 | **Curl arrow** | Curved arrow with a loop in its tail | Memo, pointing at CTAs |
 
 Each feature has 2 doodles it uses consistently. That pairing reinforces the color mapping — a user starts recognizing the section by its mark as well as its color, which is what makes the identity survive being seen in grayscale.
 
+**Hero anchors are not a property of one mark.** The Flower was listed here as "hero anchor" while it happened to be the landing page's; that page has no anchor now, and the two heroes that still take one use **Starburst** (`/pricing`) and **Spiral** (`/explore`). Any mark large enough to bleed off-frame can anchor a hero — what the anchor must not do is contradict the feature the page is about.
+
 ### 5.3 Density
 
 - **Marketing hero:** 3–4 doodles — one large anchor plus 2–3 small
+- **Landing hero (`/`):** **0** — see the note at the top of §5
 - **App screen:** 0–1, in the margin or an empty state
 - **Cards:** 0–1, only with spare space
+- **Landing content sections:** **0** — the same exception; every other page keeps its one-per-section mark
 - Doodles may overlap **display type**; never **body copy**
 
 ---

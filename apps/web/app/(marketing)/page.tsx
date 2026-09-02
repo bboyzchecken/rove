@@ -1,14 +1,16 @@
-import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, CalendarDays, CalendarSearch, Plane } from 'lucide-react';
-
 import {
-  DottedPath,
-  Flower,
-  Heart,
-  Sparkle,
-  StarBurst,
-} from '@/components/brand/doodle';
+  ArrowRight,
+  BarChart3,
+  CalendarDays,
+  CalendarSearch,
+  Check,
+  ListChecks,
+  Plane,
+  Receipt,
+  Sparkles,
+} from 'lucide-react';
+
 import {
   HeroCanvas,
   heroButtonClass,
@@ -19,6 +21,7 @@ import {
 import { SectionIntro } from '@/components/brand/section-intro';
 import { PublicShell, SHELL_SECTION } from '@/components/common/public-shell';
 import { PlatformStatsSection } from '@/components/public/platform-stats';
+import { TripMosaicSection } from '@/components/public/trip-mosaic';
 import { TravellerReviewsSection } from '@/components/public/traveller-reviews';
 import { ButtonLink } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -36,35 +39,42 @@ import { CHARACTERS } from '@/lib/catalog/characters';
  * half is made of:
  *
  *   Hero     the same white page as everything else, carrying oversized BLACK
- *            700 display broken by hand, two tilted pastel tags clipping the
- *            letters on the right, and four doodles at wildly different
- *            scales. Loud because of the drawing and the scale, not because of
- *            a colour field.
+ *            700 display broken by hand and six tilted pastel tags clipping
+ *            the letters. Loud because of the scale and the colour of the
+ *            cluster, not because of a colour field.
  *   Content  everything below. White with §6's gray blocks on it, ink type at
- *            normal scale, flat untilted chips, one doodle per section in the
- *            margin. Calm, and committed to that.
+ *            normal scale, flat untilted chips. Calm, and committed to that.
  *
  * v2 got its hero from a full-bleed cobalt band. §2.1 makes white the page on
  * every screen and §2.4 allows white type only on black, so that band is gone
  * — and the page is better for it, because the hero now demonstrates the thing
  * it is selling: a white page with pastel rooms in it.
  *
+ * NO DOODLES ANYWHERE ON THIS PAGE, as of Feedback #1. v3 hung four marks in
+ * the hero and one per content section; they are all removed until there is a
+ * mascot or a settled line style for them to be drawn in. The rest of the site
+ * keeps its marks — see the comment on the hero for why the removal stops at
+ * this file. The consequence for the two modes above is that the hero's
+ * loudness now rests entirely on type scale and the tag cluster, so if either
+ * is ever trimmed, this page has nothing left to be loud with.
+ *
  * WHERE THE SIX COLOURS APPEAR, AND WHY IT IS NOT A RAINBOW
  * §2.5 forbids mixing feature colours on a screen and then names marketing as
- * an exception. This page uses that licence exactly twice — the three entry
- * cards and the six-card feature grid — and in both the colour is the FEATURE
- * MAP being taught, in the order a visitor will meet it. Everywhere else on
- * the page (the destination chips, the numbered steps, the stat grid) is
- * deliberately uncoloured, because those are not features and a colour that
- * means nothing is what v2's UAT reacted to.
+ * an exception. This page uses that licence in four places, and in every one
+ * the colour is the FEATURE MAP being taught rather than decoration: the six
+ * hero tags (all six, once each), the three entry cards, the four step
+ * numbers, and the four feature cards. Everywhere else — the destination
+ * chips, the Web Starred list, the stat grid — is deliberately uncoloured,
+ * because those are not features and a colour that means nothing is what v2's
+ * UAT reacted to.
  *
  * The hero carries no knockout slab. §3 offers one, but a black block around
  * "ที่เดียว" cut the promise out of the stack rather than landing it — the line
  * reads harder as one unbroken run of display type, with the hand-made break
  * and the period doing the emphasis instead.
  *
- * The two modes never blend. No tilt below the hero, no doodle overlay on a
- * content screen, and no full-bleed colour band anywhere.
+ * The two modes never blend. No tilt below the hero, and no full-bleed colour
+ * band anywhere.
  */
 
 /**
@@ -73,9 +83,16 @@ import { CHARACTERS } from '@/lib/catalog/characters';
  * Colour follows §2.2's feature map, which under v3 is a stronger claim than
  * v2's thematic lock: each of these cards is a doorway into a specific room, so
  * it wears that room's colour and the visitor has already learned one third of
- * the palette before they sign up. A known flight is a fixed point on the route
- * (Itinerary, blue); known dates are the countdown (yellow); not knowing yet is
- * the thing the group votes on (Wishlist, pink).
+ * the palette before they sign up. Known dates are the countdown (yellow); a
+ * known flight is a fixed point on the route (Itinerary, blue); not knowing yet
+ * is the thing the group votes on (Wishlist, pink).
+ *
+ * THE ORDER IS NOT FREE. The lead sentence above the grid offers the three
+ * starting points in words before the cards repeat them in colour, so the two
+ * lists have to run in the same order — "รู้แค่วันก็ได้ รู้แค่ตั๋วก็ได้ หรือยังไม่รู้อะไร
+ * เลยก็ได้". Feedback #1 caught this list running ticket-first under a lead that
+ * says dates-first, which makes a reader re-map one line against the other
+ * mid-sentence. Change one and you must change the other.
  *
  * Black text on all three (§2.4) — including the blue, which v2 set in white
  * because its blue was a dark cobalt. This one is a pastel and white on it is
@@ -83,18 +100,18 @@ import { CHARACTERS } from '@/lib/catalog/characters';
  */
 const ENTRIES = [
   {
-    key: 'route',
-    icon: Plane,
-    title: 'รู้เที่ยวบินแล้ว',
-    hint: 'ใส่สนามบินกับวันบิน — BKK→NRT 4 ธ.ค. ถึง 08:05 — ที่เหลือ ROVE จัดให้',
-    chip: 'bg-blue-light text-ink',
-  },
-  {
     key: 'date',
     icon: CalendarDays,
     title: 'รู้วันแล้ว',
     hint: 'ลาไว้แล้ว เหลือแค่ไม่รู้จะไปไหน',
     chip: 'bg-yellow-light text-ink',
+  },
+  {
+    key: 'route',
+    icon: Plane,
+    title: 'รู้เที่ยวบินแล้ว',
+    hint: 'ใส่สนามบินกับวันบิน — BKK→NRT 4 ธ.ค. ถึง 08:05 — ที่เหลือ ROVE จัดให้',
+    chip: 'bg-blue-light text-ink',
   },
   {
     key: 'coordinate',
@@ -105,78 +122,169 @@ const ENTRIES = [
   },
 ] as const;
 
+/**
+ * The four steps, and the second place on this page where the feature map is
+ * taught rather than decorated (§2.5's marketing exception, same licence the
+ * entry cards and the feature grid use).
+ *
+ * The numbers were four identical black discs, which is what Feedback #1
+ * reacted to: four of the same mark in a row reads as footnote numbering, not
+ * as a route through the product. Each disc now wears the colour of the room
+ * that step actually opens, so the sequence teaches four sixths of the palette
+ * on the way past.
+ *
+ * Not a rainbow, and not free choice: pink is the wishlist room people gather
+ * in, purple is memo — the things each person drops in, blue is the itinerary
+ * that comes back out, orange is Documents & Finance where the trip settles up.
+ * Light surfaces with `text-ink` on them, because §2.4 rules out white type on
+ * a pastel and these discs are pastel now.
+ *
+ * The copy is deliberately shorter than it was. Feedback #1 cut "ทุกคนเห็นอัน
+ * เดียวกัน" off step 1 and the "ต้องไป / ไปได้ก็ดี / ไม่เอา" enumeration off step
+ * 2 — the steps are a route, not the manual, and the detail belongs to the
+ * screens themselves. Do not put it back.
+ */
 const STEPS = [
-  { n: '1', title: 'เปิดห้องทริป', text: 'ชวนเพื่อนเข้ามาด้วยลิงก์เดียว ทุกคนเห็นอันเดียวกัน' },
-  { n: '2', title: 'ทุกคนหย่อนที่อยากไป', text: 'ต้องไป / ไปได้ก็ดี / ไม่เอา — ไม่ต้องรอใครสรุป' },
-  { n: '3', title: 'ให้ AI ร่างให้', text: 'จัดวันให้ตามโซน เวลาเปิด-ปิด และพยากรณ์อากาศ' },
-  { n: '4', title: 'แก้ด้วยกัน แล้วไปเที่ยว', text: 'ลากสลับได้ คุยกันในแพลน หารเงินกันจบในแอป' },
+  { n: '1', title: 'เปิดห้องทริป', text: 'ชวนเพื่อนในลิงก์เดียว', chip: 'bg-pink-light text-ink' },
+  {
+    n: '2',
+    title: 'หย่อนสถานที่ที่อยากไป',
+    text: 'ไม่ต้องรอใคร',
+    chip: 'bg-purple-light text-ink',
+  },
+  {
+    n: '3',
+    title: 'ให้ AI ร่างให้',
+    text: 'ผู้ช่วยประจำทริป จัดวัน เช็คสถานที่ และสภาพอากาศ',
+    chip: 'bg-blue-light text-ink',
+  },
+  {
+    n: '4',
+    title: 'แก้ด้วยกัน เที่ยวด้วยกัน',
+    text: 'ปรับสลับทริป เปลี่ยนแผนตามสะดวก หารเงินจบในทริป',
+    chip: 'bg-orange-light text-ink',
+  },
 ];
 
 /**
- * The feature grid, and the one screen in the product where all six colours
- * are meant to be seen at once.
+ * The reasons to switch, and — below them — the things that are merely nice.
  *
- * §2.5 names three exceptions to "one feature colour per screen", and this is
- * the marketing form of the "legend listing all features" one: six cards, six
- * rooms, six colours, in the order a visitor will meet them. v2's version
- * reused pink twice and yellow twice and skipped two features entirely, which
- * is what a decorative palette produces — this one is the map itself.
+ * This was ONE grid of six equal cards, and Feedback #1's complaint about it
+ * ("อ่านแล้วดูไม่เป็นทางเดียวกัน") was a ranking problem wearing a copy
+ * problem's clothes. "Coverage board" — nobody's wish gets quietly dropped —
+ * sat in the same size, weight and shape as "ตัวละครประจำตัว". One is why a
+ * group would leave the app they already use; the other is a delight once
+ * they have. Given identical cards a reader cannot tell which is which, so
+ * the section argued for nothing in particular.
+ *
+ * So: four cards for the four claims, and a plain checked list for the rest.
+ * THE SIZE DIFFERENCE IS THE ARGUMENT. Do not promote a Web Starred line to a
+ * card because it feels underserved — that is precisely the flattening this
+ * split exists to undo.
+ *
+ * Icons are lucide, not emoji (Feedback #1 asked; this is the answer). Emoji
+ * are drawn by the reader's OS, so the 🐨 chosen on an iPhone is a different
+ * animal on Windows, and each one arrives with colours of its own that fight
+ * §2.5's "colour means a feature" — 🧾 is grey whatever chip it sits on. The
+ * charm the emoji were carrying belongs to the 20 characters, which are ours
+ * and render the same everywhere.
+ *
+ * Four colours here rather than six, so this is no longer §2.5's "legend
+ * listing every feature". It does not need to be: the page teaches the map
+ * across three sections now — yellow/blue/pink on the entry cards, pink/
+ * purple/blue/orange on the steps, and blue/pink/orange/green here. All six
+ * are still learned, in the order a visitor meets them, without any one grid
+ * being forced to hold a colour whose feature is not one of its four claims.
  */
 const FEATURES = [
   {
-    emoji: '🧭',
-    title: 'Coverage board',
-    text: 'บอกตรงๆ ว่าของใครยังไม่ได้เข้าแพลน จะได้ไม่มีใครน้อยใจทีหลัง',
-    chip: 'bg-pink-light text-ink',
-  },
-  {
-    emoji: '🤖',
-    title: 'AI ที่บอกเหตุผล',
+    icon: Sparkles,
+    title: 'AI ช่วยแพลนแบบใช้ได้จริง',
     text: 'ร่างฟรี 2 ครั้งต่อทริป บอกด้วยว่าทำไมถึงจัดแบบนี้ และถามกลับเมื่อไม่แน่ใจ',
     chip: 'bg-blue-light text-ink',
   },
   {
-    emoji: '🧾',
-    title: 'น้องหาร',
-    text: 'แยกของกลางกับของส่วนตัว บอกเลยว่าใครจ่ายไปเท่าไหร่ ใครต้องคืนใครกี่บาท',
+    icon: ListChecks,
+    title: 'จะกี่ที่ก็ลิสได้ครบ ไม่มีใครน้อยใจ',
+    text: 'ดรอปที่ที่อยากไปได้ทั้งแก๊ง แล้วบอกตรงๆ ว่าของใครยังไม่ได้เข้าแพลน',
+    chip: 'bg-pink-light text-ink',
+  },
+  {
+    icon: Receipt,
+    title: 'ค่าใช้จ่ายหารเท่าก็ง่าย',
+    text: 'หารได้ทั้งแบบกลุ่มและแบบส่วนตัว บอกเลยว่าใครจ่ายไปเท่าไหร่ ใครต้องคืนใครกี่บาท',
     chip: 'bg-orange-light text-ink',
   },
   {
-    emoji: '🐨',
-    title: 'ตัวละครประจำตัว',
-    text: 'เลือกได้ 20 ตัว ใช้แทนรูปโปรไฟล์ทั้งแอป เห็นปุ๊บรู้ปั๊บว่าใครเป็นใคร',
-    chip: 'bg-purple-light text-ink',
-  },
-  {
-    emoji: '⭐',
-    title: 'ชวนเพื่อนแล้วได้แต้ม',
-    text: 'แต้มจากการชวนเพื่อนและจากทริปที่เปิดสาธารณะ เอามาแลกเป็นการร่างของ AI ได้',
-    chip: 'bg-yellow-light text-ink',
-  },
-  {
-    emoji: '📊',
-    title: 'สรุปทั้งปีของตัวเอง',
-    text: 'ปีนี้ไปมากี่ทริป กี่วัน กี่ประเทศ ใช้เงินไปเท่าไหร่ — รวมมาให้ในที่เดียว',
+    icon: BarChart3,
+    title: 'สรุปรวมทั้งปี ไปไหนมาบ้างแล้ว',
+    text: 'กี่ทริป กี่วัน กี่ประเทศ ใช้เงินไปเท่าไหร่ — รวมมาให้ในที่เดียว',
     chip: 'bg-green-light text-ink',
   },
 ] as const;
 
 /**
- * What the hero's tilted tags say (§4). Where they sit, at what angle, and
- * which drop on a phone is `HeroCanvas`'s business — a page choosing its own
+ * The nice-to-haves, deliberately rendered small.
+ *
+ * Three are Feedback #1's own list; the other three are shipped features it
+ * invited suggestions for ("etc. มีแนะนำเพิ่มได้อีกนะ"). Every line here has
+ * working code behind it — adapt/clone is `POST /public/trips/:slug/adapt`,
+ * photos are `components/photo`, documents are `components/document`. Nothing
+ * aspirational goes in this list: it sits under a heading that claims these
+ * are things we have.
+ *
+ * Six, and six is the ceiling. Feedback #1 asked for the two lists to be told
+ * apart; a Web Starred list longer than the four claims above it inverts the
+ * very ranking the split was for.
+ *
+ * No colour. These are not rooms in the product, and a pastel per line would
+ * be the decorative rainbow §8 rules out — the ink check is punctuation.
+ */
+const STARRED = [
+  'มีตัวละครประจำตัว 20 แบบ',
+  'ชวนเพื่อนแล้วได้แต้ม',
+  'สร้างทริปเป็น public ได้',
+  'ก๊อปทริปคนอื่นมาแก้ต่อเป็นของตัวเองได้',
+  'เก็บรูปเข้าแพลนตามสถานที่ที่ไป',
+  'เก็บตั๋วกับเอกสารไว้ในทริป',
+] as const;
+
+/**
+ * What the hero's tilted tags say (§4). Where they sit, at what angle, and how
+ * they render on a phone is `HeroCanvas`'s business — a page choosing its own
  * coordinates is what put a tag across the knockout the first time.
  *
- * Two tags, both on the right. `HeroCanvas`'s first two slots are the
- * right-anchored ones, so the length of this list is what keeps the left of
- * the headline clear: the Thai lines are long and ragged, and a pill hanging
- * off their left edge landed mid-word rather than on a letter's edge, which
- * is the graze §4.2.4 asks for. `countdown` for the dates tag, because that is
- * the room "หาวันว่าง" opens, and ink for the anchor §4.2.5 asks every cluster
- * to have.
+ * Six now, not two, one per feature colour: Feedback #1 kept the device and
+ * asked it to carry the whole palette. That makes this the page's introduction
+ * to the colour system rather than decoration on the headline, and it is why
+ * `HeroCanvas` grew a sixth slot and a phone layout — six pills of which a
+ * phone showed one taught nothing.
+ *
+ * NO INK TAG, which §4.2.5 asks every cluster to have as its anchor. Six
+ * feature colours plus a black pill is seven, and §4.2.1 calls more than six
+ * cluttered; between an anchor and the complete map, Feedback #1 asked for the
+ * map. ROVE_BRAND_SPEC §4.2.5 needs updating to say so.
+ *
+ * The wording is Feedback #1's list with two changes it approved:
+ *   "แพลนไหนก็สะดวก" → "ไปไหนก็ได้"  the original reads two ways (which plan?
+ *                                    which trip?) and the claim being made is
+ *                                    about places, which is also the thing the
+ *                                    old headline was accused of hiding
+ *   "จัดการงบ"        → "หารเงินจบ"   the original names a chore the user does;
+ *                                    this names the state they end up in
+ *
+ * Tones are the room each phrase opens, never a colour picked for looks —
+ * "ไปไหนก็ได้" is journal because that is where a trip becomes somewhere you
+ * went, and "ทริปในฝัน" is memo because /dreams is a real screen and this is a
+ * link to it in spirit.
  */
 const HERO_TAGS = [
   { label: 'หาวันว่าง', tone: 'countdown' },
-  { label: 'AI ร่างให้', tone: 'ink' },
+  { label: 'AI ร่างให้', tone: 'itinerary' },
+  { label: 'ไปไหนก็ได้', tone: 'journal' },
+  { label: 'กี่คนก็ได้', tone: 'wishlist' },
+  { label: 'หารเงินจบ', tone: 'documents' },
+  { label: 'ทริปในฝัน', tone: 'memo' },
 ] as const;
 
 /**
@@ -228,36 +336,51 @@ export default function LandingPage() {
     >
       {/* =========================================================== hero (canvas)
           Composition, layer order and tag placement all live in `HeroCanvas`
-          (§6). This page supplies only what is specific to it: the words, the
-          anchor mark, and which two small doodles sit in the gaps. */}
+          (§6). This page supplies only the words and the tags.
+
+          NO DOODLES ON THIS PAGE. Feedback #1: "เริ่มต้นก่อนจะได้ mascot or
+          ลายเส้นประจำ / เอาออกก่อนได้ ให้ได้สีแค่ที่ต้องการก่อน" — the flower
+          anchor, the starburst, the sparkle, the curl arrow, the dotted path
+          and the heading underline are all gone until there is a mascot or a
+          signature line style to draw them in. The marks were placeholder
+          handwriting in a hand nobody had chosen yet, and six of them across
+          one page made that guess look like a decision.
+
+          They are removed HERE ONLY. `components/brand/doodle.tsx` and its
+          eleven other callers (login, pricing, explore, empty states, status
+          and legal pages) are untouched — this is the page the feedback was
+          about, and stripping the rest of the site is a separate call nobody
+          has made.
+
+          What carries the hero instead is what §1 says should: the scale of
+          the type and the six tags. */}
       <HeroCanvas
         eyebrow="ท่องเที่ยวไปโดยไม่มีเส้นทางตายตัว"
         /* Lines are broken by hand into a short stack (§3.1) — each `block` is
            one line, ragged right, never centred. The last line carries the
            promise and keeps the period §3.2 offers for the extra beat; the
-           weight and the break do that work, without a knockout slab. */
+           weight and the break do that work, without a knockout slab.
+
+           The old stack was "วางแพลนเที่ยว / กันทั้งกลุ่ม / จบในที่เดียว." and
+           "กันทั้งกลุ่ม" was the problem Feedback #1 opened with: it reads as a
+           requirement, so a solo traveller is told on line two that this site
+           is not for them, and it says nothing about what happens after the
+           planning. The three verbs are the product in the order you meet it
+           — plan it, go on it, record what it cost — and the group is now an
+           option the tags and the lead offer rather than a condition the
+           headline imposes. */
         headline={
           <>
-            <span className="block">วางแพลนเที่ยว</span>
-            <span className="block">กันทั้งกลุ่ม</span>
+            <span className="block">วางแพลน ไปเที่ยว</span>
+            <span className="block">จดงบ</span>
             <span className="block">จบในที่เดียว.</span>
           </>
         }
-        lead="ทุกคนหย่อนที่อยากไปลงห้องเดียวกัน AI ร่างแพลนรายวันพร้อมงบและเหตุผลให้ แล้วค่อยแก้ด้วยกัน จบทริปแล้วหารเงินกันในแอปได้เลย"
+        /* Rewritten with the headline, and for the same reason: the old lead
+           opened "ทุกคนหย่อนที่อยากไปลงห้องเดียวกัน", which puts a group in the
+           first four words of a page that just stopped requiring one. */
+        lead="ไปคนเดียวหรือไปกันทั้งแก๊งก็ได้ ทั่วโลก — AI ร่างแพลนรายวันพร้อมงบและเหตุผลให้ แก้ต่อได้ตามสะดวก แล้วจดค่าใช้จ่ายจริงจบในที่เดียว"
         tags={HERO_TAGS}
-        anchor={Flower}
-        anchorTone="text-pink-light"
-        marks={
-          <>
-            {/* Dropped on a phone, where the anchor already owns this corner
-                and the two marks read as one smudge (§10). */}
-            <StarBurst className="text-green-solid pointer-events-none absolute top-[30%] -right-16 z-20 hidden size-24 sm:block" />
-            {/* Under the start of the last line, clear of the type — a mark
-                clipping a letter's corner reads as a smudge, not a doodle. */}
-            <Sparkle className="text-yellow-solid pointer-events-none absolute -bottom-6 left-[6%] z-20 hidden size-12 lg:block" />
-          </>
-        }
-        arrow
         actions={
           <>
             <Link href="/new" className={heroButtonClass}>
@@ -281,7 +404,13 @@ export default function LandingPage() {
         <div className={`${SHELL_SECTION} py-16`}>
           <SectionIntro
             title="เริ่มจากสิ่งที่คุณรู้อยู่แล้ว"
-            lead="รู้แค่วันก็ได้ รู้แค่ตั๋วก็ได้ หรือยังไม่รู้อะไรเลยก็ได้ — ไม่เกินสามหน้าจอก็มีห้องทริปให้เพื่อนเข้ามาแล้ว"
+            /* The half after the dash used to be "ไม่เกินสามหน้าจอก็มีห้องทริปให้
+               เพื่อนเข้ามาแล้ว", which made one sentence carry two claims — where
+               you can start, and how fast you get there — and answered the
+               second with a group of friends nobody had mentioned yet. The
+               section is about the first claim, so it now only makes that one.
+               The card order below follows this list; see ENTRIES. */
+            lead="รู้แค่วันก็ได้ รู้แค่ตั๋วก็ได้ หรือยังไม่รู้อะไรเลยก็ได้ — เริ่มจากตรงไหนก็เปิดทริปได้"
           />
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
             {ENTRIES.map((entry) => (
@@ -312,22 +441,24 @@ export default function LandingPage() {
           This was a bare row of pills under an 11px label, sitting between the
           hero and the entry cards with nothing to say what it was — it read as
           a leftover rather than a section. It now carries the heading it
-          needed and the illustration that actually matches it: landmarks from
-          five continents strung along a dotted route is a picture of "anywhere
-          in the world", which is the claim the pills are the evidence for. */}
+          needed, and the pills sit directly under the sentence that makes them
+          evidence rather than a full-width illustration away from it.
+
+          The illustration is gone (Feedback #1). A drawing of landmarks is a
+          claim about the world, and the section's own lead says the row below
+          is "ตัวอย่างจากทริปที่คนเปิดสาธารณะไว้" — real trips people published.
+          Drawn landmarks were standing where that evidence belongs, so the
+          evidence itself stands there now: `TripMosaicSection`, published
+          trips sized by how many people looked at them.
+
+          It renders nothing until there are four of them, and the section
+          closes back up around it — the heading, the lead and the pills still
+          make sense on their own, which is why this is safe to ship before
+          the catalogue fills. */}
       <section className={`${SHELL_SECTION} py-16`}>
         <SectionIntro
           title="จะไปมุมไหนของโลก ก็วางแพลนที่นี่ได้"
           lead="ROVE ไม่ได้ผูกกับประเทศไหนเป็นพิเศษ ที่เห็นข้างล่างเป็นแค่ตัวอย่างจากทริปที่คนเปิดสาธารณะไว้"
-        />
-
-        <Image
-          src="/brand/hero-landing.webp"
-          alt="แลนด์มาร์กจากหลายทวีปเรียงกัน มีเส้นทางจุดไข่ปลาลากผ่านหมุดสถานที่ และกลุ่มเพื่อนสะพายเป้เดินอยู่ด้านหน้า"
-          width={1440}
-          height={816}
-          priority
-          className="mt-8 w-full"
         />
 
         {/* Flat and untilted — tilting is a hero-only device. */}
@@ -341,6 +472,8 @@ export default function LandingPage() {
             และที่อื่นทั่วโลก
           </Badge>
         </div>
+
+        <TripMosaicSection className="mt-8" />
       </section>
 
       {/* --------------------------------------------------------- steps (white)
@@ -352,16 +485,28 @@ export default function LandingPage() {
         <div className={`${SHELL_SECTION} relative py-16`}>
           <SectionIntro
             title="แชทเลื่อนหาย แต่แพลนไม่ควรหายไปด้วย"
-            lead="ที่อยากไปของแต่ละคน วันว่างที่ไม่ตรงกัน บิลที่ยังไม่ได้หาร — ทั้งหมดอยู่ในห้องเดียว และไม่มีใครต้องรับหน้าที่สรุป"
-            underline
+            /* Broken by hand, not left to wrap. The line is a list of three
+               problems followed by the answer to all three, and where the
+               answer starts is the whole rhetorical turn — letting the column
+               width decide moves that turn on every screen size. */
+            lead={
+              <>
+                สถานที่ที่อยากไป วันว่างที่ไม่ตรงกัน บิลที่ยังไม่ได้หาร
+                <br />
+                ทั้งหมดอยู่ในหน้าเดียว และไม่ต้องมีใครรับหน้าที่สรุป
+              </>
+            }
           />
-          {/* The dotted path is the journey mark (§5.2) — this is the one
-              section where it says something the copy does not. */}
-          <DottedPath className="pointer-events-none absolute top-10 right-2 hidden h-12 w-24 lg:block" />
+          {/* The dotted path stood here as the journey mark (§5.2) and the
+              underline sat under the heading. Both out with the rest of the
+              doodles — the coloured step numbers below are what gives this
+              section its emphasis now. */}
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {STEPS.map((step) => (
               <div key={step.n}>
-                <span className="bg-ink text-white font-display flex size-9 items-center justify-center rounded-full text-sm font-medium">
+                <span
+                  className={`font-display flex size-9 items-center justify-center rounded-full text-sm font-medium ${step.chip}`}
+                >
                   {step.n}
                 </span>
                 <p className="t-h3 text-ink mt-3">{step.title}</p>
@@ -392,49 +537,88 @@ export default function LandingPage() {
       {/* ------------------------------------------------------ features (cream) */}
       <section className={`${SHELL_SECTION} py-16`}>
         <SectionIntro
-          title="สิ่งที่แอปวางแพลนอื่นไม่ค่อยมี"
-          lead="ส่วนใหญ่ช่วยเก็บรายการที่อยากไป แต่ไม่ได้ช่วยตอนที่กลุ่มต้องตัดสินใจ หรือตอนที่ต้องเคลียร์เงินกันทีหลัง"
+          /* Was "สิ่งที่แอปวางแพลนอื่นไม่ค่อยมี" — a heading that spends its first
+             three words on the competition and only reaches ROVE by implication.
+             This one leads with what we have and lets the comparison follow. */
+          title="สิ่งที่เรามี ไม่เหมือนที่อื่น"
+          lead="ส่วนใหญ่ช่วยเก็บรายการที่อยากไป แต่ไม่ได้ช่วยตอนที่ต้องตัดสินใจ และตอนที่ต้องเคลียร์เงินกันทีหลัง"
         />
-        <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {/* Four claims, two up — wider cards than the old six-across, because
+            these titles are full sentences now rather than product nouns. */}
+        <div className="mt-8 grid gap-3 sm:grid-cols-2">
           {FEATURES.map((f) => (
             <Card key={f.title} className="p-5">
               <span
-                className={`flex size-10 items-center justify-center rounded-full text-lg ${f.chip}`}
+                className={`flex size-10 items-center justify-center rounded-full ${f.chip}`}
               >
-                {f.emoji}
+                <f.icon className="size-5" strokeWidth={2} />
               </span>
               <p className="t-h3 text-ink mt-4">{f.title}</p>
               <p className="text-muted t-small mt-1.5">{f.text}</p>
             </Card>
           ))}
         </div>
+
+        {/* Web Starred — the same content rank as a footnote, and shaped like
+            one. No card, no chip, no colour: a bordered list under a small
+            label reads as "and also these", which is exactly its job. Give it
+            cards and the section goes back to arguing for ten equal things. */}
+        <div className="border-border mt-10 border-t pt-8">
+          <p className="text-muted font-display text-xs font-medium tracking-wide uppercase">
+            Web Starred
+          </p>
+          <ul className="mt-4 grid gap-x-8 gap-y-2.5 sm:grid-cols-2">
+            {STARRED.map((line) => (
+              <li key={line} className="text-ink t-small flex items-start gap-2">
+                <Check className="mt-0.5 size-4 shrink-0" strokeWidth={2.5} />
+                {line}
+              </li>
+            ))}
+          </ul>
+        </div>
       </section>
 
       {/* ----------------------------------------------------- character
-          The one full-strength colour block in the content half of the page.
-          Pink because characters are how you appear to the group, and Wishlist
-          is the feature about people wanting things together — the closest
-          room this block belongs to. §2.2's pairs replaced v2's thematic
-          "pink = people", so the colour has to be argued from a feature now
-          rather than from a mood. */}
+          This was the one full-strength colour block in the content half of the
+          page — a light-pink card carrying a solid-pink heart at doodle scale.
+          Feedback #1 asked for the fill gone and a plain gray-bordered card in
+          its place, and it is the right call for a reason beyond taste: the
+          block sits last on the page and now ends with the only sign-up CTA
+          outside the nav, so the eye should land on the black pill, not on a
+          pink field competing with it. §2.3's small-and-loud has nothing to be
+          loud against once the surface is white, so the heart goes too. */}
       <section className="border-border border-t bg-white">
         <div className={`${SHELL_SECTION} py-16`}>
-          <Card accent="wishlist" className="relative overflow-hidden p-6 sm:p-8">
-            {/* Solid pink at doodle scale, over the light pink fill — §2.3's
-                small-and-loud against big-and-calm. */}
-            <Heart className="text-pink-solid pointer-events-none absolute -top-3 -right-3 size-24" />
+          <Card className="relative overflow-hidden p-6 sm:p-8">
             <div className="relative flex flex-wrap items-center justify-between gap-6">
               <div className="max-w-md">
                 {/* No circle-around on the number. Ringing "20 แบบ" drew a box
                     around it, and a number in a box reads as a cap — the
                     opposite of what the sentence is offering. */}
                 <p className="t-h2">เลือกตัวละครของตัวเองได้ 20 แบบ</p>
+                {/*
+                  "ไม่ต้องคิดชื่อเล่น" was here and it was simply untrue: the
+                  profile sheet asks for ชื่อที่แสดง and always has. The line
+                  promised the opposite of what the product does, so it is
+                  replaced by the invitation to use the field.
+                */}
                 <p className="text-ink t-small mt-3">
-                  ไม่ต้องอัปรูป ไม่ต้องคิดชื่อเล่น — เลือกตัวที่ใช่ แล้วมันจะตามคุณไปทุกทริป
+                  ไม่ต้องอัปรูป — ใส่ชื่อที่อยากให้เพื่อนเห็น แล้วเลือกตัวที่ใช่ มันจะตามคุณไปทุกทริป
                   ทั้งในรายชื่อสมาชิก คอมเมนต์ และบิลที่หารกัน
                 </p>
-                <ButtonLink href="/profile" variant="primary" size="sm" className="mt-5">
-                  ดูตัวละครทั้งหมด
+                {/*
+                  Was "ดูตัวละครทั้งหมด" pointing at /profile, which is behind
+                  the sign-in wall — so every reader of this page, none of whom
+                  has an account yet, was bounced to /login with a `next` they
+                  never asked for. The button now says what that bounce was
+                  really asking for.
+
+                  /login and not a /signup route: there is no separate sign-up
+                  in ROVE. The API creates the account on the first successful
+                  OAuth login, so this one door covers both (see LoginScreen).
+                */}
+                <ButtonLink href="/login" variant="primary" size="sm" className="mt-5">
+                  GO GET ACCOUNT
                 </ButtonLink>
               </div>
               <div className="flex max-w-xs flex-wrap gap-1.5">

@@ -4,7 +4,6 @@
 | ---------------------- | ------------------------------------------------------------- |
 | `mark.svg`             | the 8-armed compass mark, terracotta — hand-authored geometry |
 | `../../app/icon.svg`   | favicon / app icon: the mark on a cream disc                  |
-| `hero-landing.webp`    | landing hero illustration                                     |
 | `og-default.png`       | 1200×630 social card background (no text baked in)            |
 | `texture-linen.webp`   | 420px cream linen tile, multiplied under `.bg-linen`          |
 | `covers/*.webp`        | trip covers: six destinations + nine vibes, 1200x800 (3:2)    |
