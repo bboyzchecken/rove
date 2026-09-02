@@ -1,7 +1,16 @@
 import Link from 'next/link';
-import { ArrowRight, CalendarDays, CalendarSearch, Plane } from 'lucide-react';
+import {
+  ArrowRight,
+  BarChart3,
+  CalendarDays,
+  CalendarSearch,
+  Check,
+  ListChecks,
+  Plane,
+  Receipt,
+  Sparkles,
+} from 'lucide-react';
 
-import { DottedPath, Flower, Sparkle, StarBurst } from '@/components/brand/doodle';
 import {
   HeroCanvas,
   heroButtonClass,
@@ -29,35 +38,42 @@ import { CHARACTERS } from '@/lib/catalog/characters';
  * half is made of:
  *
  *   Hero     the same white page as everything else, carrying oversized BLACK
- *            700 display broken by hand, two tilted pastel tags clipping the
- *            letters on the right, and four doodles at wildly different
- *            scales. Loud because of the drawing and the scale, not because of
- *            a colour field.
+ *            700 display broken by hand and six tilted pastel tags clipping
+ *            the letters. Loud because of the scale and the colour of the
+ *            cluster, not because of a colour field.
  *   Content  everything below. White with §6's gray blocks on it, ink type at
- *            normal scale, flat untilted chips, one doodle per section in the
- *            margin. Calm, and committed to that.
+ *            normal scale, flat untilted chips. Calm, and committed to that.
  *
  * v2 got its hero from a full-bleed cobalt band. §2.1 makes white the page on
  * every screen and §2.4 allows white type only on black, so that band is gone
  * — and the page is better for it, because the hero now demonstrates the thing
  * it is selling: a white page with pastel rooms in it.
  *
+ * NO DOODLES ANYWHERE ON THIS PAGE, as of Feedback #1. v3 hung four marks in
+ * the hero and one per content section; they are all removed until there is a
+ * mascot or a settled line style for them to be drawn in. The rest of the site
+ * keeps its marks — see the comment on the hero for why the removal stops at
+ * this file. The consequence for the two modes above is that the hero's
+ * loudness now rests entirely on type scale and the tag cluster, so if either
+ * is ever trimmed, this page has nothing left to be loud with.
+ *
  * WHERE THE SIX COLOURS APPEAR, AND WHY IT IS NOT A RAINBOW
  * §2.5 forbids mixing feature colours on a screen and then names marketing as
- * an exception. This page uses that licence exactly twice — the three entry
- * cards and the six-card feature grid — and in both the colour is the FEATURE
- * MAP being taught, in the order a visitor will meet it. Everywhere else on
- * the page (the destination chips, the numbered steps, the stat grid) is
- * deliberately uncoloured, because those are not features and a colour that
- * means nothing is what v2's UAT reacted to.
+ * an exception. This page uses that licence in four places, and in every one
+ * the colour is the FEATURE MAP being taught rather than decoration: the six
+ * hero tags (all six, once each), the three entry cards, the four step
+ * numbers, and the four feature cards. Everywhere else — the destination
+ * chips, the Web Starred list, the stat grid — is deliberately uncoloured,
+ * because those are not features and a colour that means nothing is what v2's
+ * UAT reacted to.
  *
  * The hero carries no knockout slab. §3 offers one, but a black block around
  * "ที่เดียว" cut the promise out of the stack rather than landing it — the line
  * reads harder as one unbroken run of display type, with the hand-made break
  * and the period doing the emphasis instead.
  *
- * The two modes never blend. No tilt below the hero, no doodle overlay on a
- * content screen, and no full-bleed colour band anywhere.
+ * The two modes never blend. No tilt below the hero, and no full-bleed colour
+ * band anywhere.
  */
 
 /**
@@ -150,70 +166,124 @@ const STEPS = [
 ];
 
 /**
- * The feature grid, and the one screen in the product where all six colours
- * are meant to be seen at once.
+ * The reasons to switch, and — below them — the things that are merely nice.
  *
- * §2.5 names three exceptions to "one feature colour per screen", and this is
- * the marketing form of the "legend listing all features" one: six cards, six
- * rooms, six colours, in the order a visitor will meet them. v2's version
- * reused pink twice and yellow twice and skipped two features entirely, which
- * is what a decorative palette produces — this one is the map itself.
+ * This was ONE grid of six equal cards, and Feedback #1's complaint about it
+ * ("อ่านแล้วดูไม่เป็นทางเดียวกัน") was a ranking problem wearing a copy
+ * problem's clothes. "Coverage board" — nobody's wish gets quietly dropped —
+ * sat in the same size, weight and shape as "ตัวละครประจำตัว". One is why a
+ * group would leave the app they already use; the other is a delight once
+ * they have. Given identical cards a reader cannot tell which is which, so
+ * the section argued for nothing in particular.
+ *
+ * So: four cards for the four claims, and a plain checked list for the rest.
+ * THE SIZE DIFFERENCE IS THE ARGUMENT. Do not promote a Web Starred line to a
+ * card because it feels underserved — that is precisely the flattening this
+ * split exists to undo.
+ *
+ * Icons are lucide, not emoji (Feedback #1 asked; this is the answer). Emoji
+ * are drawn by the reader's OS, so the 🐨 chosen on an iPhone is a different
+ * animal on Windows, and each one arrives with colours of its own that fight
+ * §2.5's "colour means a feature" — 🧾 is grey whatever chip it sits on. The
+ * charm the emoji were carrying belongs to the 20 characters, which are ours
+ * and render the same everywhere.
+ *
+ * Four colours here rather than six, so this is no longer §2.5's "legend
+ * listing every feature". It does not need to be: the page teaches the map
+ * across three sections now — yellow/blue/pink on the entry cards, pink/
+ * purple/blue/orange on the steps, and blue/pink/orange/green here. All six
+ * are still learned, in the order a visitor meets them, without any one grid
+ * being forced to hold a colour whose feature is not one of its four claims.
  */
 const FEATURES = [
   {
-    emoji: '🧭',
-    title: 'Coverage board',
-    text: 'บอกตรงๆ ว่าของใครยังไม่ได้เข้าแพลน จะได้ไม่มีใครน้อยใจทีหลัง',
-    chip: 'bg-pink-light text-ink',
-  },
-  {
-    emoji: '🤖',
-    title: 'AI ที่บอกเหตุผล',
+    icon: Sparkles,
+    title: 'AI ช่วยแพลนแบบใช้ได้จริง',
     text: 'ร่างฟรี 2 ครั้งต่อทริป บอกด้วยว่าทำไมถึงจัดแบบนี้ และถามกลับเมื่อไม่แน่ใจ',
     chip: 'bg-blue-light text-ink',
   },
   {
-    emoji: '🧾',
-    title: 'น้องหาร',
-    text: 'แยกของกลางกับของส่วนตัว บอกเลยว่าใครจ่ายไปเท่าไหร่ ใครต้องคืนใครกี่บาท',
+    icon: ListChecks,
+    title: 'จะกี่ที่ก็ลิสได้ครบ ไม่มีใครน้อยใจ',
+    text: 'ดรอปที่ที่อยากไปได้ทั้งแก๊ง แล้วบอกตรงๆ ว่าของใครยังไม่ได้เข้าแพลน',
+    chip: 'bg-pink-light text-ink',
+  },
+  {
+    icon: Receipt,
+    title: 'ค่าใช้จ่ายหารเท่าก็ง่าย',
+    text: 'หารได้ทั้งแบบกลุ่มและแบบส่วนตัว บอกเลยว่าใครจ่ายไปเท่าไหร่ ใครต้องคืนใครกี่บาท',
     chip: 'bg-orange-light text-ink',
   },
   {
-    emoji: '🐨',
-    title: 'ตัวละครประจำตัว',
-    text: 'เลือกได้ 20 ตัว ใช้แทนรูปโปรไฟล์ทั้งแอป เห็นปุ๊บรู้ปั๊บว่าใครเป็นใคร',
-    chip: 'bg-purple-light text-ink',
-  },
-  {
-    emoji: '⭐',
-    title: 'ชวนเพื่อนแล้วได้แต้ม',
-    text: 'แต้มจากการชวนเพื่อนและจากทริปที่เปิดสาธารณะ เอามาแลกเป็นการร่างของ AI ได้',
-    chip: 'bg-yellow-light text-ink',
-  },
-  {
-    emoji: '📊',
-    title: 'สรุปทั้งปีของตัวเอง',
-    text: 'ปีนี้ไปมากี่ทริป กี่วัน กี่ประเทศ ใช้เงินไปเท่าไหร่ — รวมมาให้ในที่เดียว',
+    icon: BarChart3,
+    title: 'สรุปรวมทั้งปี ไปไหนมาบ้างแล้ว',
+    text: 'กี่ทริป กี่วัน กี่ประเทศ ใช้เงินไปเท่าไหร่ — รวมมาให้ในที่เดียว',
     chip: 'bg-green-light text-ink',
   },
 ] as const;
 
 /**
- * What the hero's tilted tags say (§4). Where they sit, at what angle, and
- * which drop on a phone is `HeroCanvas`'s business — a page choosing its own
+ * The nice-to-haves, deliberately rendered small.
+ *
+ * Three are Feedback #1's own list; the other three are shipped features it
+ * invited suggestions for ("etc. มีแนะนำเพิ่มได้อีกนะ"). Every line here has
+ * working code behind it — adapt/clone is `POST /public/trips/:slug/adapt`,
+ * photos are `components/photo`, documents are `components/document`. Nothing
+ * aspirational goes in this list: it sits under a heading that claims these
+ * are things we have.
+ *
+ * Six, and six is the ceiling. Feedback #1 asked for the two lists to be told
+ * apart; a Web Starred list longer than the four claims above it inverts the
+ * very ranking the split was for.
+ *
+ * No colour. These are not rooms in the product, and a pastel per line would
+ * be the decorative rainbow §8 rules out — the ink check is punctuation.
+ */
+const STARRED = [
+  'มีตัวละครประจำตัว 20 แบบ',
+  'ชวนเพื่อนแล้วได้แต้ม',
+  'สร้างทริปเป็น public ได้',
+  'ก๊อปทริปคนอื่นมาแก้ต่อเป็นของตัวเองได้',
+  'เก็บรูปเข้าแพลนตามสถานที่ที่ไป',
+  'เก็บตั๋วกับเอกสารไว้ในทริป',
+] as const;
+
+/**
+ * What the hero's tilted tags say (§4). Where they sit, at what angle, and how
+ * they render on a phone is `HeroCanvas`'s business — a page choosing its own
  * coordinates is what put a tag across the knockout the first time.
  *
- * Two tags, both on the right. `HeroCanvas`'s first two slots are the
- * right-anchored ones, so the length of this list is what keeps the left of
- * the headline clear: the Thai lines are long and ragged, and a pill hanging
- * off their left edge landed mid-word rather than on a letter's edge, which
- * is the graze §4.2.4 asks for. `countdown` for the dates tag, because that is
- * the room "หาวันว่าง" opens, and ink for the anchor §4.2.5 asks every cluster
- * to have.
+ * Six now, not two, one per feature colour: Feedback #1 kept the device and
+ * asked it to carry the whole palette. That makes this the page's introduction
+ * to the colour system rather than decoration on the headline, and it is why
+ * `HeroCanvas` grew a sixth slot and a phone layout — six pills of which a
+ * phone showed one taught nothing.
+ *
+ * NO INK TAG, which §4.2.5 asks every cluster to have as its anchor. Six
+ * feature colours plus a black pill is seven, and §4.2.1 calls more than six
+ * cluttered; between an anchor and the complete map, Feedback #1 asked for the
+ * map. ROVE_BRAND_SPEC §4.2.5 needs updating to say so.
+ *
+ * The wording is Feedback #1's list with two changes it approved:
+ *   "แพลนไหนก็สะดวก" → "ไปไหนก็ได้"  the original reads two ways (which plan?
+ *                                    which trip?) and the claim being made is
+ *                                    about places, which is also the thing the
+ *                                    old headline was accused of hiding
+ *   "จัดการงบ"        → "หารเงินจบ"   the original names a chore the user does;
+ *                                    this names the state they end up in
+ *
+ * Tones are the room each phrase opens, never a colour picked for looks —
+ * "ไปไหนก็ได้" is journal because that is where a trip becomes somewhere you
+ * went, and "ทริปในฝัน" is memo because /dreams is a real screen and this is a
+ * link to it in spirit.
  */
 const HERO_TAGS = [
   { label: 'หาวันว่าง', tone: 'countdown' },
-  { label: 'AI ร่างให้', tone: 'ink' },
+  { label: 'AI ร่างให้', tone: 'itinerary' },
+  { label: 'ไปไหนก็ได้', tone: 'journal' },
+  { label: 'กี่คนก็ได้', tone: 'wishlist' },
+  { label: 'หารเงินจบ', tone: 'documents' },
+  { label: 'ทริปในฝัน', tone: 'memo' },
 ] as const;
 
 /**
@@ -265,36 +335,51 @@ export default function LandingPage() {
     >
       {/* =========================================================== hero (canvas)
           Composition, layer order and tag placement all live in `HeroCanvas`
-          (§6). This page supplies only what is specific to it: the words, the
-          anchor mark, and which two small doodles sit in the gaps. */}
+          (§6). This page supplies only the words and the tags.
+
+          NO DOODLES ON THIS PAGE. Feedback #1: "เริ่มต้นก่อนจะได้ mascot or
+          ลายเส้นประจำ / เอาออกก่อนได้ ให้ได้สีแค่ที่ต้องการก่อน" — the flower
+          anchor, the starburst, the sparkle, the curl arrow, the dotted path
+          and the heading underline are all gone until there is a mascot or a
+          signature line style to draw them in. The marks were placeholder
+          handwriting in a hand nobody had chosen yet, and six of them across
+          one page made that guess look like a decision.
+
+          They are removed HERE ONLY. `components/brand/doodle.tsx` and its
+          eleven other callers (login, pricing, explore, empty states, status
+          and legal pages) are untouched — this is the page the feedback was
+          about, and stripping the rest of the site is a separate call nobody
+          has made.
+
+          What carries the hero instead is what §1 says should: the scale of
+          the type and the six tags. */}
       <HeroCanvas
         eyebrow="ท่องเที่ยวไปโดยไม่มีเส้นทางตายตัว"
         /* Lines are broken by hand into a short stack (§3.1) — each `block` is
            one line, ragged right, never centred. The last line carries the
            promise and keeps the period §3.2 offers for the extra beat; the
-           weight and the break do that work, without a knockout slab. */
+           weight and the break do that work, without a knockout slab.
+
+           The old stack was "วางแพลนเที่ยว / กันทั้งกลุ่ม / จบในที่เดียว." and
+           "กันทั้งกลุ่ม" was the problem Feedback #1 opened with: it reads as a
+           requirement, so a solo traveller is told on line two that this site
+           is not for them, and it says nothing about what happens after the
+           planning. The three verbs are the product in the order you meet it
+           — plan it, go on it, record what it cost — and the group is now an
+           option the tags and the lead offer rather than a condition the
+           headline imposes. */
         headline={
           <>
-            <span className="block">วางแพลนเที่ยว</span>
-            <span className="block">กันทั้งกลุ่ม</span>
+            <span className="block">วางแพลน ไปเที่ยว</span>
+            <span className="block">จดงบ</span>
             <span className="block">จบในที่เดียว.</span>
           </>
         }
-        lead="ทุกคนหย่อนที่อยากไปลงห้องเดียวกัน AI ร่างแพลนรายวันพร้อมงบและเหตุผลให้ แล้วค่อยแก้ด้วยกัน จบทริปแล้วหารเงินกันในแอปได้เลย"
+        /* Rewritten with the headline, and for the same reason: the old lead
+           opened "ทุกคนหย่อนที่อยากไปลงห้องเดียวกัน", which puts a group in the
+           first four words of a page that just stopped requiring one. */
+        lead="ไปคนเดียวหรือไปกันทั้งแก๊งก็ได้ ทั่วโลก — AI ร่างแพลนรายวันพร้อมงบและเหตุผลให้ แก้ต่อได้ตามสะดวก แล้วจดค่าใช้จ่ายจริงจบในที่เดียว"
         tags={HERO_TAGS}
-        anchor={Flower}
-        anchorTone="text-pink-light"
-        marks={
-          <>
-            {/* Dropped on a phone, where the anchor already owns this corner
-                and the two marks read as one smudge (§10). */}
-            <StarBurst className="text-green-solid pointer-events-none absolute top-[30%] -right-16 z-20 hidden size-24 sm:block" />
-            {/* Under the start of the last line, clear of the type — a mark
-                clipping a letter's corner reads as a smudge, not a doodle. */}
-            <Sparkle className="text-yellow-solid pointer-events-none absolute -bottom-6 left-[6%] z-20 hidden size-12 lg:block" />
-          </>
-        }
-        arrow
         actions={
           <>
             <Link href="/new" className={heroButtonClass}>
@@ -404,11 +489,11 @@ export default function LandingPage() {
                 ทั้งหมดอยู่ในหน้าเดียว และไม่ต้องมีใครรับหน้าที่สรุป
               </>
             }
-            underline
           />
-          {/* The dotted path is the journey mark (§5.2) — this is the one
-              section where it says something the copy does not. */}
-          <DottedPath className="pointer-events-none absolute top-10 right-2 hidden h-12 w-24 lg:block" />
+          {/* The dotted path stood here as the journey mark (§5.2) and the
+              underline sat under the heading. Both out with the rest of the
+              doodles — the coloured step numbers below are what gives this
+              section its emphasis now. */}
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {STEPS.map((step) => (
               <div key={step.n}>
@@ -451,18 +536,38 @@ export default function LandingPage() {
           title="สิ่งที่เรามี ไม่เหมือนที่อื่น"
           lead="ส่วนใหญ่ช่วยเก็บรายการที่อยากไป แต่ไม่ได้ช่วยตอนที่ต้องตัดสินใจ และตอนที่ต้องเคลียร์เงินกันทีหลัง"
         />
-        <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {/* Four claims, two up — wider cards than the old six-across, because
+            these titles are full sentences now rather than product nouns. */}
+        <div className="mt-8 grid gap-3 sm:grid-cols-2">
           {FEATURES.map((f) => (
             <Card key={f.title} className="p-5">
               <span
-                className={`flex size-10 items-center justify-center rounded-full text-lg ${f.chip}`}
+                className={`flex size-10 items-center justify-center rounded-full ${f.chip}`}
               >
-                {f.emoji}
+                <f.icon className="size-5" strokeWidth={2} />
               </span>
               <p className="t-h3 text-ink mt-4">{f.title}</p>
               <p className="text-muted t-small mt-1.5">{f.text}</p>
             </Card>
           ))}
+        </div>
+
+        {/* Web Starred — the same content rank as a footnote, and shaped like
+            one. No card, no chip, no colour: a bordered list under a small
+            label reads as "and also these", which is exactly its job. Give it
+            cards and the section goes back to arguing for ten equal things. */}
+        <div className="border-border mt-10 border-t pt-8">
+          <p className="text-muted font-display text-xs font-medium tracking-wide uppercase">
+            Web Starred
+          </p>
+          <ul className="mt-4 grid gap-x-8 gap-y-2.5 sm:grid-cols-2">
+            {STARRED.map((line) => (
+              <li key={line} className="text-ink t-small flex items-start gap-2">
+                <Check className="mt-0.5 size-4 shrink-0" strokeWidth={2.5} />
+                {line}
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
