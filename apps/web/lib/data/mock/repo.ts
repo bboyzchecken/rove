@@ -229,7 +229,11 @@ function exploreOf(db: MockDb, record: TripRecord) {
     title: record.trip.title,
     cover: record.trip.cover,
     cities: [...record.trip.cities],
-    country: '',
+    // Was hardcoded to '' while the record has carried a country all along, so
+    // anything reading `country` off the explore feed saw a blank in mock and
+    // a real code in live — which is the one thing a mock must not do. The
+    // landing mosaic labels every tile with it.
+    country: record.trip.country,
     days: record.trip.nights + 1,
     budgetPerPersonThb: record.trip.budgetPerPersonThb,
     viewCount: record.share.viewCount,

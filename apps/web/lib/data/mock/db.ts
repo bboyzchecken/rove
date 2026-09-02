@@ -64,7 +64,13 @@ import type {
 // always held it. Bumped rather than back-filled: a stored older blob has no
 // such array, and a UAT session that half-loads is worse than one that starts
 // clean.
-const STORAGE_KEY = 'rove.mock.v10';
+//
+// v11 grows the published catalogue from three trips to seven and gives each
+// one a country, for the landing mosaic (Feedback #1). Both are seed-shape
+// changes an old blob cannot satisfy: it would carry three trips with blank
+// countries, and the mosaic would render four flagless tiles or, below its
+// minimum of four, nothing at all.
+const STORAGE_KEY = 'rove.mock.v11';
 
 /** One candidate itinerary (M6) — metrics and votes are computed at read. */
 export interface VariantRecord {
@@ -431,6 +437,8 @@ function seedPublicTrip(input: {
   slug: string;
   title: string;
   cover: string;
+  /** ISO code — the landing mosaic names and flags the tile from this. */
+  country: string;
   cities: string[];
   /** Nights, so the card's "N วัน" agrees with the title it sits under. */
   nights: number;
@@ -445,6 +453,7 @@ function seedPublicTrip(input: {
     id: input.id,
     title: input.title,
     cover: input.cover,
+    country: input.country,
     cities: input.cities,
     nights: input.nights,
     budgetPerPersonThb: input.budgetPerPersonThb,
@@ -492,6 +501,26 @@ function seedPublicTrip(input: {
   return record;
 }
 
+/**
+ * The fictional published catalogue the explore feed and the landing mosaic
+ * read from.
+ *
+ * Seven, ordered by `viewCount`, because the landing mosaic draws seven tiles
+ * and sizes them by rank (see `TripMosaicSection`): three of anything makes a
+ * feed but not a mosaic. Countries are spread on purpose — the section these
+ * sit under claims "จะไปมุมไหนของโลก ก็วางแพลนที่นี่ได้", and a wall of Japan
+ * under that sentence argues against it.
+ *
+ * The view counts descend in a curve rather than in even steps, because the
+ * mosaic's whole claim is that area means attention: four trips within 5% of
+ * each other would size themselves almost identically and the layout would
+ * look arbitrary instead of ranked.
+ *
+ * MOCK ONLY. These are fictional travellers with invented numbers, which is
+ * exactly what a demo database is for and exactly what the live one must not
+ * contain — `lib/social-proof.ts` states the rule for the production landing
+ * page, and W24.1 behind it: real numbers only, hide the section otherwise.
+ */
 function seedPublicTrips(): TripRecord[] {
   return [
     seedPublicTrip({
@@ -499,6 +528,7 @@ function seedPublicTrips(): TripRecord[] {
       slug: 'tokyo-week-mint',
       title: 'โตเกียว 7 วันฉบับไปครั้งแรก',
       cover: '/brand/covers/cover-japan.webp',
+      country: 'JP',
       cities: ['Tokyo', 'Yokohama'],
       nights: 6,
       budgetPerPersonThb: 42_000,
@@ -511,6 +541,7 @@ function seedPublicTrips(): TripRecord[] {
       slug: 'kansai-food-run',
       title: 'สายกินบุกคันไซ 5 วัน',
       cover: '/brand/covers/cover-food.webp',
+      country: 'JP',
       cities: ['Osaka', 'Kyoto', 'Nara'],
       nights: 4,
       budgetPerPersonThb: 33_000,
@@ -523,6 +554,7 @@ function seedPublicTrips(): TripRecord[] {
       slug: 'seoul-cafe-hop',
       title: 'โซลคาเฟ่ฮอป 4 วัน 3 คืน',
       cover: '/brand/covers/cover-korea.webp',
+      country: 'KR',
       cities: ['Seoul'],
       nights: 3,
       budgetPerPersonThb: 24_000,
@@ -530,12 +562,64 @@ function seedPublicTrips(): TripRecord[] {
       cloneCount: 28,
       creator: { name: 'พลอย', handle: 'ploy.wander', characterId: 'rabbit' },
     }),
+    seedPublicTrip({
+      id: 'pub-vietnam',
+      slug: 'danang-hoian-slow',
+      title: 'ดานัง–ฮอยอัน 5 วันแบบไม่รีบ',
+      cover: '/brand/covers/cover-vietnam.webp',
+      country: 'VN',
+      cities: ['Da Nang', 'Hoi An'],
+      nights: 4,
+      budgetPerPersonThb: 16_500,
+      viewCount: 431,
+      cloneCount: 19,
+      creator: { name: 'เจได', handle: 'jedi.slowtrip', characterId: 'koala' },
+    }),
+    seedPublicTrip({
+      id: 'pub-taiwan',
+      slug: 'taipei-first-solo',
+      title: 'ไทเปคนเดียว 4 วัน',
+      cover: '/brand/covers/cover-city.webp',
+      country: 'TW',
+      cities: ['Taipei', 'Jiufen'],
+      nights: 3,
+      budgetPerPersonThb: 19_000,
+      viewCount: 298,
+      cloneCount: 12,
+      creator: { name: 'ฟ้า', handle: 'fah.solo', characterId: 'penguin' },
+    }),
+    seedPublicTrip({
+      id: 'pub-iceland',
+      slug: 'iceland-ring-road',
+      title: 'ไอซ์แลนด์ขับรอบเกาะ 9 วัน',
+      cover: '/brand/covers/cover-iceland.webp',
+      country: 'IS',
+      cities: ['Reykjavik', 'Vik', 'Akureyri'],
+      nights: 8,
+      budgetPerPersonThb: 98_000,
+      viewCount: 214,
+      cloneCount: 7,
+      creator: { name: 'กัน', handle: 'gun.roadtrip', characterId: 'deer' },
+    }),
+    seedPublicTrip({
+      id: 'pub-portugal',
+      slug: 'lisbon-porto-rail',
+      title: 'ลิสบอน–ปอร์โต 7 วันนั่งรถไฟ',
+      cover: '/brand/covers/cover-europe.webp',
+      country: 'PT',
+      cities: ['Lisbon', 'Porto', 'Sintra'],
+      nights: 6,
+      budgetPerPersonThb: 71_000,
+      viewCount: 156,
+      cloneCount: 5,
+      creator: { name: 'ปูน', handle: 'poon.rail', characterId: 'owl' },
+    }),
   ];
 }
 
 export function seedDb(): MockDb {
   return {
-    version: 10,
+    version: 11,
     user: {
       id: CURRENT_USER.id,
       name: CURRENT_USER.name,
@@ -661,7 +745,7 @@ export function loadDb(): MockDb {
         const parsed = JSON.parse(raw) as MockDb;
         // A seed change bumps the version; an old blob is thrown away rather
         // than migrated — this is demo data, not anyone's real trip.
-        if (parsed.version === 10) {
+        if (parsed.version === 11) {
           memory = parsed;
           return memory;
         }

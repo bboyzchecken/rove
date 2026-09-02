@@ -21,6 +21,7 @@ import {
 import { SectionIntro } from '@/components/brand/section-intro';
 import { PublicShell, SHELL_SECTION } from '@/components/common/public-shell';
 import { PlatformStatsSection } from '@/components/public/platform-stats';
+import { TripMosaicSection } from '@/components/public/trip-mosaic';
 import { TravellerReviewsSection } from '@/components/public/traveller-reviews';
 import { ButtonLink } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -446,10 +447,14 @@ export default function LandingPage() {
           The illustration is gone (Feedback #1). A drawing of landmarks is a
           claim about the world, and the section's own lead says the row below
           is "ตัวอย่างจากทริปที่คนเปิดสาธารณะไว้" — real trips people published.
-          Drawn landmarks were standing where that evidence belongs. Phase 3
-          puts the evidence itself here: a mosaic of published trips sized by
-          how many people looked at them. Until then the section is heading,
-          lead and pills, which is short but honest. */}
+          Drawn landmarks were standing where that evidence belongs, so the
+          evidence itself stands there now: `TripMosaicSection`, published
+          trips sized by how many people looked at them.
+
+          It renders nothing until there are four of them, and the section
+          closes back up around it — the heading, the lead and the pills still
+          make sense on their own, which is why this is safe to ship before
+          the catalogue fills. */}
       <section className={`${SHELL_SECTION} py-16`}>
         <SectionIntro
           title="จะไปมุมไหนของโลก ก็วางแพลนที่นี่ได้"
@@ -467,6 +472,8 @@ export default function LandingPage() {
             และที่อื่นทั่วโลก
           </Badge>
         </div>
+
+        <TripMosaicSection className="mt-8" />
       </section>
 
       {/* --------------------------------------------------------- steps (white)
