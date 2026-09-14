@@ -32,7 +32,7 @@ const FRAME = {
    * is, since the picture is 1.5x whatever height it is given — h-56 is what
    * makes it reach both edges of a phone.
    */
-  banner: 'h-56 sm:h-64',
+  banner: 'h-44 sm:h-56',
   /** A card that is as wide as its column. */
   card: 'aspect-[3/2] w-full',
   /** Beside a row in the trip list. */
@@ -62,7 +62,11 @@ export function TripCover({
         width={COVER_WIDTH}
         height={COVER_HEIGHT}
         priority={priority}
-        className="size-full object-contain"
+        // The banner is a Facebook-style strip (Feedback #2 — D-14): a fixed
+        // band the picture FILLS, cropped, rather than a 3:2 picture floating
+        // in the middle of a white band with its placeholder adrift. The 3:2
+        // frames need no crop — the artwork is 3:2 already.
+        className={cn('size-full', frame === 'banner' ? 'object-cover' : 'object-contain')}
       />
       {children}
     </div>

@@ -13,8 +13,17 @@ import { COVER_HEIGHT, COVER_WIDTH } from '@/lib/covers';
  * did not choose is worse than one that says "3:2, we crop the middle".
  */
 
-/** What the file input accepts. */
-export const COVER_ACCEPT = 'image/jpeg,image/png,image/webp';
+/**
+ * What the file input accepts.
+ *
+ * `image/*` and not a list of three (Feedback #2 — D-14). The tester could
+ * not upload a cover in UAT round 1, and the likeliest reason is the one a
+ * strict list guarantees: an iPhone's camera roll is HEIC, and a file input
+ * that names only JPG, PNG and WebP either hides those photos or refuses them
+ * with a message about file types nobody chooses. The browser decides what it
+ * can decode; `decodeImage` below says so plainly when it cannot.
+ */
+export const COVER_ACCEPT = 'image/*';
 
 /** Refused before decoding — a 50MP panorama is a mistake, not a cover. */
 export const COVER_MAX_FILE_BYTES = 12 * 1024 * 1024;
@@ -32,43 +41,127 @@ export interface PreparedCover {
   bytes: number;
 }
 
-export async function coverFromFile(file: File): Promise<PreparedCover> {
-  if (!COVER_ACCEPT.split(',').includes(file.type)) {
-    throw new Error('ใช้ได้เฉพาะไฟล์ JPG PNG หรือ WebP');
-  }
+/**
+ * Where the 3:2 window sits on the photo, 0–1 on each axis (0.5 = centred).
+ * Only the axis with spare pixels matters: a landscape photo can slide left
+ * and right, a portrait one up and down.
+ */
+export interface CoverFocus {
+  x: number;
+  y: number;
+}
+
+/** A decoded photo the picker can crop repeatedly without re-reading the file. */
+export interface DecodedCover {
+  source: CanvasImageSource;
+  width: number;
+  height: number;
+  /** A URL for the drag preview. Revoke it when done. */
+  previewUrl: string;
+  close: () => void;
+}
+
+function invalidFile(file: File) {
+  if (!file.type.startsWith('image/')) return 'ใช้ได้เฉพาะไฟล์รูป (JPG, PNG, HEIC, WebP)';
   if (file.size > COVER_MAX_FILE_BYTES) {
-    throw new Error(`ไฟล์ใหญ่เกิน ${Math.round(COVER_MAX_FILE_BYTES / 1024 / 1024)}MB`);
+    return `ไฟล์ใหญ่เกิน ${Math.round(COVER_MAX_FILE_BYTES / 1024 / 1024)}MB`;
   }
+  return null;
+}
 
-  let bitmap: ImageBitmap;
-  try {
-    bitmap = await createImageBitmap(file);
-  } catch {
-    throw new Error('เปิดไฟล์รูปนี้ไม่ได้ ลองไฟล์อื่น');
-  }
+/**
+ * Reads the photo once, the right way up.
+ *
+ * `imageOrientation: 'from-image'` is the fix for the sideways cover: a phone
+ * stores a portrait shot as landscape pixels plus an EXIF flag, and a canvas
+ * ignores the flag. Where `createImageBitmap` is missing or refuses the
+ * format, an `<img>` decode is tried — Safari can draw a HEIC it will not
+ * hand to `createImageBitmap`.
+ */
+export async function decodeCover(file: File): Promise<DecodedCover> {
+  const problem = invalidFile(file);
+  if (problem) throw new Error(problem);
 
-  try {
-    const canvas = document.createElement('canvas');
-    canvas.width = COVER_WIDTH;
-    canvas.height = COVER_HEIGHT;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('เบราว์เซอร์นี้ย่อรูปให้ไม่ได้ เลือกจากรูปที่มีให้แทนได้');
+  const previewUrl = URL.createObjectURL(file);
 
-    // Cover-crop from the centre: fill the 3:2 frame and let the overflow go,
-    // which is what the preview in the picker shows before anything is saved.
-    const scale = Math.max(COVER_WIDTH / bitmap.width, COVER_HEIGHT / bitmap.height);
-    const width = bitmap.width * scale;
-    const height = bitmap.height * scale;
-    ctx.drawImage(bitmap, (COVER_WIDTH - width) / 2, (COVER_HEIGHT - height) / 2, width, height);
-
-    for (const quality of QUALITIES) {
-      const src = encode(canvas, quality);
-      const bytes = byteLength(src);
-      if (bytes <= MAX_ENCODED_BYTES) return { src, bytes };
+  if (typeof createImageBitmap === 'function') {
+    try {
+      const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+      return {
+        source: bitmap,
+        width: bitmap.width,
+        height: bitmap.height,
+        previewUrl,
+        close: () => {
+          bitmap.close();
+          URL.revokeObjectURL(previewUrl);
+        },
+      };
+    } catch {
+      // fall through to the <img> path
     }
-    throw new Error('รูปนี้หนักเกินไป ลองรูปที่รายละเอียดน้อยกว่านี้');
+  }
+
+  const image = new Image();
+  image.decoding = 'async';
+  const loaded = new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error('decode'));
+  });
+  image.src = previewUrl;
+  try {
+    await loaded;
+  } catch {
+    URL.revokeObjectURL(previewUrl);
+    throw new Error(
+      'เปิดไฟล์รูปนี้ไม่ได้ — ถ้าเป็น HEIC จาก iPhone ลองส่งเป็น JPG หรือเลือกรูปอื่น',
+    );
+  }
+  return {
+    source: image,
+    width: image.naturalWidth,
+    height: image.naturalHeight,
+    previewUrl,
+    close: () => URL.revokeObjectURL(previewUrl),
+  };
+}
+
+/** Crops a decoded photo to the cover frame around `focus` and encodes it. */
+export function cropCover(decoded: DecodedCover, focus: CoverFocus = { x: 0.5, y: 0.5 }): PreparedCover {
+  const canvas = document.createElement('canvas');
+  canvas.width = COVER_WIDTH;
+  canvas.height = COVER_HEIGHT;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('เบราว์เซอร์นี้ย่อรูปให้ไม่ได้ เลือกจากรูปที่มีให้แทนได้');
+
+  // Cover-crop: fill the 3:2 frame, and slide the overflow to where the
+  // person dragged it (D-14 — "ลากจัดตำแหน่ง").
+  const scale = Math.max(COVER_WIDTH / decoded.width, COVER_HEIGHT / decoded.height);
+  const width = decoded.width * scale;
+  const height = decoded.height * scale;
+  const x = -(width - COVER_WIDTH) * clamp01(focus.x);
+  const y = -(height - COVER_HEIGHT) * clamp01(focus.y);
+  ctx.drawImage(decoded.source, x, y, width, height);
+
+  for (const quality of QUALITIES) {
+    const src = encode(canvas, quality);
+    const bytes = byteLength(src);
+    if (bytes <= MAX_ENCODED_BYTES) return { src, bytes };
+  }
+  throw new Error('รูปนี้หนักเกินไป ลองรูปที่รายละเอียดน้อยกว่านี้');
+}
+
+function clamp01(n: number) {
+  return Math.min(1, Math.max(0, Number.isFinite(n) ? n : 0.5));
+}
+
+/** One-shot: decode, centre-crop, encode. The picker uses the two halves. */
+export async function coverFromFile(file: File, focus?: CoverFocus): Promise<PreparedCover> {
+  const decoded = await decodeCover(file);
+  try {
+    return cropCover(decoded, focus);
   } finally {
-    bitmap.close();
+    decoded.close();
   }
 }
 
@@ -100,8 +193,8 @@ export function formatBytes(bytes: number) {
 
 /* ------------------------------------------------------ trip photos (M18) - */
 
-/** What the photo picker accepts. HEIC is handled by the OS on the way in. */
-export const PHOTO_ACCEPT = 'image/jpeg,image/png,image/webp';
+/** What the photo picker accepts — anything the browser can decode. */
+export const PHOTO_ACCEPT = 'image/*';
 
 /** Refused before decoding — a RAW-sized file is a mistake, not a snapshot. */
 export const PHOTO_MAX_FILE_BYTES = 25 * 1024 * 1024;
@@ -124,29 +217,25 @@ const PHOTO_MAX_ENCODED_BYTES = 900 * 1024;
  * multipart, they do not ride inside a row the way a cover does.
  */
 export async function photoFromFile(file: File): Promise<File> {
-  if (!PHOTO_ACCEPT.split(',').includes(file.type)) {
-    throw new Error('ใช้ได้เฉพาะไฟล์ JPG PNG หรือ WebP');
+  if (!file.type.startsWith('image/')) {
+    throw new Error('ใช้ได้เฉพาะไฟล์รูป (JPG, PNG, HEIC, WebP)');
   }
   if (file.size > PHOTO_MAX_FILE_BYTES) {
     throw new Error(`ไฟล์ใหญ่เกิน ${Math.round(PHOTO_MAX_FILE_BYTES / 1024 / 1024)}MB`);
   }
 
-  let bitmap: ImageBitmap;
-  try {
-    bitmap = await createImageBitmap(file);
-  } catch {
-    throw new Error('เปิดไฟล์รูปนี้ไม่ได้ ลองไฟล์อื่น');
-  }
+  // The same decode as the cover — orientation honoured, HEIC given a chance.
+  const decoded = await decodeCover(file);
 
   try {
-    const scale = Math.min(1, PHOTO_MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+    const scale = Math.min(1, PHOTO_MAX_EDGE / Math.max(decoded.width, decoded.height));
     const canvas = document.createElement('canvas');
-    canvas.width = Math.round(bitmap.width * scale);
-    canvas.height = Math.round(bitmap.height * scale);
+    canvas.width = Math.round(decoded.width * scale);
+    canvas.height = Math.round(decoded.height * scale);
 
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('เบราว์เซอร์นี้ย่อรูปให้ไม่ได้');
-    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(decoded.source, 0, 0, canvas.width, canvas.height);
 
     for (const quality of QUALITIES) {
       const blob = await toBlob(canvas, quality);
@@ -157,7 +246,7 @@ export async function photoFromFile(file: File): Promise<File> {
     }
     throw new Error('รูปนี้หนักเกินไป ลองรูปอื่น');
   } finally {
-    bitmap.close();
+    decoded.close();
   }
 }
 
