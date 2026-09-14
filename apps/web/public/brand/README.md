@@ -8,7 +8,7 @@
 | `texture-linen.webp`   | 420px cream linen tile, multiplied under `.bg-linen`          |
 | `covers/*.webp`        | trip covers: six destinations + nine vibes, 1200x800 (3:2)    |
 | `empty/*.webp`         | empty-state illustrations                                     |
-| `../characters/*.webp` | the 20 characters (M14) — ids match `apps/api/data/characters.json` |
+| `../characters/*.svg`  | the 20 flower characters (M14, Feedback #2 D-4) — drawn from `lib/catalog/flowers.ts` by `scripts/gen-flower-characters.mjs`, which also writes `apps/api/data/characters.json` |
 
 `covers/cover-placeholder.webp` is the neutral one every trip starts on, and
 the whole set is offered by `components/trip/trip-cover-sheet.tsx` through the

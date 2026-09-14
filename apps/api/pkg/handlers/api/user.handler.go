@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -28,6 +29,11 @@ func (s *Server) registerUserRoutes(g *echo.Group) {
 	s.registerInboxRoutes(me) // A9.2 — the inbox belongs to a person, not a trip
 	me.GET("/trips/upcoming", s.handleUpcomingTrips)
 	me.GET("/trips/past", s.handlePastTrips)
+	// Feedback #2 — D-10: whether the next trip would hit the free-tier wall,
+	// so the entry flow can say so on its first screen rather than after the
+	// last one. Under /users/me because it is a fact about the account, and
+	// because everything under /trips/ must carry a :tripId (routes_test).
+	me.GET("/trip-allowance", s.handleTripAllowance)
 	// Bill & payment (A20.x) — receipts belong to the user, not to a trip.
 	s.registerBillingRoutes(me.Group("/billing"))
 
@@ -127,6 +133,8 @@ func (s *Server) handleUpcomingTrips(c echo.Context) error {
 			EndDate:            trip.EndDate.Format("2006-01-02"),
 			DaysUntil:          domain.DaysBetween(today, *trip.StartDate) - 1,
 			CoverImageURL:      trip.CoverImageURL,
+			Color:              tripColorOf(trip),
+			Country:            trip.DestinationCountry,
 			MemberIDs:          roster.ids(),
 			MemberCharacterIDs: roster.characterIDs(),
 		}
@@ -195,6 +203,8 @@ func (s *Server) handlePastTrips(c echo.Context) error {
 			Places:             len(items),
 			SpentTHB:           spent,
 			CoverImageURL:      trip.CoverImageURL,
+			Color:              tripColorOf(trip),
+			Country:            trip.DestinationCountry,
 			MemberIDs:          roster.ids(),
 			MemberCharacterIDs: roster.characterIDs(),
 			Visibility:         trip.Visibility,
@@ -278,6 +288,7 @@ func (s *Server) handleListDreams(c echo.Context) error {
 type dreamRequest struct {
 	Title       string `json:"title" validate:"required"`
 	Destination string `json:"destination"`
+	Country     string `json:"country" validate:"omitempty,len=2"`
 	Note        string `json:"note"`
 	URL         string `json:"url"`
 	Accent      string `json:"accent"`
@@ -293,6 +304,7 @@ func (s *Server) handleCreateDream(c echo.Context) error {
 		UserID:      request.UserID(c),
 		Title:       req.Title,
 		Destination: req.Destination,
+		Country:     strings.ToUpper(req.Country),
 		Note:        req.Note,
 		URL:         req.URL,
 		Accent:      orDefault(req.Accent, "primary"),
@@ -322,6 +334,7 @@ func (s *Server) handleUpdateDream(c echo.Context) error {
 		}
 		dream.Title = req.Title
 		dream.Destination = req.Destination
+		dream.Country = strings.ToUpper(req.Country)
 		dream.Note = req.Note
 		dream.URL = req.URL
 		if req.Accent != "" {

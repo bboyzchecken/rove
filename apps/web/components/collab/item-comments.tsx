@@ -12,6 +12,7 @@ import { useTripMembers } from '@/features/trip/queries';
 import type { CommentTarget } from '@/lib/data';
 import { cn } from '@/lib/utils';
 
+import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 /**
  * The comment thread attached to one itinerary item or day (M9 — W9.1).
  *
@@ -55,7 +56,7 @@ export function ItemComments({
             className={cn('bg-surface rounded-2xl p-2.5', comment.resolved && 'opacity-55')}
           >
             <div className="flex items-start gap-2">
-              <CharacterAvatar characterId={who?.characterId ?? 'shiba'} size="xs" />
+              <CharacterAvatar characterId={who?.characterId ?? DEFAULT_CHARACTER_ID} size="xs" />
               <div className="min-w-0 flex-1">
                 <p className="text-ink text-[11px] font-medium">{who?.name ?? 'สมาชิก'}</p>
                 <p className="text-ink text-xs leading-relaxed">{comment.body}</p>

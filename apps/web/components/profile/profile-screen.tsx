@@ -18,6 +18,7 @@ import { useDreams, useMe, usePastTrips, useYearStats } from '@/features/auth/qu
 import { env } from '@/lib/env';
 import { formatMoney } from '@/lib/format';
 
+import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 /** Profile: character (M14), dream list (M15), lifetime stats and points. */
 const POINTS_PER_RUN = 300;
 
@@ -34,7 +35,7 @@ export function ProfileScreen() {
     <div className="space-y-7 px-4 py-5">
       {/* header -------------------------------------------------------- */}
       <div className="flex items-center gap-4">
-        <CharacterAvatar characterId={me?.characterId ?? 'shiba'} size="xl" />
+        <CharacterAvatar characterId={me?.characterId ?? DEFAULT_CHARACTER_ID} size="xl" />
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-ink truncate text-2xl font-medium tracking-tight">
             {me?.name ?? '—'}

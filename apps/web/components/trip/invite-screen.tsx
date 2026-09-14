@@ -13,6 +13,7 @@ import { useInvitePreview, useJoinTrip } from '@/features/trip/queries';
 import { ApiError } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 
+import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 /**
  * Landing for an invite link (M2 — W2.4).
  *
@@ -51,7 +52,7 @@ export function InviteScreen({ token }: { token: string }) {
     }
   }
 
-  const picked = character ?? me?.characterId ?? 'shiba';
+  const picked = character ?? me?.characterId ?? DEFAULT_CHARACTER_ID;
 
   if (previewError) {
     return (

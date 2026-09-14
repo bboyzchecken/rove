@@ -1,28 +1,14 @@
 {
   "version": "0.0.1",
-  "autoPort": true,
   "configurations": [
     {
-      "name": "rove-web",
-      "runtimeExecutable": "pnpm",
+      "name": "web-uat",
+      "runtimeExecutable": "sh",
       "runtimeArgs": [
-        "--dir",
-        "apps/web",
-        "exec",
-        "next",
-        "dev",
-        "--turbopack"
+        "-c",
+        "export PATH=$HOME/.nvm/versions/node/v22.23.1/bin:$PATH && cd apps/web && NEXT_PUBLIC_DATA_MODE=mock NEXT_PUBLIC_UAT_VARIANTS=1 pnpm exec next dev --turbopack -p 3100"
       ],
       "port": 3100
-    },
-    {
-      "name": "rove-web-mock",
-      "runtimeExecutable": "cmd",
-      "runtimeArgs": [
-        "/c",
-        "set NEXT_PUBLIC_DATA_MODE=mock && pnpm --dir apps/web exec next dev --turbopack -p 3101"
-      ],
-      "port": 3101
     }
   ]
 }

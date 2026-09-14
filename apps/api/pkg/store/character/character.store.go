@@ -32,7 +32,7 @@ func (s *store) List(ctx context.Context) ([]models.Character, error) {
 func (s *store) Upsert(ctx context.Context, c *models.Character) error {
 	return s.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"name_th", "image_url", "accent", "sort_order", "is_active"}),
+		DoUpdates: clause.AssignmentColumns([]string{"name_th", "name_en", "image_url", "accent", "sort_order", "is_active"}),
 	}).Create(c).Error
 }
 

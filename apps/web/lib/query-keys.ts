@@ -25,6 +25,8 @@ export const queryKeys = {
   billingPlans: () => ['billing', 'plans'] as const,
 
   trips: () => ['trips'] as const,
+  /** The free-tier wall, asked before the entry flow starts (Feedback #2 — D-10). */
+  tripAllowance: () => ['trips', 'allowance'] as const,
   tripsUpcoming: () => ['trips', 'upcoming'] as const,
   tripsPast: () => ['trips', 'past'] as const,
   stats: () => ['stats'] as const,
@@ -88,6 +90,7 @@ export const queryKeys = {
   leads: (tripId: string) => ['trip', tripId, 'leads'] as const,
   photoBookThemes: (tripId: string) => ['trip', tripId, 'photobook', 'themes'] as const,
   explore: (filters: string) => ['explore', filters] as const,
+  exploreCountries: () => ['explore', 'countries'] as const,
   creator: (handle: string) => ['creator', handle] as const,
   /** The diff a copy would apply — keyed by the frame it was asked for. */
   adaptPreview: (tokenOrSlug: string, input: string) =>

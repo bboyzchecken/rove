@@ -7,6 +7,7 @@ import { CharacterAvatar } from '@/components/ui/character-avatar';
 import { useCharacters, useMe, useUpdateMe } from '@/features/auth/queries';
 import { cn } from '@/lib/utils';
 
+import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 /**
  * Character picker (M14 — W14.1). Twenty fixed characters, no uploads.
  *
@@ -18,7 +19,7 @@ export function CharacterPicker() {
   const { data: me } = useMe();
   const updateMe = useUpdateMe();
 
-  const selected = me?.characterId ?? 'shiba';
+  const selected = me?.characterId ?? DEFAULT_CHARACTER_ID;
   const current = characters.find((c) => c.id === selected);
 
   return (

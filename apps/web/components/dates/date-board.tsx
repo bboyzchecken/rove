@@ -1,27 +1,25 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   CalendarCheck,
-  CalendarRange,
-  ChevronLeft,
-  ChevronRight,
   Eraser,
   Lock,
   PartyPopper,
-  Send,
   Sparkles,
   Unlock,
 } from 'lucide-react';
 
 import { DateStepBar, type DateStep } from '@/components/dates/date-step-bar';
 import { DestinationPicker } from '@/components/dates/destination-picker';
-import { AvailabilityCalendar, type DaySelection } from '@/components/dates/availability-calendar';
+import { AvailabilityCalendar } from '@/components/dates/availability-calendar';
 import { SectionHeader } from '@/components/common/section';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
+import { MonthNav } from '@/components/ui/month-grid';
 import { useMe } from '@/features/auth/queries';
 import {
   useDateBoard,
@@ -30,31 +28,31 @@ import {
   useSubmitAvailability,
   useUnlockDates,
 } from '@/features/dates/queries';
-import type { AvailabilityMark, DateWindow } from '@/lib/data';
-import {
-  isWeekend,
-  membersFreeInRange,
-  monthDates,
-  thaiMonthLabel,
-  thaiRangeLabel,
-} from '@/lib/data/domain';
+import type { DateWindow } from '@/lib/data';
+import { isWeekend, monthDates, thaiRangeLabel } from '@/lib/data/domain';
 import { cn } from '@/lib/utils';
 
 /**
- * "หาวันที่ตรงกัน" — the step before a trip has dates at all (M2.5).
+ * "หาวันที่ตรงกัน" — the step before a trip has dates at all (M2.5), redrawn
+ * for Feedback #2 (D-13, F3.7).
  *
- * Everyone paints the days they are free; the board turns the overlap into
- * ranked windows; the owner locks one and the trip finally gets a date frame.
- * Every number on this screen is computed from the same marks, so there is no
- * way for the heat map, the suggestions and the lock bar to disagree.
+ * What a member does here is now one thing: tap the days they are free, then
+ * press "ยืนยันวันว่างของฉัน". The board colours every day by how many people
+ * said the same, and once everyone has confirmed — or the owner asks — it
+ * offers the best one to three windows. The OWNER locks one; everyone else
+ * sees the same card with "รอหัวห้องล็อค" on it. Nobody paints a range by
+ * hand any more, which is the tab the tester never understood.
+ *
+ * Every number on this screen is computed from the same marks, so the heat
+ * map, the suggestions and the lock card can never disagree.
  */
 export function DateBoard({ tripId }: { tripId: string }) {
   const { data: me } = useMe();
+  const t = useTranslations('dates');
   const [month, setMonth] = useState<string | undefined>(undefined);
   const { data: board, isLoading } = useDateBoard(tripId, month);
-
-  const [mode, setMode] = useState<'mine' | 'range'>('mine');
-  const [selection, setSelection] = useState<DaySelection | null>(null);
+  const [askedForWindows, setAskedForWindows] = useState(false);
+  const [picked, setPicked] = useState<DateWindow | null>(null);
 
   const setAvailability = useSetAvailability(tripId);
   const submit = useSubmitAvailability(tripId);
@@ -68,19 +66,6 @@ export function DateBoard({ tripId }: { tripId: string }) {
     [board?.entries, meId],
   );
 
-  const range = useMemo(() => {
-    if (!selection) return null;
-    const end = selection.end ?? selection.start;
-    return selection.start <= end
-      ? { start: selection.start, end }
-      : { start: end, end: selection.start };
-  }, [selection]);
-
-  const rangeMembers = useMemo(() => {
-    if (!board || !range) return null;
-    return membersFreeInRange(board.entries, board.members, range.start, range.end);
-  }, [board, range]);
-
   if (isLoading || !board) {
     return (
       <div className="space-y-3">
@@ -91,19 +76,24 @@ export function DateBoard({ tripId }: { tripId: string }) {
   }
 
   const locked = board.locked;
-  const step: DateStep = locked ? 5 : board.submittedMemberIds.length > 0 ? 3 : 2;
-  const monthIndex = board.months.indexOf(board.month);
+  const isOwner = board.members.find((m) => m.id === meId)?.role === 'owner';
+  const confirmedMine = board.submittedMemberIds.includes(meId);
+  const confirmedCount = board.submittedMemberIds.length;
+  const everyoneConfirmed = confirmedCount >= board.members.length && board.members.length > 0;
   const pending = board.members.filter((m) => !board.submittedMemberIds.includes(m.id));
+  const step: DateStep = locked ? 5 : confirmedCount > 0 ? 3 : 2;
 
-  function pickWindow(window: DateWindow) {
-    setMode('range');
-    setSelection({ start: window.startDate, end: window.endDate });
-  }
+  const monthIndex = board.months.indexOf(board.month);
+  const canPrev = monthIndex > 0;
+  const canNext = monthIndex < board.months.length - 1;
 
-  function handleRangeDay(date: string) {
-    setSelection((current) =>
-      !current || current.end ? { start: date, end: null } : { ...current, end: date },
-    );
+  // The windows come out once the group is done, or once the owner asks.
+  const showWindows = !locked && (everyoneConfirmed || askedForWindows) && board.windows.length > 0;
+  const best = board.windows.slice(0, 3);
+  const highlight = picked ?? (showWindows ? best[0] ?? null : null);
+
+  function toggleDay(date: string, free: boolean) {
+    setAvailability.mutate({ memberId: meId, dates: [date], mark: free ? 'free' : null });
   }
 
   /** Marks every Saturday and Sunday of the visible month free in one tap. */
@@ -114,10 +104,6 @@ export function DateBoard({ tripId }: { tripId: string }) {
 
   function clearMine() {
     setAvailability.mutate({ memberId: meId, dates: monthDates(board!.month), mark: null });
-  }
-
-  function cycleDay(date: string, next: AvailabilityMark | null) {
-    setAvailability.mutate({ memberId: meId, dates: [date], mark: next });
   }
 
   return (
@@ -150,19 +136,21 @@ export function DateBoard({ tripId }: { tripId: string }) {
                 </span>
               </p>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-bg/70 hover:bg-bg/10"
-              onClick={() => {
-                unlock.mutate();
-                setSelection(null);
-                setMode('range');
-              }}
-              disabled={unlock.isPending}
-            >
-              <Unlock className="size-4" /> เปลี่ยนวัน
-            </Button>
+            {isOwner ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-bg/70 hover:bg-bg/10"
+                onClick={() => {
+                  unlock.mutate();
+                  setPicked(null);
+                  setAskedForWindows(false);
+                }}
+                disabled={unlock.isPending}
+              >
+                <Unlock className="size-4" /> เปลี่ยนวัน
+              </Button>
+            ) : null}
           </div>
         </Card>
       ) : null}
@@ -173,161 +161,84 @@ export function DateBoard({ tripId }: { tripId: string }) {
         <>
           {/* --------------------------------------------------- toolbar -- */}
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="bg-surface flex rounded-full p-1">
-              {(
-                [
-                  { key: 'mine', label: 'ใส่วันว่างของฉัน', icon: CalendarCheck },
-                  { key: 'range', label: 'เลือกช่วงทริป', icon: CalendarRange },
-                ] as const
-              ).map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  onClick={() => setMode(tab.key)}
-                  className={cn(
-                    'font-display flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition',
-                    mode === tab.key ? 'bg-ink text-bg' : 'text-muted',
-                  )}
-                >
-                  <tab.icon className="size-3.5" />
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                aria-label="เดือนก่อนหน้า"
-                disabled={monthIndex <= 0}
-                onClick={() => setMonth(board.months[monthIndex - 1])}
-                className="text-muted hover:bg-surface flex size-8 items-center justify-center rounded-full disabled:opacity-30"
-              >
-                <ChevronLeft className="size-4" />
-              </button>
-              <span className="font-display text-ink min-w-32 text-center text-sm font-medium">
-                {thaiMonthLabel(board.month)}
-              </span>
-              <button
-                type="button"
-                aria-label="เดือนถัดไป"
-                disabled={monthIndex >= board.months.length - 1}
-                onClick={() => setMonth(board.months[monthIndex + 1])}
-                className="text-muted hover:bg-surface flex size-8 items-center justify-center rounded-full disabled:opacity-30"
-              >
-                <ChevronRight className="size-4" />
-              </button>
-            </div>
+            <p className="text-ink text-sm font-medium">
+              แตะวันที่ว่าง แล้วกด &ldquo;ยืนยันวันว่างของฉัน&rdquo;
+            </p>
+            <MonthNav month={board.month} onChange={(m) => setMonth(m)} canPrev={canPrev} canNext={canNext} />
           </div>
-
-          <p className="text-muted text-xs">
-            {mode === 'mine'
-              ? 'แตะวันเพื่อสลับ ว่าง → ไม่ค่อยสะดวก → ไม่ว่าง · สีเข้ม = คนว่างเยอะ'
-              : 'แตะวันแรกแล้วแตะวันสุดท้าย หรือเลือกจาก "ช่วงที่ลงตัวที่สุด" ด้านล่าง'}
-          </p>
 
           <AvailabilityCalendar
             board={board}
             meId={meId}
-            mode={mode}
-            selection={selection}
-            onCycleDay={cycleDay}
-            onPickRangeDay={handleRangeDay}
+            onToggleDay={toggleDay}
+            highlight={highlight ? { start: highlight.startDate, end: highlight.endDate } : null}
           />
 
-          {/* ------------------------------------------------ mine tools -- */}
-          {mode === 'mine' ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="sm" onClick={fillWeekends}>
-                <Sparkles className="size-4" /> ว่างทุกเสาร์-อาทิตย์
-              </Button>
-              <Button variant="ghost" size="sm" onClick={clearMine}>
-                <Eraser className="size-4" /> ล้างเดือนนี้
-              </Button>
-              <span className="text-muted ml-auto text-xs">
-                ใส่ไว้แล้ว <span className="nums font-medium">{myDayCount}</span> วัน
-              </span>
-              <Button
-                size="sm"
-                onClick={() => submit.mutate(meId)}
-                disabled={submit.isPending || board.submittedMemberIds.includes(meId)}
-              >
-                <Send className="size-4" />
-                {board.submittedMemberIds.includes(meId) ? 'ส่งแล้ว' : 'ส่งวันว่าง'}
-              </Button>
-            </div>
+          {/* ------------------------------------------------ my tools --- */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" onClick={fillWeekends}>
+              <Sparkles className="size-4" /> ว่างทุกเสาร์-อาทิตย์
+            </Button>
+            <Button variant="ghost" size="sm" onClick={clearMine}>
+              <Eraser className="size-4" /> ล้างเดือนนี้
+            </Button>
+            <span className="text-muted ml-auto text-xs">
+              ใส่ไว้แล้ว <span className="nums font-medium">{myDayCount}</span> วัน
+            </span>
+          </div>
+
+          {/* The one button a member needs (D-13): confirm. */}
+          <Button
+            block
+            size="lg"
+            onClick={() => submit.mutate(meId)}
+            disabled={submit.isPending || confirmedMine || myDayCount === 0}
+          >
+            <CalendarCheck className="size-4" />
+            {confirmedMine ? t('confirmed') : myDayCount === 0 ? 'แตะวันที่ว่างก่อน' : t('confirm')}
+          </Button>
+          {confirmedMine && !everyoneConfirmed ? (
+            <p className="text-muted -mt-2 text-center text-[11px]">
+              แก้วันได้ตลอด — รออีก {pending.length} คน แล้วระบบจะเด้งช่วงที่ดีที่สุดให้
+            </p>
           ) : null}
 
-          {/* --------------------------------------------- selection bar -- */}
-          {mode === 'range' && range && rangeMembers ? (
-            <Card
-              accent="feature"
-              className="flex flex-wrap items-center justify-between gap-3 p-4"
-            >
-              <div>
-                <p className="font-display text-ink text-base font-medium">
-                  {thaiRangeLabel(range.start, range.end)} ·{' '}
-                  {Math.round(
-                    (new Date(range.end).getTime() - new Date(range.start).getTime()) / 86_400_000,
-                  ) + 1}{' '}
-                  วัน
-                </p>
-                <p className="text-muted mt-0.5 text-xs">
-                  {rangeMembers.free.length === board.members.length
-                    ? 'ทุกคนว่างครบช่วงนี้'
-                    : `ว่างครบช่วงนี้ ${rangeMembers.free.length}/${board.members.length} คน`}
-                  {rangeMembers.maybe.length > 0
-                    ? ` · อีก ${rangeMembers.maybe.length} คนไปได้แต่ไม่สะดวก`
-                    : ''}
-                </p>
+          {/* --------------------------------------- the best windows ---- */}
+          {showWindows ? (
+            <Card accent="feature" className="p-4">
+              <div className="mb-3 flex items-start justify-between gap-2">
+                <div>
+                  <p className="font-display text-ink font-medium">
+                    {everyoneConfirmed ? 'ทุกคนยืนยันแล้ว — ช่วงที่ลงตัวที่สุด' : 'ช่วงที่ลงตัวที่สุดตอนนี้'}
+                  </p>
+                  <p className="text-muted mt-0.5 text-xs">
+                    {isOwner
+                      ? 'เลือกช่วงแล้วกดล็อค ทริปจะได้วันทันที'
+                      : 'หัวห้องเป็นคนล็อค — เลือกดูช่วงที่ชอบไว้ก่อนได้'}
+                  </p>
+                </div>
+                {!everyoneConfirmed ? (
+                  <span className="text-muted text-[11px]">ยังรออีก {pending.length} คน</span>
+                ) : null}
               </div>
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={() => setSelection(null)}>
-                  เคลียร์
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => lock.mutate({ startDate: range.start, endDate: range.end })}
-                  disabled={lock.isPending}
-                >
-                  <Lock className="size-4" /> {lock.isPending ? 'กำลังล็อค…' : 'ล็อคช่วงนี้'}
-                </Button>
-              </div>
-            </Card>
-          ) : null}
 
-          {/* ------------------------------------------------- suggestions */}
-          <section>
-            <SectionHeader
-              label="ช่วงที่ลงตัวที่สุด"
-              action={
-                <span className="text-muted text-[11px]">
-                  {board.windows.length > 0 ? `${board.windows.length} ช่วง` : 'ยังไม่พอคำนวณ'}
-                </span>
-              }
-            />
-            {board.windows.length === 0 ? (
-              <Card className="p-4">
-                <p className="text-muted text-sm">
-                  ยังหาช่วงที่ตรงกันไม่ได้ — ต้องมีอย่างน้อย 2 คนที่ใส่วันว่างซ้อนกัน
-                </p>
-              </Card>
-            ) : (
               <ul className="space-y-2">
-                {board.windows.map((window) => {
-                  const active = range?.start === window.startDate && range?.end === window.endDate;
+                {best.map((window, index) => {
+                  const active = (picked ?? best[0])?.id === window.id;
                   return (
                     <li key={window.id}>
                       <button
                         type="button"
-                        onClick={() => pickWindow(window)}
+                        onClick={() => setPicked(window)}
+                        aria-pressed={active}
                         className={cn(
-                          'rounded-brand w-full p-3.5 text-left transition',
-                          active ? 'bg-primary/12 ring-primary ring-2' : 'bg-surface',
+                          'w-full rounded-2xl p-3.5 text-left transition',
+                          active ? 'bg-bg ring-ink ring-2' : 'bg-bg/60 hover:bg-bg',
                         )}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="font-display text-ink text-sm font-medium">
+                            {index === 0 ? '★ ' : ''}
                             {thaiRangeLabel(window.startDate, window.endDate)}
                           </span>
                           <span className="flex items-center gap-1.5">
@@ -341,30 +252,48 @@ export function DateBoard({ tripId }: { tripId: string }) {
                             {window.memberIds.map((id) => {
                               const member = board.members.find((m) => m.id === id);
                               return member ? (
-                                <CharacterAvatar
-                                  key={id}
-                                  characterId={member.characterId}
-                                  size="xs"
-                                  ring
-                                />
+                                <CharacterAvatar key={id} characterId={member.characterId} size="xs" ring />
                               ) : null;
                             })}
                           </span>
-                          <span className="bg-border h-1.5 flex-1 overflow-hidden rounded-full">
-                            <span
-                              className="bg-primary block h-full rounded-full"
-                              style={{ width: `${window.score}%` }}
-                            />
+                          <span className="text-muted text-[11px]">
+                            ว่างครบ {window.memberIds.length}/{board.members.length} คน
                           </span>
-                          <span className="nums text-muted text-[11px]">{window.score}</span>
                         </div>
                       </button>
                     </li>
                   );
                 })}
               </ul>
-            )}
-          </section>
+
+              <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+                {isOwner ? (
+                  <Button
+                    size="sm"
+                    disabled={lock.isPending || !(picked ?? best[0])}
+                    onClick={() => {
+                      const chosen = picked ?? best[0];
+                      if (chosen) lock.mutate({ startDate: chosen.startDate, endDate: chosen.endDate });
+                    }}
+                  >
+                    <Lock className="size-4" /> {lock.isPending ? 'กำลังล็อค…' : t('lock')}
+                  </Button>
+                ) : (
+                  <span className="text-muted inline-flex items-center gap-1.5 text-xs">
+                    <Lock className="size-3.5" /> {t('waitOwner')}
+                  </span>
+                )}
+              </div>
+            </Card>
+          ) : null}
+
+          {!showWindows && isOwner && board.windows.length > 0 ? (
+            <div className="flex justify-center">
+              <Button variant="outline" size="sm" onClick={() => setAskedForWindows(true)}>
+                ดูช่วงที่ดีที่สุดตอนนี้เลย
+              </Button>
+            </div>
+          ) : null}
 
           {/* ----------------------------------------------------- members */}
           <section>
@@ -376,7 +305,7 @@ export function DateBoard({ tripId }: { tripId: string }) {
                     รออีก {pending.length} คน
                   </span>
                 ) : (
-                  <span className="text-muted text-[11px]">ใส่วันว่างครบแล้ว</span>
+                  <span className="text-muted text-[11px]">ยืนยันวันว่างครบแล้ว</span>
                 )
               }
             />
@@ -385,7 +314,7 @@ export function DateBoard({ tripId }: { tripId: string }) {
                 const count = board.entries.filter(
                   (e) => e.memberId === member.id && e.mark === 'free',
                 ).length;
-                const submitted = board.submittedMemberIds.includes(member.id);
+                const confirmed = board.submittedMemberIds.includes(member.id);
 
                 return (
                   <div key={member.id} className="flex items-center gap-3 p-3">
@@ -396,13 +325,20 @@ export function DateBoard({ tripId }: { tripId: string }) {
                         {member.id === meId ? (
                           <span className="text-muted font-normal"> (คุณ)</span>
                         ) : null}
+                        {member.role === 'owner' ? (
+                          <span className="text-muted ml-1.5 text-[11px] font-normal">หัวห้อง</span>
+                        ) : null}
                       </p>
                       <p className="text-muted text-[11px]">
-                        {submitted ? `ใส่วันว่างแล้ว · ${count} วัน` : 'ยังไม่ได้ใส่วันว่าง'}
+                        {confirmed
+                          ? `ยืนยันแล้ว · ว่าง ${count} วัน`
+                          : count > 0
+                            ? `ใส่ไว้ ${count} วัน ยังไม่ยืนยัน`
+                            : 'ยังไม่ได้ใส่วันว่าง'}
                       </p>
                     </div>
-                    <Badge tone={submitted ? 'feature' : 'outline'}>
-                      {submitted ? 'พร้อม' : 'รออยู่'}
+                    <Badge tone={confirmed ? 'feature' : 'outline'}>
+                      {confirmed ? 'ยืนยันแล้ว' : 'รออยู่'}
                     </Badge>
                   </div>
                 );

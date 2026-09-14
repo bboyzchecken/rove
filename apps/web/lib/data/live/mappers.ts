@@ -1,4 +1,6 @@
 import { DEFAULT_COVER } from '@/lib/covers';
+import { guessCountry } from '@/lib/data/countries';
+import { tripColorOf } from '@/lib/trip-color';
 
 import type {
   ActivityEvent,
@@ -58,6 +60,7 @@ import type {
   Poi,
   PrepTask,
   ShareState,
+  StartedWith,
   Subscription,
   SubscriptionPlan,
   Trip,
@@ -141,6 +144,7 @@ import type {
   YearStatsDto,
 } from './dto';
 
+import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 /**
  * Wire → view model. The only place snake_case is allowed to touch this app.
  *
@@ -165,8 +169,15 @@ export function toTrip(dto: TripDto): Trip {
     fxRate: dto.fx_rate ?? 0.235,
     fxAsOf: (dto.fx_rate_at ?? '').slice(0, 10),
     budgetPerPersonThb: dto.budget_per_person_thb,
+    color: tripColorOf({ id: dto.id, color: dto.color }),
+    startedWith: (dto.started_with ?? []).filter(isStartedWith),
     route: dto.route ? toRoute(dto.route) : undefined,
   };
+}
+
+const STARTED_WITH: StartedWith[] = ['dates', 'flights', 'stay', 'destination', 'friends'];
+function isStartedWith(value: string): value is StartedWith {
+  return (STARTED_WITH as string[]).includes(value);
 }
 
 /* ----------------------------------------------------------------- route -- */
@@ -264,6 +275,7 @@ export function toMember(dto: MemberDto): Member {
     role: dto.role,
     characterId: dto.character_id,
     hasWishlist: dto.has_wishlist,
+    hasDates: dto.has_dates ?? false,
   };
 }
 
@@ -326,9 +338,24 @@ export function toTripOverview(dto: TripOverviewDto): TripOverview {
       membersWithoutWishlist: dto.counts.members_without_wishlist,
       bookings: dto.counts.bookings,
       openPrep: dto.counts.open_prep,
+      prepTasks: dto.counts.prep_tasks ?? 0,
+      documents: dto.counts.documents ?? 0,
+      expenses: dto.counts.expenses ?? 0,
+      photos: dto.counts.photos ?? 0,
+      membersSubmittedDates: dto.counts.members_submitted_dates ?? 0,
     },
     locked: dto.locked ? toLocked(dto.locked) : null,
+    stepOverrides: toStepOverrides(dto.step_overrides),
+    submittedDatesMemberIds: dto.submitted_dates_member_ids ?? [],
   };
+}
+
+export function toStepOverrides(raw: Record<string, string> | null | undefined) {
+  const out: Partial<Record<string, 'skipped'>> = {};
+  for (const [step, status] of Object.entries(raw ?? {})) {
+    if (status === 'skipped') out[step] = 'skipped';
+  }
+  return out;
 }
 
 /* ------------------------------------------------------------- dates ----- */
@@ -576,7 +603,7 @@ export function toPublicCreator(dto: PublicCreatorDto): PublicCreator {
   return {
     name: dto.name,
     handle: dto.handle,
-    characterId: dto.character_id || 'shiba',
+    characterId: dto.character_id || DEFAULT_CHARACTER_ID,
   };
 }
 
@@ -686,7 +713,7 @@ export function toReview(dto: ReviewDto): TripReview {
   return {
     userId: dto.user_id,
     name: dto.name,
-    characterId: dto.character_id || 'shiba',
+    characterId: dto.character_id || DEFAULT_CHARACTER_ID,
     rating: dto.rating,
     actualBudgetPerPerson: dto.actual_budget_per_person,
     body: dto.body,
@@ -732,7 +759,7 @@ export function toCreatorProfile(dto: CreatorProfileDto): CreatorProfile {
   return {
     name: dto.name,
     handle: dto.handle,
-    characterId: dto.character_id || 'shiba',
+    characterId: dto.character_id || DEFAULT_CHARACTER_ID,
     publicTrips: dto.public_trips,
     totalViews: dto.total_views,
     totalClones: dto.total_clones,
@@ -847,8 +874,9 @@ export function toExpenseSummary(dto: ExpenseSummaryDto, members: Member[]): Exp
     id,
     name: id,
     role: 'viewer',
-    characterId: 'shiba',
+    characterId: DEFAULT_CHARACTER_ID,
     hasWishlist: false,
+    hasDates: false,
   });
 
   return {
@@ -1112,6 +1140,7 @@ export function toDream(dto: DreamDto): DreamItem {
     id: dto.id,
     title: dto.title,
     destination: dto.destination,
+    country: dto.country || guessCountry(dto.destination),
     note: dto.note ?? undefined,
     url: dto.url ?? undefined,
     accent: dto.accent,
@@ -1127,6 +1156,8 @@ export function toCalendarTrip(dto: CalendarTripDto): CalendarTrip {
     endDate: dto.end_date,
     daysUntil: dto.days_until,
     cover: dto.cover_image_url || DEFAULT_COVER,
+    color: tripColorOf({ id: dto.id, color: dto.color }),
+    country: dto.country ?? '',
     memberIds: dto.member_ids ?? [],
     characterIds: dto.member_character_ids ?? [],
     weather:
@@ -1152,6 +1183,8 @@ export function toPastTrip(dto: PastTripDto): PastTrip {
     places: dto.places,
     spentThb: dto.spent_thb,
     cover: dto.cover_image_url || DEFAULT_COVER,
+    color: tripColorOf({ id: dto.id, color: dto.color }),
+    country: dto.country ?? '',
     memberIds: dto.member_ids ?? [],
     characterIds: dto.member_character_ids ?? [],
     visibility: dto.visibility,
@@ -1200,7 +1233,6 @@ export function toYearStats(dto: YearStatsDto): YearStats {
     countries: dto.countries,
     places: dto.places,
     spentThb: dto.spent_thb,
-    monthlyDays: dto.monthly_days ?? [],
   };
 }
 
@@ -1291,7 +1323,7 @@ export function toPublicReview(dto: PublicReviewDto): PublicReview {
     body: dto.body,
     actualBudgetPerPerson: dto.actual_budget_per_person ?? 0,
     name: dto.name,
-    characterId: dto.character_id || 'shiba',
+    characterId: dto.character_id || DEFAULT_CHARACTER_ID,
     createdAt: dto.created_at,
   };
 }

@@ -15,6 +15,7 @@ import { useAddComment, useComments, useResolveComment } from '@/features/collab
 import { useTripActivity, useTripMembers } from '@/features/trip/queries';
 import { cn } from '@/lib/utils';
 
+import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 /**
  * Discussion tab (M9 — W9.1) plus the activity feed (W2.5).
  *
@@ -79,7 +80,7 @@ export function DiscussionScreen({ tripId }: { tripId: string }) {
             return (
               <Card key={comment.id} className={cn('p-3.5', comment.resolved && 'opacity-60')}>
                 <div className="flex items-start gap-3">
-                  <CharacterAvatar characterId={who?.characterId ?? 'shiba'} size="sm" />
+                  <CharacterAvatar characterId={who?.characterId ?? DEFAULT_CHARACTER_ID} size="sm" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <p className="text-ink text-sm font-medium">{who?.name ?? 'สมาชิก'}</p>
@@ -116,7 +117,7 @@ export function DiscussionScreen({ tripId }: { tripId: string }) {
             const who = memberOf(entry.memberId);
             return (
               <div key={entry.id} className="flex items-center gap-3 p-3.5">
-                <CharacterAvatar characterId={who?.characterId ?? 'shiba'} size="sm" />
+                <CharacterAvatar characterId={who?.characterId ?? DEFAULT_CHARACTER_ID} size="sm" />
                 <p className="text-ink min-w-0 flex-1 text-sm">
                   <span className="font-medium">{who?.name ?? 'ROVE'}</span>{' '}
                   <span className="text-muted">{entry.text}</span>

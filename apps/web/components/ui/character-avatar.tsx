@@ -1,23 +1,30 @@
-import Image from 'next/image';
+'use client';
 
+import { useVariant } from '@/components/uat/variant-provider';
 import { getCharacter } from '@/lib/catalog/characters';
+import { flowerSvg } from '@/lib/catalog/flowers';
 import { cn } from '@/lib/utils';
 
 /**
  * A member's face anywhere in the app (M14 — W14.2). The character replaces
  * the OAuth avatar, which is the whole point: everyone in a trip room is a
- * recognisable little animal, not a grey circle.
+ * recognisable little flower, not a grey circle.
  *
- * Each character image already carries its own flat colour tile (the generator
- * bakes it in, since FLUX cannot emit transparency), so the avatar is a colour
- * block on the white page with no wrapper tint needed.
+ * Drawn inline from `lib/catalog/flowers` rather than loaded as a bitmap
+ * (Feedback #2 — F0.4): the same spec that writes the static files draws the
+ * avatar, so the two cannot drift, and the LOOK — arms and legs or not — can
+ * follow the UAT switcher while the tester is still deciding. Each spec
+ * carries its own flat colour tile, so the avatar is a colour block on the
+ * white page with no wrapper tint needed.
+ *
+ * A client component for that one hook; it has no state of its own.
  */
 const SIZES = {
-  xs: { box: 'size-7', px: 28 },
-  sm: { box: 'size-9', px: 36 },
-  md: { box: 'size-12', px: 48 },
-  lg: { box: 'size-16', px: 64 },
-  xl: { box: 'size-24', px: 96 },
+  xs: 'size-7',
+  sm: 'size-9',
+  md: 'size-12',
+  lg: 'size-16',
+  xl: 'size-24',
 } as const;
 
 export function CharacterAvatar({
@@ -35,27 +42,23 @@ export function CharacterAvatar({
   square?: boolean;
 }) {
   const character = getCharacter(characterId);
-  const s = SIZES[size];
+  const look = useVariant('flower');
 
   return (
     <span
       className={cn(
-        'relative inline-flex shrink-0 overflow-hidden',
+        'relative inline-flex shrink-0 overflow-hidden [&>svg]:size-full',
         square ? 'rounded-brand-sm' : 'rounded-full',
-        s.box,
+        SIZES[size],
         ring && 'ring-bg ring-2',
         className,
       )}
       title={character.name}
-    >
-      <Image
-        src={character.image}
-        alt={character.name}
-        width={s.px}
-        height={s.px}
-        className="size-full object-cover"
-      />
-    </span>
+      // Our own markup, built from a fixed spec — nothing user-supplied.
+      dangerouslySetInnerHTML={{
+        __html: flowerSvg(character.flower, look, { label: character.name }),
+      }}
+    />
   );
 }
 
@@ -64,16 +67,18 @@ export function CharacterStack({
   characterIds,
   size = 'sm',
   max = 5,
+  className,
 }: {
   characterIds: string[];
   size?: keyof typeof SIZES;
   max?: number;
+  className?: string;
 }) {
   const shown = characterIds.slice(0, max);
   const rest = characterIds.length - shown.length;
 
   return (
-    <span className="flex items-center -space-x-2">
+    <span className={cn('flex items-center -space-x-2', className)}>
       {shown.map((id, i) => (
         <CharacterAvatar key={`${id}-${i}`} characterId={id} size={size} ring />
       ))}

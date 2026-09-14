@@ -43,9 +43,85 @@ export function addDays(iso: string, days: number) {
 }
 
 export function daysBetween(startIso: string, endIso: string) {
+  // Feedback #2 (F0.2): an empty date used to parse as 1 Jan 1970 and the entry
+  // flow printed "46365 วัน". No dates means no span, not a span from epoch.
+  if (!isIsoDate(startIso) || !isIsoDate(endIso)) return 0;
   const start = parseIsoDate(startIso).getTime();
   const end = parseIsoDate(endIso).getTime();
   return Math.round((end - start) / 86_400_000) + 1;
+}
+
+/** Whether a string is a calendar date the app can use — "2026-12-04". */
+export function isIsoDate(value: string | null | undefined): value is string {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+/** `parseIsoDate` for callers that can act on "no date" rather than on 1970. */
+export function parseIsoDateOrNull(iso: string | null | undefined): Date | null {
+  return isIsoDate(iso) ? parseIsoDate(iso) : null;
+}
+
+/* ---------------------------------------------------- dd/mm/yyyy (D-7) ---- */
+
+/**
+ * "04/12/2026" — the one written form a date takes in a field (Feedback #2,
+ * D-7). The native date input rendered `mm/dd/yyyy` on the tester's laptop
+ * and something else on their phone, and "04/12/2026" read as either April
+ * or December depending on which machine they were holding. Gregorian year,
+ * by decision: the Buddhist year lives in labels, never in a field.
+ */
+export function formatDmy(iso: string | null | undefined) {
+  if (!isIsoDate(iso)) return '';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+/**
+ * What someone typed → ISO, or null when it is not a real date.
+ *
+ * Forgiving on the way in: "4/12/2026", "04/12/2026", "04122026" and "4-12-2026"
+ * all land on the same day. A year over 2400 is taken as พ.ศ. and moved back
+ * 543 — a Thai hand types 2569 by reflex, and refusing it teaches nothing.
+ */
+export function parseDmy(text: string): string | null {
+  const digits = text.replace(/[^\d]/g, '');
+  let d: number;
+  let m: number;
+  let y: number;
+
+  const parts = text.trim().split(/[\/\-.\s]+/).filter(Boolean);
+  if (parts.length === 3) {
+    d = Number(parts[0]);
+    m = Number(parts[1]);
+    y = Number(parts[2]);
+  } else if (digits.length === 8) {
+    d = Number(digits.slice(0, 2));
+    m = Number(digits.slice(2, 4));
+    y = Number(digits.slice(4));
+  } else {
+    return null;
+  }
+
+  if (!Number.isInteger(d) || !Number.isInteger(m) || !Number.isInteger(y)) return null;
+  if (y < 100) y += 2000;
+  if (y >= 2400) y -= 543;
+  if (y < 1900 || y > 2200 || m < 1 || m > 12 || d < 1 || d > 31) return null;
+
+  const date = new Date(y, m - 1, d);
+  if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return null;
+  return toIsoDate(date);
+}
+
+/** "yyyy-mm-01" of the month an ISO date falls in; today's month when empty. */
+export function monthOfIso(iso?: string | null) {
+  const d = parseIsoDateOrNull(iso) ?? new Date();
+  return toIsoDate(new Date(d.getFullYear(), d.getMonth(), 1));
+}
+
+/** The month `delta` months away from `monthIso`, as "yyyy-mm-01". */
+export function shiftMonth(monthIso: string, delta: number) {
+  const d = parseIsoDate(monthIso);
+  return toIsoDate(new Date(d.getFullYear(), d.getMonth() + delta, 1));
 }
 
 export function daysInMonth(monthIso: string) {

@@ -1,5 +1,8 @@
+import { ApiError } from '@/lib/api-client';
 import { DEFAULT_COVER } from '@/lib/covers';
-import { getCharacter, CHARACTERS } from '@/lib/catalog/characters';
+import { guessCountry } from '@/lib/data/countries';
+import { randomTripColor } from '@/lib/trip-color';
+import { getCharacter, CHARACTERS, DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 import { AI_CREDITS, DAYS } from './seed/trip';
 import { PAST_TRIP_ARCHIVES, POINTS_PER_PUBLISH } from './seed/user';
 
@@ -59,6 +62,7 @@ import type {
   ShareState,
   StubbedProvider,
   Trip,
+  TripAllowance,
   TripDocument,
   TripPhoto,
   TripRecap,
@@ -606,6 +610,26 @@ function withIds(legs: FlightLegInput[]): FlightLeg[] {
   }));
 }
 
+/** The free tier's one-trip-at-a-time rule, as the paywall needs it (D-10). */
+function allowanceOf(db: MockDb): TripAllowance {
+  const open = db.trips.filter(
+    (record) =>
+      !record.creator &&
+      record.role === 'owner' &&
+      record.trip.status !== 'done' &&
+      !record.ai.hasPass,
+  );
+  return {
+    allowed: open.length < FREE_ACTIVE_TRIPS,
+    activeTrips:
+      open.length < FREE_ACTIVE_TRIPS
+        ? []
+        : open.map((record) => ({ id: record.trip.id, title: record.trip.title })),
+    limit: FREE_ACTIVE_TRIPS,
+    priceThb: AI_CREDITS.passPriceThb,
+  };
+}
+
 /* ------------------------------------------------------------------ repo -- */
 
 export const mockRepo: RoveRepo = {
@@ -678,6 +702,12 @@ export const mockRepo: RoveRepo = {
           const planItems = record.days.reduce((sum, d) => sum + d.items.length, 0);
           const withoutWishlist = record.members.filter((m) => !m.hasWishlist).length;
 
+          const submittedDates = [...record.submittedMemberIds];
+          const members = clone(record.members).map((m) => ({
+            ...m,
+            hasDates: submittedDates.includes(m.id),
+          }));
+
           const checklist = [
             { key: 'room', label: 'สร้างห้องทริป', done: true },
             {
@@ -710,7 +740,7 @@ export const mockRepo: RoveRepo = {
 
           return {
             trip: { ...clone(record.trip), route },
-            members: clone(record.members),
+            members,
             coverage,
             checklist,
             activity: clone(record.activity).slice(0, 8),
@@ -721,24 +751,42 @@ export const mockRepo: RoveRepo = {
               membersWithoutWishlist: withoutWishlist,
               bookings: record.bookings.filter((b) => b.status === 'booked').length,
               openPrep: record.prep.filter((p) => !p.done).length,
+              prepTasks: record.prep.length,
+              documents: record.documents.length,
+              expenses: record.expenses.length,
+              photos: record.photos.length,
+              membersSubmittedDates: submittedDates.length,
             },
             locked: clone(record.locked),
+            stepOverrides: clone(record.stepOverrides ?? {}),
+            submittedDatesMemberIds: submittedDates,
           };
         }),
       );
+    },
+
+    async allowance() {
+      return delay(allowanceOf(loadDb()), 60);
     },
 
     async create(input) {
       // The free tier plans one trip at a time (M26 — A26.3). Enforced here as
       // well as in the API, because mock mode is where the paywall is designed:
       // a limit that only exists on the server is a limit nobody sees until it
-      // is too late to change how it reads.
-      const openTrips = loadDb().trips.filter(
-        (record) => !record.creator && record.trip.status !== 'done' && !record.ai.hasPass,
-      );
-      if (openTrips.length >= FREE_ACTIVE_TRIPS) {
-        throw new Error(
+      // is too late to change how it reads. The refusal is the same ApiError
+      // the live repo throws, payload and all, so the sheet that answers it
+      // is written once (Feedback #2 — D-10).
+      const allowance = allowanceOf(loadDb());
+      if (!allowance.allowed) {
+        throw new ApiError(
+          402,
           `แผนฟรีวางแผนได้ครั้งละ ${FREE_ACTIVE_TRIPS} ทริป — ปิดทริปที่วางอยู่ให้เสร็จ หรือปลดล็อกด้วย Trip Pass ฿${AI_CREDITS.passPriceThb} ก่อนเริ่มทริปใหม่`,
+          {
+            code: 'TRIP_LIMIT',
+            active_trips: allowance.activeTrips,
+            limit: allowance.limit,
+            price_thb: allowance.priceThb,
+          },
         );
       }
 
@@ -770,6 +818,9 @@ export const mockRepo: RoveRepo = {
             fxRate: 0.235,
             fxAsOf: toIsoDate(new Date()),
             budgetPerPersonThb: input.budgetPerPersonThb ?? 40_000,
+            // Never the colour of the room this person opened last (D-3).
+            color: randomTripColor(db.trips.find((t) => t.role === 'owner')?.trip.color),
+            startedWith: input.startedWith ?? [],
           },
           role: 'owner',
           members: [
@@ -779,6 +830,7 @@ export const mockRepo: RoveRepo = {
               role: 'owner',
               characterId: db.user.characterId,
               hasWishlist: false,
+              hasDates: false,
             },
           ],
           availability: [],
@@ -796,6 +848,7 @@ export const mockRepo: RoveRepo = {
                 }
               : null,
           destinationId: null,
+          stepOverrides: {},
           flights: legs,
           wishlist: [],
           profiles: {},
@@ -970,7 +1023,32 @@ export const mockRepo: RoveRepo = {
 
     async upcoming() {
       const db = loadDb();
-      return delay(clone(db.upcoming).map((trip) => ({ ...trip, characterIds: facesOf(db, trip) })));
+      // The countdown is computed at read time — the seed used to say "88"
+      // and would have said 88 forever (Feedback #2 — F2.3). Rooms in this
+      // browser with dates come first; the seeded extras fill the list out.
+      const today = toIsoDate(new Date());
+      const fromRooms = db.trips
+        .filter((r) => !r.creator && r.trip.startDate && r.trip.endDate && r.trip.endDate >= today)
+        .map((r) => ({
+          id: r.trip.id,
+          title: r.trip.title,
+          cities: [...r.trip.cities],
+          startDate: r.trip.startDate,
+          endDate: r.trip.endDate,
+          daysUntil: daysUntil(r.trip.startDate),
+          cover: r.trip.cover,
+          color: r.trip.color,
+          country: r.trip.country,
+          memberIds: r.members.map((m) => m.id),
+          characterIds: r.members.map((m) => m.characterId),
+          weather: db.upcoming.find((u) => u.id === r.trip.id)?.weather,
+        }));
+      const seeded = clone(db.upcoming)
+        .filter((u) => !fromRooms.some((r) => r.id === u.id) && u.endDate >= today)
+        .map((trip) => ({ ...trip, daysUntil: daysUntil(trip.startDate), characterIds: facesOf(db, trip) }));
+      return delay(
+        [...fromRooms, ...seeded].sort((a, b) => a.startDate.localeCompare(b.startDate)),
+      );
     },
     async past() {
       const db = loadDb();
@@ -992,6 +1070,20 @@ export const mockRepo: RoveRepo = {
     },
     async stats() {
       return delay(clone(loadDb().stats));
+    },
+
+    async setStepStatus(tripId, step, status) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          record.stepOverrides ??= {};
+          if (status === 'skipped') record.stepOverrides[step] = 'skipped';
+          else delete record.stepOverrides[step];
+          log(record, db.user.id, status === 'skipped' ? `ข้ามขั้น ${step}` : `เอาขั้น ${step} กลับมา`);
+          return clone(record.stepOverrides);
+        }),
+        120,
+      );
     },
   },
 
@@ -1044,6 +1136,7 @@ export const mockRepo: RoveRepo = {
           role: 'editor',
           characterId: character.id,
           hasWishlist: false,
+          hasDates: false,
         });
         record.trip.partySize = record.members.length;
         log(record, db.user.id, `มีคนเข้าห้องผ่านลิงก์เชิญ (${token.slice(0, 8)})`);
@@ -2148,13 +2241,11 @@ export const mockRepo: RoveRepo = {
       let records = [...db.publicTrips, ...db.trips.filter((t) => t.share.visibility === 'public')];
 
       if (filters.country) {
-        // Seeded records carry no country code; match on the cities instead.
-        const q = filters.country.toLowerCase();
-        records = records.filter(
-          (r) =>
-            r.trip.cities.some((c) => c.toLowerCase().includes(q)) ||
-            r.trip.title.toLowerCase().includes(q),
-        );
+        records = records.filter((r) => r.trip.country === filters.country);
+      }
+      if (filters.countries && filters.countries.length > 0) {
+        const wanted = new Set(filters.countries.map((c) => c.toUpperCase()));
+        records = records.filter((r) => wanted.has(r.trip.country.toUpperCase()));
       }
       if (filters.q) {
         const q = filters.q.toLowerCase();
@@ -2195,18 +2286,40 @@ export const mockRepo: RoveRepo = {
         });
       }
 
+      // Mock mode has no daily view series, so "ติดเทรนด์" answers as
+      // "ยอดนิยม" — the same fallback the API makes before a week of data
+      // exists (fix-list §9). Popular by clones-first, so the two chips at
+      // least read differently on the seeded catalogue.
       records.sort((a, b) =>
         filters.sort === 'new'
           ? b.trip.startDate.localeCompare(a.trip.startDate)
-          : b.share.viewCount +
-            b.share.cloneCount * 5 -
-            (a.share.viewCount + a.share.cloneCount * 5),
+          : filters.sort === 'trending'
+            ? b.share.cloneCount - a.share.cloneCount ||
+              b.share.viewCount - a.share.viewCount
+            : b.share.viewCount +
+              b.share.cloneCount * 5 -
+              (a.share.viewCount + a.share.cloneCount * 5),
       );
 
       return delay({
         items: records.slice(offset, offset + limit).map((r) => exploreOf(db, r)),
         total: records.length,
       });
+    },
+
+    async exploreCountries() {
+      const db = loadDb();
+      const counts = new Map<string, number>();
+      for (const record of [...db.publicTrips, ...db.trips.filter((t) => t.share.visibility === 'public')]) {
+        const code = record.trip.country.toUpperCase();
+        if (code) counts.set(code, (counts.get(code) ?? 0) + 1);
+      }
+      return delay(
+        [...counts.entries()]
+          .map(([code, count]) => ({ code, count }))
+          .sort((a, b) => b.count - a.count || a.code.localeCompare(b.code)),
+        80,
+      );
     },
 
     async creator(handle) {
@@ -2220,7 +2333,7 @@ export const mockRepo: RoveRepo = {
       const first = records[0];
       const identity = mine
         ? { name: db.user.name, handle, characterId: db.user.characterId }
-        : (first?.creator ?? { name: 'นักเดินทาง', handle, characterId: 'shiba' });
+        : (first?.creator ?? { name: 'นักเดินทาง', handle, characterId: DEFAULT_CHARACTER_ID });
 
       return delay({
         ...identity,
@@ -2253,6 +2366,7 @@ export const mockRepo: RoveRepo = {
               role: 'owner',
               characterId: db.user.characterId,
               hasWishlist: false,
+              hasDates: false,
             },
           ];
           copy.creator = undefined;
@@ -2916,7 +3030,11 @@ export const mockRepo: RoveRepo = {
     async addDream(input) {
       return delay(
         mutate((db) => {
-          const dream: DreamItem = { ...input, id: mockId('dr') };
+          const dream: DreamItem = {
+            ...input,
+            country: input.country || guessCountry(input.destination),
+            id: mockId('dr'),
+          };
           db.dreams.unshift(dream);
           return clone(dream);
         }),
@@ -3086,8 +3204,9 @@ function recapOfArchive(db: MockDb, past: PastTrip): TripRecap {
       id,
       name: roster.find((m) => m.id === id)?.name ?? `เพื่อนคนที่ ${index + 1}`,
       role: index === 0 ? ('owner' as const) : ('editor' as const),
-      characterId: characterIds[index] ?? 'shiba',
+      characterId: characterIds[index] ?? DEFAULT_CHARACTER_ID,
       hasWishlist: true,
+      hasDates: true,
     })),
     itinerary: clone(archive?.itinerary ?? []),
     decisions: clone(archive?.decisions ?? []),
@@ -3188,7 +3307,7 @@ function facesOf(db: MockDb, trip: { id: string; memberIds: string[] }) {
     (id, index) =>
       roster.find((m) => m.id === id)?.characterId ??
       roster[index % Math.max(1, roster.length)]?.characterId ??
-      'shiba',
+      DEFAULT_CHARACTER_ID,
   );
 }
 
@@ -3238,7 +3357,10 @@ function boardOf(record: TripRecord, month?: string): AvailabilityBoard {
     tripId: record.trip.id,
     month: active,
     months,
-    members: clone(record.members),
+    members: clone(record.members).map((m) => ({
+      ...m,
+      hasDates: record.submittedMemberIds.includes(m.id),
+    })),
     submittedMemberIds: [...record.submittedMemberIds],
     entries: clone(record.availability),
     windows: computeWindows(record.availability, record.members),

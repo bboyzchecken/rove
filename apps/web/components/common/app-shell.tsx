@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Compass, LayoutDashboard, Luggage, Plus, UserRound } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import { Compass, Luggage, Plus, UserRound } from 'lucide-react';
 
 import { LocaleSwitchCompact } from '@/components/common/locale-switch';
 import { ModeBanner } from '@/components/common/mode-banner';
@@ -13,12 +14,13 @@ import { useMe } from '@/features/auth/queries';
 import { pathFeature } from '@/lib/feature';
 import { cn } from '@/lib/utils';
 
+import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 /**
  * App chrome. Mobile-first (§2.1): a thumb-reachable bottom bar on phones, the
  * same destinations as a top bar from `md` up. The trip room draws its own tab
  * strip underneath this.
  *
- * Five destinations, with "สร้างทริป" in the middle where the thumb rests.
+ * Four destinations, with "สร้างทริป" in the middle where the thumb rests.
  * None of them points at a single trip: with two trips in flight, a "ทริปนี้"
  * tab cannot say which one it means, so the tab is the *list* and the room is
  * one tap deeper.
@@ -35,17 +37,22 @@ import { cn } from '@/lib/utils';
  * `max-w-5xl`, the same gutter, the same height, logo left and actions right —
  * so signing in does not move the chrome. Change one and change the other.
  */
+/**
+ * Feedback #2 — D-6: "สรุปของฉัน" and "ทริปของฉัน" were two tabs showing the
+ * same rooms in two shapes. One tab now, and it is the home screen; `/trips`
+ * redirects there so old links keep working.
+ */
 const NAV = [
-  { href: '/home', label: 'สรุปของฉัน', icon: LayoutDashboard },
-  { href: '/explore', label: 'สำรวจ', icon: Compass },
-  { href: '/new', label: 'สร้างทริป', icon: Plus, accent: true },
-  { href: '/trips', label: 'ทริปของฉัน', icon: Luggage },
-  { href: '/profile', label: 'ฉัน', icon: UserRound },
+  { href: '/home', key: 'myTrips', icon: Luggage },
+  { href: '/explore', key: 'explore', icon: Compass },
+  { href: '/new', key: 'newTrip', icon: Plus, accent: true },
+  { href: '/profile', key: 'me', icon: UserRound },
 ] as const;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { data: me } = useMe();
+  const t = useTranslations('nav');
 
   // A trip room lives under /t/:id and a finished one under /recap/:id — both
   // belong to the "ทริปของฉัน" tab.
@@ -55,8 +62,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // reader is down there. Without this, tapping a card put out the only light
   // saying where they were.
   const isActive = (href: string) => {
-    if (href === '/trips') {
+    if (href === '/home') {
       return (
+        pathname.startsWith('/home') ||
         pathname.startsWith('/trips') ||
         pathname.startsWith('/t/') ||
         pathname.startsWith('/recap/')
@@ -104,7 +112,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   isActive(item.href) ? 'bg-ink text-bg' : 'text-muted hover:bg-surface',
                 )}
               >
-                {item.label}
+                {t(item.key)}
               </Link>
             ))}
           </nav>
@@ -113,7 +121,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <LocaleSwitchCompact className="mr-1" />
             <InboxBell />
             <Link href="/profile" aria-label="โปรไฟล์">
-              <CharacterAvatar characterId={me?.characterId ?? 'shiba'} size="sm" />
+              <CharacterAvatar characterId={me?.characterId ?? DEFAULT_CHARACTER_ID} size="sm" />
             </Link>
           </div>
         </div>
@@ -134,12 +142,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   key={item.href}
                   href={item.href}
                   className="flex flex-col items-center gap-1 px-2"
-                  aria-label={item.label}
+                  aria-label={t(item.key)}
                 >
                   <span className="bg-primary text-primary-fg flex size-9 items-center justify-center rounded-full">
                     <Icon className="size-5" strokeWidth={2.5} />
                   </span>
-                  <span className="text-muted text-[10px] font-medium">{item.label}</span>
+                  <span className="text-muted text-[10px] font-medium">{t(item.key)}</span>
                 </Link>
               );
             }
@@ -154,7 +162,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 )}
               >
                 <Icon className="size-5" strokeWidth={active ? 2.5 : 2} />
-                <span className="text-[10px] font-medium">{item.label}</span>
+                <span className="text-[10px] font-medium">{t(item.key)}</span>
               </Link>
             );
           })}

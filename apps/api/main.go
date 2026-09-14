@@ -48,6 +48,7 @@ import (
 	poistore "github.com/bboyzchecken/rove/apps/api/pkg/store/poi"
 	pointsstore "github.com/bboyzchecken/rove/apps/api/pkg/store/points"
 	leadstore "github.com/bboyzchecken/rove/apps/api/pkg/store/lead"
+	progressstore "github.com/bboyzchecken/rove/apps/api/pkg/store/progress"
 	reviewstore "github.com/bboyzchecken/rove/apps/api/pkg/store/review"
 	rewardstore "github.com/bboyzchecken/rove/apps/api/pkg/store/reward"
 	prepstore "github.com/bboyzchecken/rove/apps/api/pkg/store/prep"
@@ -236,6 +237,7 @@ func storeModules() fx.Option {
 		reviewstore.Module,
 		rewardstore.Module,
 		leadstore.Module,
+		progressstore.Module,
 	)
 }
 

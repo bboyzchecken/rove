@@ -37,6 +37,8 @@ type DreamItem struct {
 	UserID      string `gorm:"type:char(36);not null;index" json:"user_id"`
 	Title       string `gorm:"type:varchar(200);not null" json:"title"`
 	Destination string `gorm:"type:varchar(160)" json:"destination"`
+	// ISO country, so the dream stack can fly a flag (Feedback #2 — D-19).
+	Country     string `gorm:"type:varchar(2);not null;default:''" json:"country"`
 	Note        string `gorm:"type:text" json:"note"`
 	URL         string `gorm:"type:varchar(1000)" json:"url"`
 	Accent      string `gorm:"type:varchar(20);not null;default:'primary'" json:"accent"`

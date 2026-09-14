@@ -57,7 +57,7 @@ export function PointsScreen() {
           title="ยังไม่มีรายการแต้ม"
           hint="เปิดทริปเป็นสาธารณะหรือชวนเพื่อนเข้าทริปแรก แล้วแต้มแรกจะมาโผล่ที่นี่"
           action={
-            <ButtonLink href="/trips" variant="primary" size="sm">
+            <ButtonLink href="/home" variant="primary" size="sm">
               ไปที่ทริปของฉัน
             </ButtonLink>
           }

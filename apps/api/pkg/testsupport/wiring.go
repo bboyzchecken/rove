@@ -46,6 +46,7 @@ import (
 	poistore "github.com/bboyzchecken/rove/apps/api/pkg/store/poi"
 	pointsstore "github.com/bboyzchecken/rove/apps/api/pkg/store/points"
 	leadstore "github.com/bboyzchecken/rove/apps/api/pkg/store/lead"
+	progressstore "github.com/bboyzchecken/rove/apps/api/pkg/store/progress"
 	reviewstore "github.com/bboyzchecken/rove/apps/api/pkg/store/review"
 	rewardstore "github.com/bboyzchecken/rove/apps/api/pkg/store/reward"
 	prepstore "github.com/bboyzchecken/rove/apps/api/pkg/store/prep"
@@ -70,10 +71,12 @@ var allModels = []any{
 	&models.PlanVariant{}, &models.TripPhoto{}, &models.TripDocument{},
 	&models.Notification{}, &models.Poll{}, &models.TripReview{},
 	&models.DiscountCode{}, &models.CreatorEarning{}, &models.Payout{}, &models.AgentLead{},
+	&models.TripStepOverride{}, &models.TripViewDaily{},
 }
 
 // allTables is the drop order — children before parents.
 var allTables = []string{
+	"trip_step_overrides", "trip_view_daily",
 	"agent_leads", "payouts", "creator_earnings", "discount_codes",
 	"trip_reviews", "polls", "notifications", "trip_documents", "trip_photos",
 	"plan_variants", "member_profiles",
@@ -124,6 +127,7 @@ func newParams(cfg core.Config, db *gorm.DB) handlers.ServerParams {
 		Earnings:      rewardstore.NewEarningStore(db),
 		Payouts:       rewardstore.NewPayoutStore(db),
 		Leads:         leadstore.New(db),
+		Steps:         progressstore.New(db),
 
 		Hub: stubHub{},
 		// The airport index is embedded data with no I/O — the real one is the

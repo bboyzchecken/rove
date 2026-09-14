@@ -38,6 +38,7 @@ var publicPaths = map[string]bool{
 	"/api/v1/invites/:token":            true, // preview before signing in
 	"/api/v1/public/trips/:tokenOrSlug": true,
 	"/api/v1/public/explore":            true,
+	"/api/v1/public/countries":          true, // the explore filter sheet (Feedback #2 — D-18)
 	"/api/v1/public/creators/:handle":   true, // creator page is the SEO surface (W11.2)
 	// Platform social proof (A24.1 / A24.2). Public on purpose: the landing
 	// page is the one screen that has to render before anybody signs in.

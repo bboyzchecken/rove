@@ -2,10 +2,13 @@ package trip
 
 import (
 	"context"
+	"time"
 
 	"go.uber.org/fx"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
+	"github.com/bboyzchecken/rove/apps/api/pkg/domain"
 	"github.com/bboyzchecken/rove/apps/api/pkg/models"
 )
 
@@ -82,6 +85,36 @@ func (s *store) BumpCloneCount(ctx context.Context, tripID string) error {
 		UpdateColumn("clone_count", gorm.Expr("clone_count + 1")).Error
 }
 
+// BumpDailyView upserts today's row — the same "never read first" rule as the
+// lifetime counter, with the day as part of the key.
+func (s *store) BumpDailyView(ctx context.Context, tripID string, day time.Time) error {
+	row := models.TripViewDaily{TripID: tripID, Day: domain.Day(day), Views: 1}
+	return s.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "trip_id"}, {Name: "day"}},
+		DoUpdates: clause.Assignments(map[string]any{"views": gorm.Expr("views + 1")}),
+	}).Create(&row).Error
+}
+
+func (s *store) HasViewsSince(ctx context.Context, since time.Time) (bool, error) {
+	var n int64
+	err := s.db.WithContext(ctx).Model(&models.TripViewDaily{}).
+		Where("day >= ?", domain.Day(since)).
+		Limit(1).
+		Count(&n).Error
+	return n > 0, err
+}
+
+func (s *store) PublicCountryCounts(ctx context.Context) ([]models.CountryCount, error) {
+	var out []models.CountryCount
+	err := s.db.WithContext(ctx).Model(&models.Trip{}).
+		Select("destination_country AS code, COUNT(*) AS count").
+		Where("visibility = ? AND destination_country <> ''", models.VisibilityPublic).
+		Group("destination_country").
+		Order("count DESC").
+		Scan(&out).Error
+	return out, err
+}
+
 func (s *store) Count(ctx context.Context) (int64, error) {
 	var n int64
 	err := s.db.WithContext(ctx).Model(&models.Trip{}).Count(&n).Error
@@ -113,6 +146,20 @@ func (s *store) TitlesByIDs(ctx context.Context, ids []string) (map[string]strin
 		out[row.ID] = row.Title
 	}
 	return out, nil
+}
+
+func (s *store) LatestOwnedColor(ctx context.Context, userID string) (string, error) {
+	var colors []string
+	err := s.db.WithContext(ctx).
+		Model(&models.Trip{}).
+		Where("owner_id = ?", userID).
+		Order("created_at DESC").
+		Limit(1).
+		Pluck("color", &colors).Error
+	if err != nil || len(colors) == 0 {
+		return "", err
+	}
+	return colors[0], nil
 }
 
 /* ---------------------------------------------- platform totals (A24.1) -- */
@@ -163,13 +210,16 @@ func (s *store) ListPublic(ctx context.Context, f models.ExploreFilter) ([]model
 		Where("visibility = ?", models.VisibilityPublic)
 
 	if f.Country != "" {
-		q = q.Where("destination_country = ?", f.Country)
+		q = q.Where("trips.destination_country = ?", f.Country)
+	}
+	if len(f.Countries) > 0 {
+		q = q.Where("trips.destination_country IN ?", f.Countries)
 	}
 	if f.Query != "" {
 		like := "%" + f.Query + "%"
 		// destination_cities is a JSON array; LIKE over its text form is crude
 		// but works identically on MySQL and the SQLite the tests run on.
-		q = q.Where("title LIKE ? OR destination_cities LIKE ?", like, like)
+		q = q.Where("(trips.title LIKE ? OR trips.destination_cities LIKE ?)", like, like)
 	}
 
 	var total int64
@@ -178,10 +228,30 @@ func (s *store) ListPublic(ctx context.Context, f models.ExploreFilter) ([]model
 	}
 
 	switch f.Sort {
-	case "new":
-		q = q.Order("updated_at DESC")
+	case models.ExploreSortNew:
+		// Published first, and never edited-last-night first (D-18). Rows
+		// published before the column existed fall back to updated_at.
+		q = q.Order("COALESCE(trips.published_at, trips.updated_at) DESC")
+	case models.ExploreSortTrending:
+		// Views in the last seven days against the seven before them: a plan
+		// that went from 2 views to 40 outranks one that has always had 40.
+		// The +1 keeps a brand-new plan from dividing by zero and keeps a plan
+		// with one view from scoring infinity.
+		now := domain.Day(time.Now().UTC())
+		recent := now.AddDate(0, 0, -7)
+		prior := now.AddDate(0, 0, -14)
+		q = q.Joins(
+			"LEFT JOIN (SELECT trip_id, "+
+				"SUM(CASE WHEN day >= ? THEN views ELSE 0 END) AS recent_views, "+
+				"SUM(CASE WHEN day < ? THEN views ELSE 0 END) AS prior_views "+
+				"FROM trip_view_daily WHERE day >= ? GROUP BY trip_id) v ON v.trip_id = trips.id",
+			recent, recent, prior,
+		).
+			Order("(COALESCE(v.recent_views, 0) * 1.0 / (COALESCE(v.prior_views, 0) + 1)) DESC").
+			Order("COALESCE(v.recent_views, 0) DESC").
+			Order("(trips.view_count + trips.clone_count * 5) DESC")
 	default: // popular
-		q = q.Order("(view_count + clone_count * 5) DESC").Order("updated_at DESC")
+		q = q.Order("(trips.view_count + trips.clone_count * 5) DESC").Order("trips.updated_at DESC")
 	}
 
 	var out []models.Trip

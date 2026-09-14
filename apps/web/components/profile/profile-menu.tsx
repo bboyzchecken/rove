@@ -15,7 +15,8 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-import { LocaleSwitch } from '@/components/common/locale-switch';
+import { LocaleSwitch } from '@/components/common/locale-switch';
+
 import { Card } from '@/components/ui/card';
 import { useDreams, useLogout, useMe } from '@/features/auth/queries';
 import { useBillingSummary } from '@/features/billing/queries';
@@ -55,7 +56,7 @@ export function ProfileMenu({ onEditProfile }: { onEditProfile: () => void }) {
         icon={Luggage}
         label="ทริปของฉัน"
         hint={countLabel(trips.length, 'ทริป')}
-        href="/trips"
+        href="/home"
       />
       <MenuRow
         icon={Sparkles}

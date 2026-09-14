@@ -9,6 +9,7 @@ import { WishlistBoard } from '@/components/wishlist/wishlist-board';
 import { useTripMembers } from '@/features/trip/queries';
 import { useCoverage, useWishlist } from '@/features/wishlist/queries';
 
+import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 /** Coverage Board (M3 — W3.3) with the "who has not filled theirs in" nudge (W3.4). */
 export function WishlistScreen({ tripId }: { tripId: string }) {
   const { data: items = [] } = useWishlist(tripId);
@@ -41,7 +42,7 @@ export function WishlistScreen({ tripId }: { tripId: string }) {
                 <li key={item.id} className="text-ink flex items-center gap-2 text-xs">
                   <CharacterAvatar
                     characterId={
-                      members.find((m) => m.id === item.memberId)?.characterId ?? 'shiba'
+                      members.find((m) => m.id === item.memberId)?.characterId ?? DEFAULT_CHARACTER_ID
                     }
                     size="xs"
                   />

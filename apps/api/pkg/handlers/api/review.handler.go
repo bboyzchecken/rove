@@ -225,7 +225,7 @@ func (s *Server) reviewDTO(ctx contextT, review models.TripReview) reviewDTO {
 	dto := reviewDTO{
 		UserID:                review.UserID,
 		Name:                  "นักเดินทาง",
-		CharacterID:           "shiba",
+		CharacterID:           models.DefaultCharacterID,
 		Rating:                review.Rating,
 		ActualBudgetPerPerson: review.ActualBudgetPerPerson,
 		Body:                  review.Body,

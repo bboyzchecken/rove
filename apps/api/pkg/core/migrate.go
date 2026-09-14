@@ -1,9 +1,12 @@
 package core
 
 import (
+	"fmt"
+
 	"github.com/go-gormigrate/gormigrate/v2"
 	"gorm.io/gorm"
 
+	"github.com/bboyzchecken/rove/apps/api/pkg/domain"
 	"github.com/bboyzchecken/rove/apps/api/pkg/models"
 )
 
@@ -257,9 +260,140 @@ func Migrate(db *gorm.DB) error {
 				return dropIndexes(tx, tripPassIndexes)
 			},
 		},
+		{
+			// Feedback #2 — D-3: the trip's own colour. Additive column; rows that
+			// predate it are back-filled with the same hash the readers use, so a
+			// trip's colour is fixed from the first time anyone sees it rather than
+			// re-rolled on every read.
+			ID: "202609140000_trip_color",
+			Migrate: func(tx *gorm.DB) error {
+				if err := tx.AutoMigrate(&models.Trip{}); err != nil {
+					return err
+				}
+				return backfillTripColors(tx)
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return tx.Migrator().DropColumn(&models.Trip{}, "color")
+			},
+		},
+		{
+			// Feedback #2 — D-9 / D-11 / D-12: what the group started with, and the
+			// steps they chose to skip. `started_with` rides on trips; a skip is a
+			// row in its own table because it is the one status the room cannot
+			// derive from its other tables.
+			ID: "202609140001_trip_steps",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.AutoMigrate(&models.Trip{}, &models.TripStepOverride{})
+			},
+			Rollback: func(tx *gorm.DB) error {
+				if err := tx.Migrator().DropTable("trip_step_overrides"); err != nil {
+					return err
+				}
+				return tx.Migrator().DropColumn(&models.Trip{}, "started_with")
+			},
+		},
+		{
+			// Feedback #2 — D-4: the twenty animals become twenty flowers. The new
+			// rows are seeded by `go run . seed`; this moves every account that had
+			// picked an animal onto the flower in the same position, and retires
+			// the animals so the picker stops offering them. MUST run before the
+			// web build that ships the flowers is deployed (fix-list §9).
+			ID: "202609140002_flower_characters",
+			Migrate: func(tx *gorm.DB) error {
+				if err := tx.AutoMigrate(&models.Character{}); err != nil {
+					return err
+				}
+				return migrateCharactersToFlowers(tx)
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return rollbackFlowerCharacters(tx)
+			},
+		},
+		{
+			// Feedback #2 — D-19: a dream flies a flag, so it needs a country
+			// code next to the Thai name it has always carried.
+			ID: "202609140003_dream_country",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.AutoMigrate(&models.DreamItem{})
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return tx.Migrator().DropColumn(&models.DreamItem{}, "country")
+			},
+		},
+		{
+			// Feedback #2 — D-18: "ติดเทรนด์" needs views per day, and "มาใหม่"
+			// needs to know when a plan was published rather than last touched.
+			// Public rows that predate the column take their updated_at as the
+			// publish date — the best guess there is, and the order the feed
+			// used to show anyway.
+			ID: "202609140004_explore_trending",
+			Migrate: func(tx *gorm.DB) error {
+				if err := tx.AutoMigrate(&models.Trip{}, &models.TripViewDaily{}); err != nil {
+					return err
+				}
+				return tx.Exec(
+					"UPDATE trips SET published_at = updated_at WHERE visibility = ? AND published_at IS NULL",
+					models.VisibilityPublic,
+				).Error
+			},
+			Rollback: func(tx *gorm.DB) error {
+				if err := tx.Migrator().DropTable("trip_view_daily"); err != nil {
+					return err
+				}
+				return tx.Migrator().DropColumn(&models.Trip{}, "published_at")
+			},
+		},
 	})
 
 	return m.Migrate()
+}
+
+// legacyCharacterIDs are the animals, in catalogue order. `flower-01` replaces
+// the first, `flower-02` the second, and so on — the same map the web app
+// keeps in lib/catalog/flowers.ts.
+var legacyCharacterIDs = []string{
+	"shiba", "cat", "red-panda", "bear", "rabbit", "fox", "penguin", "owl", "deer", "hedgehog",
+	"capybara", "koala", "panda", "tiger", "otter", "whale", "frog", "sheep", "raccoon", "turtle",
+}
+
+func flowerID(index int) string {
+	return "flower-" + fmt.Sprintf("%02d", index+1)
+}
+
+func migrateCharactersToFlowers(tx *gorm.DB) error {
+	for i, animal := range legacyCharacterIDs {
+		if err := tx.Exec("UPDATE users SET character_id = ? WHERE character_id = ?", flowerID(i), animal).Error; err != nil {
+			return err
+		}
+	}
+	return tx.Exec("UPDATE characters SET is_active = ? WHERE id IN ?", false, legacyCharacterIDs).Error
+}
+
+func rollbackFlowerCharacters(tx *gorm.DB) error {
+	for i, animal := range legacyCharacterIDs {
+		if err := tx.Exec("UPDATE users SET character_id = ? WHERE character_id = ?", animal, flowerID(i)).Error; err != nil {
+			return err
+		}
+	}
+	return tx.Exec("UPDATE characters SET is_active = ? WHERE id IN ?", true, legacyCharacterIDs).Error
+}
+
+// backfillTripColors gives every existing trip the colour `domain.ColorFromID`
+// would have answered for it, so the readers' fallback and the stored value
+// agree — in Go rather than in SQL, because CRC32 is spelled differently on
+// every database this runs against.
+func backfillTripColors(tx *gorm.DB) error {
+	var ids []string
+	if err := tx.Model(&models.Trip{}).Where("color = ?", "").Pluck("id", &ids).Error; err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if err := tx.Model(&models.Trip{}).Where("id = ?", id).
+			UpdateColumn("color", domain.ColorFromID(id)).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // hotPathIndex is one index, named so the guard below can ask whether it is

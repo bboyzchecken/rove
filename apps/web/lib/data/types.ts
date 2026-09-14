@@ -18,7 +18,9 @@ import type {
   RecapDecision,
   RecapSpend,
   Settlement,
+  StartedWith,
   Trip,
+  TripColor,
   TripStatus,
 } from './model';
 
@@ -46,7 +48,9 @@ export type {
   RecapSpend,
   RouteStop,
   Settlement,
+  StartedWith,
   Trip,
+  TripColor,
   TripRoute,
   TripStatus,
   WishKind,
@@ -670,10 +674,14 @@ export interface ExploreTrip {
   reviews: ReviewSummary;
 }
 
+export type ExploreSort = 'popular' | 'new' | 'trending';
+
 export interface ExploreFilters {
   q?: string;
   country?: string;
-  sort?: 'popular' | 'new';
+  /** Several at once (Feedback #2 — D-18). Empty means everywhere. */
+  countries?: string[];
+  sort?: ExploreSort;
   limit?: number;
   offset?: number;
   /**
@@ -739,6 +747,12 @@ export interface AdaptDiff {
 export interface ExploreResult {
   items: ExploreTrip[];
   total: number;
+}
+
+/** One row of the country filter: where public plans go, and how many. */
+export interface ExploreCountry {
+  code: string;
+  count: number;
 }
 
 /** The public creator page (W11.2). */
@@ -813,8 +827,32 @@ export interface TripOverview {
     membersWithoutWishlist: number;
     bookings: number;
     openPrep: number;
+    /** Feedback #2 — every tab needs a count for its four-state status. */
+    prepTasks: number;
+    documents: number;
+    expenses: number;
+    photos: number;
+    membersSubmittedDates: number;
   };
   locked: LockedDates | null;
+  /** Steps the group marked "ไม่จำเป็น" (D-12): step → 'skipped'. */
+  stepOverrides: Partial<Record<string, 'skipped'>>;
+  /** Members who confirmed their free days on the date board (D-20). */
+  submittedDatesMemberIds: string[];
+}
+
+/** What a member may set a step to by hand (D-12). */
+export type StepOverrideStatus = 'skipped' | 'todo';
+
+/**
+ * Whether the next trip is allowed on this account (Feedback #2 — D-10), and
+ * if not, which trips are in the way and what the way past costs.
+ */
+export interface TripAllowance {
+  allowed: boolean;
+  activeTrips: { id: string; title: string }[];
+  limit: number;
+  priceThb: number;
 }
 
 export interface CreateTripInput {
@@ -836,6 +874,8 @@ export interface CreateTripInput {
   /** Date-first entry creates the room with no dates and opens the date board. */
   coordinateDates?: boolean;
   sourceTripId?: string;
+  /** What the group ticked on the first screen (Feedback #2 — D-9). */
+  startedWith?: StartedWith[];
 }
 
 export interface UpdateTripInput {
@@ -847,6 +887,8 @@ export interface UpdateTripInput {
   budgetPerPersonThb?: number;
   status?: TripStatus;
   cover?: string;
+  /** Owner only (D-3). */
+  color?: TripColor;
 }
 
 /** What A1.2 makes of a pasted booking e-mail (M1 — W1.4). */

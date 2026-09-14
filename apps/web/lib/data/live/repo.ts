@@ -77,6 +77,7 @@ import type {
   VoteDto,
   WishlistItemDto,
   YearStatsDto,
+  TripAllowanceDto,
 } from './dto';
 import {
   fromBooking,
@@ -146,8 +147,9 @@ import {
   toWishlistItem,
   toWindow,
   toYearStats,
+  toStepOverrides,
 } from './mappers';
-import { CHARACTERS } from '@/lib/catalog/characters';
+import { CHARACTERS, DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 
 /**
  * The live repository — every call reaches the Go API and lands in MySQL.
@@ -161,7 +163,7 @@ function toMe(dto: MeDto): CurrentUser {
     id: dto.id,
     name: dto.display_name,
     handle: dto.handle ?? '',
-    characterId: dto.character_id || 'shiba',
+    characterId: dto.character_id || DEFAULT_CHARACTER_ID,
     email: dto.email ?? undefined,
     homeCurrency: dto.home_currency,
     isAdmin: dto.role === 'admin',
@@ -260,6 +262,7 @@ export const liveRepo: RoveRepo = {
         entry_type: input.entryType,
         title: input.title,
         destination_cities: input.cities,
+        destination_country: input.country,
         start_date: input.startDate || null,
         end_date: input.endDate || null,
         party_size: input.partySize,
@@ -267,6 +270,7 @@ export const liveRepo: RoveRepo = {
         coordinate_dates: input.coordinateDates ?? false,
         source_trip_id: input.sourceTripId,
         flights: (input.flights ?? []).map(fromFlightLeg),
+        started_with: input.startedWith ?? [],
       });
       return toTrip(dto);
     },
@@ -280,6 +284,7 @@ export const liveRepo: RoveRepo = {
         budget_per_person_thb: patch.budgetPerPersonThb,
         status: patch.status,
         cover_image_url: patch.cover,
+        color: patch.color,
       });
       return toTrip(dto);
     },
@@ -314,6 +319,20 @@ export const liveRepo: RoveRepo = {
     },
     async stats() {
       return toYearStats(await api.get<YearStatsDto>('/users/me/stats'));
+    },
+    async allowance() {
+      const dto = await api.get<TripAllowanceDto>('/users/me/trip-allowance');
+      return {
+        allowed: dto.allowed,
+        activeTrips: dto.active_trips ?? [],
+        limit: dto.limit,
+        priceThb: dto.price_thb,
+      };
+    },
+    async setStepStatus(tripId, step, status) {
+      return toStepOverrides(
+        await api.patch<Record<string, string>>(`/trips/${tripId}/steps/${step}`, { status }),
+      );
     },
   },
 
@@ -818,6 +837,7 @@ export const liveRepo: RoveRepo = {
         searchParams: {
           q: filters.q,
           country: filters.country,
+          countries: filters.countries?.length ? filters.countries.join(',') : undefined,
           sort: filters.sort,
           match: filters.match,
           limit: filters.limit != null ? String(filters.limit) : undefined,
@@ -825,6 +845,11 @@ export const liveRepo: RoveRepo = {
         },
       });
       return { items: (dto.items ?? []).map(toExploreTrip), total: dto.total };
+    },
+
+    async exploreCountries() {
+      const rows = await api.get<{ code: string; count: number }[]>('/public/countries');
+      return (rows ?? []).map((row) => ({ code: row.code, count: row.count }));
     },
 
     async creator(handle) {
@@ -1108,6 +1133,7 @@ export const liveRepo: RoveRepo = {
         await api.post<DreamDto>('/users/me/dreams', {
           title: input.title,
           destination: input.destination,
+          country: input.country,
           note: input.note,
           url: input.url,
           accent: input.accent,

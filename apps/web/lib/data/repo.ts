@@ -34,6 +34,7 @@ import type {
   DreamItem,
   ExpenseEntry,
   ExpenseSummary,
+  ExploreCountry,
   ExploreFilters,
   ExploreResult,
   ExportFormat,
@@ -68,9 +69,11 @@ import type {
   ReviewBoard,
   SaveReviewInput,
   ShareState,
+  StepOverrideStatus,
   Subscription,
   SubscriptionPlan,
   Trip,
+  TripAllowance,
   TripConflict,
   TripDocument,
   TripPhoto,
@@ -173,6 +176,17 @@ export interface TripRepo {
   /** The read-only archive of a finished trip (M17 — A17.4). */
   recap(tripId: string): Promise<TripRecap>;
   stats(): Promise<YearStats>;
+  /** Whether creating a trip would hit the free-tier wall (Feedback #2 — D-10). */
+  allowance(): Promise<TripAllowance>;
+  /**
+   * Marks a step "ไม่จำเป็น" or puts it back (Feedback #2 — D-12). Returns
+   * the trip's whole override map, which is what the overview carries.
+   */
+  setStepStatus(
+    tripId: string,
+    step: string,
+    status: StepOverrideStatus,
+  ): Promise<Partial<Record<string, 'skipped'>>>;
 }
 
 export interface MemberRepo {
@@ -350,6 +364,8 @@ export interface ShareRepo {
 
   /** The explore feed of published trips (A11.2). */
   explore(filters: ExploreFilters): Promise<ExploreResult>;
+  /** Countries with public plans, most first (Feedback #2 — D-18). */
+  exploreCountries(): Promise<ExploreCountry[]>;
   /** A creator's public page (W11.2); null when the handle matches nobody. */
   creator(handle: string): Promise<CreatorProfile | null>;
   /** Copies a published trip into MY account (A11.1). Requires sign-in. */

@@ -3,6 +3,7 @@
 import { CharacterAvatar } from '@/components/ui/character-avatar';
 import type { Member, PresenceMember } from '@/lib/data';
 
+import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 /**
  * Who else is in this room right now (W9.3) — presentation only.
  *
@@ -29,7 +30,7 @@ export function TripPresence({
         {others.slice(0, 4).map((member) => (
           <CharacterAvatar
             key={member.memberId}
-            characterId={members.find((m) => m.id === member.memberId)?.characterId ?? 'shiba'}
+            characterId={members.find((m) => m.id === member.memberId)?.characterId ?? DEFAULT_CHARACTER_ID}
             size="xs"
           />
         ))}

@@ -1,8 +1,9 @@
-import { TripList } from '@/components/trip/trip-list';
+import { redirect } from 'next/navigation';
 
-/** Every room this user is in — the destination the bottom bar's trip tab needs. */
-export const metadata = { title: 'ทริปของฉัน' };
-
+/**
+ * "ทริปของฉัน" merged into the home screen (Feedback #2 — D-6). Invite mails
+ * and bookmarks still say /trips, so the address keeps answering.
+ */
 export default function TripsPage() {
-  return <TripList />;
+  redirect('/home');
 }
