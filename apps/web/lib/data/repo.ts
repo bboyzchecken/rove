@@ -68,6 +68,7 @@ import type {
   ReviewBoard,
   SaveReviewInput,
   ShareState,
+  StepOverrideStatus,
   Subscription,
   SubscriptionPlan,
   Trip,
@@ -173,6 +174,15 @@ export interface TripRepo {
   /** The read-only archive of a finished trip (M17 — A17.4). */
   recap(tripId: string): Promise<TripRecap>;
   stats(): Promise<YearStats>;
+  /**
+   * Marks a step "ไม่จำเป็น" or puts it back (Feedback #2 — D-12). Returns
+   * the trip's whole override map, which is what the overview carries.
+   */
+  setStepStatus(
+    tripId: string,
+    step: string,
+    status: StepOverrideStatus,
+  ): Promise<Partial<Record<string, 'skipped'>>>;
 }
 
 export interface MemberRepo {

@@ -77,6 +77,10 @@ type tripDTO struct {
 	BudgetPerPersonTHB float64  `json:"budget_per_person_thb"`
 	Visibility         string   `json:"visibility"`
 	DestinationID      string   `json:"destination_id"`
+	// Feedback #2 — the trip's own colour (D-3) and what the group started
+	// with (D-9). Never empty on the wire: see toTripDTO.
+	Color       string   `json:"color"`
+	StartedWith []string `json:"started_with"`
 
 	// Present on the endpoints that load the route: get and overview.
 	Route *routeDTO `json:"route,omitempty"`
@@ -116,7 +120,18 @@ func toTripDTO(t models.Trip) tripDTO {
 		BudgetPerPersonTHB: t.BudgetPerPersonTHB,
 		Visibility:         t.Visibility,
 		DestinationID:      t.DestinationID,
+		Color:              tripColorOf(t),
+		StartedWith:        jsonStrings(toJSONRaw(t.StartedWith)),
 	}
+}
+
+// tripColorOf never answers "" — a row from before the column hashes to a
+// stable colour, so the same trip is the same colour on every read.
+func tripColorOf(t models.Trip) string {
+	if domain.IsTripColor(t.Color) {
+		return t.Color
+	}
+	return domain.ColorFromID(t.ID)
 }
 
 /* ---------------------------------------------------------------- member -- */
@@ -127,10 +142,13 @@ type memberDTO struct {
 	Role        string `json:"role"`
 	CharacterID string `json:"character_id"`
 	HasWishlist bool   `json:"has_wishlist"`
+	// Feedback #2 (D-20): whether they confirmed their free days. Only the
+	// overview and the date board fill this in; elsewhere it stays false.
+	HasDates bool `json:"has_dates"`
 }
 
 func toMemberDTO(m models.TripMember, u models.User, hasWishlist bool) memberDTO {
-	character := "shiba"
+	character := defaultCharacter
 	if u.CharacterID != nil && *u.CharacterID != "" {
 		character = *u.CharacterID
 	}
@@ -161,7 +179,7 @@ type meDTO struct {
 }
 
 func toMeDTO(u models.User, points int) meDTO {
-	character := "shiba"
+	character := defaultCharacter
 	if u.CharacterID != nil && *u.CharacterID != "" {
 		character = *u.CharacterID
 	}
@@ -766,6 +784,7 @@ type calendarTripDTO struct {
 	EndDate            string   `json:"end_date"`
 	DaysUntil          int      `json:"days_until"`
 	CoverImageURL      string   `json:"cover_image_url"`
+	Color              string   `json:"color"`
 	MemberIDs          []string `json:"member_ids"`
 	MemberCharacterIDs []string `json:"member_character_ids"`
 	WeatherIcon        *string  `json:"weather_icon"`
@@ -784,6 +803,7 @@ type pastTripDTO struct {
 	Places             int      `json:"places"`
 	SpentTHB           float64  `json:"spent_thb"`
 	CoverImageURL      string   `json:"cover_image_url"`
+	Color              string   `json:"color"`
 	MemberIDs          []string `json:"member_ids"`
 	MemberCharacterIDs []string `json:"member_character_ids"`
 	// The recap card says whether this one is already public, because the
@@ -863,6 +883,14 @@ type overviewCountsDTO struct {
 	MembersWithoutWishlist int `json:"members_without_wishlist"`
 	Bookings               int `json:"bookings"`
 	OpenPrep               int `json:"open_prep"`
+	// Feedback #2 — the web derives a four-state status per step from these
+	// (lib/trip-progress.ts), so every step the checklist names needs a count.
+	PrepTasks int `json:"prep_tasks"`
+	Documents int `json:"documents"`
+	Expenses  int `json:"expenses"`
+	Photos    int `json:"photos"`
+	// Members who have confirmed their free days on the date board (D-20).
+	MembersSubmittedDates int `json:"members_submitted_dates"`
 }
 
 type tripOverviewDTO struct {
@@ -873,6 +901,11 @@ type tripOverviewDTO struct {
 	Activity  []activityDTO     `json:"activity"`
 	Counts    overviewCountsDTO `json:"counts"`
 	Locked    *lockedDatesDTO   `json:"locked"`
+	// Steps the group marked "ไม่จำเป็น" (D-12): step → "skipped".
+	StepOverrides map[string]string `json:"step_overrides"`
+	// Who has confirmed their free days — the member dot on the trip page
+	// (D-20) needs it next to has_wishlist.
+	SubmittedDatesMemberIDs []string `json:"submitted_dates_member_ids"`
 }
 
 /* ---------------------------------------------------------------- route -- */

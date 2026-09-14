@@ -54,6 +54,7 @@ func runSeed(cfg core.Config) {
 type characterSeed struct {
 	ID        string `json:"id"`
 	NameTH    string `json:"name_th"`
+	NameEN    string `json:"name_en"`
 	ImageURL  string `json:"image_url"`
 	Accent    string `json:"accent"`
 	SortOrder int    `json:"sort_order"`
@@ -87,6 +88,7 @@ func seedCharacters(ctx context.Context, db *gorm.DB) error {
 		err := store.Upsert(ctx, &models.Character{
 			ID:        seed.ID,
 			NameTH:    seed.NameTH,
+			NameEN:    seed.NameEN,
 			ImageURL:  seed.ImageURL,
 			Accent:    firstNonEmpty(seed.Accent, "primary"),
 			SortOrder: seed.SortOrder,

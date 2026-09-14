@@ -2,14 +2,19 @@
 
 import { useState } from 'react';
 
+import { Check } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
-import { Field, Input, fieldClass } from '@/components/ui/field';
+import { Field, FieldLabel, Input, fieldClass } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
-import { useUpdateTrip } from '@/features/trip/queries';
-import type { Trip } from '@/lib/data';
+import { useMe } from '@/features/auth/queries';
+import { useTripOverview, useUpdateTrip } from '@/features/trip/queries';
+import type { Trip, TripColor } from '@/lib/data';
 import { daysBetween } from '@/lib/data/domain';
+import { TRIP_COLORS, TRIP_COLOR_LABEL, tripColorClasses } from '@/lib/trip-color';
 import { cn } from '@/lib/utils';
 
+import { DateField } from '@/components/ui/date-field';
 /**
  * Inline frame edit (M2 — W2.3). The mutation behind it is optimistic, so the
  * numbers on the overview move the moment this closes.
@@ -26,6 +31,12 @@ export function TripFrameDialog({
   onClose: () => void;
 }) {
   const update = useUpdateTrip(tripId);
+  const { data: me } = useMe();
+  const { data: overview } = useTripOverview(tripId);
+  // The colour is the owner's to change (D-3); everyone else sees it, not the
+  // swatches. Same rule the API keeps.
+  const isOwner = overview?.members.find((m) => m.id === me?.id)?.role === 'owner';
+  const [color, setColor] = useState<TripColor>(trip.color);
   const [title, setTitle] = useState(trip.title);
   const [startDate, setStartDate] = useState(trip.startDate);
   const [endDate, setEndDate] = useState(trip.endDate);
@@ -47,6 +58,7 @@ export function TripFrameDialog({
         .split(',')
         .map((c) => c.trim())
         .filter(Boolean),
+      color: isOwner && color !== trip.color ? color : undefined,
     });
     onClose();
   }
@@ -68,18 +80,50 @@ export function TripFrameDialog({
           <Input value={title} onChange={(e) => setTitle(e.target.value)} />
         </Field>
 
+        {/* The trip's colour (Feedback #2 — D-3, brand spec §2.7): the same
+            pair follows the trip to the home screen, the calendar and the
+            room header, so the swatches show the light half — that is what
+            most of those surfaces paint with. */}
+        {isOwner ? (
+          <div role="group" aria-label="สีประจำทริป">
+            <FieldLabel>สีประจำทริป</FieldLabel>
+            <div className="flex flex-wrap gap-2">
+              {TRIP_COLORS.map((option) => {
+                const classes = tripColorClasses(option);
+                const active = option === color;
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    aria-pressed={active}
+                    aria-label={TRIP_COLOR_LABEL[option]}
+                    title={TRIP_COLOR_LABEL[option]}
+                    onClick={() => setColor(option)}
+                    className={cn(
+                      'flex size-9 items-center justify-center rounded-full transition',
+                      classes.light,
+                      active ? 'ring-ink ring-2 ring-offset-2' : 'hover:scale-105',
+                    )}
+                  >
+                    {active ? <Check className="text-ink size-4" strokeWidth={3} /> : null}
+                  </button>
+                );
+              })}
+            </div>
+            <span className="text-muted mt-1 block text-[11px]">
+              ใช้สีเดียวกันในหน้าทริปของฉัน ปฏิทิน และหัวห้องทริป
+            </span>
+          </div>
+        ) : null}
+
         <div className="grid grid-cols-2 gap-2">
-          <Field label="ไปวันที่">
-            <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-          </Field>
-          <Field label="กลับวันที่">
-            <Input
-              type="date"
-              value={endDate}
-              min={startDate}
-              onChange={(e) => setEndDate(e.target.value)}
-            />
-          </Field>
+          <DateField label="ไปวันที่" value={startDate} onChange={setStartDate} />
+          <DateField
+            label="กลับวันที่"
+            value={endDate}
+            min={startDate || undefined}
+            onChange={setEndDate}
+          />
         </div>
         {startDate && endDate ? (
           <p className="text-muted -mt-1 text-[11px]">

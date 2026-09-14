@@ -18,6 +18,8 @@ import { toIsoDate } from '@/lib/data/domain';
 import { formatMoney, formatThaiDate } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
+import { DateField } from '@/components/ui/date-field';
+import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 /**
  * Expense list + add form (M16 — W16.1, W16.2).
  *
@@ -40,7 +42,7 @@ export function ExpenseBoard({ tripId, fxRate }: { tripId: string; fxRate: numbe
     .sort((a, b) => (a.date < b.date ? 1 : -1));
 
   const nameOf = (id: string) => members.find((m) => m.id === id)?.name ?? '—';
-  const characterOf = (id: string) => members.find((m) => m.id === id)?.characterId ?? 'shiba';
+  const characterOf = (id: string) => members.find((m) => m.id === id)?.characterId ?? DEFAULT_CHARACTER_ID;
 
   return (
     <div className="space-y-3">
@@ -241,10 +243,7 @@ function AddExpenseForm({
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <label className="block">
-            <FieldLabel>วันที่</FieldLabel>
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          </label>
+          <DateField label="วันที่" value={date} onChange={setDate} />
           <label className="block">
             <FieldLabel>หมวด</FieldLabel>
             <Select value={category} onChange={(e) => setCategory(e.target.value)}>

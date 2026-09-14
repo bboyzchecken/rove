@@ -11,6 +11,7 @@ import { useExpenses, useSettleUp } from '@/features/expense/queries';
 import { useTrip, useTripMembers } from '@/features/trip/queries';
 import { formatMoney, formatThaiDate } from '@/lib/format';
 
+import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 /**
  * Expense tab (M16) — actual money, kept strictly apart from the Budget tab's
  * estimate. Never included in any public payload (W16.5).
@@ -32,7 +33,7 @@ export function ExpenseScreen({ tripId }: { tripId: string }) {
   }
 
   const nameOf = (id: string) => members.find((m) => m.id === id)?.name ?? '—';
-  const characterOf = (id: string) => members.find((m) => m.id === id)?.characterId ?? 'shiba';
+  const characterOf = (id: string) => members.find((m) => m.id === id)?.characterId ?? DEFAULT_CHARACTER_ID;
 
   return (
     <div className="space-y-7">

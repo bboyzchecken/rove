@@ -9,6 +9,7 @@ import type {
   FlightLegInput,
   MemberProfile,
   ShareState,
+  StepOverrideStatus,
   TripOverview,
   TripVisibility,
   UpdateTripInput,
@@ -167,6 +168,44 @@ export function useUpdateTrip(tripId: string) {
 
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.trip(tripId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.trips() });
+    },
+  });
+}
+
+/**
+ * "ข้าม" on a checklist step (Feedback #2 — D-12). Optimistic: the row turns
+ * grey the moment it is tapped, and every screen that reads step statuses
+ * off the overview follows on the same tick.
+ */
+export function useSetStepStatus(tripId: string) {
+  const queryClient = useQueryClient();
+  const key = queryKeys.tripOverview(tripId);
+
+  return useMutation({
+    mutationFn: (input: { step: string; status: StepOverrideStatus }) =>
+      repo.trips.setStepStatus(tripId, input.step, input.status),
+
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<TripOverview>(key);
+      if (previous) {
+        const stepOverrides = { ...previous.stepOverrides };
+        if (input.status === 'skipped') stepOverrides[input.step] = 'skipped';
+        else delete stepOverrides[input.step];
+        queryClient.setQueryData<TripOverview>(key, { ...previous, stepOverrides });
+      }
+      return { previous };
+    },
+
+    onError: (_error, _input, context) => {
+      if (context?.previous) queryClient.setQueryData(key, context.previous);
+    },
+
+    onSuccess: (stepOverrides, input) => {
+      track('step_skipped', { step: input.step, status: input.status });
+      const current = queryClient.getQueryData<TripOverview>(key);
+      if (current) queryClient.setQueryData<TripOverview>(key, { ...current, stepOverrides });
       void queryClient.invalidateQueries({ queryKey: queryKeys.trips() });
     },
   });

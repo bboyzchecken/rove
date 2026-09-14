@@ -18,6 +18,7 @@ import type { TripPhoto } from '@/lib/data';
 import { PHOTO_ACCEPT, photoFromFile } from '@/lib/image';
 import { cn } from '@/lib/utils';
 
+import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 /**
  * Photos tab (M18 — W18.1): everything the group shot, grouped by the day it
  * belongs to. Uploads are resized in the browser first, so a phone original
@@ -161,7 +162,7 @@ export function PhotosScreen({ tripId }: { tripId: string }) {
                 ) : null}
                 <span className="absolute bottom-1 left-1">
                   <CharacterAvatar
-                    characterId={members.find((m) => m.id === photo.userId)?.characterId ?? 'shiba'}
+                    characterId={members.find((m) => m.id === photo.userId)?.characterId ?? DEFAULT_CHARACTER_ID}
                     size="xs"
                   />
                 </span>

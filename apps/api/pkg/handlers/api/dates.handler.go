@@ -354,15 +354,21 @@ func (s *Server) buildBoard(c echo.Context, month string) (*availabilityBoardDTO
 	}
 
 	submitted := make([]string, 0, len(submissions))
+	submittedSet := make(map[string]bool, len(submissions))
 	for _, sub := range submissions {
 		submitted = append(submitted, sub.UserID)
+		submittedSet[sub.UserID] = true
+	}
+	members := roster.dtos()
+	for i := range members {
+		members[i].HasDates = submittedSet[members[i].UserID]
 	}
 
 	return &availabilityBoardDTO{
 		TripID:             tripID,
 		Month:              active,
 		Months:             months,
-		Members:            roster.dtos(),
+		Members:            members,
 		SubmittedMemberIDs: submitted,
 		Entries:            entryDTOs,
 		Windows:            domain.ComputeWindows(toAvailabilityInputs(entries), roster.ids(), domain.WindowOptions{}),

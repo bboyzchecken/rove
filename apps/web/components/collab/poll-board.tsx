@@ -22,6 +22,7 @@ import { useTripMembers } from '@/features/trip/queries';
 import type { Member, Poll } from '@/lib/data';
 import { cn } from '@/lib/utils';
 
+import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 /**
  * Polls (M9 — A9.3): the decisions that are not a whole plan. Which hotel,
  * which day for the theme park, who rents the car.
@@ -174,7 +175,7 @@ function PollCard({
                 {option.who.slice(0, 3).map((memberId) => (
                   <CharacterAvatar
                     key={memberId}
-                    characterId={members.find((m) => m.id === memberId)?.characterId ?? 'shiba'}
+                    characterId={members.find((m) => m.id === memberId)?.characterId ?? DEFAULT_CHARACTER_ID}
                     size="xs"
                   />
                 ))}

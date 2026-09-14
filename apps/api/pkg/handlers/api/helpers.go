@@ -48,7 +48,7 @@ func (m memberSet) characterIDs() []string {
 }
 
 // defaultCharacter is who someone is until they pick (§15).
-const defaultCharacter = "shiba"
+const defaultCharacter = models.DefaultCharacterID
 
 // characterOf tolerates the zero User a map miss hands back, so a member whose
 // account row is missing still renders as somebody.

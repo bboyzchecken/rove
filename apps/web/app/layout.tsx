@@ -1,9 +1,13 @@
 import type { Metadata, Viewport } from 'next';
 import { IBM_Plex_Sans_Thai, Inter, Space_Grotesk } from 'next/font/google';
+import { cookies } from 'next/headers';
 import { NextIntlClientProvider } from 'next-intl';
 import { getLocale } from 'next-intl/server';
 
+import { VariantProvider } from '@/components/uat/variant-provider';
+import { VariantSwitcher } from '@/components/uat/variant-switcher';
 import { env } from '@/lib/env';
+import { selectionFromCookies } from '@/lib/uat/variants';
 import '@/styles/globals.css';
 
 import { Providers } from './providers';
@@ -74,6 +78,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // i18n/request.ts; client components reach them via useTranslations.
   const locale = await getLocale();
 
+  // Feedback #2 — the tester's A/B/C picks (F0.1). Read here, on the server,
+  // so the first paint already shows the chosen variant; the provider carries
+  // them to every client component and the switcher writes them back.
+  const jar = await cookies();
+  const variants = selectionFromCookies((name) => jar.get(name)?.value);
+
   return (
     <html
       lang={locale}
@@ -81,7 +91,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     >
       <body className="min-h-dvh antialiased">
         <NextIntlClientProvider>
-          <Providers>{children}</Providers>
+          <Providers>
+            <VariantProvider initial={variants}>
+              {children}
+              <VariantSwitcher />
+            </VariantProvider>
+          </Providers>
         </NextIntlClientProvider>
       </body>
     </html>

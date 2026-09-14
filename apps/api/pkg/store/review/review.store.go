@@ -142,7 +142,7 @@ func (s *store) ListRecentPublic(ctx context.Context, limit int) ([]models.Publi
 			Body:                  row.Body,
 			ActualBudgetPerPerson: row.ActualBudgetPerPerson,
 			Name:                  row.Name,
-			CharacterID:           "shiba",
+			CharacterID:           models.DefaultCharacterID,
 			CreatedAt:             row.CreatedAt.UTC().Format(time.RFC3339),
 		}
 		if row.TripSlug != nil {

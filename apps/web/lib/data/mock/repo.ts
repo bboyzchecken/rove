@@ -1,5 +1,6 @@
 import { DEFAULT_COVER } from '@/lib/covers';
-import { getCharacter, CHARACTERS } from '@/lib/catalog/characters';
+import { randomTripColor } from '@/lib/trip-color';
+import { getCharacter, CHARACTERS, DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 import { AI_CREDITS, DAYS } from './seed/trip';
 import { PAST_TRIP_ARCHIVES, POINTS_PER_PUBLISH } from './seed/user';
 
@@ -678,6 +679,12 @@ export const mockRepo: RoveRepo = {
           const planItems = record.days.reduce((sum, d) => sum + d.items.length, 0);
           const withoutWishlist = record.members.filter((m) => !m.hasWishlist).length;
 
+          const submittedDates = [...record.submittedMemberIds];
+          const members = clone(record.members).map((m) => ({
+            ...m,
+            hasDates: submittedDates.includes(m.id),
+          }));
+
           const checklist = [
             { key: 'room', label: 'สร้างห้องทริป', done: true },
             {
@@ -710,7 +717,7 @@ export const mockRepo: RoveRepo = {
 
           return {
             trip: { ...clone(record.trip), route },
-            members: clone(record.members),
+            members,
             coverage,
             checklist,
             activity: clone(record.activity).slice(0, 8),
@@ -721,8 +728,15 @@ export const mockRepo: RoveRepo = {
               membersWithoutWishlist: withoutWishlist,
               bookings: record.bookings.filter((b) => b.status === 'booked').length,
               openPrep: record.prep.filter((p) => !p.done).length,
+              prepTasks: record.prep.length,
+              documents: record.documents.length,
+              expenses: record.expenses.length,
+              photos: record.photos.length,
+              membersSubmittedDates: submittedDates.length,
             },
             locked: clone(record.locked),
+            stepOverrides: clone(record.stepOverrides ?? {}),
+            submittedDatesMemberIds: submittedDates,
           };
         }),
       );
@@ -770,6 +784,9 @@ export const mockRepo: RoveRepo = {
             fxRate: 0.235,
             fxAsOf: toIsoDate(new Date()),
             budgetPerPersonThb: input.budgetPerPersonThb ?? 40_000,
+            // Never the colour of the room this person opened last (D-3).
+            color: randomTripColor(db.trips.find((t) => t.role === 'owner')?.trip.color),
+            startedWith: input.startedWith ?? [],
           },
           role: 'owner',
           members: [
@@ -779,6 +796,7 @@ export const mockRepo: RoveRepo = {
               role: 'owner',
               characterId: db.user.characterId,
               hasWishlist: false,
+              hasDates: false,
             },
           ],
           availability: [],
@@ -796,6 +814,7 @@ export const mockRepo: RoveRepo = {
                 }
               : null,
           destinationId: null,
+          stepOverrides: {},
           flights: legs,
           wishlist: [],
           profiles: {},
@@ -993,6 +1012,20 @@ export const mockRepo: RoveRepo = {
     async stats() {
       return delay(clone(loadDb().stats));
     },
+
+    async setStepStatus(tripId, step, status) {
+      return delay(
+        mutate((db) => {
+          const record = tripRecord(db, tripId);
+          record.stepOverrides ??= {};
+          if (status === 'skipped') record.stepOverrides[step] = 'skipped';
+          else delete record.stepOverrides[step];
+          log(record, db.user.id, status === 'skipped' ? `ข้ามขั้น ${step}` : `เอาขั้น ${step} กลับมา`);
+          return clone(record.stepOverrides);
+        }),
+        120,
+      );
+    },
   },
 
   /* ----------------------------------------------------------- members -- */
@@ -1044,6 +1077,7 @@ export const mockRepo: RoveRepo = {
           role: 'editor',
           characterId: character.id,
           hasWishlist: false,
+          hasDates: false,
         });
         record.trip.partySize = record.members.length;
         log(record, db.user.id, `มีคนเข้าห้องผ่านลิงก์เชิญ (${token.slice(0, 8)})`);
@@ -2220,7 +2254,7 @@ export const mockRepo: RoveRepo = {
       const first = records[0];
       const identity = mine
         ? { name: db.user.name, handle, characterId: db.user.characterId }
-        : (first?.creator ?? { name: 'นักเดินทาง', handle, characterId: 'shiba' });
+        : (first?.creator ?? { name: 'นักเดินทาง', handle, characterId: DEFAULT_CHARACTER_ID });
 
       return delay({
         ...identity,
@@ -2253,6 +2287,7 @@ export const mockRepo: RoveRepo = {
               role: 'owner',
               characterId: db.user.characterId,
               hasWishlist: false,
+              hasDates: false,
             },
           ];
           copy.creator = undefined;
@@ -3086,8 +3121,9 @@ function recapOfArchive(db: MockDb, past: PastTrip): TripRecap {
       id,
       name: roster.find((m) => m.id === id)?.name ?? `เพื่อนคนที่ ${index + 1}`,
       role: index === 0 ? ('owner' as const) : ('editor' as const),
-      characterId: characterIds[index] ?? 'shiba',
+      characterId: characterIds[index] ?? DEFAULT_CHARACTER_ID,
       hasWishlist: true,
+      hasDates: true,
     })),
     itinerary: clone(archive?.itinerary ?? []),
     decisions: clone(archive?.decisions ?? []),
@@ -3188,7 +3224,7 @@ function facesOf(db: MockDb, trip: { id: string; memberIds: string[] }) {
     (id, index) =>
       roster.find((m) => m.id === id)?.characterId ??
       roster[index % Math.max(1, roster.length)]?.characterId ??
-      'shiba',
+      DEFAULT_CHARACTER_ID,
   );
 }
 
@@ -3238,7 +3274,10 @@ function boardOf(record: TripRecord, month?: string): AvailabilityBoard {
     tripId: record.trip.id,
     month: active,
     months,
-    members: clone(record.members),
+    members: clone(record.members).map((m) => ({
+      ...m,
+      hasDates: record.submittedMemberIds.includes(m.id),
+    })),
     submittedMemberIds: [...record.submittedMemberIds],
     entries: clone(record.availability),
     windows: computeWindows(record.availability, record.members),

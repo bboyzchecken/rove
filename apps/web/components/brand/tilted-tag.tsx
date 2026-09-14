@@ -24,16 +24,14 @@ import { cn } from '@/lib/utils';
  * and the colour pairs, which are the parts that must not drift.
  */
 /**
- * The hero is one of the three places §2.5 lets several feature colours sit
- * together, so a tag cluster may name hues — and it should, because naming
- * them is the point: a marketing hero scattered with the six pastels is where
- * a first-time visitor meets the palette they will later navigate by.
+ * A tag cluster names hues, and since Feedback #2 (§2.5 v3.1) that needs no
+ * licence: several brand colours on one screen is ordinary now, and the hero
+ * is simply where a first-time visitor meets the six pastels the rest of the
+ * site is painted in.
  *
- * The tones are the FEATURES, not the hues, for the same reason the scopes in
- * brand.css are. A tag that says "รายจ่าย" should take `documents` and get
- * orange because that is where the feature lives, so a future palette change
- * moves the hero with it rather than stranding it on a colour that no longer
- * means anything.
+ * The tones are still keyed by FEATURE name rather than by hue, for the same
+ * reason the scopes in brand.css are: a future palette change should move the
+ * hero with it rather than strand a tag on a colour that no longer exists.
  *
  * Every one carries black text (§2.4) — including the anchor, where black is
  * on white rather than the other way round.

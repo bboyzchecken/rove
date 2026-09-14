@@ -127,6 +127,7 @@ func (s *Server) handleUpcomingTrips(c echo.Context) error {
 			EndDate:            trip.EndDate.Format("2006-01-02"),
 			DaysUntil:          domain.DaysBetween(today, *trip.StartDate) - 1,
 			CoverImageURL:      trip.CoverImageURL,
+			Color:              tripColorOf(trip),
 			MemberIDs:          roster.ids(),
 			MemberCharacterIDs: roster.characterIDs(),
 		}
@@ -195,6 +196,7 @@ func (s *Server) handlePastTrips(c echo.Context) error {
 			Places:             len(items),
 			SpentTHB:           spent,
 			CoverImageURL:      trip.CoverImageURL,
+			Color:              tripColorOf(trip),
 			MemberIDs:          roster.ids(),
 			MemberCharacterIDs: roster.characterIDs(),
 			Visibility:         trip.Visibility,

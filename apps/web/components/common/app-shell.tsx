@@ -13,6 +13,7 @@ import { useMe } from '@/features/auth/queries';
 import { pathFeature } from '@/lib/feature';
 import { cn } from '@/lib/utils';
 
+import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 /**
  * App chrome. Mobile-first (§2.1): a thumb-reachable bottom bar on phones, the
  * same destinations as a top bar from `md` up. The trip room draws its own tab
@@ -113,7 +114,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <LocaleSwitchCompact className="mr-1" />
             <InboxBell />
             <Link href="/profile" aria-label="โปรไฟล์">
-              <CharacterAvatar characterId={me?.characterId ?? 'shiba'} size="sm" />
+              <CharacterAvatar characterId={me?.characterId ?? DEFAULT_CHARACTER_ID} size="sm" />
             </Link>
           </div>
         </div>

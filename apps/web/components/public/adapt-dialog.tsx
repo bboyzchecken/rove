@@ -11,6 +11,7 @@ import { useAdaptPreview, useCloneAdapted } from '@/features/public/queries';
 import type { AdaptChange, AdaptDiff, Trip } from '@/lib/data';
 import { cn } from '@/lib/utils';
 
+import { DateField } from '@/components/ui/date-field';
 /**
  * "ปรับให้เข้ากับทริปฉัน" (A11.4).
  *
@@ -84,14 +85,7 @@ export function AdaptDialog({
           <FieldLabel>ไปกี่คน</FieldLabel>
           <Stepper value={partySize} min={1} max={30} onChange={setPartySize} suffix="คน" />
         </div>
-        <div>
-          <FieldLabel>เริ่มวันไหน</FieldLabel>
-          <Input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-          />
-        </div>
+        <DateField label="เริ่มวันไหน" value={startDate} onChange={setStartDate} />
         <div>
           <FieldLabel>งบต่อคน (บาท)</FieldLabel>
           <Input

@@ -21,10 +21,10 @@ import type { AvailabilityEntry, ExpenseEntry, Member, PlanDay } from '@/lib/dat
  */
 
 const MEMBERS: Member[] = [
-  { id: 'm1', name: 'ตอง', role: 'owner', characterId: 'shiba', hasWishlist: true },
-  { id: 'm2', name: 'มายด์', role: 'editor', characterId: 'cat', hasWishlist: true },
-  { id: 'm3', name: 'ปอนด์', role: 'editor', characterId: 'capybara', hasWishlist: true },
-  { id: 'm4', name: 'จูน', role: 'editor', characterId: 'penguin', hasWishlist: false },
+  { id: 'm1', name: 'ตอง', role: 'owner', characterId: 'flower-01', hasWishlist: true, hasDates: true },
+  { id: 'm2', name: 'มายด์', role: 'editor', characterId: 'flower-02', hasWishlist: true, hasDates: true },
+  { id: 'm3', name: 'ปอนด์', role: 'editor', characterId: 'flower-11', hasWishlist: true, hasDates: true },
+  { id: 'm4', name: 'จูน', role: 'editor', characterId: 'flower-07', hasWishlist: false, hasDates: true },
 ];
 
 function free(memberId: string, days: number[]): AvailabilityEntry[] {

@@ -16,6 +16,7 @@ import { thaiDate } from '@/lib/data/domain';
 import { buildRoute, routeWarnings, type RouteWarning } from '@/lib/data/route';
 import { cn } from '@/lib/utils';
 
+import { DateField } from '@/components/ui/date-field';
 /**
  * The route builder (M1 — W1.3).
  *
@@ -216,14 +217,11 @@ export function RouteBuilder({
               leg.mode === 'flight' && '@2xl:grid-cols-3',
             )}
           >
-            <Field label={leg.mode === 'ground' ? 'เดินทางวันที่' : 'บินวันที่'}>
-              <Input
-                type="date"
-                value={leg.depDate}
-                onChange={(e) => patch(leg.key, { depDate: e.target.value })}
-                className="nums"
-              />
-            </Field>
+            <DateField
+              label={leg.mode === 'ground' ? 'เดินทางวันที่' : 'บินวันที่'}
+              value={leg.depDate}
+              onChange={(iso) => patch(leg.key, { depDate: iso })}
+            />
             <Field label="ถึงกี่โมง (ใส่ทีหลังได้)">
               <Input
                 type="time"

@@ -24,7 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
-import { Field, Input, Textarea, fieldClass } from '@/components/ui/field';
+import { Field, Textarea, fieldClass } from '@/components/ui/field';
 import { useCharacters, useUpdateMe } from '@/features/auth/queries';
 import { useCreateTrip } from '@/features/trip/queries';
 import { track } from '@/lib/analytics';
@@ -32,6 +32,8 @@ import { repo } from '@/lib/data';
 import { addDays, daysBetween, thaiRangeLabel } from '@/lib/data/domain';
 import { cn } from '@/lib/utils';
 
+import { DateField } from '@/components/ui/date-field';
+import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 /**
  * Entry flow (M1 — W1.2 / W1.3 / W2.8).
  *
@@ -99,7 +101,7 @@ export function NewTripFlow() {
   const [startDate, setStartDate] = useState(DEFAULT_START);
   const [endDate, setEndDate] = useState(DEFAULT_END);
   const [party, setParty] = useState(4);
-  const [character, setCharacter] = useState('shiba');
+  const [character, setCharacter] = useState(DEFAULT_CHARACTER_ID);
   const [ticket, setTicket] = useState('');
   const [pasting, setPasting] = useState(false);
   const [parsing, setParsing] = useState(false);
@@ -387,24 +389,20 @@ export function NewTripFlow() {
               {entry === 'date' ? (
                 <>
                   <div className="grid grid-cols-2 gap-2">
-                    <Field label="ไปวันที่">
-                      <Input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => {
-                          setStartDate(e.target.value);
-                          if (e.target.value > endDate) setEndDate(addDays(e.target.value, 4));
-                        }}
-                      />
-                    </Field>
-                    <Field label="กลับวันที่">
-                      <Input
-                        type="date"
-                        value={endDate}
-                        min={startDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                      />
-                    </Field>
+                    <DateField
+                      label="ไปวันที่"
+                      value={startDate}
+                      onChange={(iso) => {
+                        setStartDate(iso);
+                        if (iso && endDate && iso > endDate) setEndDate(addDays(iso, 4));
+                      }}
+                    />
+                    <DateField
+                      label="กลับวันที่"
+                      value={endDate}
+                      min={startDate || undefined}
+                      onChange={setEndDate}
+                    />
                   </div>
 
                   <p className="text-muted text-xs">

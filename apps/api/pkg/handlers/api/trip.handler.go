@@ -101,6 +101,27 @@ type createTripRequest struct {
 	// wins: the dates, the destinations and the country all come from the legs
 	// rather than from anything typed alongside them.
 	Flights []flightRequest `json:"flights"`
+	// What the group ticked on the first screen (Feedback #2 — D-9). Stored
+	// so the room can order its steps around what is already settled.
+	StartedWith []string `json:"started_with"`
+}
+
+// startedWithKeys is the vocabulary of D-9. Anything else in the request is
+// dropped rather than stored, so a typo cannot become a step nobody renders.
+var startedWithKeys = map[string]bool{
+	"dates": true, "flights": true, "stay": true, "destination": true, "friends": true,
+}
+
+func cleanStartedWith(in []string) []string {
+	out := make([]string, 0, len(in))
+	seen := map[string]bool{}
+	for _, key := range in {
+		if startedWithKeys[key] && !seen[key] {
+			seen[key] = true
+			out = append(out, key)
+		}
+	}
+	return out
 }
 
 func (s *Server) handleCreateTrip(c echo.Context) error {
@@ -132,7 +153,14 @@ func (s *Server) handleCreateTrip(c echo.Context) error {
 		Status:             models.TripStatusPlanning,
 		BudgetPerPersonTHB: req.BudgetPerPersonTHB,
 		CoverImageURL:      "/brand/covers/cover-japan.webp",
+		StartedWith:        jsonArray(cleanStartedWith(req.StartedWith)),
 	}
+
+	// The trip's own colour (Feedback #2 — D-3): random, but not the same as
+	// the one this person most recently opened, so two rooms being planned
+	// side by side never come out identical by chance.
+	last, _ := s.trips.LatestOwnedColor(ctx, userID)
+	trip.Color = domain.RandomTripColor(last)
 
 	if !req.CoordinateDates {
 		if start, ok := parseDateParam(str.Deref(req.StartDate, "")); ok {
@@ -275,6 +303,8 @@ type updateTripRequest struct {
 	BudgetPerPersonTHB *float64  `json:"budget_per_person_thb"`
 	Status             *string   `json:"status"`
 	CoverImageURL      *string   `json:"cover_image_url"`
+	// Owner only (D-3) — everyone else's PATCH may carry it and it is refused.
+	Color *string `json:"color"`
 }
 
 func (s *Server) handleUpdateTrip(c echo.Context) error {
@@ -322,6 +352,15 @@ func (s *Server) handleUpdateTrip(c echo.Context) error {
 	}
 	if req.CoverImageURL != nil {
 		trip.CoverImageURL = *req.CoverImageURL
+	}
+	if req.Color != nil {
+		if request.TripRole(c) != models.TripRoleOwner {
+			return request.Forbidden(c, "หัวห้องเท่านั้นที่เปลี่ยนสีทริปได้")
+		}
+		if !domain.IsTripColor(*req.Color) {
+			return request.BadRequest(c, "ไม่รู้จักสีนี้")
+		}
+		trip.Color = *req.Color
 	}
 
 	if err := s.trips.Update(ctx, trip); err != nil {
@@ -462,6 +501,20 @@ func (s *Server) handleTripOverview(c echo.Context) error {
 	bookings, _ := s.bookings.ListByTrip(ctx, tripID)
 	prep, _ := s.prep.ListByTrip(ctx, tripID)
 	activity, _ := s.collab.ListActivity(ctx, tripID, "", 8)
+	// Feedback #2 — the four-state checklist (D-11) needs to know about every
+	// tab, not just the five the old checklist named. Counts only: the tabs
+	// themselves load their rows.
+	documents, _ := s.documents.ListByTrip(ctx, tripID)
+	expenses, _ := s.expenses.ListByTrip(ctx, tripID)
+	photos, _ := s.photos.ListByTrip(ctx, tripID, models.PhotoFilter{})
+	overrides, _ := s.steps.ListByTrip(ctx, tripID)
+	submissions, _ := s.dates.Submissions(ctx, tripID)
+	submitted := make([]string, 0, len(submissions))
+	submittedSet := make(map[string]bool, len(submissions))
+	for _, sub := range submissions {
+		submitted = append(submitted, sub.UserID)
+		submittedSet[sub.UserID] = true
+	}
 
 	// Derived, not re-derived-and-stored: the write-back belongs to whatever
 	// changed the plan or the wishlist, and every one of those paths already
@@ -518,9 +571,14 @@ func (s *Server) handleTripOverview(c echo.Context) error {
 		activityDTOs = append(activityDTOs, toActivityDTO(a))
 	}
 
+	members := roster.dtos()
+	for i := range members {
+		members[i].HasDates = submittedSet[members[i].UserID]
+	}
+
 	return c.JSON(http.StatusOK, tripOverviewDTO{
 		Trip:      s.withRoute(ctx, toTripDTO(*trip), tripID),
-		Members:   roster.dtos(),
+		Members:   members,
 		Coverage:  toCoverageDTO(coverage),
 		Checklist: checklist,
 		Activity:  activityDTOs,
@@ -531,8 +589,15 @@ func (s *Server) handleTripOverview(c echo.Context) error {
 			MembersWithoutWishlist: withoutWishlist,
 			Bookings:               bookedCount,
 			OpenPrep:               openPrep,
+			PrepTasks:              len(prep),
+			Documents:              len(documents),
+			Expenses:               len(expenses),
+			Photos:                 len(photos),
+			MembersSubmittedDates:  len(submitted),
 		},
-		Locked: locked,
+		Locked:                  locked,
+		StepOverrides:           stepOverridesDTO(overrides),
+		SubmittedDatesMemberIDs: submitted,
 	})
 }
 

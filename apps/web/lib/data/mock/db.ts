@@ -12,6 +12,7 @@ import {
 } from './seed/trip';
 import { CURRENT_USER, DREAMS, PAST_TRIPS, POINTS_LEDGER, UPCOMING, YEAR_STATS } from './seed/user';
 import { DEMO_PUBLIC_SLUG } from '@/lib/demo-trip';
+import { colorFromId } from '@/lib/trip-color';
 
 import { AI_PAY_CHANNELS, FREE_SUBSCRIPTION, seedOrders } from './billing';
 
@@ -70,7 +71,12 @@ import type {
 // changes an old blob cannot satisfy: it would carry three trips with blank
 // countries, and the mosaic would render four flagless tiles or, below its
 // minimum of four, nothing at all.
-const STORAGE_KEY = 'rove.mock.v11';
+//
+// v12 (Feedback #2) gives every trip a colour and a `startedWith`, every
+// member a `hasDates`, and every record a `stepOverrides` map — and turns the
+// twenty animals into flowers, so a stored `characterId: 'shiba'` would no
+// longer name a row in the catalogue.
+const STORAGE_KEY = 'rove.mock.v12';
 
 /** One candidate itinerary (M6) — metrics and votes are computed at read. */
 export interface VariantRecord {
@@ -98,6 +104,8 @@ export interface TripRecord {
   months: string[];
   locked: LockedDates | null;
   destinationId: string | null;
+  /** Steps the group marked "ไม่จำเป็น" (Feedback #2 — D-12). */
+  stepOverrides: Partial<Record<string, 'skipped'>>;
   /** The booked route (M1 — A1.3). The frame above is derived from it. */
   flights: FlightLeg[];
   wishlist: WishlistItem[];
@@ -234,6 +242,7 @@ function seedDemoTrip(): TripRecord {
       memberIds: MEMBERS.map((m) => m.id),
     },
     destinationId: 'japan',
+    stepOverrides: {},
     // The demo trip has its tickets: 15 Nov out, 22 Nov back.
     flights: [
       {
@@ -358,10 +367,10 @@ function seedDemoTrip(): TripRecord {
 /** The trip that has no dates yet — the one the date board is built for. */
 function seedDateTrip(): TripRecord {
   const members: Member[] = [
-    { id: 'm1', name: 'ตอง', role: 'owner', characterId: 'shiba', hasWishlist: false },
-    { id: 'm2', name: 'มายด์', role: 'editor', characterId: 'cat', hasWishlist: false },
-    { id: 'm3', name: 'ปอนด์', role: 'editor', characterId: 'capybara', hasWishlist: false },
-    { id: 'm4', name: 'จูน', role: 'editor', characterId: 'penguin', hasWishlist: false },
+    { id: 'm1', name: 'ตอง', role: 'owner', characterId: 'flower-01', hasWishlist: false, hasDates: true },
+    { id: 'm2', name: 'มายด์', role: 'editor', characterId: 'flower-02', hasWishlist: false, hasDates: true },
+    { id: 'm3', name: 'ปอนด์', role: 'editor', characterId: 'flower-11', hasWishlist: false, hasDates: true },
+    { id: 'm4', name: 'จูน', role: 'editor', characterId: 'flower-07', hasWishlist: false, hasDates: true },
   ];
 
   return {
@@ -383,6 +392,9 @@ function seedDateTrip(): TripRecord {
       fxRate: 0.235,
       fxAsOf: '2026-08-18',
       budgetPerPersonThb: 40_000,
+      color: 'blue',
+      // Opened by someone who only knew who was coming (D-9).
+      startedWith: ['friends'],
     },
     role: 'owner',
     members,
@@ -391,6 +403,7 @@ function seedDateTrip(): TripRecord {
     months: ['2026-12-01', '2027-01-01'],
     locked: null,
     destinationId: null,
+    stepOverrides: {},
     // No dates yet means no tickets yet — this is the date-board trip.
     flights: [],
     wishlist: [],
@@ -458,6 +471,8 @@ function seedPublicTrip(input: {
     nights: input.nights,
     budgetPerPersonThb: input.budgetPerPersonThb,
     status: 'done',
+    color: colorFromId(input.id),
+    startedWith: [],
   };
   // The itinerary is trimmed to the length the frame claims — a 4-day trip
   // whose plan runs 8 days is the kind of detail a UAT tester spots first.
@@ -474,6 +489,7 @@ function seedPublicTrip(input: {
       role: 'owner',
       characterId: input.creator.characterId,
       hasWishlist: true,
+      hasDates: true,
     },
   ];
   // Someone else's room: their money and their chatter never ship with a seed.
@@ -534,7 +550,7 @@ function seedPublicTrips(): TripRecord[] {
       budgetPerPersonThb: 42_000,
       viewCount: 1284,
       cloneCount: 96,
-      creator: { name: 'มิ้นท์', handle: 'mint.travels', characterId: 'cat' },
+      creator: { name: 'มิ้นท์', handle: 'mint.travels', characterId: 'flower-02' },
     }),
     seedPublicTrip({
       id: 'pub-osaka',
@@ -547,7 +563,7 @@ function seedPublicTrips(): TripRecord[] {
       budgetPerPersonThb: 33_000,
       viewCount: 872,
       cloneCount: 41,
-      creator: { name: 'ภูมิ', handle: 'phum.eats', characterId: 'bear' },
+      creator: { name: 'ภูมิ', handle: 'phum.eats', characterId: 'flower-04' },
     }),
     seedPublicTrip({
       id: 'pub-korea',
@@ -560,7 +576,7 @@ function seedPublicTrips(): TripRecord[] {
       budgetPerPersonThb: 24_000,
       viewCount: 655,
       cloneCount: 28,
-      creator: { name: 'พลอย', handle: 'ploy.wander', characterId: 'rabbit' },
+      creator: { name: 'พลอย', handle: 'ploy.wander', characterId: 'flower-05' },
     }),
     seedPublicTrip({
       id: 'pub-vietnam',
@@ -573,7 +589,7 @@ function seedPublicTrips(): TripRecord[] {
       budgetPerPersonThb: 16_500,
       viewCount: 431,
       cloneCount: 19,
-      creator: { name: 'เจได', handle: 'jedi.slowtrip', characterId: 'koala' },
+      creator: { name: 'เจได', handle: 'jedi.slowtrip', characterId: 'flower-12' },
     }),
     seedPublicTrip({
       id: 'pub-taiwan',
@@ -586,7 +602,7 @@ function seedPublicTrips(): TripRecord[] {
       budgetPerPersonThb: 19_000,
       viewCount: 298,
       cloneCount: 12,
-      creator: { name: 'ฟ้า', handle: 'fah.solo', characterId: 'penguin' },
+      creator: { name: 'ฟ้า', handle: 'fah.solo', characterId: 'flower-07' },
     }),
     seedPublicTrip({
       id: 'pub-iceland',
@@ -599,7 +615,7 @@ function seedPublicTrips(): TripRecord[] {
       budgetPerPersonThb: 98_000,
       viewCount: 214,
       cloneCount: 7,
-      creator: { name: 'กัน', handle: 'gun.roadtrip', characterId: 'deer' },
+      creator: { name: 'กัน', handle: 'gun.roadtrip', characterId: 'flower-09' },
     }),
     seedPublicTrip({
       id: 'pub-portugal',
@@ -612,7 +628,7 @@ function seedPublicTrips(): TripRecord[] {
       budgetPerPersonThb: 71_000,
       viewCount: 156,
       cloneCount: 5,
-      creator: { name: 'ปูน', handle: 'poon.rail', characterId: 'owl' },
+      creator: { name: 'ปูน', handle: 'poon.rail', characterId: 'flower-08' },
     }),
   ];
 }

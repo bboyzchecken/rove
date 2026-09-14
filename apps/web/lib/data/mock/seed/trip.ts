@@ -24,13 +24,17 @@ export const TRIP: Trip = {
   fxRate: 0.235,
   fxAsOf: '2026-08-18',
   budgetPerPersonThb: 45_000,
+  // Feedback #2: the trip's own colour (D-3) and what the group started with
+  // (D-9) — the demo group booked tickets before they opened the room.
+  color: 'yellow',
+  startedWith: ['dates', 'flights'],
 };
 
 export const MEMBERS: Member[] = [
-  { id: 'm1', name: 'ตอง', role: 'owner', characterId: 'shiba', hasWishlist: true },
-  { id: 'm2', name: 'มายด์', role: 'editor', characterId: 'cat', hasWishlist: true },
-  { id: 'm3', name: 'ปอนด์', role: 'editor', characterId: 'capybara', hasWishlist: true },
-  { id: 'm4', name: 'จูน', role: 'editor', characterId: 'penguin', hasWishlist: false },
+  { id: 'm1', name: 'ตอง', role: 'owner', characterId: 'flower-01', hasWishlist: true, hasDates: true },
+  { id: 'm2', name: 'มายด์', role: 'editor', characterId: 'flower-02', hasWishlist: true, hasDates: true },
+  { id: 'm3', name: 'ปอนด์', role: 'editor', characterId: 'flower-11', hasWishlist: true, hasDates: true },
+  { id: 'm4', name: 'จูน', role: 'editor', characterId: 'flower-07', hasWishlist: false, hasDates: true },
 ];
 
 export const ME = MEMBERS[0]!;

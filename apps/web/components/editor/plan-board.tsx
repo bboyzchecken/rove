@@ -61,6 +61,7 @@ import type { ItemType, Member, PlanItem } from '@/lib/data';
 import { formatMoney } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
+import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 /**
  * Itinerary editor (M5 — W5.1 timeline, W5.4 drag reorder, W5.5 delete,
  * W5.6 map view) with the AI rationale panel (W4.2) alongside it.
@@ -534,7 +535,7 @@ function SortableTimelineCard({
             {item.forMembers.map((id) => (
               <CharacterAvatar
                 key={id}
-                characterId={members.find((m) => m.id === id)?.characterId ?? 'shiba'}
+                characterId={members.find((m) => m.id === id)?.characterId ?? DEFAULT_CHARACTER_ID}
                 size="xs"
               />
             ))}

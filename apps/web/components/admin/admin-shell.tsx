@@ -18,6 +18,7 @@ import { useMe } from '@/features/auth/queries';
 import { useProviderMode } from '@/features/meta/queries';
 import { cn } from '@/lib/utils';
 
+import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 /**
  * The admin console's chrome (Phase 5 — W25.2).
  *
@@ -158,7 +159,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             <Link href="/home" className="text-muted hover:text-ink text-xs transition">
               กลับไปหน้าผู้ใช้
             </Link>
-            <CharacterAvatar characterId={me?.characterId ?? 'shiba'} size="sm" />
+            <CharacterAvatar characterId={me?.characterId ?? DEFAULT_CHARACTER_ID} size="sm" />
           </div>
         </header>
 

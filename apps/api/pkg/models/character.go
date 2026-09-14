@@ -7,9 +7,14 @@ import "context"
 // The id is the slug, not a UUID: it is seeded from data/characters.json, the
 // web app ships the same list as static assets, and both sides have to agree
 // on "shiba" without a lookup.
+// DefaultCharacterID is who someone is until they pick (§15). The first
+// flower, since Feedback #2 (D-4) — it stands where `shiba` stood.
+const DefaultCharacterID = "flower-01"
+
 type Character struct {
 	ID        string `gorm:"type:varchar(40);primaryKey" json:"id"`
 	NameTH    string `gorm:"type:varchar(80);not null" json:"name_th"`
+	NameEN    string `gorm:"type:varchar(80);not null;default:''" json:"name_en"`
 	ImageURL  string `gorm:"type:varchar(500);not null" json:"image_url"`
 	Accent    string `gorm:"type:varchar(20);not null;default:'primary'" json:"accent"`
 	SortOrder int    `gorm:"not null;default:0" json:"sort_order"`

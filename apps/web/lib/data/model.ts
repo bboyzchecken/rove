@@ -11,19 +11,34 @@
  * says so.
  */
 
+import type { FlowerSpec } from '@/lib/catalog/flowers';
+
 export type WishKind = 'must' | 'nice' | 'avoid';
 export type CoverageState = 'covered' | 'partial' | 'uncovered';
 export type ItemType = 'poi' | 'meal' | 'transport' | 'stay' | 'free' | 'flight';
 export type ExpenseScope = 'shared' | 'personal';
 export type TripStatus = 'planning' | 'ready' | 'ongoing' | 'done';
 
+/** One of the six brand pairs, by name (Feedback #2 — D-3). See lib/trip-color. */
+export type TripColor = 'blue' | 'pink' | 'yellow' | 'green' | 'orange' | 'purple';
+
+/**
+ * What a group already had when they opened the room (Feedback #2 — D-9).
+ * The trip page orders its steps around these.
+ */
+export type StartedWith = 'dates' | 'flights' | 'stay' | 'destination' | 'friends';
+
 export interface Character {
   id: string;
+  /** Thai name — kept from the animal each flower replaced (Feedback #2, D-4). */
   name: string;
-  /** 320×320 webp in /public/characters */
+  nameEn: string;
+  /** The static SVG in /public/characters, for anything that needs a URL. */
   image: string;
   /** Accent token the picker tints the tile with. */
   accent: 'primary' | 'green' | 'blue' | 'yellow' | 'pink';
+  /** What to draw — see lib/catalog/flowers. */
+  flower: FlowerSpec;
 }
 
 export interface Member {
@@ -33,6 +48,8 @@ export interface Member {
   characterId: string;
   /** false → the Overview nudges this person (W3.4). */
   hasWishlist: boolean;
+  /** Confirmed their free days on the date board (Feedback #2 — D-20). */
+  hasDates: boolean;
 }
 
 export interface WishlistItem {
@@ -191,6 +208,10 @@ export interface Trip {
   fxRate: number;
   fxAsOf: string;
   budgetPerPersonThb: number;
+  /** The trip's own colour, everywhere it appears (D-3). */
+  color: TripColor;
+  /** What the group ticked on the first screen (D-9). */
+  startedWith: StartedWith[];
   /**
    * The legs the trip is built on, when the caller loaded them (M1 — A1.3).
    * Absent on the list endpoints, which do not pay for the join.
@@ -243,6 +264,7 @@ export interface CalendarTrip {
   endDate: string;
   daysUntil: number;
   cover: string;
+  color: TripColor;
   memberIds: string[];
   /** Characters of those members, so a card can draw faces without a lookup. */
   characterIds?: string[];
@@ -260,6 +282,7 @@ export interface PastTrip {
   places: number;
   spentThb: number;
   cover: string;
+  color: TripColor;
   memberIds: string[];
   characterIds?: string[];
   /** Whether the recap is already public — the publish nudge reads this. */

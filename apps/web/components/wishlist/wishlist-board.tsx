@@ -16,6 +16,7 @@ import { useAddWish, useRemoveWish, useWishlist } from '@/features/wishlist/quer
 import type { CoverageState, WishKind } from '@/lib/data';
 import { cn } from '@/lib/utils';
 
+import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 /**
  * Wishlist editor + Coverage Board in one surface (M3 — W3.2, W3.3).
  *
@@ -103,7 +104,7 @@ export function WishlistBoard({ tripId }: { tripId: string }) {
           return (
             <Card key={item.id} className="p-3.5">
               <div className="flex items-start gap-3">
-                <CharacterAvatar characterId={member?.characterId ?? 'shiba'} size="sm" />
+                <CharacterAvatar characterId={member?.characterId ?? DEFAULT_CHARACTER_ID} size="sm" />
 
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">

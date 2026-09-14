@@ -1,141 +1,161 @@
 [
   {
-    "id": "shiba",
+    "id": "flower-01",
     "name_th": "ชิบะ",
-    "image_url": "/characters/char-01-shiba.webp",
+    "name_en": "Shiba",
+    "image_url": "/characters/flower-01.svg",
     "accent": "pink",
     "sort_order": 1
   },
   {
-    "id": "cat",
+    "id": "flower-02",
     "name_th": "แมวส้ม",
-    "image_url": "/characters/char-02-cat.webp",
+    "name_en": "Orange cat",
+    "image_url": "/characters/flower-02.svg",
     "accent": "yellow",
     "sort_order": 2
   },
   {
-    "id": "red-panda",
+    "id": "flower-03",
     "name_th": "เรดแพนด้า",
-    "image_url": "/characters/char-03-red-panda.webp",
+    "name_en": "Red panda",
+    "image_url": "/characters/flower-03.svg",
     "accent": "pink",
     "sort_order": 3
   },
   {
-    "id": "bear",
+    "id": "flower-04",
     "name_th": "หมีน้อย",
-    "image_url": "/characters/char-04-bear.webp",
+    "name_en": "Little bear",
+    "image_url": "/characters/flower-04.svg",
     "accent": "yellow",
     "sort_order": 4
   },
   {
-    "id": "rabbit",
+    "id": "flower-05",
     "name_th": "กระต่าย",
-    "image_url": "/characters/char-05-rabbit.webp",
-    "accent": "pink",
+    "name_en": "Rabbit",
+    "image_url": "/characters/flower-05.svg",
+    "accent": "blue",
     "sort_order": 5
   },
   {
-    "id": "fox",
+    "id": "flower-06",
     "name_th": "จิ้งจอก",
-    "image_url": "/characters/char-06-fox.webp",
+    "name_en": "Fox",
+    "image_url": "/characters/flower-06.svg",
     "accent": "yellow",
     "sort_order": 6
   },
   {
-    "id": "penguin",
+    "id": "flower-07",
     "name_th": "เพนกวิน",
-    "image_url": "/characters/char-07-penguin.webp",
+    "name_en": "Penguin",
+    "image_url": "/characters/flower-07.svg",
     "accent": "blue",
     "sort_order": 7
   },
   {
-    "id": "owl",
+    "id": "flower-08",
     "name_th": "นกฮูก",
-    "image_url": "/characters/char-08-owl.webp",
-    "accent": "yellow",
+    "name_en": "Owl",
+    "image_url": "/characters/flower-08.svg",
+    "accent": "primary",
     "sort_order": 8
   },
   {
-    "id": "deer",
+    "id": "flower-09",
     "name_th": "กวางน้อย",
-    "image_url": "/characters/char-09-deer.webp",
-    "accent": "blue",
+    "name_en": "Fawn",
+    "image_url": "/characters/flower-09.svg",
+    "accent": "green",
     "sort_order": 9
   },
   {
-    "id": "hedgehog",
+    "id": "flower-10",
     "name_th": "เม่นแคระ",
-    "image_url": "/characters/char-10-hedgehog.webp",
-    "accent": "pink",
+    "name_en": "Hedgehog",
+    "image_url": "/characters/flower-10.svg",
+    "accent": "primary",
     "sort_order": 10
   },
   {
-    "id": "capybara",
+    "id": "flower-11",
     "name_th": "คาปิบารา",
-    "image_url": "/characters/char-11-capybara.webp",
+    "name_en": "Capybara",
+    "image_url": "/characters/flower-11.svg",
     "accent": "green",
     "sort_order": 11
   },
   {
-    "id": "koala",
+    "id": "flower-12",
     "name_th": "โคอาลา",
-    "image_url": "/characters/char-12-koala.webp",
+    "name_en": "Koala",
+    "image_url": "/characters/flower-12.svg",
     "accent": "blue",
     "sort_order": 12
   },
   {
-    "id": "panda",
+    "id": "flower-13",
     "name_th": "แพนด้า",
-    "image_url": "/characters/char-13-panda.webp",
-    "accent": "green",
+    "name_en": "Panda",
+    "image_url": "/characters/flower-13.svg",
+    "accent": "yellow",
     "sort_order": 13
   },
   {
-    "id": "tiger",
+    "id": "flower-14",
     "name_th": "เสือน้อย",
-    "image_url": "/characters/char-14-tiger.webp",
+    "name_en": "Tiger cub",
+    "image_url": "/characters/flower-14.svg",
     "accent": "yellow",
     "sort_order": 14
   },
   {
-    "id": "otter",
+    "id": "flower-15",
     "name_th": "นาก",
-    "image_url": "/characters/char-15-otter.webp",
-    "accent": "blue",
+    "name_en": "Otter",
+    "image_url": "/characters/flower-15.svg",
+    "accent": "primary",
     "sort_order": 15
   },
   {
-    "id": "whale",
+    "id": "flower-16",
     "name_th": "วาฬ",
-    "image_url": "/characters/char-16-whale.webp",
+    "name_en": "Whale",
+    "image_url": "/characters/flower-16.svg",
     "accent": "blue",
     "sort_order": 16
   },
   {
-    "id": "frog",
+    "id": "flower-17",
     "name_th": "กบ",
-    "image_url": "/characters/char-17-frog.webp",
+    "name_en": "Frog",
+    "image_url": "/characters/flower-17.svg",
     "accent": "green",
     "sort_order": 17
   },
   {
-    "id": "sheep",
+    "id": "flower-18",
     "name_th": "แกะ",
-    "image_url": "/characters/char-18-sheep.webp",
+    "name_en": "Sheep",
+    "image_url": "/characters/flower-18.svg",
     "accent": "pink",
     "sort_order": 18
   },
   {
-    "id": "raccoon",
+    "id": "flower-19",
     "name_th": "แรคคูน",
-    "image_url": "/characters/char-19-raccoon.webp",
-    "accent": "green",
+    "name_en": "Raccoon",
+    "image_url": "/characters/flower-19.svg",
+    "accent": "primary",
     "sort_order": 19
   },
   {
-    "id": "turtle",
+    "id": "flower-20",
     "name_th": "เต่า",
-    "image_url": "/characters/char-20-turtle.webp",
+    "name_en": "Turtle",
+    "image_url": "/characters/flower-20.svg",
     "accent": "green",
     "sort_order": 20
   }

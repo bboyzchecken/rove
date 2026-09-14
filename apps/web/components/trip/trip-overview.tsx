@@ -21,6 +21,7 @@ import { useTripOverview } from '@/features/trip/queries';
 import { thaiRangeLabel, toIsoDate } from '@/lib/data/domain';
 import { formatMoney } from '@/lib/format';
 
+import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 /**
  * Trip overview (M2 — W2.2) with the onboarding checklist from W1.5.
  *
@@ -324,7 +325,7 @@ export function TripOverview({ tripId }: { tripId: string }) {
               const who = members.find((m) => m.id === entry.memberId);
               return (
                 <div key={entry.id} className="flex items-center gap-3 p-3.5">
-                  <CharacterAvatar characterId={who?.characterId ?? 'shiba'} size="sm" />
+                  <CharacterAvatar characterId={who?.characterId ?? DEFAULT_CHARACTER_ID} size="sm" />
                   <p className="text-ink min-w-0 flex-1 text-sm">
                     <span className="font-medium">{who?.name ?? 'ROVE'}</span>{' '}
                     <span className="text-muted">{entry.text}</span>

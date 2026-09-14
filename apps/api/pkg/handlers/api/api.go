@@ -66,6 +66,7 @@ type ServerParams struct {
 	Earnings      models.EarningStore
 	Payouts       models.PayoutStore
 	Leads         models.LeadStore
+	Steps         models.TripStepStore
 
 	Hub       events.Hub
 	FX        fxsvc.Service
@@ -113,6 +114,7 @@ type Server struct {
 	earnings      models.EarningStore
 	payouts       models.PayoutStore
 	leads         models.LeadStore
+	steps         models.TripStepStore
 
 	hub       events.Hub
 	fx        fxsvc.Service
@@ -167,6 +169,7 @@ func NewServer(p ServerParams) *Server {
 		earnings:      p.Earnings,
 		payouts:       p.Payouts,
 		leads:         p.Leads,
+		steps:         p.Steps,
 		hub:           p.Hub,
 		fx:            p.FX,
 		airports:      p.Airports,
@@ -262,6 +265,7 @@ func (s *Server) registerRoutes() {
 	// Every route below carries :tripId and is guarded by TripRoleMiddleware.
 	trips := v1.Group("/trips", s.JwtMiddleware)
 	s.registerTripRoutes(trips)          // A1.1 / A2.1
+	s.registerProgressRoutes(trips)      // Feedback #2 — step overrides
 	s.registerFlightRoutes(trips)        // A1.3 — the route the trip is built on
 	s.registerMemberRoutes(trips)        // A2.2 / A2.3
 	s.registerDateRoutes(trips)          // A2.6 — date coordination

@@ -71,7 +71,7 @@ export const CURRENT_USER = {
   id: 'm1',
   name: 'ตอง',
   handle: '@tong',
-  characterId: 'shiba',
+  characterId: 'flower-01',
   /** Earned from published trips, referrals and bookings — see POINTS_LEDGER. */
   points: POINTS_BALANCE,
   memberSince: '2568',
@@ -97,6 +97,7 @@ export const UPCOMING: CalendarTrip[] = [
     endDate: '2026-11-22',
     daysUntil: 88,
     cover: '/brand/covers/cover-japan.webp',
+    color: 'yellow',
     memberIds: ['m1', 'm2', 'm3', 'm4'],
     weather: { icon: '🍁', high: 18, low: 10, text: 'ช่วงใบไม้แดงพอดี' },
   },
@@ -108,6 +109,7 @@ export const UPCOMING: CalendarTrip[] = [
     endDate: '2027-01-05',
     daysUntil: 132,
     cover: '/brand/covers/cover-iceland.webp',
+    color: 'purple',
     memberIds: ['m1', 'm2'],
     weather: { icon: '🌌', high: -2, low: -8, text: 'ฟ้าใส 3 คืนติด' },
   },
@@ -124,6 +126,7 @@ export const PAST_TRIPS: PastTrip[] = [
     places: 21,
     spentThb: 32_800,
     cover: '/brand/covers/cover-korea.webp',
+    color: 'pink',
     memberIds: ['m1', 'm2', 'm3'],
     visibility: 'public',
     publicSlug: 'seoul-with-friends-2569',
@@ -138,6 +141,7 @@ export const PAST_TRIPS: PastTrip[] = [
     places: 15,
     spentThb: 18_600,
     cover: '/brand/covers/cover-vietnam.webp',
+    color: 'green',
     memberIds: ['m1', 'm4'],
   },
   {
@@ -150,6 +154,7 @@ export const PAST_TRIPS: PastTrip[] = [
     places: 11,
     spentThb: 6_400,
     cover: '/brand/covers/cover-thailand.webp',
+    color: 'orange',
     memberIds: ['m1', 'm2', 'm3', 'm4'],
   },
 ];

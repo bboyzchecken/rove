@@ -23,6 +23,8 @@ export interface TripDto {
   fx_rate_at: string | null;
   budget_per_person_thb: number;
   visibility: 'private' | 'link' | 'public';
+  color: string;
+  started_with: string[] | null;
   /** Present on the endpoints that load the route: get, create and overview. */
   route?: RouteDto;
   role?: 'owner' | 'editor' | 'viewer';
@@ -95,6 +97,7 @@ export interface MemberDto {
   role: 'owner' | 'editor' | 'viewer';
   character_id: string;
   has_wishlist: boolean;
+  has_dates?: boolean;
 }
 
 /* ------------------------------------------------------ community (M9) --- */
@@ -770,8 +773,15 @@ export interface TripOverviewDto {
     members_without_wishlist: number;
     bookings: number;
     open_prep: number;
+    prep_tasks?: number;
+    documents?: number;
+    expenses?: number;
+    photos?: number;
+    members_submitted_dates?: number;
   };
   locked: LockedDatesDto | null;
+  step_overrides?: Record<string, string> | null;
+  submitted_dates_member_ids?: string[] | null;
 }
 
 export interface CalendarTripDto {
@@ -782,6 +792,7 @@ export interface CalendarTripDto {
   end_date: string;
   days_until: number;
   cover_image_url: string;
+  color: string;
   member_ids: string[];
   member_character_ids: string[] | null;
   weather_icon: string | null;
@@ -800,6 +811,7 @@ export interface PastTripDto {
   places: number;
   spent_thb: number;
   cover_image_url: string;
+  color: string;
   member_ids: string[];
   member_character_ids: string[] | null;
   visibility: 'private' | 'link' | 'public';

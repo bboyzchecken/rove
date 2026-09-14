@@ -115,6 +115,20 @@ func (s *store) TitlesByIDs(ctx context.Context, ids []string) (map[string]strin
 	return out, nil
 }
 
+func (s *store) LatestOwnedColor(ctx context.Context, userID string) (string, error) {
+	var colors []string
+	err := s.db.WithContext(ctx).
+		Model(&models.Trip{}).
+		Where("owner_id = ?", userID).
+		Order("created_at DESC").
+		Limit(1).
+		Pluck("color", &colors).Error
+	if err != nil || len(colors) == 0 {
+		return "", err
+	}
+	return colors[0], nil
+}
+
 /* ---------------------------------------------- platform totals (A24.1) -- */
 
 func (s *store) CountPlanners(ctx context.Context) (int64, error) {

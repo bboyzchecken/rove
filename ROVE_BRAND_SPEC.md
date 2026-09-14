@@ -14,7 +14,9 @@ This document is the single source of truth for the website rewrite and all gene
 
 **White page, pastel rooms.**
 
-The product is a set of feature areas, each with its own color identity. A user should know which part of ROVE they're in from a glance at the color, before reading anything. That is the whole idea, and it is what fixes the "ไม่ get ทันที" problem from UAT — recognition comes from consistent color-to-feature mapping, not from a single memorable brand hue.
+The product is a set of feature areas, each with its own color identity. A user should know which part of ROVE they're in from a glance at the color, before reading anything. That was the whole idea in v3.
+
+> **v3.1:** it did not survive UAT round 1. The colour-to-feature mapping is withdrawn in §2.5; recognition now comes from the *trip's* own colour (§2.7) and from colours that tell things apart on a screen. The palette, the black actions and the white page are unchanged.
 
 Black does the work. Every primary action is a black pill. Color never competes with the CTA.
 
@@ -70,14 +72,27 @@ Contrast was measured for all twelve colors:
 
 This is also why checkmarks and icons sitting on solid accent circles are **black**, not white.
 
-### 2.5 One feature color per screen
+### 2.5 Colour tells things apart
 
-A screen belongs to one feature and shows one color pair. Mixing pastels on a single screen destroys the mapping and returns to the "generic playful" look UAT rejected.
+> **v3.1 — 14 ก.ย. 2569, Feedback #2 (D-2).** The v3 rule *"one feature colour per screen"* is withdrawn. UAT round 1 asked for the opposite on every screen it touched — a colour per trip (หน้า 8), a colour per card (หน้า 10, 18), a colour per status (หน้า 19) — and none of that is possible while a hue is reserved for a feature. Colour is now a way to **tell things apart, and to be pleasant**; it is no longer a map of the product.
 
-Exceptions — the only places multiple feature colors may appear together:
-- The home / trip dashboard, where each feature is a separate entry card
-- A legend or settings screen listing all features
-- The doodle overlay on the marketing hero
+What still holds:
+
+- The palette is the six pairs in §2.2 and nothing else. No seventh hue, no tints outside the pairs.
+- Light for large areas, solid for small accents — §2.3, unchanged.
+- **Black text on every colour** — §2.4, unchanged, and now the rule doing the most work: it is what keeps six colours on one screen legible.
+- White stays the page. Colour sits on it in blocks; it never becomes the ground.
+- At most **six** distinct feature colours on one screen. The pairs are the budget, and six is where a screen stops reading as arranged and starts reading as bunting.
+
+What changed:
+
+- A screen may mix pairs freely. Four stat cards may wear four colours; a status may wear one; a trip keeps **one colour everywhere it appears** — list row, calendar bar, room header (§2.7).
+- `data-feature` / `bg-feature` stay in the code as a *default* — the base colour a room falls back to when nothing more specific has claimed one — not as a constraint. A component that names a hue on purpose is no longer a bug.
+- The three "exceptions" v3 listed here (the dashboard, a legend, the marketing hero) are gone with the rule they excepted from.
+
+### 2.7 Trip colour
+
+Every trip carries one colour, picked at random from the six pairs when it is created and changeable by the trip owner from the trip settings. The light half is the trip's row, bar and banner fill; the solid half is its dot and its countdown accent. The same pair follows the trip to every surface — ทริปที่กำลังจะถึง, the year calendar, the room header — so a person recognises *their trip* by colour before reading its name. This is the recognition v3 was after, attached to the thing a user actually cares about rather than to a feature.
 
 ### 2.6 Warning-state conflict
 
@@ -325,7 +340,7 @@ Generate in **black on white**, never in a brand color. Color is applied in code
 | Black primary CTA | Feature-colored primary buttons |
 | Light colors for large areas | Solid colors for large areas |
 | Solid colors for small accents | Solid colors as section backgrounds |
-| One feature color per screen | Pastel rainbow on one screen |
+| Up to six brand colours per screen, each telling something apart (§2.5 v3.1) | A hue outside the six pairs |
 | Heavy rounding, flat fills | Any shadow, glow, or blur |
 | Black checkmarks on solid circles | White checkmarks |
 | Line-only doodles | Filled doodle shapes |
@@ -341,7 +356,7 @@ Generate in **black on white**, never in a brand color. Color is applied in code
 - [ ] Set page background to `#FFFFFF` everywhere; remove `#FFFCF1` cream
 - [ ] Convert every primary button to black `#000000` with white text
 - [ ] Convert every secondary button to `#F7F7F7` with black text
-- [ ] Map each feature area to its color pair per §2.2 and audit that no screen mixes pairs
+- [x] ~~Map each feature area to its color pair per §2.2 and audit that no screen mixes pairs~~ — withdrawn in v3.1 (§2.5)
 - [ ] Confirm no white text anywhere except on black
 - [ ] Confirm no solid accent color fills an area larger than ~48px
 - [ ] Strip every `box-shadow` from the codebase
