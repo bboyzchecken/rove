@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -25,6 +26,9 @@ func (s *Server) registerPublicRoutes(g *echo.Group) {
 	// Explore is public, but ?match= compares against a trip the caller owns —
 	// optional auth rather than a second endpoint (A11.3).
 	g.GET("/public/explore", s.handleExplore, s.OptionalJwt)
+	// Which countries have public plans, and how many (Feedback #2 — D-18):
+	// the filter sheet lists them most-first, the way a booking site does.
+	g.GET("/public/countries", s.handlePublicCountries)
 	g.GET("/public/creators/:handle", s.handleCreatorProfile)
 	// Cloning needs an account to own the copy — the one public action that
 	// asks you to sign in first (A11.1).
@@ -54,8 +58,8 @@ type publicTripDTO struct {
 	// How it actually went, from the people who went (A11.5). The expense
 	// ledger stays out of every public payload; this is the one figure the
 	// travellers themselves chose to publish.
-	Reviews      reviewSummaryDTO `json:"reviews"`
-	ReviewEntries []reviewDTO     `json:"review_entries"`
+	Reviews       reviewSummaryDTO `json:"reviews"`
+	ReviewEntries []reviewDTO      `json:"review_entries"`
 }
 
 func (s *Server) publicCreatorOf(ctx contextT, ownerID string) publicCreatorDTO {
@@ -132,8 +136,10 @@ func (s *Server) handlePublicTrip(c echo.Context) error {
 	roster, _ := s.loadMembers(ctx, trip.ID)
 
 	// Counted after the payload is assembled: a failed render should not
-	// inflate the number.
+	// inflate the number. The lifetime counter and today's row move together
+	// so "ยอดนิยม" and "ติดเทรนด์" cannot disagree about a view (D-18).
 	_ = s.trips.BumpViewCount(ctx, trip.ID)
+	_ = s.trips.BumpDailyView(ctx, trip.ID, time.Now().UTC())
 
 	reviews, _ := s.reviews.ListByTrip(ctx, trip.ID)
 
@@ -230,11 +236,20 @@ func (s *Server) handleExplore(c echo.Context) error {
 	}
 
 	filter := models.ExploreFilter{
-		Query:   c.QueryParam("q"),
-		Country: c.QueryParam("country"),
-		Sort:    c.QueryParam("sort"),
-		Limit:   limit,
-		Offset:  offset,
+		Query:     c.QueryParam("q"),
+		Country:   c.QueryParam("country"),
+		Countries: splitCountries(c.QueryParam("countries")),
+		Sort:      c.QueryParam("sort"),
+		Limit:     limit,
+		Offset:    offset,
+	}
+
+	// "ติดเทรนด์" needs a week of daily views behind it; before there are any,
+	// it answers as "ยอดนิยม" rather than as an empty page (fix-list §9).
+	if filter.Sort == models.ExploreSortTrending {
+		if has, err := s.trips.HasViewsSince(ctx, time.Now().UTC().AddDate(0, 0, -14)); err != nil || !has {
+			filter.Sort = models.ExploreSortPopular
+		}
 	}
 
 	if matchTripID := c.QueryParam("match"); matchTripID != "" {
@@ -258,6 +273,33 @@ func (s *Server) handleExplore(c echo.Context) error {
 		"items": s.withReviews(ctx, items, ids),
 		"total": total,
 	})
+}
+
+// splitCountries reads "JP,KR" into upper-case two-letter codes, dropping
+// anything that is not one.
+func splitCountries(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	out := make([]string, 0, 4)
+	for _, part := range strings.Split(raw, ",") {
+		code := strings.ToUpper(strings.TrimSpace(part))
+		if len(code) == 2 {
+			out = append(out, code)
+		}
+	}
+	return out
+}
+
+func (s *Server) handlePublicCountries(c echo.Context) error {
+	rows, err := s.trips.PublicCountryCounts(c.Request().Context())
+	if err != nil {
+		return request.Internal(c, "โหลดรายชื่อประเทศไม่สำเร็จ")
+	}
+	if rows == nil {
+		rows = []models.CountryCount{}
+	}
+	return c.JSON(http.StatusOK, rows)
 }
 
 /* ----------------------------------------------------------- match (A11.3) -- */

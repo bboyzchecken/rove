@@ -726,6 +726,10 @@ func (s *Server) handleSetVisibility(c echo.Context) error {
 		if req.Visibility == models.VisibilityPublic && trip.Slug == nil {
 			slug := str.Slugify(trip.Title) + "-" + str.RandomToken(6)
 			trip.Slug = &slug
+			// "มาใหม่" is ordered by this (D-18) — set once, on first publish.
+			if trip.PublishedAt == nil {
+				trip.PublishedAt = ptrTime(time.Now().UTC())
+			}
 
 			// First publish is worth points (§6.5).
 			_ = s.points.Add(ctx, &models.UserPoints{

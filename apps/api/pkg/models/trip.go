@@ -59,6 +59,11 @@ type Trip struct {
 	// Which suggestion the group picked, if they came through the date board.
 	DestinationID string `gorm:"type:varchar(40)" json:"destination_id"`
 
+	// When the owner first made it public (Feedback #2 — D-18): "มาใหม่" on
+	// explore is ordered by this, not by updated_at, so a plan edited last
+	// night does not jump to the top of "new".
+	PublishedAt *time.Time `json:"published_at"`
+
 	// The trip's own colour (Feedback #2 — D-3, brand spec §2.7): one of
 	// domain.TripColors by name, picked at random on create and changed only by
 	// the owner. Empty on rows older than the column; readers fall back to
@@ -120,10 +125,40 @@ type ExploreFilter struct {
 	// Free text against title and cities.
 	Query   string
 	Country string
-	// "popular" (views + clones) or "new" (latest published first).
+	// Several at once (Feedback #2 — D-18): the filter sheet lets a person
+	// tick Japan and Korea together. Empty means every country.
+	Countries []string
+	// "popular" (views + clones), "new" (latest published first) or
+	// "trending" (views in the last seven days against the seven before).
 	Sort   string
 	Limit  int
 	Offset int
+}
+
+// Sort names the feed accepts. Anything else is popular.
+const (
+	ExploreSortPopular  = "popular"
+	ExploreSortNew      = "new"
+	ExploreSortTrending = "trending"
+)
+
+// TripViewDaily is one day's views of one trip (Feedback #2 — D-18). The
+// lifetime counter on the trip stays; this is the series "ติดเทรนด์" reads,
+// and it is bumped in the same place. Rows older than a month are useless and
+// may be pruned.
+type TripViewDaily struct {
+	TripID string    `gorm:"type:char(36);primaryKey" json:"trip_id"`
+	Day    time.Time `gorm:"type:date;primaryKey" json:"day"`
+	Views  int       `gorm:"not null;default:0" json:"views"`
+}
+
+func (TripViewDaily) TableName() string { return "trip_view_daily" }
+
+// CountryCount is one row of the explore filter sheet: a country and how many
+// public plans go there.
+type CountryCount struct {
+	Code  string `json:"code"`
+	Count int64  `json:"count"`
 }
 
 type TripStore interface {
@@ -139,6 +174,14 @@ type TripStore interface {
 	// shared link at once must not lose a view.
 	BumpViewCount(ctx context.Context, tripID string) error
 	BumpCloneCount(ctx context.Context, tripID string) error
+	// BumpDailyView adds one to today's row for the trending feed (D-18).
+	BumpDailyView(ctx context.Context, tripID string, day time.Time) error
+	// HasViewsSince says whether the daily series has anything in it yet — the
+	// trending chip falls back to popular until it does (fix-list §9).
+	HasViewsSince(ctx context.Context, since time.Time) (bool, error)
+	// PublicCountryCounts feeds the country filter: every country with at least
+	// one public plan, most first.
+	PublicCountryCounts(ctx context.Context) ([]CountryCount, error)
 	Count(ctx context.Context) (int64, error)
 	// ActiveOwnedIDs lists the trips this user owns that are not finished. It
 	// answers the free tier's "one trip at a time" rule (M26 — A26.3), and

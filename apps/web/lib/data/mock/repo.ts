@@ -2241,13 +2241,11 @@ export const mockRepo: RoveRepo = {
       let records = [...db.publicTrips, ...db.trips.filter((t) => t.share.visibility === 'public')];
 
       if (filters.country) {
-        // Seeded records carry no country code; match on the cities instead.
-        const q = filters.country.toLowerCase();
-        records = records.filter(
-          (r) =>
-            r.trip.cities.some((c) => c.toLowerCase().includes(q)) ||
-            r.trip.title.toLowerCase().includes(q),
-        );
+        records = records.filter((r) => r.trip.country === filters.country);
+      }
+      if (filters.countries && filters.countries.length > 0) {
+        const wanted = new Set(filters.countries.map((c) => c.toUpperCase()));
+        records = records.filter((r) => wanted.has(r.trip.country.toUpperCase()));
       }
       if (filters.q) {
         const q = filters.q.toLowerCase();
@@ -2288,18 +2286,40 @@ export const mockRepo: RoveRepo = {
         });
       }
 
+      // Mock mode has no daily view series, so "ติดเทรนด์" answers as
+      // "ยอดนิยม" — the same fallback the API makes before a week of data
+      // exists (fix-list §9). Popular by clones-first, so the two chips at
+      // least read differently on the seeded catalogue.
       records.sort((a, b) =>
         filters.sort === 'new'
           ? b.trip.startDate.localeCompare(a.trip.startDate)
-          : b.share.viewCount +
-            b.share.cloneCount * 5 -
-            (a.share.viewCount + a.share.cloneCount * 5),
+          : filters.sort === 'trending'
+            ? b.share.cloneCount - a.share.cloneCount ||
+              b.share.viewCount - a.share.viewCount
+            : b.share.viewCount +
+              b.share.cloneCount * 5 -
+              (a.share.viewCount + a.share.cloneCount * 5),
       );
 
       return delay({
         items: records.slice(offset, offset + limit).map((r) => exploreOf(db, r)),
         total: records.length,
       });
+    },
+
+    async exploreCountries() {
+      const db = loadDb();
+      const counts = new Map<string, number>();
+      for (const record of [...db.publicTrips, ...db.trips.filter((t) => t.share.visibility === 'public')]) {
+        const code = record.trip.country.toUpperCase();
+        if (code) counts.set(code, (counts.get(code) ?? 0) + 1);
+      }
+      return delay(
+        [...counts.entries()]
+          .map(([code, count]) => ({ code, count }))
+          .sort((a, b) => b.count - a.count || a.code.localeCompare(b.code)),
+        80,
+      );
     },
 
     async creator(handle) {

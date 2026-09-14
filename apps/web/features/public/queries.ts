@@ -18,6 +18,15 @@ export function useExplore(filters: ExploreFilters) {
   });
 }
 
+/** Countries with public plans, for the filter sheet (Feedback #2 — D-18). */
+export function useExploreCountries() {
+  return useQuery({
+    queryKey: queryKeys.exploreCountries(),
+    queryFn: () => repo.share.exploreCountries(),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 /**
  * What the platform has to show for itself (M24 — A24.1 / A24.2).
  *

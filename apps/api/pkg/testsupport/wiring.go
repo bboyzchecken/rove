@@ -71,12 +71,12 @@ var allModels = []any{
 	&models.PlanVariant{}, &models.TripPhoto{}, &models.TripDocument{},
 	&models.Notification{}, &models.Poll{}, &models.TripReview{},
 	&models.DiscountCode{}, &models.CreatorEarning{}, &models.Payout{}, &models.AgentLead{},
-	&models.TripStepOverride{},
+	&models.TripStepOverride{}, &models.TripViewDaily{},
 }
 
 // allTables is the drop order — children before parents.
 var allTables = []string{
-	"trip_step_overrides",
+	"trip_step_overrides", "trip_view_daily",
 	"agent_leads", "payouts", "creator_earnings", "discount_codes",
 	"trip_reviews", "polls", "notifications", "trip_documents", "trip_photos",
 	"plan_variants", "member_profiles",

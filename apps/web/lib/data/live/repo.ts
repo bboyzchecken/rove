@@ -837,6 +837,7 @@ export const liveRepo: RoveRepo = {
         searchParams: {
           q: filters.q,
           country: filters.country,
+          countries: filters.countries?.length ? filters.countries.join(',') : undefined,
           sort: filters.sort,
           match: filters.match,
           limit: filters.limit != null ? String(filters.limit) : undefined,
@@ -844,6 +845,11 @@ export const liveRepo: RoveRepo = {
         },
       });
       return { items: (dto.items ?? []).map(toExploreTrip), total: dto.total };
+    },
+
+    async exploreCountries() {
+      const rows = await api.get<{ code: string; count: number }[]>('/public/countries');
+      return (rows ?? []).map((row) => ({ code: row.code, count: row.count }));
     },
 
     async creator(handle) {

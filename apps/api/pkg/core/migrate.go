@@ -320,6 +320,29 @@ func Migrate(db *gorm.DB) error {
 				return tx.Migrator().DropColumn(&models.DreamItem{}, "country")
 			},
 		},
+		{
+			// Feedback #2 — D-18: "ติดเทรนด์" needs views per day, and "มาใหม่"
+			// needs to know when a plan was published rather than last touched.
+			// Public rows that predate the column take their updated_at as the
+			// publish date — the best guess there is, and the order the feed
+			// used to show anyway.
+			ID: "202609140004_explore_trending",
+			Migrate: func(tx *gorm.DB) error {
+				if err := tx.AutoMigrate(&models.Trip{}, &models.TripViewDaily{}); err != nil {
+					return err
+				}
+				return tx.Exec(
+					"UPDATE trips SET published_at = updated_at WHERE visibility = ? AND published_at IS NULL",
+					models.VisibilityPublic,
+				).Error
+			},
+			Rollback: func(tx *gorm.DB) error {
+				if err := tx.Migrator().DropTable("trip_view_daily"); err != nil {
+					return err
+				}
+				return tx.Migrator().DropColumn(&models.Trip{}, "published_at")
+			},
+		},
 	})
 
 	return m.Migrate()

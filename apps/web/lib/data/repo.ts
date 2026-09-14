@@ -34,6 +34,7 @@ import type {
   DreamItem,
   ExpenseEntry,
   ExpenseSummary,
+  ExploreCountry,
   ExploreFilters,
   ExploreResult,
   ExportFormat,
@@ -363,6 +364,8 @@ export interface ShareRepo {
 
   /** The explore feed of published trips (A11.2). */
   explore(filters: ExploreFilters): Promise<ExploreResult>;
+  /** Countries with public plans, most first (Feedback #2 — D-18). */
+  exploreCountries(): Promise<ExploreCountry[]>;
   /** A creator's public page (W11.2); null when the handle matches nobody. */
   creator(handle: string): Promise<CreatorProfile | null>;
   /** Copies a published trip into MY account (A11.1). Requires sign-in. */

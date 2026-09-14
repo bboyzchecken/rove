@@ -674,10 +674,14 @@ export interface ExploreTrip {
   reviews: ReviewSummary;
 }
 
+export type ExploreSort = 'popular' | 'new' | 'trending';
+
 export interface ExploreFilters {
   q?: string;
   country?: string;
-  sort?: 'popular' | 'new';
+  /** Several at once (Feedback #2 — D-18). Empty means everywhere. */
+  countries?: string[];
+  sort?: ExploreSort;
   limit?: number;
   offset?: number;
   /**
@@ -743,6 +747,12 @@ export interface AdaptDiff {
 export interface ExploreResult {
   items: ExploreTrip[];
   total: number;
+}
+
+/** One row of the country filter: where public plans go, and how many. */
+export interface ExploreCountry {
+  code: string;
+  count: number;
 }
 
 /** The public creator page (W11.2). */
