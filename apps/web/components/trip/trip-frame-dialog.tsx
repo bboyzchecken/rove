@@ -9,7 +9,7 @@ import { Field, FieldLabel, Input, fieldClass } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
 import { useMe } from '@/features/auth/queries';
 import { useTripOverview, useUpdateTrip } from '@/features/trip/queries';
-import type { Trip, TripColor } from '@/lib/data';
+import type { Trip, TripColor, UpdateTripInput } from '@/lib/data';
 import { daysBetween } from '@/lib/data/domain';
 import { TRIP_COLORS, TRIP_COLOR_LABEL, tripColorClasses } from '@/lib/trip-color';
 import { cn } from '@/lib/utils';
@@ -48,7 +48,7 @@ export function TripFrameDialog({
   const hasRoute = (trip.route?.flights.length ?? 0) > 0;
 
   async function save() {
-    await update.mutateAsync({
+    const patch: UpdateTripInput = {
       title: title.trim() || trip.title,
       startDate: startDate || undefined,
       endDate: endDate || undefined,
@@ -58,8 +58,11 @@ export function TripFrameDialog({
         .split(',')
         .map((c) => c.trim())
         .filter(Boolean),
-      color: isOwner && color !== trip.color ? color : undefined,
-    });
+    };
+    if (isOwner && color !== trip.color) {
+      patch.color = color;
+    }
+    await update.mutateAsync(patch);
     onClose();
   }
 

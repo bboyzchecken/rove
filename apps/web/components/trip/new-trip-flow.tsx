@@ -338,7 +338,7 @@ export function NewTripFlow() {
                     <span
                       className={cn(
                         'flex size-11 shrink-0 items-center justify-center rounded-2xl',
-                        on ? 'bg-feature-solid text-ink' : 'bg-surface text-ink',
+                        on ? 'bg-feature-solid text-bg' : 'bg-surface text-ink',
                       )}
                     >
                       <option.icon className="size-5" strokeWidth={2.2} />

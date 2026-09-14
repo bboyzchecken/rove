@@ -130,12 +130,12 @@
   --brand-border: 0 0% 89.8%; /* #E5E5E5 */
 
   /* --- Form fields (§6 Inputs) --------------------------------------------
-   * §6 is explicit and it inverts v2: a field is `#F7F7F7` with NO border,
-   * and the focus ring is a 2px ink line. v2 made a field white-with-a-line
-   * so it would separate from the cream page; on a white page the same field
-   * would be invisible, so the fill and the page swap roles. */
-  --brand-field: var(--brand-gray);
-  --brand-field-border: 0 0% 89.8%;
+   * A field is white with a visible border, so it reads as an editable hole on
+   * both the white page and on a surface card. The gray fill of v2 looked
+   * disabled on a white page; white-with-a-line is the universal "type here"
+   * affordance, and the border darkens enough (~#D1D1D1) to separate clearly. */
+  --brand-field: var(--brand-white);
+  --brand-field-border: 0 0% 82%;
 
   /* --- Semantic -----------------------------------------------------------
    * §6's first rule: NEVER COLOUR A PRIMARY BUTTON WITH A FEATURE COLOUR.
