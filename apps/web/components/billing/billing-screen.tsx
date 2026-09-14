@@ -131,7 +131,7 @@ export function BillingScreen() {
               title="ยังไม่เคยซื้ออะไรเลย"
               hint="ทุกทริปร่างด้วย AI ได้ฟรีอยู่แล้ว ถ้าซื้อสิทธิ์เพิ่มเมื่อไหร่ ใบเสร็จจะมาอยู่ตรงนี้"
               action={
-                <ButtonLink href="/trips" size="sm" variant="primary">
+                <ButtonLink href="/home" size="sm" variant="primary">
                   ไปที่ทริปของฉัน
                 </ButtonLink>
               }

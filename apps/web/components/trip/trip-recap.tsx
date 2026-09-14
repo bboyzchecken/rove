@@ -122,7 +122,7 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
       {/* ------------------------------------------------------- header */}
       <TripCover src={recap.cover} frame="banner" priority>
         <Link
-          href="/trips"
+          href="/home"
           className="bg-bg/90 text-ink absolute top-4 left-4 flex size-9 items-center justify-center rounded-full"
           aria-label="กลับไปหน้าทริปของฉัน"
         >

@@ -79,10 +79,6 @@ const APP_ROUTES: Record<string, Feature> = {
   billing: 'documents',
   points: 'documents',
   recap: 'journal',
-  /* The trip list is "how long until each of these", which is the countdown
-   * feature seen from outside a room rather than a list-shaped thing of its
-   * own — so its status chips read in the same yellow as the room they open. */
-  trips: 'countdown',
 
   /* Browsing published plans, and the two pages it leads to: a plan (/p/:slug)
    * and a creator (/u/:handle). All three are about routes somebody else has

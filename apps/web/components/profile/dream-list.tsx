@@ -7,10 +7,11 @@ import { Link2, Plus, Trash2 } from 'lucide-react';
 import { EmptyState } from '@/components/common/empty-state';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { FieldLabel, Input } from '@/components/ui/field';
+import { FieldLabel, Input, Select } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
 import { useAddDream, useDreams, useRemoveDream } from '@/features/auth/queries';
 import type { DreamItem } from '@/lib/data';
+import { COUNTRIES, countryName, flagOf, guessCountry } from '@/lib/data/countries';
 
 /**
  * Dream Trip bucket list (M15 — W15.1 … W15.3).
@@ -44,7 +45,10 @@ export function DreamList() {
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-ink text-sm font-medium">{dream.title}</p>
-              <p className="text-muted mt-0.5 text-[11px]">{dream.destination}</p>
+              <p className="text-muted mt-0.5 text-[11px]">
+                {dream.country ? <span className="mr-1">{flagOf(dream.country)}</span> : null}
+                {dream.destination}
+              </p>
               {dream.note ? (
                 <p className="text-muted mt-1.5 text-xs leading-relaxed">{dream.note}</p>
               ) : null}
@@ -101,20 +105,25 @@ function cityOf(destination: string) {
 function AddDreamSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const addDream = useAddDream();
   const [title, setTitle] = useState('');
+  const [country, setCountry] = useState('');
   const [destination, setDestination] = useState('');
   const [url, setUrl] = useState('');
   const [note, setNote] = useState('');
 
   async function save() {
     if (!title.trim()) return;
+    const code = country || guessCountry(destination);
     await addDream.mutateAsync({
       title: title.trim(),
-      destination: destination.trim() || 'ยังไม่ระบุ',
+      destination:
+        destination.trim() || (code ? countryName(code) : 'ยังไม่ระบุ'),
+      country: code,
       url: url.trim() || undefined,
       note: note.trim() || undefined,
       accent: ACCENTS[Math.floor(title.length % ACCENTS.length)]!,
     });
     setTitle('');
+    setCountry('');
     setDestination('');
     setUrl('');
     setNote('');
@@ -145,11 +154,24 @@ function AddDreamSheet({ open, onClose }: { open: boolean; onClose: () => void }
           onChange={setTitle}
           placeholder="เช่น นอนดูแสงเหนือในกระท่อมกระจก"
         />
+        {/* The flag on the stack comes from this (D-19); the free-text line
+            under it stays for the city or the region. */}
+        <label className="block">
+          <FieldLabel>ประเทศ</FieldLabel>
+          <Select value={country} onChange={(e) => setCountry(e.target.value)}>
+            <option value="">ยังไม่แน่ใจ</option>
+            {COUNTRIES.map((c) => (
+              <option key={c.code} value={c.code}>
+                {flagOf(c.code)} {c.th}
+              </option>
+            ))}
+          </Select>
+        </label>
         <Field
-          label="ที่ไหน"
+          label="เมือง หรือย่าน"
           value={destination}
           onChange={setDestination}
-          placeholder="ประเทศ · เมือง"
+          placeholder="เช่น ฮิเมจิ หรือ ประเทศ · เมือง"
         />
         <Field
           label="ลิงก์ที่เจอมา (ใส่ก็ได้ ไม่ใส่ก็ได้)"

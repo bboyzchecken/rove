@@ -758,6 +758,7 @@ type dreamDTO struct {
 	ID          string  `json:"id"`
 	Title       string  `json:"title"`
 	Destination string  `json:"destination"`
+	Country     string  `json:"country"`
 	Note        *string `json:"note"`
 	URL         *string `json:"url"`
 	Accent      string  `json:"accent"`
@@ -768,6 +769,7 @@ func toDreamDTO(d models.DreamItem) dreamDTO {
 		ID:          d.ID,
 		Title:       d.Title,
 		Destination: d.Destination,
+		Country:     d.Country,
 		Note:        strPtr(d.Note),
 		URL:         strPtr(d.URL),
 		Accent:      d.Accent,
@@ -785,6 +787,7 @@ type calendarTripDTO struct {
 	DaysUntil          int      `json:"days_until"`
 	CoverImageURL      string   `json:"cover_image_url"`
 	Color              string   `json:"color"`
+	Country            string   `json:"country"`
 	MemberIDs          []string `json:"member_ids"`
 	MemberCharacterIDs []string `json:"member_character_ids"`
 	WeatherIcon        *string  `json:"weather_icon"`
@@ -804,6 +807,7 @@ type pastTripDTO struct {
 	SpentTHB           float64  `json:"spent_thb"`
 	CoverImageURL      string   `json:"cover_image_url"`
 	Color              string   `json:"color"`
+	Country            string   `json:"country"`
 	MemberIDs          []string `json:"member_ids"`
 	MemberCharacterIDs []string `json:"member_character_ids"`
 	// The recap card says whether this one is already public, because the

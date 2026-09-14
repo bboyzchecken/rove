@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Compass, LayoutDashboard, Luggage, Plus, UserRound } from 'lucide-react';
+import { Compass, Luggage, Plus, UserRound } from 'lucide-react';
 
 import { LocaleSwitchCompact } from '@/components/common/locale-switch';
 import { ModeBanner } from '@/components/common/mode-banner';
@@ -19,7 +19,7 @@ import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
  * same destinations as a top bar from `md` up. The trip room draws its own tab
  * strip underneath this.
  *
- * Five destinations, with "สร้างทริป" in the middle where the thumb rests.
+ * Four destinations, with "สร้างทริป" in the middle where the thumb rests.
  * None of them points at a single trip: with two trips in flight, a "ทริปนี้"
  * tab cannot say which one it means, so the tab is the *list* and the room is
  * one tap deeper.
@@ -36,11 +36,15 @@ import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
  * `max-w-5xl`, the same gutter, the same height, logo left and actions right —
  * so signing in does not move the chrome. Change one and change the other.
  */
+/**
+ * Feedback #2 — D-6: "สรุปของฉัน" and "ทริปของฉัน" were two tabs showing the
+ * same rooms in two shapes. One tab now, and it is the home screen; `/trips`
+ * redirects there so old links keep working.
+ */
 const NAV = [
-  { href: '/home', label: 'สรุปของฉัน', icon: LayoutDashboard },
+  { href: '/home', label: 'ทริปของฉัน', icon: Luggage },
   { href: '/explore', label: 'สำรวจ', icon: Compass },
   { href: '/new', label: 'สร้างทริป', icon: Plus, accent: true },
-  { href: '/trips', label: 'ทริปของฉัน', icon: Luggage },
   { href: '/profile', label: 'ฉัน', icon: UserRound },
 ] as const;
 
@@ -56,8 +60,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // reader is down there. Without this, tapping a card put out the only light
   // saying where they were.
   const isActive = (href: string) => {
-    if (href === '/trips') {
+    if (href === '/home') {
       return (
+        pathname.startsWith('/home') ||
         pathname.startsWith('/trips') ||
         pathname.startsWith('/t/') ||
         pathname.startsWith('/recap/')

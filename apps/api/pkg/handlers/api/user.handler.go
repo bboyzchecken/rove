@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -133,6 +134,7 @@ func (s *Server) handleUpcomingTrips(c echo.Context) error {
 			DaysUntil:          domain.DaysBetween(today, *trip.StartDate) - 1,
 			CoverImageURL:      trip.CoverImageURL,
 			Color:              tripColorOf(trip),
+			Country:            trip.DestinationCountry,
 			MemberIDs:          roster.ids(),
 			MemberCharacterIDs: roster.characterIDs(),
 		}
@@ -202,6 +204,7 @@ func (s *Server) handlePastTrips(c echo.Context) error {
 			SpentTHB:           spent,
 			CoverImageURL:      trip.CoverImageURL,
 			Color:              tripColorOf(trip),
+			Country:            trip.DestinationCountry,
 			MemberIDs:          roster.ids(),
 			MemberCharacterIDs: roster.characterIDs(),
 			Visibility:         trip.Visibility,
@@ -285,6 +288,7 @@ func (s *Server) handleListDreams(c echo.Context) error {
 type dreamRequest struct {
 	Title       string `json:"title" validate:"required"`
 	Destination string `json:"destination"`
+	Country     string `json:"country" validate:"omitempty,len=2"`
 	Note        string `json:"note"`
 	URL         string `json:"url"`
 	Accent      string `json:"accent"`
@@ -300,6 +304,7 @@ func (s *Server) handleCreateDream(c echo.Context) error {
 		UserID:      request.UserID(c),
 		Title:       req.Title,
 		Destination: req.Destination,
+		Country:     strings.ToUpper(req.Country),
 		Note:        req.Note,
 		URL:         req.URL,
 		Accent:      orDefault(req.Accent, "primary"),
@@ -329,6 +334,7 @@ func (s *Server) handleUpdateDream(c echo.Context) error {
 		}
 		dream.Title = req.Title
 		dream.Destination = req.Destination
+		dream.Country = strings.ToUpper(req.Country)
 		dream.Note = req.Note
 		dream.URL = req.URL
 		if req.Accent != "" {

@@ -18,7 +18,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('a past trip opens its recap with the decisions intact', async ({ page }) => {
-  await page.goto('/trips');
+  await page.goto('/home');
 
   await page.getByRole('link', { name: /ปายหนีร้อน/ }).click();
 

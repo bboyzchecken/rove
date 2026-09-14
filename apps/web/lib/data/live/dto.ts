@@ -745,6 +745,7 @@ export interface DreamDto {
   id: string;
   title: string;
   destination: string;
+  country?: string | null;
   note: string | null;
   url: string | null;
   accent: 'primary' | 'green' | 'blue' | 'yellow' | 'pink';
@@ -793,6 +794,7 @@ export interface CalendarTripDto {
   days_until: number;
   cover_image_url: string;
   color: string;
+  country?: string | null;
   member_ids: string[];
   member_character_ids: string[] | null;
   weather_icon: string | null;
@@ -812,6 +814,7 @@ export interface PastTripDto {
   spent_thb: number;
   cover_image_url: string;
   color: string;
+  country?: string | null;
   member_ids: string[];
   member_character_ids: string[] | null;
   visibility: 'private' | 'link' | 'public';

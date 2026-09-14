@@ -76,7 +76,10 @@ import type {
 // member a `hasDates`, and every record a `stepOverrides` map — and turns the
 // twenty animals into flowers, so a stored `characterId: 'shiba'` would no
 // longer name a row in the catalogue.
-const STORAGE_KEY = 'rove.mock.v12';
+//
+// v13 adds a country to every upcoming / past trip and every dream, for the
+// flags on the home screen (F2.4, F2.7).
+const STORAGE_KEY = 'rove.mock.v13';
 
 /** One candidate itinerary (M6) — metrics and votes are computed at read. */
 export interface VariantRecord {

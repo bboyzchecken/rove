@@ -1127,6 +1127,7 @@ export const liveRepo: RoveRepo = {
         await api.post<DreamDto>('/users/me/dreams', {
           title: input.title,
           destination: input.destination,
+          country: input.country,
           note: input.note,
           url: input.url,
           accent: input.accent,

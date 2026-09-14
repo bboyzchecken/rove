@@ -1,4 +1,5 @@
 import { DEFAULT_COVER } from '@/lib/covers';
+import { guessCountry } from '@/lib/data/countries';
 import { tripColorOf } from '@/lib/trip-color';
 
 import type {
@@ -1139,6 +1140,7 @@ export function toDream(dto: DreamDto): DreamItem {
     id: dto.id,
     title: dto.title,
     destination: dto.destination,
+    country: dto.country || guessCountry(dto.destination),
     note: dto.note ?? undefined,
     url: dto.url ?? undefined,
     accent: dto.accent,
@@ -1155,6 +1157,7 @@ export function toCalendarTrip(dto: CalendarTripDto): CalendarTrip {
     daysUntil: dto.days_until,
     cover: dto.cover_image_url || DEFAULT_COVER,
     color: tripColorOf({ id: dto.id, color: dto.color }),
+    country: dto.country ?? '',
     memberIds: dto.member_ids ?? [],
     characterIds: dto.member_character_ids ?? [],
     weather:
@@ -1181,6 +1184,7 @@ export function toPastTrip(dto: PastTripDto): PastTrip {
     spentThb: dto.spent_thb,
     cover: dto.cover_image_url || DEFAULT_COVER,
     color: tripColorOf({ id: dto.id, color: dto.color }),
+    country: dto.country ?? '',
     memberIds: dto.member_ids ?? [],
     characterIds: dto.member_character_ids ?? [],
     visibility: dto.visibility,
@@ -1229,7 +1233,6 @@ export function toYearStats(dto: YearStatsDto): YearStats {
     countries: dto.countries,
     places: dto.places,
     spentThb: dto.spent_thb,
-    monthlyDays: dto.monthly_days ?? [],
   };
 }
 

@@ -18,7 +18,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: env.brandName,
     short_name: env.brandName,
     description: 'วางแพลนทริปร่วมกันทั้งกลุ่ม แล้วพกแพลนติดตัวไปเที่ยว',
-    start_url: '/trips',
+    start_url: '/home',
     display: 'standalone',
     orientation: 'portrait',
     background_color: '#FFFFFF',

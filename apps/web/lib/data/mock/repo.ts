@@ -1,5 +1,6 @@
 import { ApiError } from '@/lib/api-client';
 import { DEFAULT_COVER } from '@/lib/covers';
+import { guessCountry } from '@/lib/data/countries';
 import { randomTripColor } from '@/lib/trip-color';
 import { getCharacter, CHARACTERS, DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 import { AI_CREDITS, DAYS } from './seed/trip';
@@ -1022,7 +1023,32 @@ export const mockRepo: RoveRepo = {
 
     async upcoming() {
       const db = loadDb();
-      return delay(clone(db.upcoming).map((trip) => ({ ...trip, characterIds: facesOf(db, trip) })));
+      // The countdown is computed at read time — the seed used to say "88"
+      // and would have said 88 forever (Feedback #2 — F2.3). Rooms in this
+      // browser with dates come first; the seeded extras fill the list out.
+      const today = toIsoDate(new Date());
+      const fromRooms = db.trips
+        .filter((r) => !r.creator && r.trip.startDate && r.trip.endDate && r.trip.endDate >= today)
+        .map((r) => ({
+          id: r.trip.id,
+          title: r.trip.title,
+          cities: [...r.trip.cities],
+          startDate: r.trip.startDate,
+          endDate: r.trip.endDate,
+          daysUntil: daysUntil(r.trip.startDate),
+          cover: r.trip.cover,
+          color: r.trip.color,
+          country: r.trip.country,
+          memberIds: r.members.map((m) => m.id),
+          characterIds: r.members.map((m) => m.characterId),
+          weather: db.upcoming.find((u) => u.id === r.trip.id)?.weather,
+        }));
+      const seeded = clone(db.upcoming)
+        .filter((u) => !fromRooms.some((r) => r.id === u.id) && u.endDate >= today)
+        .map((trip) => ({ ...trip, daysUntil: daysUntil(trip.startDate), characterIds: facesOf(db, trip) }));
+      return delay(
+        [...fromRooms, ...seeded].sort((a, b) => a.startDate.localeCompare(b.startDate)),
+      );
     },
     async past() {
       const db = loadDb();
@@ -2984,7 +3010,11 @@ export const mockRepo: RoveRepo = {
     async addDream(input) {
       return delay(
         mutate((db) => {
-          const dream: DreamItem = { ...input, id: mockId('dr') };
+          const dream: DreamItem = {
+            ...input,
+            country: input.country || guessCountry(input.destination),
+            id: mockId('dr'),
+          };
           db.dreams.unshift(dream);
           return clone(dream);
         }),

@@ -309,6 +309,17 @@ func Migrate(db *gorm.DB) error {
 				return rollbackFlowerCharacters(tx)
 			},
 		},
+		{
+			// Feedback #2 — D-19: a dream flies a flag, so it needs a country
+			// code next to the Thai name it has always carried.
+			ID: "202609140003_dream_country",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.AutoMigrate(&models.DreamItem{})
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return tx.Migrator().DropColumn(&models.DreamItem{}, "country")
+			},
+		},
 	})
 
 	return m.Migrate()

@@ -251,6 +251,8 @@ export interface DreamItem {
   id: string;
   title: string;
   destination: string;
+  /** ISO country, for the flag (Feedback #2 — D-19). Empty on older rows. */
+  country: string;
   note?: string;
   url?: string;
   accent: 'primary' | 'green' | 'blue' | 'yellow' | 'pink';
@@ -265,6 +267,8 @@ export interface CalendarTrip {
   daysUntil: number;
   cover: string;
   color: TripColor;
+  /** ISO country — the calendar labels a bar with where, not with the title. */
+  country: string;
   memberIds: string[];
   /** Characters of those members, so a card can draw faces without a lookup. */
   characterIds?: string[];
@@ -283,6 +287,7 @@ export interface PastTrip {
   spentThb: number;
   cover: string;
   color: TripColor;
+  country: string;
   memberIds: string[];
   characterIds?: string[];
   /** Whether the recap is already public — the publish nudge reads this. */
@@ -319,6 +324,4 @@ export interface YearStats {
   countries: number;
   places: number;
   spentThb: number;
-  /** Months travelled, for the sparkline strip. */
-  monthlyDays: number[];
 }
