@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -89,6 +90,9 @@ type createTripRequest struct {
 	EntryType          string   `json:"entry_type"`
 	Title              string   `json:"title" validate:"required"`
 	DestinationCities  []string `json:"destination_cities"`
+	// ISO country, for a room that knows where it is going but has no tickets
+	// yet (Feedback #2 — D-9 "รู้ปลายทางแล้ว"). A route overrides it.
+	DestinationCountry string `json:"destination_country"`
 	StartDate          *string  `json:"start_date"`
 	EndDate            *string  `json:"end_date"`
 	PartySize          int      `json:"party_size"`
@@ -141,10 +145,15 @@ func (s *Server) handleCreateTrip(c echo.Context) error {
 		return err
 	}
 
+	country := "JP"
+	if len(req.DestinationCountry) == 2 {
+		country = strings.ToUpper(req.DestinationCountry)
+	}
+
 	trip := &models.Trip{
 		OwnerID:            userID,
 		Title:              req.Title,
-		DestinationCountry: "JP",
+		DestinationCountry: country,
 		DestinationCities:  jsonArray(req.DestinationCities),
 		PartySize:          maxInt(req.PartySize, 1),
 		HomeCurrency:       "THB",
@@ -214,7 +223,21 @@ func (s *Server) handleCreateTrip(c echo.Context) error {
 	return c.JSON(http.StatusCreated, s.withRoute(ctx, toTripDTO(*trip), trip.ID))
 }
 
-// checkTripAllowance enforces the free tier's one-trip-at-a-time rule.
+// tripAllowanceDTO is what the paywall renders (Feedback #2 — D-10): not just
+// "no", but which trips are holding the slot and what the way past costs.
+type tripAllowanceDTO struct {
+	Allowed     bool             `json:"allowed"`
+	ActiveTrips []tripSummaryRef `json:"active_trips"`
+	Limit       int              `json:"limit"`
+	PriceTHB    int              `json:"price_thb"`
+}
+
+type tripSummaryRef struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+}
+
+// tripAllowance answers the free tier's one-trip-at-a-time rule (M26 — A26.3).
 //
 // The cap is on trips being *planned*, not on trips ever created: a finished
 // trip stops counting, so nobody has to delete their memories to plan the next
@@ -224,53 +247,96 @@ func (s *Server) handleCreateTrip(c echo.Context) error {
 // One is deliberately tight. The free tier is generous where it costs almost
 // nothing (three AI drafts, unlimited members, the whole planning surface) and
 // firm on the one axis that decides whether anybody ever reaches the paywall.
-//
-// It reports whether the request has already been answered, not whether it
-// failed: request.Error writes the response and returns nil, so a caller that
-// checked `err != nil` would print a refusal and then go on to create the trip
-// anyway. `answered` is the signal; err is only there to be passed along.
-func (s *Server) checkTripAllowance(c echo.Context, ctx contextT, userID string) (answered bool, err error) {
+func (s *Server) tripAllowance(ctx contextT, userID string) (tripAllowanceDTO, error) {
+	out := tripAllowanceDTO{
+		Allowed:     true,
+		ActiveTrips: []tripSummaryRef{},
+		Limit:       domain.FreeActiveTrips,
+		PriceTHB:    domain.TripPassPriceTHB,
+	}
+
 	sub, err := s.billing.ActiveSubscription(ctx, userID)
 	if err != nil {
-		return true, request.Internal(c, "ตรวจสิทธิ์ไม่สำเร็จ")
+		return out, err
 	}
 	if sub != nil && sub.PlanID == domain.YearPlanID {
-		return false, nil
+		return out, nil
 	}
 
 	owned, err := s.trips.ActiveOwnedIDs(ctx, userID)
 	if err != nil {
-		return true, request.Internal(c, "ตรวจสิทธิ์ไม่สำเร็จ")
+		return out, err
 	}
 	// The common case — nobody near the cap — costs one query, not two.
 	if len(owned) < domain.FreeActiveTrips {
-		return false, nil
+		return out, nil
 	}
 
 	paid, err := s.billing.PassTripIDs(ctx, userID)
 	if err != nil {
-		return true, request.Internal(c, "ตรวจสิทธิ์ไม่สำเร็จ")
+		return out, err
 	}
 	unlocked := make(map[string]struct{}, len(paid))
 	for _, id := range paid {
 		unlocked[id] = struct{}{}
 	}
 
-	onFreeTier := 0
+	onFreeTier := make([]string, 0, len(owned))
 	for _, id := range owned {
 		if _, ok := unlocked[id]; !ok {
-			onFreeTier++
+			onFreeTier = append(onFreeTier, id)
 		}
 	}
-	if onFreeTier < domain.FreeActiveTrips {
+	if len(onFreeTier) < domain.FreeActiveTrips {
+		return out, nil
+	}
+
+	// Named, so the paywall can offer "ปิดทริปนี้" per row rather than send
+	// the person off to find which trip is in the way.
+	titles, _ := s.trips.TitlesByIDs(ctx, onFreeTier)
+	for _, id := range onFreeTier {
+		out.ActiveTrips = append(out.ActiveTrips, tripSummaryRef{ID: id, Title: titles[id]})
+	}
+	out.Allowed = false
+	return out, nil
+}
+
+func (s *Server) handleTripAllowance(c echo.Context) error {
+	out, err := s.tripAllowance(c.Request().Context(), request.UserID(c))
+	if err != nil {
+		return request.Internal(c, "ตรวจสิทธิ์ไม่สำเร็จ")
+	}
+	return c.JSON(http.StatusOK, out)
+}
+
+// checkTripAllowance is tripAllowance as a gate on POST /trips.
+//
+// It reports whether the request has already been answered, not whether it
+// failed: request.Error writes the response and returns nil, so a caller that
+// checked `err != nil` would print a refusal and then go on to create the trip
+// anyway. `answered` is the signal; err is only there to be passed along.
+func (s *Server) checkTripAllowance(c echo.Context, ctx contextT, userID string) (answered bool, err error) {
+	allowance, err := s.tripAllowance(ctx, userID)
+	if err != nil {
+		return true, request.Internal(c, "ตรวจสิทธิ์ไม่สำเร็จ")
+	}
+	if allowance.Allowed {
 		return false, nil
 	}
 
 	// 402 rather than 403: this is not a permission the account lacks, it is a
-	// price, and the client shows a paywall on exactly this code.
-	return true, request.Error(c, http.StatusPaymentRequired, fmt.Sprintf(
-		"แผนฟรีวางแผนได้ครั้งละ %d ทริป — ปิดทริปที่วางอยู่ให้เสร็จ หรือปลดล็อกด้วย Trip Pass ฿%d ก่อนเริ่มทริปใหม่",
-		domain.FreeActiveTrips, domain.TripPassPriceTHB))
+	// price. The body carries what the paywall needs (Feedback #2 — D-10):
+	// the same `error` string every other refusal has, plus a code the client
+	// can switch on and the trips that are holding the slot.
+	return true, c.JSON(http.StatusPaymentRequired, map[string]any{
+		"error": fmt.Sprintf(
+			"แผนฟรีวางแผนได้ครั้งละ %d ทริป — ปิดทริปที่วางอยู่ให้เสร็จ หรือปลดล็อกด้วย Trip Pass ฿%d ก่อนเริ่มทริปใหม่",
+			domain.FreeActiveTrips, domain.TripPassPriceTHB),
+		"code":         "TRIP_LIMIT",
+		"active_trips": allowance.ActiveTrips,
+		"limit":        allowance.Limit,
+		"price_thb":    allowance.PriceTHB,
+	})
 }
 
 func (s *Server) handleGetTrip(c echo.Context) error {

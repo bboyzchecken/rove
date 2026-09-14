@@ -1,3 +1,4 @@
+import { ApiError } from '@/lib/api-client';
 import { DEFAULT_COVER } from '@/lib/covers';
 import { randomTripColor } from '@/lib/trip-color';
 import { getCharacter, CHARACTERS, DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
@@ -60,6 +61,7 @@ import type {
   ShareState,
   StubbedProvider,
   Trip,
+  TripAllowance,
   TripDocument,
   TripPhoto,
   TripRecap,
@@ -607,6 +609,26 @@ function withIds(legs: FlightLegInput[]): FlightLeg[] {
   }));
 }
 
+/** The free tier's one-trip-at-a-time rule, as the paywall needs it (D-10). */
+function allowanceOf(db: MockDb): TripAllowance {
+  const open = db.trips.filter(
+    (record) =>
+      !record.creator &&
+      record.role === 'owner' &&
+      record.trip.status !== 'done' &&
+      !record.ai.hasPass,
+  );
+  return {
+    allowed: open.length < FREE_ACTIVE_TRIPS,
+    activeTrips:
+      open.length < FREE_ACTIVE_TRIPS
+        ? []
+        : open.map((record) => ({ id: record.trip.id, title: record.trip.title })),
+    limit: FREE_ACTIVE_TRIPS,
+    priceThb: AI_CREDITS.passPriceThb,
+  };
+}
+
 /* ------------------------------------------------------------------ repo -- */
 
 export const mockRepo: RoveRepo = {
@@ -742,17 +764,28 @@ export const mockRepo: RoveRepo = {
       );
     },
 
+    async allowance() {
+      return delay(allowanceOf(loadDb()), 60);
+    },
+
     async create(input) {
       // The free tier plans one trip at a time (M26 — A26.3). Enforced here as
       // well as in the API, because mock mode is where the paywall is designed:
       // a limit that only exists on the server is a limit nobody sees until it
-      // is too late to change how it reads.
-      const openTrips = loadDb().trips.filter(
-        (record) => !record.creator && record.trip.status !== 'done' && !record.ai.hasPass,
-      );
-      if (openTrips.length >= FREE_ACTIVE_TRIPS) {
-        throw new Error(
+      // is too late to change how it reads. The refusal is the same ApiError
+      // the live repo throws, payload and all, so the sheet that answers it
+      // is written once (Feedback #2 — D-10).
+      const allowance = allowanceOf(loadDb());
+      if (!allowance.allowed) {
+        throw new ApiError(
+          402,
           `แผนฟรีวางแผนได้ครั้งละ ${FREE_ACTIVE_TRIPS} ทริป — ปิดทริปที่วางอยู่ให้เสร็จ หรือปลดล็อกด้วย Trip Pass ฿${AI_CREDITS.passPriceThb} ก่อนเริ่มทริปใหม่`,
+          {
+            code: 'TRIP_LIMIT',
+            active_trips: allowance.activeTrips,
+            limit: allowance.limit,
+            price_thb: allowance.priceThb,
+          },
         );
       }
 

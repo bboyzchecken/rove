@@ -18,18 +18,40 @@ test.beforeEach(async ({ page }) => {
   await resetDemoData(page);
 });
 
-test('X1.1 — "ยังไม่รู้วัน" reaches a trip room in three screens', async ({ page }) => {
+test('X1.1 — knowing nothing yet reaches a trip room in three screens', async ({ page }) => {
   await page.goto('/new');
 
-  // 1. Pick how to start.
-  await page.getByRole('button', { name: /ยังไม่รู้วัน/ }).click();
-  // 2. Party size.
+  // 1. "ตอนนี้มีอะไรแล้วบ้าง" — tick nothing (Feedback #2, D-9).
+  await expect(page.getByRole('heading', { name: 'ตอนนี้มีอะไรแล้วบ้าง' })).toBeVisible();
+  await page.getByRole('button', { name: /^ต่อไป/ }).click();
+  // 2. Party size — starts at one (D-8).
+  await expect(page.getByText('ไปกันกี่คน')).toBeVisible();
   await page.getByRole('button', { name: /^ต่อไป/ }).click();
   // 3. Character, then create.
   await page.getByRole('button', { name: /สร้างห้องทริป/ }).click();
 
   await expect(page).toHaveURL(/\/t\/[^/]+\/dates$/);
-  await expect(page.getByText('ใส่วันว่างของฉัน')).toBeVisible();
+});
+
+test('what the group already has is asked for first, and nothing is prefilled', async ({ page }) => {
+  await page.goto('/new');
+
+  await page.getByRole('button', { name: /รู้วันแล้ว/ }).click();
+  await page.getByRole('button', { name: /จองที่พักแล้ว/ }).click();
+  await page.getByRole('button', { name: /^ต่อไป/ }).click();
+
+  // Dates first, blank, in dd/mm/yyyy (D-7 / D-8) — and no day count until both exist.
+  await expect(page.getByRole('heading', { name: 'ไปวันไหน' })).toBeVisible();
+  const start = page.getByRole('textbox', { name: 'ไปวันที่' });
+  await expect(start).toHaveValue('');
+  await expect(page.getByText(/46365/)).toHaveCount(0);
+
+  await start.fill('04/12/2026');
+  await page.getByRole('textbox', { name: 'กลับวันที่' }).fill('10/12/2026');
+  await expect(page.getByText(/7 วัน 6 คืน/)).toBeVisible();
+
+  // The hotel field only exists because it was ticked.
+  await expect(page.getByPlaceholder('ชื่อโรงแรม หรือย่านที่พัก')).toBeVisible();
 });
 
 test('a pasted ticket fills in the route', async ({ page }) => {
@@ -47,7 +69,7 @@ test('a pasted ticket fills in the route', async ({ page }) => {
 
 /** The picker only answers once React owns the field, so open it first. */
 async function pickAirport(page: Page, index: number, query: string, option: RegExp) {
-  const field = page.getByPlaceholder('พิมพ์รหัสสนามบิน เมือง หรือประเทศ').nth(index);
+  const field = page.getByPlaceholder('ค้นหาสนามบินทั่วโลก — รหัส เมือง หรือประเทศ').nth(index);
   await field.click();
   await expect(page.getByText('ที่คนไทยไปบ่อย').first()).toBeVisible();
 
@@ -68,7 +90,9 @@ test('the route door searches airports worldwide and counts the nights', async (
 test('two countries in one route are spelled out', async ({ page }) => {
   await page.goto('/new?from=route&to=ICN');
 
-  // Seoul is already the destination; add a hop to Tokyo after it.
+  // Seoul is already the destination; nothing else is (D-8), so the home
+  // airport is typed too. Then add a hop to Tokyo after Seoul.
+  await pickAirport(page, 0, 'BKK', /Suvarnabhumi/);
   await page.getByRole('button', { name: /เพิ่มเมือง\/ประเทศระหว่างทาง/ }).click();
   await pickAirport(page, 0, 'NRT', /Narita/);
 

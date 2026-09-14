@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plane, Search, X } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 
 import { FieldLabel, fieldClass } from '@/components/ui/field';
 import { repo } from '@/lib/data';
@@ -28,7 +28,7 @@ export function AirportPicker({
   code,
   onChange,
   label,
-  placeholder = 'พิมพ์รหัสสนามบิน เมือง หรือประเทศ',
+  placeholder = 'ค้นหาสนามบินทั่วโลก — รหัส เมือง หรือประเทศ',
   autoFocus = false,
 }: {
   value: Airport | null;
@@ -105,28 +105,34 @@ export function AirportPicker({
     <div className="relative block min-w-0" ref={boxRef}>
       {label ? <FieldLabel>{label}</FieldLabel> : null}
 
+      {/* ONE box, ONE height, in both states (Feedback #2 — F1.3). The chosen
+          state used to be a two-line grey button and the empty state a search
+          field with a hint hanging under it, so the two airport fields of a
+          leg stood at different heights whenever one was filled and the other
+          was not. Now: same shell, same padding, one line of text either way,
+          and the hint lives in the placeholder. */}
       {chosen && !open ? (
         <button
           type="button"
           onClick={() => setOpen(true)}
           className={cn(fieldClass, 'hover:border-muted/45 flex items-center gap-2.5 text-left')}
         >
-          <span className="text-lg leading-none">{value ? flagOf(value.countryCode) : '✈️'}</span>
-          <span className="min-w-0 flex-1">
-            <span className="text-ink nums block text-sm font-medium">
-              {value ? airportLabel(value) : chosen}
-            </span>
-            <span className="text-muted block truncate text-[11px]">
-              {value ? `${value.name} · ${value.countryTh}` : 'กำลังโหลดข้อมูลสนามบิน…'}
-            </span>
+          <span className="text-base leading-none">{value ? flagOf(value.countryCode) : '✈️'}</span>
+          <span className="text-ink nums min-w-0 flex-1 truncate">
+            <span className="font-medium">{value ? airportLabel(value) : chosen}</span>
+            {value ? <span className="text-muted ml-1.5 text-[11px]">{value.countryTh}</span> : null}
           </span>
-          <X
-            className="text-muted size-4 shrink-0"
+          <span
+            role="button"
+            aria-label="ล้างสนามบิน"
+            className="text-muted hover:text-ink -mr-1 flex size-6 shrink-0 items-center justify-center rounded-full"
             onClick={(event) => {
               event.stopPropagation();
               onChange(null);
             }}
-          />
+          >
+            <X className="size-4" />
+          </span>
         </button>
       ) : (
         <div className="relative">
@@ -195,11 +201,6 @@ export function AirportPicker({
         </div>
       ) : null}
 
-      {!chosen && !open ? (
-        <p className="text-muted mt-1 flex items-center gap-1 text-[11px]">
-          <Plane className="size-3" /> ค้นหาสนามบินได้ทั่วโลก
-        </p>
-      ) : null}
     </div>
   );
 }

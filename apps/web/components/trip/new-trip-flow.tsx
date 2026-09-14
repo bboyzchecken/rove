@@ -5,14 +5,18 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
   ArrowRight,
+  BedDouble,
   CalendarDays,
-  CalendarSearch,
   Check,
   ClipboardPaste,
+  MapPin,
   Plane,
+  Users,
 } from 'lucide-react';
 
+import { TripLimitBanner, TripLimitSheet } from '@/components/billing/trip-limit-sheet';
 import { RoveMark } from '@/components/brand/rove-mark';
+import { AirportPicker } from '@/components/trip/airport-picker';
 import {
   RouteBuilder,
   RouteSummary,
@@ -24,47 +28,51 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
-import { Field, Textarea, fieldClass } from '@/components/ui/field';
-import { useCharacters, useUpdateMe } from '@/features/auth/queries';
-import { useCreateTrip } from '@/features/trip/queries';
+import { DateField } from '@/components/ui/date-field';
+import { Field, Input, Textarea, fieldClass } from '@/components/ui/field';
+import { useCharacters, useMe, useUpdateMe } from '@/features/auth/queries';
+import { useCreateTrip, useTripAllowance } from '@/features/trip/queries';
 import { track } from '@/lib/analytics';
+import { ApiError } from '@/lib/api-client';
+import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 import { repo } from '@/lib/data';
-import { addDays, daysBetween, thaiRangeLabel } from '@/lib/data/domain';
+import type { Airport, StartedWith, TripAllowance } from '@/lib/data';
+import { addDays, daysBetween, isIsoDate, thaiRangeLabel } from '@/lib/data/domain';
 import { cn } from '@/lib/utils';
 
-import { DateField } from '@/components/ui/date-field';
-import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 /**
- * Entry flow (M1 — W1.2 / W1.3 / W2.8).
+ * Entry flow (M1 — W1.2 / W1.3 / W2.8), reshaped by Feedback #2 (D-8, D-9).
  *
- * Three doors, and they no longer overlap. The old set had four, two of which
- * asked the same question in different words: "เริ่มจากเมือง" wanted a city
- * name and "วางข้อความตั๋ว" wanted the ticket that names the same city. Worse,
- * the city answer was ambiguous — someone who picked "โซล" and "อูเอโนะ" had
- * told us nothing about whether that is one country or two, or how they cross
- * between them, and the planner cannot draft days it cannot place.
+ * UAT round 1's tester arrived knowing the dates, holding a hotel booking AND
+ * holding tickets — and none of the three doors ("รู้เที่ยวบิน / รู้วัน /
+ * ยังไม่รู้วัน") was that. The doors made the group pick ONE thing they knew
+ * and pretend not to know the rest, and the room they landed in then asked
+ * for the rest as if it were missing. That is ต้นตอร่วม 1 in the fix list.
  *
- * So the doors are now sorted by what the group actually knows:
+ * So the first screen is a question, not a choice: "ตอนนี้มีอะไรแล้วบ้าง",
+ * tick everything that applies (or nothing). The second screen asks only for
+ * what was ticked, in the order that matters — a route decides the dates, so
+ * it comes before a date field ever would — and the room remembers the answer
+ * (`trip.startedWith`) so its own checklist opens with those steps ticked.
  *
- *   1. รู้เที่ยวบินแล้ว  → the route: airports, dates, arrival times. Pasting a
- *                          ticket is a shortcut *inside* this door, not a door
- *                          of its own — it fills in the same legs.
- *   2. รู้วันแล้ว        → dates now, destination later.
- *   3. ยังไม่รู้วัน      → the date board finds the days first.
+ * D-8: nothing is prefilled. No default week in December, no BKK, no party of
+ * four. A field the tester did not fill is a field the tester did not answer,
+ * and a default that looks like an answer is how "04/12/2026" became a trip.
  *
- * X1.1 still holds: every door reaches a created trip in at most three screens.
+ * X1.1 still holds: three screens to a created trip, whatever was ticked.
  */
-type Entry = 'route' | 'date' | 'coordinate';
 
-const ENTRIES: { key: Entry; icon: typeof CalendarDays; title: string; hint: string }[] = [
+const HAVE: { key: StartedWith; icon: typeof CalendarDays; title: string; hint: string }[] = [
+  { key: 'dates', icon: CalendarDays, title: 'รู้วันแล้ว', hint: 'ลาไว้แล้ว หรือตกลงวันกันได้แล้ว' },
   {
-    key: 'route',
+    key: 'flights',
     icon: Plane,
-    title: 'รู้เที่ยวบินแล้ว',
-    hint: 'ใส่สนามบินและวันบิน เดี๋ยวจัดวันให้',
+    title: 'จองไฟลท์แล้ว',
+    hint: 'มีตั๋วในมือ — วางข้อความจากอีเมลตั๋วได้เลย',
   },
-  { key: 'date', icon: CalendarDays, title: 'รู้วันแล้ว', hint: 'ลาไว้แล้ว ยังไม่รู้จะไปไหน' },
-  { key: 'coordinate', icon: CalendarSearch, title: 'ยังไม่รู้วัน', hint: 'หาวันที่ทุกคนว่างก่อน' },
+  { key: 'stay', icon: BedDouble, title: 'จองที่พักแล้ว', hint: 'ใส่ชื่อหรือลิงก์ที่พักเก็บไว้ก่อน' },
+  { key: 'destination', icon: MapPin, title: 'รู้ปลายทางแล้ว', hint: 'รู้แล้วว่าจะไปเมืองไหน' },
+  { key: 'friends', icon: Users, title: 'มีเพื่อนไปด้วยแล้ว', hint: 'รู้แล้วว่าไปกันกี่คน' },
 ];
 
 const SAMPLE_TICKET = `Thai Airways — Booking confirmed
@@ -72,55 +80,64 @@ TG 682  BKK 23:59 → NRT 08:05  04 Dec 2026
 TG 677  NRT 14:35 → BKK 22:05  10 Dec 2026
 Passengers: 4`;
 
-const DEFAULT_START = '2026-12-04';
-const DEFAULT_END = '2026-12-10';
-/** Where a Thai group almost always leaves from — one less field to fill. */
-const HOME_AIRPORT = 'BKK';
-
 export function NewTripFlow() {
   const router = useRouter();
   const params = useSearchParams();
-  const initial = normaliseEntry(params.get('from'));
-  const presetAirport = params.get('to');
+  const presetAirport = params.get('to')?.toUpperCase() ?? '';
   const presetCity = params.get('city');
 
-  const [entry, setEntry] = useState<Entry | null>(initial);
-  const [step, setStep] = useState(initial ? 1 : 0);
+  const [have, setHave] = useState<StartedWith[]>(() =>
+    normaliseEntry(params.get('from'), Boolean(presetAirport || presetCity)),
+  );
+  const [step, setStep] = useState(0);
+
+  // D-8: every field starts blank. The only thing that may arrive filled in
+  // is a destination handed over by a link (a dream, a landing card).
   const [legs, setLegs] = useState<DraftLeg[]>(() => [
-    newLeg('out', {
-      from: HOME_AIRPORT,
-      to: presetAirport?.toUpperCase() ?? '',
-      depDate: DEFAULT_START,
-    }),
-    newLeg('back', {
-      from: presetAirport?.toUpperCase() ?? '',
-      to: HOME_AIRPORT,
-      depDate: DEFAULT_END,
-    }),
+    newLeg('out', { to: presetAirport }),
+    newLeg('back', { from: presetAirport }),
   ]);
-  const [startDate, setStartDate] = useState(DEFAULT_START);
-  const [endDate, setEndDate] = useState(DEFAULT_END);
-  const [party, setParty] = useState(4);
-  const [character, setCharacter] = useState(DEFAULT_CHARACTER_ID);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [destination, setDestination] = useState<Airport | null>(null);
+  const [stayName, setStayName] = useState('');
+  const [stayUrl, setStayUrl] = useState('');
+  const [party, setParty] = useState(1);
+  const [character, setCharacter] = useState<string | null>(null);
   const [ticket, setTicket] = useState('');
   const [pasting, setPasting] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [ticketNote, setTicketNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // The paywall (D-10): known before the first tap, and answered in a sheet
+  // rather than a grey box if POST /trips still says no.
+  const { data: allowance } = useTripAllowance();
+  const [wall, setWall] = useState<TripAllowance | null>(null);
+  const [wallOpen, setWallOpen] = useState(false);
+
+  const { data: me } = useMe();
   const { data: characters } = useCharacters();
   const createTrip = useCreateTrip();
   const updateMe = useUpdateMe();
   const { airports, route, warnings } = useRouteDraft(legs);
 
-  // A link from "ที่อยากไป" carries a city name, not a code. Look it up once so
-  // the route opens on the airport that serves it.
+  const picked = character ?? me?.characterId ?? DEFAULT_CHARACTER_ID;
+
+  // A link from "ที่อยากไป" carries a city name, not a code. Look it up once
+  // so the destination — and the route, should they tick flights — opens on
+  // the airport that serves it.
   useEffect(() => {
-    if (!presetCity || presetAirport) return;
+    if (!presetCity && !presetAirport) return;
     let cancelled = false;
 
-    void repo.airports.search(presetCity, 1).then(([airport]) => {
+    const lookup = presetAirport
+      ? repo.airports.get(presetAirport)
+      : repo.airports.search(presetCity ?? '', 1).then(([airport]) => airport ?? null);
+
+    void lookup.then((airport) => {
       if (cancelled || !airport) return;
+      setDestination(airport);
       setLegs((prev) =>
         prev.map((leg) =>
           leg.direction === 'out'
@@ -137,9 +154,19 @@ export function NewTripFlow() {
     };
   }, [presetCity, presetAirport]);
 
-  const coordinating = entry === 'coordinate';
-  const routing = entry === 'route';
-  const nights = routing ? route.nights : Math.max(0, daysBetween(startDate, endDate) - 1);
+  const has = (key: StartedWith) => have.includes(key);
+  const routing = has('flights');
+  const asksDates = has('dates') && !routing;
+  const asksDestination = has('destination') && !routing;
+  const hasTypedDates = isIsoDate(startDate) && isIsoDate(endDate) && startDate <= endDate;
+  const coordinating = !routing && !hasTypedDates;
+  const nights = routing ? route.nights : hasTypedDates ? daysBetween(startDate, endDate) - 1 : 0;
+
+  function toggle(key: StartedWith) {
+    setHave((current) =>
+      current.includes(key) ? current.filter((k) => k !== key) : [...current, key],
+    );
+  }
 
   /** The paste shortcut: the same legs, typed by the airline instead of by you. */
   async function readTicket(text: string) {
@@ -168,6 +195,8 @@ export function NewTripFlow() {
           }),
         ),
       );
+      // A ticket says how many are flying; the stepper still starts at one
+      // (D-8) and only moves when the ticket actually says so.
       if (parsed.partySize) setParty(parsed.partySize);
       setTicketNote(`อ่านได้ ${parsed.flights.length} เที่ยวบิน — ตรวจแล้วแก้ตรงไหนก็ได้`);
       track('route_built', { legs: parsed.flights.length, countries: 0, source: 'ticket' });
@@ -176,49 +205,84 @@ export function NewTripFlow() {
     }
   }
 
-  function suggestedTitle() {
-    if (coordinating) return 'ทริปใหม่ของแก๊ง';
-    const where = routing ? (route.stops[0]?.city ?? 'ทริปใหม่') : 'ทริปใหม่';
-    const year = Number((routing ? route.startDate : startDate).slice(0, 4)) + 543;
-    return Number.isFinite(year) ? `${where} ${year}` : where;
+  function whereLabel() {
+    if (routing && route.stops[0]) return route.stops[0].city;
+    if (destination) return destination.cityTh || destination.city;
+    return null;
   }
 
-  /** The one rule: a route decides the frame, everything else is typed. */
+  function suggestedTitle() {
+    const where = whereLabel();
+    const start = routing ? route.startDate : hasTypedDates ? startDate : '';
+    const year = start ? Number(start.slice(0, 4)) + 543 : NaN;
+    if (where) return Number.isFinite(year) ? `${where} ${year}` : where;
+    return has('friends') ? 'ทริปใหม่ของแก๊ง' : 'ทริปใหม่';
+  }
+
+  /** Each section asks for one thing, and only that thing blocks the next screen. */
   function canContinue() {
-    if (!routing) return true;
-    return route.stops.length > 0;
+    if (routing) return route.stops.length > 0;
+    if (asksDates) return hasTypedDates;
+    if (asksDestination) return destination !== null;
+    return true;
+  }
+
+  function blocker() {
+    if (routing && route.stops.length === 0) return 'ใส่สนามบินปลายทางและวันบินของขาไปก่อน';
+    if (asksDates && !hasTypedDates) return 'ใส่วันไปและวันกลับก่อน';
+    if (asksDestination && !destination) return 'เลือกสนามบินปลายทางก่อน';
+    return null;
   }
 
   async function create() {
     setError(null);
     try {
-      if (character) await updateMe.mutateAsync({ characterId: character });
+      if (picked !== me?.characterId) await updateMe.mutateAsync({ characterId: picked });
 
       const trip = await createTrip.mutateAsync({
-        entryType: coordinating ? 'date' : routing ? 'route' : 'date',
+        entryType: routing ? 'route' : 'date',
         title: suggestedTitle(),
         flights: routing ? legs.filter((leg) => leg.from && leg.to && leg.depDate) : undefined,
-        cities: routing ? undefined : [],
-        startDate: coordinating || routing ? undefined : startDate,
-        endDate: coordinating || routing ? undefined : endDate,
+        cities: routing ? undefined : destination ? [destination.cityTh || destination.city] : [],
+        country: routing ? undefined : destination?.countryCode,
+        startDate: !routing && hasTypedDates ? startDate : undefined,
+        endDate: !routing && hasTypedDates ? endDate : undefined,
         partySize: party,
         coordinateDates: coordinating,
+        startedWith: have,
       });
+
+      // The hotel they already booked goes into the room as a booking, so the
+      // bookings step opens on it rather than on "nothing yet".
+      if (has('stay') && stayName.trim()) {
+        await repo.booking.save(trip.id, {
+          kind: 'stay',
+          title: stayName.trim(),
+          partner: '',
+          url: stayUrl.trim(),
+          status: 'booked',
+        });
+      }
 
       router.push(coordinating ? `/t/${trip.id}/dates` : `/t/${trip.id}`);
     } catch (cause) {
+      if (cause instanceof ApiError && cause.code === 'TRIP_LIMIT') {
+        setWall(allowanceFromPayload(cause.payload, allowance));
+        setWallOpen(true);
+        return;
+      }
       setError(cause instanceof Error ? cause.message : 'สร้างทริปไม่สำเร็จ');
     }
   }
 
+  const activeWall = wall ?? allowance ?? null;
+
   return (
     /*
-     * The shell is `px-4 py-5` and nothing else, exactly like /home, /trips and
+     * The shell is `px-4 py-5` and nothing else, exactly like /home and
      * /profile: the width comes from the one `max-w-5xl` in AppShell, so the
      * three steps line up with each other and with every other tab instead of
-     * each picking its own gutter. Where a full-width row would be silly — two
-     * date inputs stretched over 60rem — the *content* is capped, never the
-     * shell, so the headings never move sideways between steps.
+     * each picking its own gutter.
      */
     <div className="px-4 py-5">
       {/* progress ------------------------------------------------------ */}
@@ -234,55 +298,102 @@ export function NewTripFlow() {
         ))}
       </div>
 
-      {/* step 0 -------------------------------------------------------- */}
+      {/* step 0 — what do you already have -------------------------------- */}
       {step === 0 ? (
         <div className="animate-rove-rise">
           <h1 className="font-display text-ink text-2xl font-medium tracking-tight md:text-3xl">
-            ตอนนี้รู้อะไรแล้วบ้าง
+            ตอนนี้มีอะไรแล้วบ้าง
           </h1>
           <p className="text-muted mt-1 text-sm">
-            เลือกอันที่ใกล้ที่สุด เดี๋ยวที่เหลือค่อยเติมทีหลัง
+            ติ๊กได้หลายข้อ หรือไม่ติ๊กเลยก็ได้ — ที่เหลือค่อยเติมในห้องทริป
           </p>
 
-          {/* A list of three on a phone, three doors side by side on a desk. */}
-          <div className="mt-5 grid gap-2.5 sm:grid-cols-3 md:mt-7 md:gap-4">
-            {ENTRIES.map((option) => (
-              <button
-                key={option.key}
-                onClick={() => {
-                  setEntry(option.key);
-                  setStep(1);
-                }}
-                className="h-full text-left"
-              >
-                <Card className="hover:bg-surface flex h-full items-center gap-3.5 p-4 transition sm:flex-col sm:items-start sm:gap-3 sm:p-5">
-                  <span className="bg-feature text-ink flex size-11 shrink-0 items-center justify-center rounded-2xl">
-                    <option.icon className="size-5" strokeWidth={2.2} />
-                  </span>
-                  <div className="flex-1 sm:flex-none">
-                    <p className="font-display text-ink font-medium">{option.title}</p>
-                    <p className="text-muted text-xs">{option.hint}</p>
-                  </div>
-                  <ArrowRight className="text-muted size-4 shrink-0 sm:mt-auto" />
-                </Card>
-              </button>
-            ))}
+          {activeWall && !activeWall.allowed ? (
+            <div className="mt-4 md:max-w-2xl">
+              <TripLimitBanner allowance={activeWall} onOpen={() => setWallOpen(true)} />
+            </div>
+          ) : null}
+
+          <div className="mt-5 grid gap-2.5 sm:grid-cols-2 md:mt-7 md:max-w-2xl">
+            {HAVE.map((option) => {
+              const on = has(option.key);
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggle(option.key)}
+                  className="text-left"
+                >
+                  <Card
+                    accent={on ? 'feature' : 'none'}
+                    className={cn(
+                      'flex h-full items-center gap-3.5 p-4 transition',
+                      on ? 'ring-ink ring-2' : 'hover:bg-surface',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'flex size-11 shrink-0 items-center justify-center rounded-2xl',
+                        on ? 'bg-feature-solid text-ink' : 'bg-surface text-ink',
+                      )}
+                    >
+                      <option.icon className="size-5" strokeWidth={2.2} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-display text-ink font-medium">{option.title}</p>
+                      <p className="text-muted text-xs">{option.hint}</p>
+                    </div>
+                    <span
+                      className={cn(
+                        'flex size-6 shrink-0 items-center justify-center rounded-full',
+                        on ? 'bg-ink text-bg' : 'border-muted/30 border-2',
+                      )}
+                    >
+                      {on ? <Check className="size-3.5" strokeWidth={3} /> : null}
+                    </span>
+                  </Card>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-6 flex flex-col items-center gap-2 md:mt-8 md:max-w-2xl md:flex-row md:justify-between md:gap-4">
+            <p className="text-muted order-2 text-center text-[11px] md:order-1 md:text-left">
+              {have.length === 0
+                ? 'ยังไม่รู้อะไรเลยก็เริ่มได้ — ให้ทุกคนใส่วันว่างแล้วหาช่วงที่ตรงกันก่อน'
+                : `ถัดไปจะถามเฉพาะ ${have.length} อย่างที่ติ๊กไว้`}
+            </p>
+            <Button
+              block
+              size="lg"
+              className="order-1 md:order-2 md:w-auto md:px-10"
+              onClick={() => setStep(1)}
+            >
+              ต่อไป <ArrowRight className="size-4" />
+            </Button>
           </div>
         </div>
       ) : null}
 
-      {/* step 1 -------------------------------------------------------- */}
+      {/* step 1 — only what was ticked, in the order that matters ----------- */}
       {step === 1 ? (
         <div className="animate-rove-rise">
           <button
             onClick={() => setStep(0)}
             className="text-muted mb-3 inline-flex items-center gap-1 text-xs font-medium"
           >
-            <ArrowLeft className="size-3.5" /> เปลี่ยนวิธีเริ่ม
+            <ArrowLeft className="size-3.5" /> เปลี่ยนสิ่งที่มีแล้ว
           </button>
 
           <h1 className="font-display text-ink text-2xl font-medium tracking-tight md:text-3xl">
-            {routing ? 'บินไปลงที่ไหน' : coordinating ? 'ไปกันกี่คน' : 'ไปวันไหน'}
+            {routing
+              ? 'ใส่เที่ยวบินที่จองไว้'
+              : asksDates
+                ? 'ไปวันไหน'
+                : asksDestination
+                  ? 'ไปที่ไหน'
+                  : 'ไปกันกี่คน'}
           </h1>
           {routing ? (
             <p className="text-muted mt-1 text-sm">
@@ -291,11 +402,9 @@ export function NewTripFlow() {
           ) : null}
 
           {/*
-            The route door is the only one with two things to look at — the legs
-            being typed and the trip they add up to. On a phone they queue up;
-            from `lg` the summary moves beside the form and sticks, so the night
-            count reacts in place instead of scrolling away. The other doors
-            have one column of content and keep one column.
+            The route is the only section with two things to look at — the
+            legs being typed and the trip they add up to. On a phone they
+            queue up; from `lg` the summary moves beside the form and sticks.
           */}
           <div
             className={cn(
@@ -303,7 +412,6 @@ export function NewTripFlow() {
               routing ? 'grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-6' : 'space-y-4',
             )}
           >
-            {/* --- route door ------------------------------------------- */}
             {routing ? (
               <>
                 <div className="lg:col-start-1 lg:row-start-1">
@@ -315,19 +423,9 @@ export function NewTripFlow() {
                   />
                 </div>
 
-                {/*
-                  One summary, two places: directly under the legs on a phone,
-                  and — via the row/column placement rather than a second copy —
-                  sticky beside them from `lg` up, where it stays in view while
-                  the dates below are still being typed.
-                */}
                 <aside className="lg:col-start-2 lg:row-span-2 lg:row-start-1">
                   <div className="lg:sticky lg:top-20">
                     <RouteSummary route={route} />
-                    {/* An empty column would read as a broken layout, so until a
-                        destination is picked the column says what will land in
-                        it. Phones skip it: there the summary is just the next
-                        block down, and a placeholder would only be noise. */}
                     {route.stops.length === 0 ? (
                       <Card accent="gray" className="hidden p-4 lg:block">
                         <p className="text-ink text-xs leading-relaxed">
@@ -382,12 +480,18 @@ export function NewTripFlow() {
                       ) : null}
                     </div>
                   ) : null}
+
+                  {has('dates') ? (
+                    <p className="text-muted mt-3 text-[11px]">
+                      วันเดินทางมาจากวันบินที่ใส่ไว้ ไม่ต้องใส่ซ้ำ
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
 
-              {/* --- date door -------------------------------------------- */}
-              {entry === 'date' ? (
-                <>
+              {/* --- dates ------------------------------------------------ */}
+              {asksDates ? (
+                <section>
                   <div className="grid grid-cols-2 gap-2">
                     <DateField
                       label="ไปวันที่"
@@ -404,28 +508,56 @@ export function NewTripFlow() {
                       onChange={setEndDate}
                     />
                   </div>
-
-                  <p className="text-muted text-xs">
-                    {nights + 1} วัน {nights} คืน · {thaiRangeLabel(startDate, endDate)}
-                  </p>
-
-                  <Card accent="gray" className="p-4">
-                    <p className="text-ink text-xs leading-relaxed">
-                      ยังไม่ต้องเลือกปลายทางตอนนี้ — สร้างห้องแล้ว ROVE จะแนะนำที่ที่เหมาะกับ{' '}
-                      {nights + 1} วันนี้ให้ พอจองตั๋วได้แล้วค่อยใส่เที่ยวบินทีหลัง
+                  {/* The day count only exists once both ends do — a count
+                      against a blank is the "46365 วัน" of UAT round 1. */}
+                  {hasTypedDates ? (
+                    <p className="text-muted mt-2 text-xs">
+                      {nights + 1} วัน {nights} คืน · {thaiRangeLabel(startDate, endDate)}
                     </p>
-                    <button
-                      onClick={() => setEntry('route')}
-                      className="text-primary mt-2 text-xs font-medium"
-                    >
-                      จองตั๋วแล้ว? ใส่เที่ยวบินเลยดีกว่า →
-                    </button>
-                  </Card>
-                </>
+                  ) : (
+                    <p className="text-muted mt-2 text-xs">ใส่เป็น วัน/เดือน/ปี ค.ศ.</p>
+                  )}
+                </section>
               ) : null}
 
-              {/* --- coordinate door -------------------------------------- */}
-              {coordinating ? (
+              {/* --- destination ------------------------------------------ */}
+              {asksDestination ? (
+                <section>
+                  <AirportPicker
+                    label="ลงเครื่องที่สนามบินไหน"
+                    value={destination}
+                    onChange={setDestination}
+                    autoFocus={!asksDates}
+                  />
+                  <p className="text-muted mt-1.5 text-[11px]">
+                    ค้นจากชื่อเมืองก็ได้ — ถ้ายังไม่แน่ใจ ข้ามไปก่อนแล้วค่อยเลือกในห้องทริป
+                  </p>
+                </section>
+              ) : null}
+
+              {/* --- stay --------------------------------------------------- */}
+              {has('stay') ? (
+                <section className="grid gap-2 sm:grid-cols-2">
+                  <Field label="ที่พักที่จองไว้">
+                    <Input
+                      value={stayName}
+                      onChange={(e) => setStayName(e.target.value)}
+                      placeholder="ชื่อโรงแรม หรือย่านที่พัก"
+                    />
+                  </Field>
+                  <Field label="ลิงก์การจอง (ใส่ทีหลังได้)">
+                    <Input
+                      value={stayUrl}
+                      onChange={(e) => setStayUrl(e.target.value)}
+                      placeholder="วางลิงก์จาก Agoda / Booking / Airbnb"
+                      inputMode="url"
+                    />
+                  </Field>
+                </section>
+              ) : null}
+
+              {/* --- who is coming ----------------------------------------- */}
+              {!routing && !asksDates && !asksDestination && !has('stay') ? (
                 <Card accent="gray" className="p-4">
                   <p className="text-ink text-xs leading-relaxed">
                     สร้างห้องก่อนโดยยังไม่ต้องมีวัน — ทุกคนเข้ามาแตะวันที่ตัวเองว่าง แล้ว ROVE
@@ -437,8 +569,10 @@ export function NewTripFlow() {
               <Field label="ไปกันกี่คน" group>
                 <div className="flex items-center gap-3">
                   <button
+                    type="button"
                     onClick={() => setParty((p) => Math.max(1, p - 1))}
                     className="bg-surface text-ink size-10 rounded-full text-lg font-medium"
+                    aria-label="ลดจำนวนคน"
                   >
                     −
                   </button>
@@ -446,28 +580,30 @@ export function NewTripFlow() {
                     {party}
                   </span>
                   <button
+                    type="button"
                     onClick={() => setParty((p) => Math.min(12, p + 1))}
                     className="bg-surface text-ink size-10 rounded-full text-lg font-medium"
+                    aria-label="เพิ่มจำนวนคน"
                   >
                     +
                   </button>
-                  <span className="text-muted text-xs">ชวนเพิ่มทีหลังได้ตลอด</span>
+                  <span className="text-muted text-xs">
+                    {has('friends') ? 'นับตัวเองด้วย · ชวนเพิ่มทีหลังได้' : 'ชวนเพิ่มทีหลังได้ตลอด'}
+                  </span>
                 </div>
               </Field>
             </div>
           </div>
 
-          {/* Full-width thumb target on a phone; a button the size of its own
-              label once there is a mouse. */}
           <div
             className={cn(
               'mt-6 flex flex-col items-center gap-2 md:mt-8 md:flex-row md:justify-end md:gap-4',
               routing ? '' : 'md:max-w-2xl',
             )}
           >
-            {routing && !canContinue() ? (
+            {blocker() ? (
               <p className="text-muted order-2 text-center text-[11px] md:order-1 md:text-right">
-                ใส่สนามบินปลายทางและวันบินของขาไปก่อน
+                {blocker()}
               </p>
             ) : null}
             <Button
@@ -483,7 +619,7 @@ export function NewTripFlow() {
         </div>
       ) : null}
 
-      {/* step 2 -------------------------------------------------------- */}
+      {/* step 2 — character, summary, create -------------------------------- */}
       {step === 2 ? (
         <div className="animate-rove-rise">
           <button
@@ -500,17 +636,18 @@ export function NewTripFlow() {
             เพื่อนในทริปจะเห็นตัวนี้แทนรูปโปรไฟล์ เปลี่ยนทีหลังได้
           </p>
 
-          {/* Twenty characters: four rows on a phone, two on a desk. */}
           <div className="mt-5 grid max-w-3xl grid-cols-5 gap-2 sm:grid-cols-8 md:mt-7 md:grid-cols-10 md:gap-3">
             {(characters ?? []).map((c) => (
               <button
                 key={c.id}
+                type="button"
                 onClick={() => setCharacter(c.id)}
                 className={cn(
                   'rounded-2xl p-1.5 transition',
-                  character === c.id ? 'bg-ink' : 'bg-surface',
+                  picked === c.id ? 'bg-ink' : 'bg-surface',
                 )}
                 title={c.name}
+                aria-pressed={picked === c.id}
               >
                 <CharacterAvatar characterId={c.id} size="md" className="mx-auto" />
               </button>
@@ -521,11 +658,11 @@ export function NewTripFlow() {
             <p className="section-label mb-2">สรุปทริปที่จะสร้าง</p>
             <div className="flex flex-wrap gap-1.5">
               <Badge tone="ink">
-                {coordinating
-                  ? 'ยังไม่กำหนดวัน'
-                  : routing
-                    ? thaiRangeLabel(route.startDate, route.endDate)
-                    : thaiRangeLabel(startDate, endDate)}
+                {routing && route.startDate
+                  ? thaiRangeLabel(route.startDate, route.endDate)
+                  : hasTypedDates
+                    ? thaiRangeLabel(startDate, endDate)
+                    : 'ยังไม่กำหนดวัน'}
               </Badge>
               {routing
                 ? route.stops.map((stop) => (
@@ -533,7 +670,10 @@ export function NewTripFlow() {
                       {stop.city} {stop.nights} คืน
                     </Badge>
                   ))
-                : null}
+                : whereLabel()
+                  ? <Badge tone="feature">{whereLabel()}</Badge>
+                  : null}
+              {has('stay') && stayName.trim() ? <Badge tone="feature">{stayName.trim()}</Badge> : null}
               <Badge tone="feature">{party} คน</Badge>
             </div>
             {coordinating ? (
@@ -549,7 +689,7 @@ export function NewTripFlow() {
           </Card>
 
           {error ? (
-            <Card accent="gray" className="mt-3 max-w-3xl p-3">
+            <Card accent="warning" className="mt-3 max-w-3xl p-3">
               <p className="text-ink text-xs">{error}</p>
             </Card>
           ) : null}
@@ -571,26 +711,60 @@ export function NewTripFlow() {
           </div>
         </div>
       ) : null}
+
+      {activeWall ? (
+        <TripLimitSheet
+          open={wallOpen}
+          onClose={() => setWallOpen(false)}
+          allowance={activeWall}
+          onFreed={() => {
+            setWall(null);
+            setWallOpen(false);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
 
 /**
- * Old links still arrive with `?from=city` and `?from=ticket`. Both meant "I
- * know where I am going", which is now one door.
+ * Old links still arrive with `?from=…`. Each used to open a door; now each
+ * pre-ticks the box that door stood for. `city` and `ticket` both meant "I
+ * know where I am going" in different words.
  */
-function normaliseEntry(value: string | null): Entry | null {
+function normaliseEntry(value: string | null, hasDestination: boolean): StartedWith[] {
+  const out: StartedWith[] = [];
   switch (value) {
     case 'route':
-    case 'city':
     case 'ticket':
-      return 'route';
+      out.push('flights');
+      break;
+    case 'city':
+      out.push('destination');
+      break;
     case 'date':
-      return 'date';
-    case 'coordinate':
-      return 'coordinate';
+      out.push('dates');
+      break;
     default:
-      return null;
+      break;
   }
+  if (hasDestination && !out.includes('flights') && !out.includes('destination')) {
+    out.push('destination');
+  }
+  return out;
 }
 
+/** The 402 body, in the shape the sheet renders; the last GET as a fallback. */
+function allowanceFromPayload(payload: unknown, fallback: TripAllowance | undefined): TripAllowance {
+  const body = (payload ?? {}) as {
+    active_trips?: { id: string; title: string }[];
+    limit?: number;
+    price_thb?: number;
+  };
+  return {
+    allowed: false,
+    activeTrips: body.active_trips ?? fallback?.activeTrips ?? [],
+    limit: body.limit ?? fallback?.limit ?? 1,
+    priceThb: body.price_thb ?? fallback?.priceThb ?? 299,
+  };
+}

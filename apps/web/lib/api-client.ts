@@ -11,9 +11,24 @@ export class ApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    /**
+     * The whole body, for the few refusals that say more than one line —
+     * the paywall (Feedback #2 — D-10) names the trips holding the slot.
+     */
+    public readonly payload: unknown = null,
   ) {
     super(message);
     this.name = 'ApiError';
+  }
+
+  /** The machine-readable reason, when the API gave one (`{code: "TRIP_LIMIT"}`). */
+  get code(): string | null {
+    const body = this.payload;
+    if (body && typeof body === 'object' && 'code' in body) {
+      const code = (body as { code: unknown }).code;
+      return typeof code === 'string' ? code : null;
+    }
+    return null;
   }
 
   get isUnauthorized() {
@@ -70,7 +85,7 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
       payload && typeof payload === 'object' && 'error' in payload
         ? String((payload as { error: unknown }).error)
         : `request failed with ${res.status}`;
-    throw new ApiError(res.status, message);
+    throw new ApiError(res.status, message, payload);
   }
 
   return payload as T;

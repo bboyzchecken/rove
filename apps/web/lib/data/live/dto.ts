@@ -966,3 +966,12 @@ export interface PublicReviewDto {
   character_id: string;
   created_at: string;
 }
+
+/* ------------------------------------------------------- paywall (D-10) --- */
+
+export interface TripAllowanceDto {
+  allowed: boolean;
+  active_trips: { id: string; title: string }[] | null;
+  limit: number;
+  price_thb: number;
+}

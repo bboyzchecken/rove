@@ -834,6 +834,17 @@ export interface TripOverview {
 /** What a member may set a step to by hand (D-12). */
 export type StepOverrideStatus = 'skipped' | 'todo';
 
+/**
+ * Whether the next trip is allowed on this account (Feedback #2 — D-10), and
+ * if not, which trips are in the way and what the way past costs.
+ */
+export interface TripAllowance {
+  allowed: boolean;
+  activeTrips: { id: string; title: string }[];
+  limit: number;
+  priceThb: number;
+}
+
 export interface CreateTripInput {
   /**
    * Which door the trip came through (M1). "route" is the one for a group that

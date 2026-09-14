@@ -28,6 +28,11 @@ func (s *Server) registerUserRoutes(g *echo.Group) {
 	s.registerInboxRoutes(me) // A9.2 — the inbox belongs to a person, not a trip
 	me.GET("/trips/upcoming", s.handleUpcomingTrips)
 	me.GET("/trips/past", s.handlePastTrips)
+	// Feedback #2 — D-10: whether the next trip would hit the free-tier wall,
+	// so the entry flow can say so on its first screen rather than after the
+	// last one. Under /users/me because it is a fact about the account, and
+	// because everything under /trips/ must carry a :tripId (routes_test).
+	me.GET("/trip-allowance", s.handleTripAllowance)
 	// Bill & payment (A20.x) — receipts belong to the user, not to a trip.
 	s.registerBillingRoutes(me.Group("/billing"))
 

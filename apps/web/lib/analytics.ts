@@ -68,6 +68,8 @@ export interface AnalyticsEvents {
   next_trip_started: { surface: 'room' | 'recap' };
   /** Feedback #2 — D-12: a checklist step marked "ไม่จำเป็น" (or put back). */
   step_skipped: { step: string; status: 'skipped' | 'todo' };
+  /** Feedback #2 — D-10: a trip marked finished from the paywall to free the slot. */
+  trip_closed_for_slot: Record<string, never>;
   /** Feedback #2 — D-3: the owner changed the trip's colour. */
   trip_color_changed: { color: string };
 

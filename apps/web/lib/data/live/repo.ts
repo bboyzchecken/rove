@@ -77,6 +77,7 @@ import type {
   VoteDto,
   WishlistItemDto,
   YearStatsDto,
+  TripAllowanceDto,
 } from './dto';
 import {
   fromBooking,
@@ -261,6 +262,7 @@ export const liveRepo: RoveRepo = {
         entry_type: input.entryType,
         title: input.title,
         destination_cities: input.cities,
+        destination_country: input.country,
         start_date: input.startDate || null,
         end_date: input.endDate || null,
         party_size: input.partySize,
@@ -317,6 +319,15 @@ export const liveRepo: RoveRepo = {
     },
     async stats() {
       return toYearStats(await api.get<YearStatsDto>('/users/me/stats'));
+    },
+    async allowance() {
+      const dto = await api.get<TripAllowanceDto>('/users/me/trip-allowance');
+      return {
+        allowed: dto.allowed,
+        activeTrips: dto.active_trips ?? [],
+        limit: dto.limit,
+        priceThb: dto.price_thb,
+      };
     },
     async setStepStatus(tripId, step, status) {
       return toStepOverrides(

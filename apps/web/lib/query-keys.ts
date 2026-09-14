@@ -25,6 +25,8 @@ export const queryKeys = {
   billingPlans: () => ['billing', 'plans'] as const,
 
   trips: () => ['trips'] as const,
+  /** The free-tier wall, asked before the entry flow starts (Feedback #2 — D-10). */
+  tripAllowance: () => ['trips', 'allowance'] as const,
   tripsUpcoming: () => ['trips', 'upcoming'] as const,
   tripsPast: () => ['trips', 'past'] as const,
   stats: () => ['stats'] as const,
