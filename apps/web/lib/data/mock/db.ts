@@ -352,7 +352,12 @@ function seedDemoTrip(): TripRecord {
       { id: 'a3', memberId: 'm1', text: 'ให้ AI ร่างแพลน 8 วัน', createdAt: '2026-08-18T08:00:00.000Z' },
       { id: 'a4', memberId: 'm1', text: 'ตั้งงบไว้ที่ 45,000 บาท/คน', createdAt: '2026-08-16T03:30:00.000Z' },
     ],
-    ai: { used: AI_CREDITS.used, included: AI_CREDITS.freePerTrip, extra: 0, hasPass: false },
+    // Paid for (Feedback #2 — D-10). The free tier plans one trip at a time
+    // and the seed opens two, so a fresh tester used to meet the paywall on
+    // their very first "สร้างห้องทริป" — UAT round 1's หน้า 6. Both seeded rooms
+    // now hold a pass: the first trip a tester creates goes through, and the
+    // second one meets the wall with a room of their own to close.
+    ai: { used: AI_CREDITS.used, included: AI_CREDITS.freePerTrip, extra: 0, hasPass: true },
     // Published, because this is also the trip the landing page offers to an
     // anonymous visitor as "ดูทริปตัวอย่าง" (/p/japan-autumn-8d). The same
     // slug is seeded into MySQL for live mode, so one URL answers in both.
@@ -432,7 +437,8 @@ function seedDateTrip(): TripRecord {
       { id: 'da1', memberId: 'm4', text: 'ใส่วันว่างเดือนธันวาแล้ว', createdAt: '2026-08-19T01:00:00.000Z' },
       { id: 'da2', memberId: 'm1', text: 'สร้างห้องทริปและชวนเพื่อน 3 คน', createdAt: '2026-08-18T12:00:00.000Z' },
     ],
-    ai: { used: 0, included: AI_CREDITS.freePerTrip, extra: 0, hasPass: false },
+    // See seedDemoTrip: paid, so the seed does not use up the free slot.
+    ai: { used: 0, included: AI_CREDITS.freePerTrip, extra: 0, hasPass: true },
     share: {
       visibility: 'private',
       shareToken: null,

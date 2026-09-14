@@ -82,7 +82,7 @@ const TAB_PHASE: Record<string, (typeof PHASES)[number]['key'] | 'overview'> = {
 
 export function TripTabs({ tripId }: { tripId: string }) {
   const pathname = usePathname();
-  const t = useTranslations('trip');
+  const t = useTranslations();
   const variant = useVariant('trip-tabs');
   const { data: overview } = useTripOverview(tripId);
   const base = `/t/${tripId}`;
@@ -114,7 +114,7 @@ export function TripTabs({ tripId }: { tripId: string }) {
           </Link>
           {tab ? (
             <span className="font-display text-ink flex items-center gap-2 text-sm font-medium">
-              {t(tab.key)}
+              {t(`trip.${tab.key}`)}
               {status ? <StatusChip status={status} /> : null}
             </span>
           ) : null}
@@ -136,7 +136,7 @@ export function TripTabs({ tripId }: { tripId: string }) {
               currentPhase === 'overview' ? 'bg-ink text-bg' : 'bg-surface text-ink hover:bg-border',
             )}
           >
-            {t('overview')}
+            {t('trip.overview')}
           </Link>
           {PHASES.map((phase) => {
             const tabs = ordered.filter((tab) => TAB_PHASE[tab.segment] === phase.key);
@@ -179,7 +179,7 @@ export function TripTabs({ tripId }: { tripId: string }) {
                   key={tab.key}
                   href={hrefOf(tab)}
                   active={activeSegment === tab.segment}
-                  label={t(tab.key)}
+                  label={t(`trip.${tab.key}`)}
                   status={statusOf(tab)}
                   small
                 />
@@ -202,7 +202,7 @@ export function TripTabs({ tripId }: { tripId: string }) {
             key={tab.key}
             href={hrefOf(tab)}
             active={activeSegment === tab.segment}
-            label={t(tab.key)}
+            label={t(`trip.${tab.key}`)}
             status={statusOf(tab)}
           />
         ))}
@@ -213,7 +213,7 @@ export function TripTabs({ tripId }: { tripId: string }) {
             href={hrefOf(nextTab) as never}
             className="bg-orange-light text-ink inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-medium"
           >
-            ขั้นต่อไป: {STEP_BY_KEY[next.key].label} <ArrowRight className="size-3.5" />
+            {t('status.next')}: {STEP_BY_KEY[next.key].label} <ArrowRight className="size-3.5" />
           </Link>
         </div>
       ) : null}
@@ -279,6 +279,7 @@ function TabLink({
 }
 
 export function StatusChip({ status, className }: { status: StepStatus; className?: string }) {
+  const t = useTranslations('status');
   return (
     <span
       className={cn(
@@ -291,7 +292,7 @@ export function StatusChip({ status, className }: { status: StepStatus; classNam
       )}
     >
       <span className={cn('size-1.5 rounded-full', DOT[status])} />
-      {STATUS_LABEL[status]}
+      {t(status)}
     </span>
   );
 }

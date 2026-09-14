@@ -89,7 +89,10 @@ export function NewTripFlow() {
   const [have, setHave] = useState<StartedWith[]>(() =>
     normaliseEntry(params.get('from'), Boolean(presetAirport || presetCity)),
   );
-  const [step, setStep] = useState(0);
+  // A link that already says what the group has (a landing card, a dream)
+  // has answered the first screen; it opens on the second. Anyone arriving
+  // plain starts at the question.
+  const [step, setStep] = useState(params.get('from') !== null ? 1 : 0);
 
   // D-8: every field starts blank. The only thing that may arrive filled in
   // is a destination handed over by a link (a dream, a landing card).

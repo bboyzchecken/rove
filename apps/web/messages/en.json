@@ -31,5 +31,46 @@
     "covered": "In the plan",
     "partial": "Partly in",
     "uncovered": "Not in yet"
+  },
+  "nav": {
+    "myTrips": "My Trips",
+    "explore": "Explore",
+    "newTrip": "New trip",
+    "me": "Me"
+  },
+  "status": {
+    "todo": "To do",
+    "check": "Check",
+    "done": "Done",
+    "skipped": "Skipped",
+    "skip": "Skip",
+    "restore": "Restore",
+    "next": "Next step"
+  },
+  "explore": {
+    "all": "All",
+    "popular": "Popular",
+    "new": "New",
+    "trending": "Trending",
+    "country": "Country",
+    "search": "Search trips or cities"
+  },
+  "dates": {
+    "confirm": "Confirm my free days",
+    "confirmed": "Free days confirmed",
+    "lock": "Lock these dates",
+    "waitOwner": "Waiting for the owner to lock",
+    "myDay": "My day"
+  },
+  "home": {
+    "upcoming": "Upcoming trips",
+    "planning": "Still planning",
+    "calendar": "Trip calendar",
+    "past": "Past trips",
+    "dreams": "Someday",
+    "addDream": "Add More Dream Trip"
+  },
+  "variants": {
+    "title": "Pick a version to view"
   }
 }

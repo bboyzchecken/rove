@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Check, Globe, Search, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,7 @@ export function CountryFilterButton({
 }) {
   const [open, setOpen] = useState(false);
   const { data: countries = [] } = useExploreCountries();
+  const t = useTranslations('explore');
 
   return (
     <>
@@ -44,7 +46,7 @@ export function CountryFilterButton({
         )}
       >
         <Globe className="size-4" />
-        ประเทศ
+        {t('country')}
         {selected.length > 0 ? (
           <span className="bg-bg/20 nums rounded-full px-1.5 text-[11px]">{selected.length}</span>
         ) : null}

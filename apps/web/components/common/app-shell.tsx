@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { Compass, Luggage, Plus, UserRound } from 'lucide-react';
 
 import { LocaleSwitchCompact } from '@/components/common/locale-switch';
@@ -42,15 +43,16 @@ import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
  * redirects there so old links keep working.
  */
 const NAV = [
-  { href: '/home', label: 'ทริปของฉัน', icon: Luggage },
-  { href: '/explore', label: 'สำรวจ', icon: Compass },
-  { href: '/new', label: 'สร้างทริป', icon: Plus, accent: true },
-  { href: '/profile', label: 'ฉัน', icon: UserRound },
+  { href: '/home', key: 'myTrips', icon: Luggage },
+  { href: '/explore', key: 'explore', icon: Compass },
+  { href: '/new', key: 'newTrip', icon: Plus, accent: true },
+  { href: '/profile', key: 'me', icon: UserRound },
 ] as const;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { data: me } = useMe();
+  const t = useTranslations('nav');
 
   // A trip room lives under /t/:id and a finished one under /recap/:id — both
   // belong to the "ทริปของฉัน" tab.
@@ -110,7 +112,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   isActive(item.href) ? 'bg-ink text-bg' : 'text-muted hover:bg-surface',
                 )}
               >
-                {item.label}
+                {t(item.key)}
               </Link>
             ))}
           </nav>
@@ -140,12 +142,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   key={item.href}
                   href={item.href}
                   className="flex flex-col items-center gap-1 px-2"
-                  aria-label={item.label}
+                  aria-label={t(item.key)}
                 >
                   <span className="bg-primary text-primary-fg flex size-9 items-center justify-center rounded-full">
                     <Icon className="size-5" strokeWidth={2.5} />
                   </span>
-                  <span className="text-muted text-[10px] font-medium">{item.label}</span>
+                  <span className="text-muted text-[10px] font-medium">{t(item.key)}</span>
                 </Link>
               );
             }
@@ -160,7 +162,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 )}
               >
                 <Icon className="size-5" strokeWidth={active ? 2.5 : 2} />
-                <span className="text-[10px] font-medium">{item.label}</span>
+                <span className="text-[10px] font-medium">{t(item.key)}</span>
               </Link>
             );
           })}

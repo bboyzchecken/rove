@@ -24,7 +24,7 @@ test('a past trip opens its recap with the decisions intact', async ({ page }) =
 
   await expect(page).toHaveURL(/\/recap\/pai$/);
   await expect(page.getByRole('heading', { name: 'ปายหนีร้อน' })).toBeVisible();
-  await expect(page.getByText('สิ่งที่ตัดสินใจกันไว้')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'สิ่งที่ตัดสินใจกันไว้' })).toBeVisible();
   await expect(page.getByText(/เสาร์–จันทร์ ไม่ต้องลาเลย/)).toBeVisible();
   await expect(page.getByText(/ขับรถขึ้นเองแทนนั่งรถตู้/)).toBeVisible();
   await expect(page.getByText('แพลนที่เดินจริง')).toBeVisible();
@@ -39,9 +39,9 @@ test('publishing a finished trip pays the points it promised', async ({ page }) 
 
   await expect(page.getByText('ทริปนี้เปิดสาธารณะอยู่')).toBeVisible();
 
-  // 1,240 on the seed, plus the 500 the nudge promised.
+  // The seeded ledger sums to 1,470, plus the 500 the nudge promised.
   await page.goto('/profile');
-  await expect(page.getByText('1,740')).toBeVisible();
+  await expect(page.getByText('1,970').first()).toBeVisible();
 });
 
 test('a trip that is already public is not offered the reward twice', async ({ page }) => {

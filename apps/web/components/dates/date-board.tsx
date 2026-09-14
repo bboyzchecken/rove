@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   CalendarCheck,
   Eraser,
@@ -47,6 +48,7 @@ import { cn } from '@/lib/utils';
  */
 export function DateBoard({ tripId }: { tripId: string }) {
   const { data: me } = useMe();
+  const t = useTranslations('dates');
   const [month, setMonth] = useState<string | undefined>(undefined);
   const { data: board, isLoading } = useDateBoard(tripId, month);
   const [askedForWindows, setAskedForWindows] = useState(false);
@@ -193,11 +195,7 @@ export function DateBoard({ tripId }: { tripId: string }) {
             disabled={submit.isPending || confirmedMine || myDayCount === 0}
           >
             <CalendarCheck className="size-4" />
-            {confirmedMine
-              ? 'ยืนยันวันว่างแล้ว'
-              : myDayCount === 0
-                ? 'แตะวันที่ว่างก่อน'
-                : 'ยืนยันวันว่างของฉัน'}
+            {confirmedMine ? t('confirmed') : myDayCount === 0 ? 'แตะวันที่ว่างก่อน' : t('confirm')}
           </Button>
           {confirmedMine && !everyoneConfirmed ? (
             <p className="text-muted -mt-2 text-center text-[11px]">
@@ -278,11 +276,11 @@ export function DateBoard({ tripId }: { tripId: string }) {
                       if (chosen) lock.mutate({ startDate: chosen.startDate, endDate: chosen.endDate });
                     }}
                   >
-                    <Lock className="size-4" /> {lock.isPending ? 'กำลังล็อค…' : 'ล็อคช่วงนี้'}
+                    <Lock className="size-4" /> {lock.isPending ? 'กำลังล็อค…' : t('lock')}
                   </Button>
                 ) : (
                   <span className="text-muted inline-flex items-center gap-1.5 text-xs">
-                    <Lock className="size-3.5" /> รอหัวห้องล็อค
+                    <Lock className="size-3.5" /> {t('waitOwner')}
                   </span>
                 )}
               </div>

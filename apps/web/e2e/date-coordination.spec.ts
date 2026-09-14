@@ -40,7 +40,8 @@ test('once everyone has confirmed, the board offers the best window and the owne
 
   // Locking is what turns a room into a trip: the header takes the dates on.
   await expect(page.getByText('ได้วันแล้ว')).toBeVisible();
-  await expect(page.getByText('4–8 ธ.ค. · 5 วัน 4 คืน')).toBeVisible();
+  // The locked card and the header both say it now — either is proof enough.
+  await expect(page.getByText('4–8 ธ.ค. · 5 วัน 4 คืน').first()).toBeVisible();
 
   // …and the destination step appears, ranked for a five-day trip.
   await expect(page.getByText('ไปไหนดีกับ 5 วันนี้')).toBeVisible();

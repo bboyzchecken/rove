@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Copy, Eye, Search, Sparkles, Star } from 'lucide-react';
 
 import { Flower, Spiral } from '@/components/brand/doodle';
@@ -47,11 +48,11 @@ const HERO_TAGS = [
 
 type Feed = 'all' | 'popular' | 'new' | 'trending';
 
-const FEEDS: { id: Feed; label: string; hint: string; sort: ExploreSort }[] = [
-  { id: 'all', label: 'ทั้งหมด', hint: 'ทุกแพลนที่เปิดสาธารณะ', sort: 'popular' },
-  { id: 'popular', label: 'ยอดนิยม', hint: 'คนดูและก๊อปไปมากที่สุด', sort: 'popular' },
-  { id: 'new', label: 'มาใหม่', hint: 'เพิ่งเปิดสาธารณะ', sort: 'new' },
-  { id: 'trending', label: 'ติดเทรนด์', hint: 'ยอดดูพุ่งใน 7 วันนี้', sort: 'trending' },
+const FEEDS: { id: Feed; hint: string; sort: ExploreSort }[] = [
+  { id: 'all', hint: 'ทุกแพลนที่เปิดสาธารณะ', sort: 'popular' },
+  { id: 'popular', hint: 'คนดูและก๊อปไปมากที่สุด', sort: 'popular' },
+  { id: 'new', hint: 'เพิ่งเปิดสาธารณะ', sort: 'new' },
+  { id: 'trending', hint: 'ยอดดูพุ่งใน 7 วันนี้', sort: 'trending' },
 ];
 
 export function ExploreScreen({ signedIn }: { signedIn: boolean }) {
@@ -65,6 +66,7 @@ export function ExploreScreen({ signedIn }: { signedIn: boolean }) {
   const { data: me } = useMe();
   const { data: myTrips } = useTrips();
   const matchable = myTrips ?? [];
+  const t = useTranslations('explore');
 
   const current = FEEDS.find((f) => f.id === feed) ?? FEEDS[0]!;
 
@@ -126,7 +128,7 @@ export function ExploreScreen({ signedIn }: { signedIn: boolean }) {
           <Search className="text-muted size-4 shrink-0" />
           <input
             className={cn(bareInputClass, 'ml-2')}
-            placeholder="ค้นหาชื่อทริปหรือเมือง"
+            placeholder={t('search')}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -173,7 +175,7 @@ export function ExploreScreen({ signedIn }: { signedIn: boolean }) {
                 : 'bg-surface text-ink hover:bg-border',
             )}
           >
-            {option.label}
+            {t(option.id)}
           </button>
         ))}
       </div>
