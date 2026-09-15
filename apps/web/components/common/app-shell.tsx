@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Compass, Luggage, Plus, UserRound } from 'lucide-react';
+import { Compass, Heart, Luggage, Plus, UserRound } from 'lucide-react';
 
 import { LocaleSwitchCompact } from '@/components/common/locale-switch';
 import { ModeBanner } from '@/components/common/mode-banner';
@@ -20,7 +20,7 @@ import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
  * same destinations as a top bar from `md` up. The trip room draws its own tab
  * strip underneath this.
  *
- * Four destinations, with "สร้างทริป" in the middle where the thumb rests.
+ * Four destinations (five on phones), with "สร้างทริป" in the middle where the thumb rests.
  * None of them points at a single trip: with two trips in flight, a "ทริปนี้"
  * tab cannot say which one it means, so the tab is the *list* and the room is
  * one tap deeper.
@@ -29,9 +29,9 @@ import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
  * not the site's front door, and conflating the two is what made the map
  * confusing.
  *
- * "ที่อยากไป" is not here even though it is a real destination: /dreams is one
- * tap from /home, /profile and the profile menu, whereas /explore had no way in
- * at all outside the 404. A tab is worth more to the screen nobody can reach.
+ * "ที่อยากไป" is not in the desktop nav even though it is a real destination:
+ * /dreams is one tap from /home, /profile and the profile menu. The phone bar
+ * carries it as "ดรีมทริป" (Feedback #3 — D-5) to balance two tabs each side.
  *
  * The header here and `PublicShell`'s are deliberately the same frame —
  * `max-w-5xl`, the same gutter, the same height, logo left and actions right —
@@ -47,6 +47,18 @@ const NAV = [
   { href: '/explore', key: 'explore', icon: Compass },
   { href: '/new', key: 'newTrip', icon: Plus, accent: true },
   { href: '/profile', key: 'me', icon: UserRound },
+] as const;
+
+/**
+ * Feedback #3 — D-5/D-7: the phone bar is five even columns with สร้างทริป in
+ * the middle, so "ดรีมทริป" joins it there. The desktop pill nav keeps `NAV`.
+ */
+const BOTTOM_NAV = [
+  NAV[0],
+  NAV[1],
+  NAV[2],
+  { href: '/dreams', key: 'dreams', icon: Heart },
+  NAV[3],
 ] as const;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -131,8 +143,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Bottom bar: phones only. */}
       <nav className="border-border bg-bg/95 fixed inset-x-0 bottom-0 z-30 border-t backdrop-blur-md md:hidden">
-        <div className="mx-auto flex max-w-md items-stretch justify-around px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-          {NAV.map((item) => {
+        <div className="mx-auto grid max-w-md grid-cols-5 items-stretch px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          {BOTTOM_NAV.map((item) => {
             const active = isActive(item.href);
             const Icon = item.icon;
 
@@ -141,13 +153,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="flex flex-col items-center gap-1 px-2"
+                  className="flex min-w-0 flex-col items-center justify-end gap-1"
                   aria-label={t(item.key)}
                 >
                   <span className="bg-primary text-primary-fg flex size-9 items-center justify-center rounded-full">
                     <Icon className="size-5" strokeWidth={2.5} />
                   </span>
-                  <span className="text-muted text-[10px] font-medium">{t(item.key)}</span>
+                  <span className="text-muted text-[10px] font-medium whitespace-nowrap">
+                    {t(item.key)}
+                  </span>
                 </Link>
               );
             }
@@ -157,12 +171,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex flex-col items-center gap-1 px-2 pt-1',
+                  'flex min-w-0 flex-col items-center justify-end gap-1 pt-1',
                   active ? 'text-primary' : 'text-muted',
                 )}
               >
                 <Icon className="size-5" strokeWidth={active ? 2.5 : 2} />
-                <span className="text-[10px] font-medium">{t(item.key)}</span>
+                <span className="text-[10px] font-medium whitespace-nowrap">{t(item.key)}</span>
               </Link>
             );
           })}

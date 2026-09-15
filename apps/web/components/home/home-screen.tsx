@@ -84,13 +84,17 @@ export function HomeScreen() {
         <Link href={(activeTripId ? `/t/${activeTripId}/plan` : '/new') as never}>
           <Card accent="itinerary" className="flex h-full flex-col items-start gap-2 p-3.5">
             <Sparkles className="text-ink size-5" strokeWidth={2.2} />
-            <span className="text-ink text-xs leading-tight font-medium">ให้ AI ร่างแพลน</span>
+            <span className="text-ink text-xs leading-tight font-medium">
+              ให้ AI ร่างแพลนทริปที่กำลังจะมาถึง
+            </span>
           </Card>
         </Link>
         <Link href={(activeTripId ? `/t/${activeTripId}/expense` : '/new') as never}>
           <Card accent="documents" className="flex h-full flex-col items-start gap-2 p-3.5">
             <Receipt className="text-ink size-5" strokeWidth={2.2} />
-            <span className="text-ink text-xs leading-tight font-medium">บันทึกรายจ่าย</span>
+            <span className="text-ink text-xs leading-tight font-medium">
+              บันทึกรายจ่ายทริปที่กำลังจะมาถึง
+            </span>
           </Card>
         </Link>
       </div>
@@ -182,14 +186,24 @@ export function HomeScreen() {
             {past.map((trip) => (
               <Link key={trip.id} href={`/recap/${trip.id}` as never} className="shrink-0">
                 <Card accent="gray" className="flex w-72 gap-3 p-3">
-                  <TripCover src={trip.cover} frame="thumb" className="rounded-brand-sm w-24 self-start sm:w-24" />
+                  <TripCover
+                    src={trip.cover}
+                    frame="thumb"
+                    className="rounded-brand-sm w-24 self-start sm:w-24"
+                  />
                   <div className="min-w-0 flex-1">
-                    <p className="font-display text-ink truncate text-base font-medium">{trip.title}</p>
+                    <p className="font-display text-ink truncate text-base font-medium">
+                      {trip.title}
+                    </p>
                     <p className="text-muted nums mt-0.5 text-[11px]">{trip.dateLabel}</p>
                     <div className="mt-2.5 flex items-start gap-3">
                       <Figure value={trip.days} label="วัน" />
                       <Figure value={trip.places} label="ที่" />
-                      <Figure value={formatMoney(trip.spentThb, 'THB')} label="ใช้ไป" className="flex-1" />
+                      <Figure
+                        value={formatMoney(trip.spentThb, 'THB')}
+                        label="ใช้ไป"
+                        className="flex-1"
+                      />
                     </div>
                     <div className="mt-2.5 flex items-center justify-between gap-2">
                       <CharacterStack characterIds={trip.characterIds ?? []} size="xs" max={4} />
@@ -251,10 +265,20 @@ function StatCard({
 }
 
 /** A number bigger than its caption — F2.6's "ตัวเลขให้ใหญ่กว่า label". */
-function Figure({ value, label, className }: { value: React.ReactNode; label: string; className?: string }) {
+function Figure({
+  value,
+  label,
+  className,
+}: {
+  value: React.ReactNode;
+  label: string;
+  className?: string;
+}) {
   return (
     <div className={cn('min-w-0', className)}>
-      <div className="font-display text-ink nums truncate text-sm leading-none font-medium">{value}</div>
+      <div className="font-display text-ink nums truncate text-sm leading-none font-medium">
+        {value}
+      </div>
       <div className="text-muted mt-0.5 text-[10px]">{label}</div>
     </div>
   );

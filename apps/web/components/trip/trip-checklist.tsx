@@ -183,15 +183,22 @@ function StepRow({
 
       {action}
 
-      {(status === 'todo' || status === 'check') && step.skippable ? (
-        <button
-          type="button"
-          onClick={onSkip}
-          title="ทริปนี้ไม่ต้องทำขั้นนี้"
-          className="text-muted hover:text-ink shrink-0 rounded-full px-1.5 py-1 text-[11px]"
-        >
-          ข้าม
-        </button>
+      {/* Feedback #3 — D-4: every row with a button keeps the "ข้าม" slot, so
+          the black pills end on one line whether or not the step can be
+          skipped. */}
+      {action ? (
+        (status === 'todo' || status === 'check') && step.skippable ? (
+          <button
+            type="button"
+            onClick={onSkip}
+            title="ทริปนี้ไม่ต้องทำขั้นนี้"
+            className="text-muted hover:text-ink w-9 shrink-0 rounded-full py-1 text-center text-[11px]"
+          >
+            ข้าม
+          </button>
+        ) : (
+          <span aria-hidden className="w-9 shrink-0" />
+        )
       ) : null}
     </li>
   );

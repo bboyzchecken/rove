@@ -11,7 +11,9 @@ import {
   ClipboardPaste,
   MapPin,
   Plane,
+  Plus,
   Users,
+  X,
 } from 'lucide-react';
 
 import { TripLimitBanner, TripLimitSheet } from '@/components/billing/trip-limit-sheet';
@@ -63,17 +65,51 @@ import { cn } from '@/lib/utils';
  */
 
 const HAVE: { key: StartedWith; icon: typeof CalendarDays; title: string; hint: string }[] = [
-  { key: 'dates', icon: CalendarDays, title: 'รู้วันแล้ว', hint: 'ลาไว้แล้ว หรือตกลงวันกันได้แล้ว' },
+  {
+    key: 'dates',
+    icon: CalendarDays,
+    title: 'รู้วันแล้ว',
+    hint: 'ลาไว้แล้ว หรือตกลงวันกันได้แล้ว',
+  },
   {
     key: 'flights',
     icon: Plane,
     title: 'จองไฟลท์แล้ว',
     hint: 'มีตั๋วในมือ — วางข้อความจากอีเมลตั๋วได้เลย',
   },
-  { key: 'stay', icon: BedDouble, title: 'จองที่พักแล้ว', hint: 'ใส่ชื่อหรือลิงก์ที่พักเก็บไว้ก่อน' },
+  {
+    key: 'stay',
+    icon: BedDouble,
+    title: 'จองที่พักแล้ว',
+    hint: 'ใส่ชื่อหรือลิงก์ที่พักเก็บไว้ก่อน',
+  },
   { key: 'destination', icon: MapPin, title: 'รู้ปลายทางแล้ว', hint: 'รู้แล้วว่าจะไปเมืองไหน' },
   { key: 'friends', icon: Users, title: 'มีเพื่อนไปด้วยแล้ว', hint: 'รู้แล้วว่าไปกันกี่คน' },
 ];
+
+interface DraftStay {
+  id: string;
+  name: string;
+  url: string;
+  /** ISO "yyyy-mm-dd" or "" — dates are optional (Feedback #3 — D-1). */
+  checkIn: string;
+  checkOut: string;
+  showDates: boolean;
+}
+
+let stayCounter = 0;
+function newStay(patch: Partial<DraftStay> = {}): DraftStay {
+  stayCounter += 1;
+  return {
+    id: `stay-${stayCounter}`,
+    name: '',
+    url: '',
+    checkIn: '',
+    checkOut: '',
+    showDates: false,
+    ...patch,
+  };
+}
 
 const SAMPLE_TICKET = `Thai Airways — Booking confirmed
 TG 682  BKK 23:59 → NRT 08:05  04 Dec 2026
@@ -103,8 +139,7 @@ export function NewTripFlow() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [destination, setDestination] = useState<Airport | null>(null);
-  const [stayName, setStayName] = useState('');
-  const [stayUrl, setStayUrl] = useState('');
+  const [stays, setStays] = useState<DraftStay[]>(() => [newStay()]);
   const [party, setParty] = useState(1);
   const [character, setCharacter] = useState<string | null>(null);
   const [ticket, setTicket] = useState('');
@@ -164,6 +199,25 @@ export function NewTripFlow() {
   const hasTypedDates = isIsoDate(startDate) && isIsoDate(endDate) && startDate <= endDate;
   const coordinating = !routing && !hasTypedDates;
   const nights = routing ? route.nights : hasTypedDates ? daysBetween(startDate, endDate) - 1 : 0;
+
+  // D-2 (Feedback #3): a stay's nights sit inside the trip once the trip has
+  // an edge — typed dates, or the first and last flight.
+  const tripStart = routing ? route.startDate : hasTypedDates ? startDate : '';
+  const tripEnd = routing ? route.endDate : hasTypedDates ? endDate : '';
+  const namedStays = stays.filter((stay) => stay.name.trim());
+
+  function updateStay(id: string, patch: Partial<DraftStay>) {
+    setStays((current) => current.map((stay) => (stay.id === id ? { ...stay, ...patch } : stay)));
+  }
+
+  /** The next hotel usually starts the morning the last one ends. */
+  function addStay() {
+    setStays((current) => {
+      const previous = current[current.length - 1];
+      const checkIn = previous?.checkOut ?? '';
+      return [...current, newStay({ checkIn, showDates: Boolean(checkIn) })];
+    });
+  }
 
   function toggle(key: StartedWith) {
     setHave((current) =>
@@ -255,16 +309,21 @@ export function NewTripFlow() {
         startedWith: have,
       });
 
-      // The hotel they already booked goes into the room as a booking, so the
-      // bookings step opens on it rather than on "nothing yet".
-      if (has('stay') && stayName.trim()) {
-        await repo.booking.save(trip.id, {
-          kind: 'stay',
-          title: stayName.trim(),
-          partner: '',
-          url: stayUrl.trim(),
-          status: 'booked',
-        });
+      // The hotels they already booked go into the room as bookings, so the
+      // bookings step opens on them rather than on "nothing yet". A trip that
+      // changes city has one per city (Feedback #3 — D-1).
+      if (has('stay')) {
+        for (const stay of namedStays) {
+          await repo.booking.save(trip.id, {
+            kind: 'stay',
+            title: stay.name.trim(),
+            partner: '',
+            url: stay.url.trim(),
+            status: 'booked',
+            checkIn: isIsoDate(stay.checkIn) ? stay.checkIn : undefined,
+            checkOut: isIsoDate(stay.checkOut) ? stay.checkOut : undefined,
+          });
+        }
       }
 
       router.push(coordinating ? `/t/${trip.id}/dates` : `/t/${trip.id}`);
@@ -540,22 +599,90 @@ export function NewTripFlow() {
 
               {/* --- stay --------------------------------------------------- */}
               {has('stay') ? (
-                <section className="grid gap-2 sm:grid-cols-2">
-                  <Field label="ที่พักที่จองไว้">
-                    <Input
-                      value={stayName}
-                      onChange={(e) => setStayName(e.target.value)}
-                      placeholder="ชื่อโรงแรม หรือย่านที่พัก"
-                    />
-                  </Field>
-                  <Field label="ลิงก์การจอง (ใส่ทีหลังได้)">
-                    <Input
-                      value={stayUrl}
-                      onChange={(e) => setStayUrl(e.target.value)}
-                      placeholder="วางลิงก์จาก Agoda / Booking / Airbnb"
-                      inputMode="url"
-                    />
-                  </Field>
+                <section className="space-y-3">
+                  {stays.map((stay, index) => (
+                    <div
+                      key={stay.id}
+                      className={cn(
+                        'space-y-2',
+                        stays.length > 1 && 'border-border rounded-2xl border p-3',
+                      )}
+                    >
+                      {stays.length > 1 ? (
+                        <div className="flex items-center justify-between">
+                          <p className="text-ink text-xs font-medium">ที่พักที่ {index + 1}</p>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setStays((current) => current.filter((s) => s.id !== stay.id))
+                            }
+                            className="text-muted hover:text-ink inline-flex items-center gap-1 text-[11px]"
+                            aria-label={`ลบที่พักที่ ${index + 1}`}
+                          >
+                            <X className="size-3.5" /> ลบ
+                          </button>
+                        </div>
+                      ) : null}
+
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <Field label="ที่พักที่จองไว้">
+                          <Input
+                            value={stay.name}
+                            onChange={(e) => updateStay(stay.id, { name: e.target.value })}
+                            placeholder="ชื่อโรงแรม หรือย่านที่พัก"
+                          />
+                        </Field>
+                        <Field label="ลิงก์การจอง (ใส่ทีหลังได้)">
+                          <Input
+                            value={stay.url}
+                            onChange={(e) => updateStay(stay.id, { url: e.target.value })}
+                            placeholder="วางลิงก์จาก Agoda / Booking / Airbnb"
+                            inputMode="url"
+                          />
+                        </Field>
+                      </div>
+
+                      {stay.showDates ? (
+                        <div className="grid grid-cols-2 gap-2">
+                          <DateField
+                            label="เช็คอิน"
+                            value={stay.checkIn}
+                            min={tripStart || undefined}
+                            max={tripEnd || undefined}
+                            onChange={(iso) =>
+                              updateStay(stay.id, {
+                                checkIn: iso,
+                                checkOut:
+                                  iso && stay.checkOut && iso > stay.checkOut ? '' : stay.checkOut,
+                              })
+                            }
+                          />
+                          <DateField
+                            label="เช็คเอาต์"
+                            value={stay.checkOut}
+                            min={stay.checkIn || tripStart || undefined}
+                            max={tripEnd || undefined}
+                            onChange={(iso) => updateStay(stay.id, { checkOut: iso })}
+                          />
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => updateStay(stay.id, { showDates: true })}
+                          className="text-primary inline-flex items-center gap-1 text-xs font-medium"
+                        >
+                          <CalendarDays className="size-3.5" /> ใส่วันที่ (ไม่บังคับ)
+                        </button>
+                      )}
+                    </div>
+                  ))}
+
+                  <Button type="button" variant="soft" size="sm" onClick={addStay}>
+                    <Plus className="size-4" /> เพิ่มที่พัก
+                  </Button>
+                  <p className="text-muted text-[11px]">
+                    เปลี่ยนเมืองระหว่างทริป? เพิ่มที่พักได้หลายที่
+                  </p>
                 </section>
               ) : null}
 
@@ -667,16 +794,22 @@ export function NewTripFlow() {
                     ? thaiRangeLabel(startDate, endDate)
                     : 'ยังไม่กำหนดวัน'}
               </Badge>
-              {routing
-                ? route.stops.map((stop) => (
-                    <Badge key={stop.airport} tone="feature">
-                      {stop.city} {stop.nights} คืน
+              {routing ? (
+                route.stops.map((stop) => (
+                  <Badge key={stop.airport} tone="feature">
+                    {stop.city} {stop.nights} คืน
+                  </Badge>
+                ))
+              ) : whereLabel() ? (
+                <Badge tone="feature">{whereLabel()}</Badge>
+              ) : null}
+              {has('stay')
+                ? namedStays.map((stay) => (
+                    <Badge key={stay.id} tone="feature">
+                      {stay.name.trim()}
                     </Badge>
                   ))
-                : whereLabel()
-                  ? <Badge tone="feature">{whereLabel()}</Badge>
-                  : null}
-              {has('stay') && stayName.trim() ? <Badge tone="feature">{stayName.trim()}</Badge> : null}
+                : null}
               <Badge tone="feature">{party} คน</Badge>
             </div>
             {coordinating ? (
@@ -758,7 +891,10 @@ function normaliseEntry(value: string | null, hasDestination: boolean): StartedW
 }
 
 /** The 402 body, in the shape the sheet renders; the last GET as a fallback. */
-function allowanceFromPayload(payload: unknown, fallback: TripAllowance | undefined): TripAllowance {
+function allowanceFromPayload(
+  payload: unknown,
+  fallback: TripAllowance | undefined,
+): TripAllowance {
   const body = (payload ?? {}) as {
     active_trips?: { id: string; title: string }[];
     limit?: number;
