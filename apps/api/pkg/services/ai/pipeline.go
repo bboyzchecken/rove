@@ -30,7 +30,6 @@ import (
 // deterministic Go code, and the model never gets to mark its own homework.
 type Pipeline interface {
 	Generate(ctx context.Context, in GenerateInput, onStep StepFunc) (*DraftResult, error)
-	ParseTicket(ctx context.Context, text string) (*ParsedTicket, error)
 }
 
 // StepFunc reports progress so the SSE stream can show what is happening.
@@ -708,42 +707,6 @@ func openQuestions(in GenerateInput) []string {
 	}
 	return out
 }
-
-/* ---------------------------------------------------------- parse ticket -- */
-
-// ParseTicket reads a pasted booking e-mail. In mock mode — and whenever the
-// model is unavailable — it falls back to a regex that handles the shape
-// airline confirmations actually use, which is enough to reach a trip frame.
-func (p *pipeline) ParseTicket(ctx context.Context, text string) (*ParsedTicket, error) {
-	if p.cfg.UseStubs() || p.cfg.Anthropic.ApiKey == "" {
-		return parseTicketHeuristic(text), nil
-	}
-
-	res, err := p.client.Complete(ctx, p.cfg.Anthropic.ModelFast, ticketSystem,
-		[]Message{{Role: "user", Content: text}}, 1500)
-	if err != nil || res.Simulated || strings.TrimSpace(res.Text) == "" {
-		return parseTicketHeuristic(text), nil
-	}
-
-	raw := strings.TrimSpace(res.Text)
-	if start := strings.Index(raw, "{"); start > 0 {
-		raw = raw[start:]
-	}
-	if end := strings.LastIndex(raw, "}"); end >= 0 && end < len(raw)-1 {
-		raw = raw[:end+1]
-	}
-
-	var out ParsedTicket
-	if err := json.Unmarshal([]byte(raw), &out); err != nil {
-		return parseTicketHeuristic(text), nil
-	}
-	return &out, nil
-}
-
-const ticketSystem = `อ่านอีเมลยืนยันตั๋วเครื่องบิน แล้วตอบกลับเป็น JSON เท่านั้น:
-{"flights":[{"direction":"out|back","airline":"","flight_no":"","dep_airport":"","arr_airport":"","dep_at":"YYYY-MM-DDTHH:mm","arr_at":"YYYY-MM-DDTHH:mm"}],
- "suggested_title":"","start_date":"YYYY-MM-DD","end_date":"YYYY-MM-DD"}
-ถ้าอ่านไม่ออกให้ส่ง flights เป็น []`
 
 /* ----------------------------------------------------------------- util -- */
 

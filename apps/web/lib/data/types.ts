@@ -891,24 +891,6 @@ export interface UpdateTripInput {
   color?: TripColor;
 }
 
-/** What A1.2 makes of a pasted booking e-mail (M1 — W1.4). */
-export interface ParsedTicket {
-  flights: {
-    code: string;
-    from: string;
-    to: string;
-    date: string;
-    time?: string;
-    direction: 'out' | 'back';
-  }[];
-  startDate: string | null;
-  endDate: string | null;
-  partySize: number | null;
-  cities: string[];
-  /** Mock mode reads the text with a regex instead of the model. */
-  simulated: boolean;
-}
-
 export interface InviteLink {
   token: string;
   url: string;

@@ -21,6 +21,11 @@ import { cn } from '@/lib/utils';
  * the viewport, and the sheet came out straddling the top of the page with its
  * own title scrolled off-screen. On `<body>` there is nothing above it to
  * capture it.
+ *
+ * On a phone the whole card scrolls as one piece (F6 of Feedback #4 leaves
+ * this alone on purpose — the mobile sheet was already fine). From `sm` up,
+ * header and footer stop moving: only the body between them scrolls, so a
+ * long form never drags its own title or save button off-screen.
  */
 export function Sheet({
   open,
@@ -71,11 +76,11 @@ export function Sheet({
         aria-modal="true"
         aria-label={title}
         className={cn(
-          'bg-bg shadow-float-lg animate-rove-rise relative max-h-[88dvh] w-full overflow-y-auto rounded-t-[2rem] p-5 sm:max-w-md sm:rounded-[2rem]',
+          'bg-bg shadow-float-lg animate-rove-rise relative max-h-[88dvh] w-full overflow-y-auto rounded-t-[2rem] p-5 sm:flex sm:max-w-md sm:flex-col sm:overflow-hidden sm:rounded-[2rem] sm:p-0',
           className,
         )}
       >
-        <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="border-border mb-4 flex items-start justify-between gap-3 sm:mb-0 sm:shrink-0 sm:border-b sm:px-6 sm:pt-6 sm:pb-4">
           <div>
             <h2 className="font-display text-ink text-lg font-medium tracking-tight">
               {title}
@@ -91,9 +96,13 @@ export function Sheet({
           </button>
         </div>
 
-        {children}
+        <div className="sm:min-h-0 sm:flex-1 sm:overflow-y-auto sm:px-6">{children}</div>
 
-        {footer ? <div className="mt-5">{footer}</div> : null}
+        {footer ? (
+          <div className="border-border mt-5 sm:mt-0 sm:shrink-0 sm:border-t sm:px-6 sm:py-4">
+            {footer}
+          </div>
+        ) : null}
       </div>
     </div>,
     document.body,

@@ -14,7 +14,6 @@ const (
 	AIKindRefine      = "refine"
 	AIKindRebalance   = "rebalance"
 	AIKindDestination = "suggest_destination"
-	AIKindTicket      = "parse_ticket"
 	AIKindNormalize   = "normalize_wishlist"
 )
 

@@ -48,7 +48,6 @@ import type {
   VariantList,
   VariantMetrics,
   Order,
-  ParsedTicket,
   PastTrip,
   AudienceSummary,
   PlatformStats,
@@ -121,7 +120,6 @@ import type {
   VariantListDto,
   VariantMetricsDto,
   OrderDto,
-  ParsedTicketDto,
   PastTripDto,
   AudienceDto,
   PlatformStatsDto,
@@ -1233,24 +1231,6 @@ export function toYearStats(dto: YearStatsDto): YearStats {
     countries: dto.countries,
     places: dto.places,
     spentThb: dto.spent_thb,
-  };
-}
-
-export function toParsedTicket(dto: ParsedTicketDto): ParsedTicket {
-  return {
-    flights: (dto.flights ?? []).map((f) => ({
-      code: f.code,
-      from: f.from,
-      to: f.to,
-      date: f.date,
-      time: f.time ?? undefined,
-      direction: f.direction,
-    })),
-    startDate: dto.start_date,
-    endDate: dto.end_date,
-    partySize: dto.party_size,
-    cities: dto.cities ?? [],
-    simulated: dto.simulated,
   };
 }
 

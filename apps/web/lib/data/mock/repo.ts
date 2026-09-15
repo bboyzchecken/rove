@@ -48,7 +48,6 @@ import type {
   ExportResult,
   FlightLeg,
   FlightLegInput,
-  ParsedTicket,
   PastTrip,
   PlanDay,
   PlanItem,
@@ -936,66 +935,6 @@ export const mockRepo: RoveRepo = {
       );
     },
 
-    /**
-     * No model call in mock mode: the paste is read with a regex that handles
-     * the shape airline confirmations actually use — a route line with two
-     * airport codes and a date. Enough for UAT to reach a real trip frame.
-     */
-    async parseTicket(text) {
-      const MONTHS: Record<string, number> = {
-        jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
-        jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
-      };
-      const flights: ParsedTicket['flights'] = [];
-      // carrier + number … origin … destination … "15 Nov 2026"
-      const line = new RegExp(
-        String.raw`([A-Z]{2})\s?(\d{2,4})\s+\b([A-Z]{3})\b\s*(\d{2}:\d{2})?[^A-Za-z0-9]*(?:→|->|to)?\s*\b([A-Z]{3})\b[^\n]*?(\d{1,2})\s+([A-Za-z]{3})[a-z]*\s+(\d{4})`,
-        'g',
-      );
-
-      for (const match of text.matchAll(line)) {
-        const [, carrier, number, from, time, to, day, monthName, year] = match;
-        const month = MONTHS[(monthName ?? '').slice(0, 3).toLowerCase()];
-        if (!month) continue;
-        flights.push({
-          code: `${carrier}${number}`,
-          from: from!,
-          to: to!,
-          date: `${year}-${String(month).padStart(2, '0')}-${day!.padStart(2, '0')}`,
-          time,
-          direction: flights.length === 0 ? 'out' : 'back',
-        });
-      }
-
-      const dates = flights.map((f) => f.date).sort();
-      const party = Number(/(?:passengers?|ผู้โดยสาร)\D*(\d+)/i.exec(text)?.[1] ?? '');
-
-      // Destinations come from the worldwide index, so a ticket to anywhere
-      // resolves — not only to the dozen cities this used to know by heart.
-      const found = await getAirports(flights.map((f) => f.to));
-      const home = flights[0]?.from.toUpperCase();
-      const cities = [
-        ...new Set(
-          flights
-            .filter((f) => f.to.toUpperCase() !== home)
-            .map((f) => found[f.to.toUpperCase()])
-            .filter(Boolean)
-            .map((airport) => airport!.cityTh || airport!.city),
-        ),
-      ];
-
-      return delay(
-        {
-          flights,
-          startDate: dates[0] ?? null,
-          endDate: dates[dates.length - 1] ?? null,
-          partySize: Number.isFinite(party) && party > 0 ? party : null,
-          cities,
-          simulated: true,
-        } satisfies ParsedTicket,
-        480,
-      );
-    },
 
     async route(tripId) {
       const record = mutate((db) => clone(tripRecord(db, tripId)));

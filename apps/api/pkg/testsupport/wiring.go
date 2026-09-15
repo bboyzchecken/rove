@@ -196,9 +196,6 @@ type stubPipeline struct{}
 func (stubPipeline) Generate(context.Context, ai.GenerateInput, ai.StepFunc) (*ai.DraftResult, error) {
 	return nil, nil
 }
-func (stubPipeline) ParseTicket(context.Context, string) (*ai.ParsedTicket, error) {
-	return nil, nil
-}
 
 type stubRunner struct{}
 

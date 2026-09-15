@@ -944,26 +944,6 @@ type routeDTO struct {
 	RoundTrip   bool                 `json:"round_trip"`
 }
 
-/* ---------------------------------------------------------------- ticket -- */
-
-type parsedTicketFlightDTO struct {
-	Code      string  `json:"code"`
-	From      string  `json:"from"`
-	To        string  `json:"to"`
-	Date      string  `json:"date"`
-	Time      *string `json:"time"`
-	Direction string  `json:"direction"`
-}
-
-type parsedTicketDTO struct {
-	Flights   []parsedTicketFlightDTO `json:"flights"`
-	StartDate *string                 `json:"start_date"`
-	EndDate   *string                 `json:"end_date"`
-	PartySize *int                    `json:"party_size"`
-	Cities    []string                `json:"cities"`
-	Simulated bool                    `json:"simulated"`
-}
-
 /* ---------------------------------------------------------------- export -- */
 
 type exportDTO struct {

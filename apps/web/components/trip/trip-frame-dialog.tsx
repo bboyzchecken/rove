@@ -11,6 +11,7 @@ import { useMe } from '@/features/auth/queries';
 import { useTripOverview, useUpdateTrip } from '@/features/trip/queries';
 import type { Trip, TripColor, UpdateTripInput } from '@/lib/data';
 import { daysBetween } from '@/lib/data/domain';
+import { shiftEndOnStartChange } from '@/lib/date-range';
 import { TRIP_COLORS, TRIP_COLOR_LABEL, tripColorClasses } from '@/lib/trip-color';
 import { cn } from '@/lib/utils';
 
@@ -40,6 +41,10 @@ export function TripFrameDialog({
   const [title, setTitle] = useState(trip.title);
   const [startDate, setStartDate] = useState(trip.startDate);
   const [endDate, setEndDate] = useState(trip.endDate);
+  // Feedback #4 D-2: moving the start past the end shifts the end forward
+  // instead of leaving a range that ends before it starts — said once here so
+  // it does not read like the date silently changed itself.
+  const [datesShifted, setDatesShifted] = useState(false);
   const [partySize, setPartySize] = useState(trip.partySize);
   const [budget, setBudget] = useState(trip.budgetPerPersonThb);
   const [cities, setCities] = useState(trip.cities.join(', '));
@@ -120,7 +125,16 @@ export function TripFrameDialog({
         ) : null}
 
         <div className="grid grid-cols-2 gap-2">
-          <DateField label="ไปวันที่" value={startDate} onChange={setStartDate} />
+          <DateField
+            label="ไปวันที่"
+            value={startDate}
+            onChange={(iso) => {
+              const next = shiftEndOnStartChange(startDate, endDate, iso);
+              setStartDate(next.start);
+              setEndDate(next.end);
+              setDatesShifted(next.shifted);
+            }}
+          />
           <DateField
             label="กลับวันที่"
             value={endDate}
@@ -131,6 +145,7 @@ export function TripFrameDialog({
         {startDate && endDate ? (
           <p className="text-muted -mt-1 text-[11px]">
             {nights + 1} วัน {nights} คืน
+            {datesShifted ? ' · เลื่อนวันกลับตามให้แล้ว (ระยะทริปเท่าเดิม)' : ''}
           </p>
         ) : null}
 

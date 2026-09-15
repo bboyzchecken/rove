@@ -48,7 +48,6 @@ import type {
   MemberProfile,
   MoveItemInput,
   Order,
-  ParsedTicket,
   PastTrip,
   PlatformStats,
   PointsLedger,
@@ -165,8 +164,6 @@ export interface TripRepo {
   update(tripId: string, patch: UpdateTripInput): Promise<Trip>;
   remove(tripId: string): Promise<void>;
   clone(tripId: string): Promise<Trip>;
-  /** Reads a pasted booking e-mail into a trip frame (M1 — A1.2). */
-  parseTicket(text: string): Promise<ParsedTicket>;
   /** The legs of a trip, plus everything derived from them (M1 — A1.3). */
   route(tripId: string): Promise<TripRoute>;
   /** Replaces the whole route; the trip frame follows the legs. */

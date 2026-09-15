@@ -71,6 +71,9 @@ func newHarness(t *testing.T, mock bool) *Harness {
 		AuthCookieName: "rove_token",
 		WebBaseURL:     "http://localhost:3000",
 		AppBaseURL:     "http://localhost:5000",
+		// Fixed so tests can exercise the partner postback (A12.6) — without a
+		// secret configured the route answers 404 by design.
+		AffiliateWebhookSecret: "test-webhook-secret-not-used-anywhere-real",
 	}
 
 	return &Harness{
@@ -156,6 +159,32 @@ func (h *Harness) Request(method, path, token string, body any) *Response {
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	if token != "" {
 		req.Header.Set(echo.HeaderAuthorization, "Bearer "+token)
+	}
+
+	rec := httptest.NewRecorder()
+	h.Server.Echo().ServeHTTP(rec, req)
+	return &Response{ResponseRecorder: rec, t: h.T}
+}
+
+// RequestWithHeaders is Request for routes authenticated by something other
+// than a bearer token — the partner postback's shared-secret signature, for
+// instance — where the caller sets whatever headers the route actually checks.
+func (h *Harness) RequestWithHeaders(method, path string, headers map[string]string, body any) *Response {
+	h.T.Helper()
+
+	payload := ""
+	if body != nil {
+		raw, err := json.Marshal(body)
+		if err != nil {
+			h.T.Fatalf("marshal body: %v", err)
+		}
+		payload = string(raw)
+	}
+
+	req := httptest.NewRequest(method, path, strings.NewReader(payload))
+	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	for k, v := range headers {
+		req.Header.Set(k, v)
 	}
 
 	rec := httptest.NewRecorder()

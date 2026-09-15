@@ -119,6 +119,9 @@ func (s *Server) handleCreateBooking(c echo.Context) error {
 	if checkOut, ok := parseDateParam(req.CheckOut); ok {
 		booking.CheckOut = &checkOut
 	}
+	if !datesInOrder(booking.CheckIn, booking.CheckOut) {
+		return request.BadRequest(c, "วันเช็คเอาต์ต้องไม่ก่อนวันเช็คอิน")
+	}
 
 	if err := s.bookings.Create(ctx, booking); err != nil {
 		return request.Internal(c, "บันทึกการจองไม่สำเร็จ")
@@ -143,8 +146,6 @@ func (s *Server) handleUpdateBooking(c echo.Context) error {
 		return request.NotFound(c, "ไม่พบการจองนี้")
 	}
 
-	wasBooked := booking.Status == models.BookingBooked
-
 	if req.Title != "" {
 		booking.Title = req.Title
 	}
@@ -166,6 +167,9 @@ func (s *Server) handleUpdateBooking(c echo.Context) error {
 	if checkOut, ok := parseDateParam(req.CheckOut); ok {
 		booking.CheckOut = &checkOut
 	}
+	if !datesInOrder(booking.CheckIn, booking.CheckOut) {
+		return request.BadRequest(c, "วันเช็คเอาต์ต้องไม่ก่อนวันเช็คอิน")
+	}
 	if booking.Status == models.BookingBooked && booking.BookedBy == nil {
 		booking.BookedBy = &userID
 	}
@@ -183,12 +187,11 @@ func (s *Server) handleUpdateBooking(c echo.Context) error {
 		}
 	}
 
-	if !wasBooked && booking.Status == models.BookingBooked {
-		s.awardBookingPoints(ctx, tripID, *booking)
-		// The promise that makes the paywall bearable (M26 — A26.4).
-		s.refundTripPass(ctx, tripID)
-	}
-
+	// Marking "จองแล้ว" here is a group ticking their own box — it earns nothing.
+	// Points, the creator's share and the Trip Pass refund all require a partner
+	// to confirm the booking themselves (Feedback #4 D-24): otherwise the same
+	// toggle could be flipped off and back on to mint rewards without a real
+	// booking behind them.
 	s.track(c, tripID, "", events.TypeBookingChanged, "booking", booking.ID)
 	return c.JSON(http.StatusOK, toBookingDTO(*booking))
 }
@@ -280,10 +283,11 @@ type affiliateWebhookRequest struct {
 // source creator earns their points. Guarded by a shared secret; without one
 // configured the route answers 404 — an unconfigured webhook must not exist.
 //
-// Note: the manual "จองแล้ว" path (handleUpdateBooking) also awards points as a
-// stand-in while no partner posts back. When real postbacks go live per
-// partner (A12.9), that stand-in should be reviewed so a booking is not paid
-// twice.
+// This is now the *only* door that awards anything for a booking (Feedback #4
+// D-24). Ticking "จองแล้ว" by hand in handleUpdateBooking used to award the
+// same points as a stand-in while no partner posted back — closed because
+// toggling that box off and on again earned it twice, and it never proved a
+// booking actually happened.
 func (s *Server) handleAffiliateWebhook(c echo.Context) error {
 	secret := s.cfg.AffiliateWebhookSecret
 	if secret == "" {
@@ -416,33 +420,6 @@ func (s *Server) refundTripPass(ctx contextT, tripID string) {
 			pass.TripTitle, credit.Code),
 		Link: "/billing/" + pass.ID,
 	})
-}
-
-// awardBookingPoints credits the creator of the trip this one was copied from.
-func (s *Server) awardBookingPoints(ctx contextT, tripID string, booking models.Booking) {
-	trip, err := s.trips.GetByID(ctx, tripID)
-	if err != nil || trip.SourceCreatorID == nil {
-		return
-	}
-	_ = s.points.Add(ctx, &models.UserPoints{
-		UserID: *trip.SourceCreatorID,
-		Delta:  domain.PointsPerBooking,
-		Reason: models.PointsReasonBooking,
-		Note:   "มีคนจองจากทริปที่คุณเปิดสาธารณะ",
-		TripID: &tripID,
-	})
-
-	// The revenue-share line for the same event (A12.11). Nobody reported a
-	// commission here — the group ticked a box in the app — so it is accrued
-	// from the partner rate and flagged as the estimate it is. What the group
-	// typed as a per-person price is the only booking value we have.
-	value := 0.0
-	if booking.PricePerPersonTHB != nil {
-		value = *booking.PricePerPersonTHB * float64(trip.PartySize)
-	}
-	s.recordCreatorEarning(
-		ctx, *trip.SourceCreatorID, tripID, booking.Partner, nil, value, 0, false,
-	)
 }
 
 func partnerName(key string) string {

@@ -878,22 +878,6 @@ export interface ModeDto {
   env: string;
 }
 
-export interface ParsedTicketDto {
-  flights: {
-    code: string;
-    from: string;
-    to: string;
-    date: string;
-    time: string | null;
-    direction: 'out' | 'back';
-  }[];
-  start_date: string | null;
-  end_date: string | null;
-  party_size: number | null;
-  cities: string[] | null;
-  simulated: boolean;
-}
-
 export interface InviteDto {
   token: string;
   url: string;

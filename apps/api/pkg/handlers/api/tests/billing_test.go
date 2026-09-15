@@ -285,9 +285,7 @@ func TestPassIsRefundedOnceHoweverManyBookings(t *testing.T) {
 			ExpectStatus(http.StatusCreated).
 			Decode(&booking)
 
-		h.Request(http.MethodPatch, "/api/v1/trips/"+trip.ID+"/bookings/"+booking.ID, token,
-			map[string]any{"status": models.BookingBooked}).
-			ExpectStatus(http.StatusOK)
+		confirmBookingViaPartner(t, h, trip.ID, booking.ID, token, 12_000)
 	}
 
 	// The pass is marked refunded, exactly once.
@@ -336,9 +334,7 @@ func TestRefundedPassStillUnlocksTheTrip(t *testing.T) {
 		map[string]any{"title": "โรงแรม", "partner": "agoda", "kind": models.BookingStay}).
 		ExpectStatus(http.StatusCreated).
 		Decode(&booking)
-	h.Request(http.MethodPatch, "/api/v1/trips/"+trip.ID+"/bookings/"+booking.ID, token,
-		map[string]any{"status": models.BookingBooked}).
-		ExpectStatus(http.StatusOK)
+	confirmBookingViaPartner(t, h, trip.ID, booking.ID, token, 12_000)
 
 	var credits passBody
 	h.Request(http.MethodGet, "/api/v1/trips/"+trip.ID+"/ai/credits", token, nil).
@@ -363,9 +359,7 @@ func TestBookingWithoutAPassRefundsNothing(t *testing.T) {
 		map[string]any{"title": "โรงแรม", "partner": "agoda", "kind": models.BookingStay}).
 		ExpectStatus(http.StatusCreated).
 		Decode(&booking)
-	h.Request(http.MethodPatch, "/api/v1/trips/"+trip.ID+"/bookings/"+booking.ID, token,
-		map[string]any{"status": models.BookingBooked}).
-		ExpectStatus(http.StatusOK)
+	confirmBookingViaPartner(t, h, trip.ID, booking.ID, token, 12_000)
 
 	var codes int64
 	if err := h.DB.Model(&models.DiscountCode{}).Where("user_id = ?", alice.ID).Count(&codes).Error; err != nil {

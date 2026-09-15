@@ -200,6 +200,10 @@ func (s *Server) handleCreateTrip(c echo.Context) error {
 		trip.FxRateAt = &now
 	}
 
+	if !datesInOrder(trip.StartDate, trip.EndDate) {
+		return request.BadRequest(c, "วันกลับต้องไม่ก่อนวันไป")
+	}
+
 	if err := s.trips.Create(ctx, trip); err != nil {
 		return request.Internal(c, "สร้างทริปไม่สำเร็จ")
 	}
@@ -427,6 +431,10 @@ func (s *Server) handleUpdateTrip(c echo.Context) error {
 			return request.BadRequest(c, "ไม่รู้จักสีนี้")
 		}
 		trip.Color = *req.Color
+	}
+
+	if !datesInOrder(trip.StartDate, trip.EndDate) {
+		return request.BadRequest(c, "วันกลับต้องไม่ก่อนวันไป")
 	}
 
 	if err := s.trips.Update(ctx, trip); err != nil {

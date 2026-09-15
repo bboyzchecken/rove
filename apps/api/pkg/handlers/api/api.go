@@ -259,7 +259,6 @@ func (s *Server) registerRoutes() {
 	s.registerStatsRoutes(v1)    // A24.1 / A24.2 — platform social proof
 	s.registerPOIRoutes(v1)      // A4.2
 	s.registerAirportRoutes(v1)  // A1.3 — worldwide airport search
-	s.registerAIPublicRoutes(v1) // A1.2 — reading a ticket happens before a trip
 
 	// --- trip-scoped ---------------------------------------------------------
 	// Every route below carries :tripId and is guarded by TripRoleMiddleware.

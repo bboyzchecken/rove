@@ -309,3 +309,23 @@ func parseDateParam(value string) (time.Time, bool) {
 	}
 	return t, true
 }
+
+// datesInOrder is where a trip's frame, a booking's stay and a flight leg all
+// check "the end is not before the start" (Feedback #4 D-1). The date fields
+// already stop a person picking it that way; this is the API not trusting
+// that a client actually is one.
+func datesInOrder(start, end *time.Time) bool {
+	if start == nil || end == nil {
+		return true
+	}
+	return !end.Before(*start)
+}
+
+// clockTimesInOrder is datesInOrder for a plan item's "HH:mm" pair — the end
+// is optional, so a blank one is not a violation.
+func clockTimesInOrder(start, end string) bool {
+	if end == "" {
+		return true
+	}
+	return end >= start
+}

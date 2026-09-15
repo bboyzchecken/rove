@@ -56,7 +56,6 @@ import type {
   VariantDto,
   VariantListDto,
   VariantVotesDto,
-  ParsedTicketDto,
   PastTripDto,
   AudienceDto,
   PlatformStatsDto,
@@ -128,7 +127,6 @@ import {
   toPublicCreator,
   toVariant,
   toVariantList,
-  toParsedTicket,
   toPastTrip,
   toPlanDay,
   toPlanItem,
@@ -293,9 +291,6 @@ export const liveRepo: RoveRepo = {
     },
     async clone(tripId) {
       return toTrip(await api.post<TripDto>(`/trips/${tripId}/clone`));
-    },
-    async parseTicket(text) {
-      return api.post<ParsedTicketDto>('/ai/parse-ticket', { text }).then(toParsedTicket);
     },
 
     async route(tripId) {
