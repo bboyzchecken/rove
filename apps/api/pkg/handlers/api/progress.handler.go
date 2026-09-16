@@ -30,9 +30,9 @@ var stepKeys = map[string]bool{
 }
 
 type setStepStatusRequest struct {
-	// "skipped" writes the override; "todo" removes it and the step goes back
-	// to whatever the room derives for it.
-	Status string `json:"status" validate:"required,oneof=skipped todo"`
+	// "skipped" or "confirmed" writes the override; "todo" removes it and the
+	// step goes back to whatever the room derives for it.
+	Status string `json:"status" validate:"required,oneof=skipped confirmed todo"`
 }
 
 func (s *Server) handleSetStepStatus(c echo.Context) error {
@@ -50,18 +50,23 @@ func (s *Server) handleSetStepStatus(c echo.Context) error {
 	tripID := request.TripID(c)
 	userID := request.UserID(c)
 
-	if req.Status == models.StepSkipped {
+	switch req.Status {
+	case models.StepSkipped, models.StepConfirmed:
 		err := s.steps.Set(ctx, &models.TripStepOverride{
 			TripID:   tripID,
 			Step:     step,
-			Status:   models.StepSkipped,
+			Status:   req.Status,
 			ByUserID: userID,
 		})
 		if err != nil {
 			return request.Internal(c, "บันทึกไม่สำเร็จ")
 		}
-		s.track(c, tripID, "ข้ามขั้น "+step, events.TypeTripUpdated, "trip", tripID)
-	} else {
+		verb := "ข้ามขั้น "
+		if req.Status == models.StepConfirmed {
+			verb = "ทำเครื่องหมายเรียบร้อยที่ขั้น "
+		}
+		s.track(c, tripID, verb+step, events.TypeTripUpdated, "trip", tripID)
+	default:
 		if err := s.steps.Clear(ctx, tripID, step); err != nil {
 			return request.Internal(c, "บันทึกไม่สำเร็จ")
 		}

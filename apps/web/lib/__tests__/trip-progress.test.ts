@@ -86,6 +86,15 @@ describe('stepStatus', () => {
     expect(stepStatus(withFriends, 'invite')).toBe('done');
   });
 
+  it('a confirmed override reads as done, never as check (D-26)', () => {
+    const o = overview({
+      trip: { ...TRIP, startedWith: [] },
+      stepOverrides: { dates: 'confirmed' },
+    });
+    expect(derivedStatus(o, 'dates')).toBe('check');
+    expect(stepStatus(o, 'dates')).toBe('done');
+  });
+
   it('a plan that leaves must-go wishes uncovered is "check"', () => {
     const o = overview({
       counts: { ...overview().counts, planDays: 3, wishlistItems: 4, membersWithoutWishlist: 0 },
@@ -136,6 +145,30 @@ describe('progressSummary', () => {
     });
     expect(progressSummary(o).percent).toBe(100);
     expect(missingSummary(o)).toEqual([]);
+  });
+
+  it('never lets an untouched during-phase step block 100% (Feedback #4 — F9)', () => {
+    // Same fixture as "reads 100%" above, but expense/photos are left at
+    // their default 'todo' (counts.expenses/photos = 0, nothing skipped) —
+    // a fully-prepared trip has not spent anything yet, and cannot have,
+    // before it starts.
+    const o = overview({
+      trip: { ...TRIP, startedWith: [] },
+      locked: { startDate: TRIP.startDate, endDate: TRIP.endDate, days: 8, lockedBy: 'm1', lockedAt: '', memberIds: [] },
+      members: [
+        ...overview().members,
+        { id: 'm2', name: 'มายด์', role: 'editor', characterId: 'flower-02', hasWishlist: true, hasDates: true },
+      ],
+      counts: { ...overview().counts, wishlistItems: 3, membersWithoutWishlist: 0, planDays: 3, bookings: 2, prepTasks: 2, documents: 1 },
+      coverage: { covered: 3, partial: 0, uncovered: 0, total: 3, mustCovered: 1, mustTotal: 1, percent: 100 },
+      stepOverrides: { route: 'skipped' },
+    });
+    const summary = progressSummary(o);
+    expect(summary.percent).toBe(100);
+    expect(summary.remaining).toBe(0);
+    // Nothing pre-travel is left, so "ขั้นต่อไป" must not jump to a
+    // during-phase step just because it happens to still be todo.
+    expect(summary.next).toBeUndefined();
   });
 });
 

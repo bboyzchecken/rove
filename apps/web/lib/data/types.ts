@@ -51,6 +51,7 @@ export type {
   StartedWith,
   Trip,
   TripColor,
+  TripPhase,
   TripRoute,
   TripStatus,
   WishKind,
@@ -835,14 +836,18 @@ export interface TripOverview {
     membersSubmittedDates: number;
   };
   locked: LockedDates | null;
-  /** Steps the group marked "ไม่จำเป็น" (D-12): step → 'skipped'. */
-  stepOverrides: Partial<Record<string, 'skipped'>>;
+  /**
+   * Steps the group set by hand: 'skipped' (D-12, "ไม่จำเป็น") or 'confirmed'
+   * (Feedback #4 — D-26, "เรียบร้อยแล้ว" on a check step with no way to reach
+   * 100% on its own).
+   */
+  stepOverrides: Partial<Record<string, 'skipped' | 'confirmed'>>;
   /** Members who confirmed their free days on the date board (D-20). */
   submittedDatesMemberIds: string[];
 }
 
-/** What a member may set a step to by hand (D-12). */
-export type StepOverrideStatus = 'skipped' | 'todo';
+/** What a member may set a step to by hand (D-12, D-26). */
+export type StepOverrideStatus = 'skipped' | 'confirmed' | 'todo';
 
 /**
  * Whether the next trip is allowed on this account (Feedback #2 — D-10), and

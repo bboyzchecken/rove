@@ -119,8 +119,16 @@ func (s *Server) handleUpcomingTrips(c echo.Context) error {
 	today := domain.Day(time.Now().UTC())
 	out := make([]calendarTripDTO, 0, len(trips))
 
+	for i := range trips {
+		s.autoCloseIfStale(ctx, &trips[i], today)
+	}
+
 	for _, trip := range trips {
-		if trip.StartDate == nil || trip.EndDate == nil || trip.EndDate.Before(today) {
+		// Feedback #4 — F10/D-15/D-16: a trip stays "current" until the owner
+		// confirms it done, not until its dates run out — a group still
+		// logging their last day of expenses should not lose the room to the
+		// past-trips list before they say so.
+		if trip.StartDate == nil || trip.EndDate == nil || trip.Status == models.TripStatusDone {
 			continue
 		}
 
@@ -168,8 +176,14 @@ func (s *Server) handlePastTrips(c echo.Context) error {
 	today := domain.Day(time.Now().UTC())
 	out := make([]pastTripDTO, 0)
 
+	for i := range trips {
+		s.autoCloseIfStale(ctx, &trips[i], today)
+	}
+
 	for _, trip := range trips {
-		if trip.EndDate == nil || !trip.EndDate.Before(today) {
+		// See handleUpcomingTrips — "past" means the owner confirmed it, not
+		// that the calendar moved on (D-15).
+		if trip.EndDate == nil || trip.Status != models.TripStatusDone {
 			continue
 		}
 
@@ -214,6 +228,26 @@ func (s *Server) handlePastTrips(c echo.Context) error {
 
 	sort.SliceStable(out, func(a, b int) bool { return out[a].EndDate > out[b].EndDate })
 	return c.JSON(http.StatusOK, out)
+}
+
+// autoCloseAfterDays is D-28's example number, not yet reconfirmed as the
+// exact figure — easy to change, since it is the only place this lives.
+const autoCloseAfterDays = 30
+
+// autoCloseIfStale closes a trip nobody has confirmed the end of long enough
+// after its return date that they plausibly never will (Feedback #4 —
+// F10/D-28). Runs inline wherever a user's whole trip list is already being
+// walked — home dashboard reads are the only place a stale trip would
+// otherwise surface, so there is no separate sweep to schedule.
+func (s *Server) autoCloseIfStale(ctx contextT, trip *models.Trip, today time.Time) {
+	if trip.Status == models.TripStatusDone || trip.EndDate == nil {
+		return
+	}
+	if today.Sub(*trip.EndDate) < autoCloseAfterDays*24*time.Hour {
+		return
+	}
+	trip.Status = models.TripStatusDone
+	_ = s.trips.Update(ctx, trip)
 }
 
 // handleMyStats aggregates the year (A17.1). Everything is derived from trips

@@ -154,6 +154,47 @@ export function useCloseTrip() {
   });
 }
 
+/**
+ * "จบทริป" from the awaiting_end card (Feedback #4 — F10/D-15): the owner
+ * confirms the room's record is final. Same status flip `useCloseTrip` makes
+ * from the paywall — a separate hook because the trigger (and so the
+ * analytics event) is a different one, not because the mutation differs.
+ */
+export function useConfirmTripDone() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (tripId: string) => repo.trips.update(tripId, { status: 'done' }),
+    onSuccess: (_trip, tripId) => {
+      track('trip_confirmed_done', {});
+      void queryClient.invalidateQueries({ queryKey: queryKeys.trips() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.trip(tripId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tripOverview(tripId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tripsUpcoming() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tripsPast() });
+    },
+  });
+}
+
+/**
+ * "เปิดทริปอีกครั้ง" (Feedback #4 — F10/D-15, "เผื่อกดผิด"): reverses a done
+ * trip back to planning. D-15 promises closing never deletes anything, so
+ * there is nothing to restore beyond the status itself.
+ */
+export function useReopenTrip() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (tripId: string) => repo.trips.update(tripId, { status: 'planning' }),
+    onSuccess: (_trip, tripId) => {
+      track('trip_reopened', {});
+      void queryClient.invalidateQueries({ queryKey: queryKeys.trips() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.trip(tripId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tripOverview(tripId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tripsUpcoming() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tripsPast() });
+    },
+  });
+}
+
 export function useCreateTrip() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -218,8 +259,11 @@ export function useSetStepStatus(tripId: string) {
       const previous = queryClient.getQueryData<TripOverview>(key);
       if (previous) {
         const stepOverrides = { ...previous.stepOverrides };
-        if (input.status === 'skipped') stepOverrides[input.step] = 'skipped';
-        else delete stepOverrides[input.step];
+        if (input.status === 'skipped' || input.status === 'confirmed') {
+          stepOverrides[input.step] = input.status;
+        } else {
+          delete stepOverrides[input.step];
+        }
         queryClient.setQueryData<TripOverview>(key, { ...previous, stepOverrides });
       }
       return { previous };

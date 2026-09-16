@@ -107,8 +107,8 @@ export interface TripRecord {
   months: string[];
   locked: LockedDates | null;
   destinationId: string | null;
-  /** Steps the group marked "ไม่จำเป็น" (Feedback #2 — D-12). */
-  stepOverrides: Partial<Record<string, 'skipped'>>;
+  /** Steps set by hand: skipped (Feedback #2 — D-12) or confirmed (Feedback #4 — D-26). */
+  stepOverrides: Partial<Record<string, 'skipped' | 'confirmed'>>;
   /** The booked route (M1 — A1.3). The frame above is derived from it. */
   flights: FlightLeg[];
   wishlist: WishlistItem[];

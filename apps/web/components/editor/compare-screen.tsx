@@ -76,7 +76,7 @@ export function CompareScreen({ tripId }: { tripId: string }) {
             disabled={freeze.isPending}
           >
             {frozen ? <LockOpen className="size-3.5" /> : <Lock className="size-3.5" />}
-            {frozen ? 'ปลดล็อกแพลน' : 'ตกลงตามนี้ — สรุปแพลน'}
+            {frozen ? 'ปลดล็อคเพื่อแก้' : 'พร้อมไปแล้ว'}
           </Button>
         ) : null}
       </div>
@@ -85,7 +85,7 @@ export function CompareScreen({ tripId }: { tripId: string }) {
         <Card accent="gray" className="flex items-center gap-3 p-4">
           <Lock className="text-ink size-4 shrink-0" />
           <p className="text-ink text-sm">
-            แพลนถูกสรุปแล้ว — แก้ไทม์ไลน์และสลับแพลนไม่ได้จนกว่าเจ้าของทริปจะปลดล็อก
+            แพลนถูกสรุปแล้ว — แก้ไทม์ไลน์และสลับแพลนไม่ได้จนกว่าเจ้าของทริปจะปลดล็อกก่อน
           </p>
         </Card>
       ) : null}

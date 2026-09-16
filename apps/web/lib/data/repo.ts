@@ -176,14 +176,15 @@ export interface TripRepo {
   /** Whether creating a trip would hit the free-tier wall (Feedback #2 — D-10). */
   allowance(): Promise<TripAllowance>;
   /**
-   * Marks a step "ไม่จำเป็น" or puts it back (Feedback #2 — D-12). Returns
-   * the trip's whole override map, which is what the overview carries.
+   * Marks a step "ไม่จำเป็น" or "เรียบร้อยแล้ว" by hand, or clears either
+   * (Feedback #2 — D-12; Feedback #4 — D-26). Returns the trip's whole
+   * override map, which is what the overview carries.
    */
   setStepStatus(
     tripId: string,
     step: string,
     status: StepOverrideStatus,
-  ): Promise<Partial<Record<string, 'skipped'>>>;
+  ): Promise<Partial<Record<string, 'skipped' | 'confirmed'>>>;
 }
 
 export interface MemberRepo {

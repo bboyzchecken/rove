@@ -349,9 +349,9 @@ export function toTripOverview(dto: TripOverviewDto): TripOverview {
 }
 
 export function toStepOverrides(raw: Record<string, string> | null | undefined) {
-  const out: Partial<Record<string, 'skipped'>> = {};
+  const out: Partial<Record<string, 'skipped' | 'confirmed'>> = {};
   for (const [step, status] of Object.entries(raw ?? {})) {
-    if (status === 'skipped') out[step] = 'skipped';
+    if (status === 'skipped' || status === 'confirmed') out[step] = status;
   }
   return out;
 }

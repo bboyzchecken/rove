@@ -12,6 +12,7 @@ import { useTrip } from '@/features/trip/queries';
 import type { PlanDay, PlanItem } from '@/lib/data';
 import { readOfflineTrip, saveOfflineTrip } from '@/lib/offline';
 import { toIsoDate } from '@/lib/data/domain';
+import { markRoomViewed } from '@/lib/trip-mode';
 import { cn } from '@/lib/utils';
 
 /**
@@ -69,12 +70,15 @@ export function TripNowScreen({ tripId }: { tripId: string }) {
   return (
     <main className="mx-auto min-h-dvh max-w-lg px-4 pt-4 pb-10">
       <div className="flex items-center justify-between gap-3">
+        {/* Feedback #4 — D-13: an ongoing trip's room bounces straight back
+            here unless this is what sends someone there on purpose. */}
         <Link
           href={`/t/${tripId}` as never}
+          onClick={() => markRoomViewed(tripId)}
           className="text-muted hover:text-ink flex items-center gap-1 text-sm transition"
         >
           <ChevronLeft className="size-4" />
-          ห้องทริป
+          ดูทั้งห้อง
         </Link>
         <Badge tone="outline">โหมดวันเดินทาง</Badge>
       </div>

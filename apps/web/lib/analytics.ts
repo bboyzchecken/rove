@@ -66,10 +66,15 @@ export interface AnalyticsEvents {
   // surface split says which of the two moments does the work.
   next_trip_nudge_shown: { surface: 'room' | 'recap' };
   next_trip_started: { surface: 'room' | 'recap' };
-  /** Feedback #2 — D-12: a checklist step marked "ไม่จำเป็น" (or put back). */
-  step_skipped: { step: string; status: 'skipped' | 'todo' };
+  /** Feedback #2 — D-12 / Feedback #4 — D-26: a checklist step marked "ไม่จำเป็น",
+   *  "เรียบร้อยแล้ว" by hand, or put back. */
+  step_skipped: { step: string; status: 'skipped' | 'confirmed' | 'todo' };
   /** Feedback #2 — D-10: a trip marked finished from the paywall to free the slot. */
   trip_closed_for_slot: Record<string, never>;
+  /** Feedback #4 — F10/D-15: the owner confirmed "จบทริป" from the awaiting_end card. */
+  trip_confirmed_done: Record<string, never>;
+  /** Feedback #4 — F10/D-15: the owner undid a done trip back to planning. */
+  trip_reopened: Record<string, never>;
   /** Feedback #2 — D-3: the owner changed the trip's colour. */
   trip_color_changed: { color: string };
 

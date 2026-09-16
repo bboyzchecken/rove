@@ -10,6 +10,7 @@ import {
   monthStartDow,
   settle,
   thaiRangeLabel,
+  tripPhase,
   validateDays,
 } from '@/lib/data/domain';
 import type { AvailabilityEntry, ExpenseEntry, Member, PlanDay } from '@/lib/data';
@@ -52,6 +53,43 @@ describe('dates', () => {
   it('collapses a shared month in the range label', () => {
     expect(thaiRangeLabel('2026-12-04', '2026-12-08')).toBe('4–8 ธ.ค.');
     expect(thaiRangeLabel('2026-12-28', '2027-01-02')).toBe('28 ธ.ค. – 2 ม.ค.');
+  });
+});
+
+describe('tripPhase', () => {
+  const start = '2026-11-15';
+  const end = '2026-11-22';
+
+  it('is planning before the trip when the plan is not locked', () => {
+    expect(tripPhase('planning', start, end, '2026-11-01')).toBe('planning');
+  });
+
+  it('is ready before the trip once the owner presses พร้อมไปแล้ว', () => {
+    expect(tripPhase('ready', start, end, '2026-11-01')).toBe('ready');
+  });
+
+  it('does NOT become ongoing on the travel dates unless status is ready (D-27)', () => {
+    expect(tripPhase('planning', start, end, start)).toBe('planning');
+    expect(tripPhase('planning', start, end, '2026-11-18')).toBe('planning');
+  });
+
+  it('is ongoing inside the travel dates once ready', () => {
+    expect(tripPhase('ready', start, end, start)).toBe('ongoing');
+    expect(tripPhase('ready', start, end, '2026-11-18')).toBe('ongoing');
+    expect(tripPhase('ready', start, end, end)).toBe('ongoing');
+  });
+
+  it('is awaiting_end past the return date regardless of status, until done', () => {
+    expect(tripPhase('ready', start, end, '2026-11-23')).toBe('awaiting_end');
+    expect(tripPhase('planning', start, end, '2026-11-23')).toBe('awaiting_end');
+  });
+
+  it('is done once the owner confirms, even mid-trip', () => {
+    expect(tripPhase('done', start, end, '2026-11-18')).toBe('done');
+  });
+
+  it('is planning when the trip has no dates yet', () => {
+    expect(tripPhase('planning', '', '', '2026-11-18')).toBe('planning');
   });
 });
 

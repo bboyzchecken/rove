@@ -271,9 +271,28 @@ function summariseReviews(reviews: TripReview[]): ReviewSummary {
   };
 }
 
-/** Nobody reviews a holiday they are still packing for. */
+/**
+ * Nobody reviews a holiday they are still packing for (Feedback #4 —
+ * F10/D-15): the owner's confirmation is what makes a trip over, not the
+ * calendar on its own.
+ */
 function tripIsOver(record: TripRecord) {
-  return record.trip.status === 'done' || record.trip.endDate < toIsoDate(new Date());
+  return record.trip.status === 'done';
+}
+
+/** D-28's example number, not yet reconfirmed as the exact figure — the twin
+ *  of the Go API's `autoCloseAfterDays` in `user.handler.go`. */
+const AUTO_CLOSE_AFTER_DAYS = 30;
+
+/**
+ * Closes a trip nobody has confirmed the end of long enough after its return
+ * date that they plausibly never will (Feedback #4 — F10/D-28). Mutates the
+ * record in place — callers run this inside `mutate()` so it persists.
+ */
+function autoCloseIfStale(trip: Trip, today: string) {
+  if (trip.status === 'done' || !trip.startDate || !trip.endDate) return;
+  if (daysBetween(trip.endDate, today) - 1 < AUTO_CLOSE_AFTER_DAYS) return;
+  trip.status = 'done';
 }
 
 function reviewBoardOf(db: MockDb, record: TripRecord): ReviewBoard {
@@ -961,13 +980,25 @@ export const mockRepo: RoveRepo = {
     },
 
     async upcoming() {
-      const db = loadDb();
+      const today = toIsoDate(new Date());
+      // Feedback #4 — F10/D-28: the same sweep the live API runs, so a stale
+      // trip does not sit in "upcoming" forever just because mock mode never
+      // makes a server request that would trigger it.
+      const db = mutate((db) => {
+        for (const record of db.trips) autoCloseIfStale(record.trip, today);
+        return db;
+      });
       // The countdown is computed at read time — the seed used to say "88"
       // and would have said 88 forever (Feedback #2 — F2.3). Rooms in this
       // browser with dates come first; the seeded extras fill the list out.
-      const today = toIsoDate(new Date());
+      //
+      // Feedback #4 — F10/D-15/D-16: "current" means not yet confirmed done,
+      // not "dates not yet over" — a group still closing out their last day
+      // should not lose the room to the past-trips list on their own.
       const fromRooms = db.trips
-        .filter((r) => !r.creator && r.trip.startDate && r.trip.endDate && r.trip.endDate >= today)
+        .filter(
+          (r) => !r.creator && r.trip.startDate && r.trip.endDate && r.trip.status !== 'done',
+        )
         .map((r) => ({
           id: r.trip.id,
           title: r.trip.title,
@@ -990,9 +1021,36 @@ export const mockRepo: RoveRepo = {
       );
     },
     async past() {
-      const db = loadDb();
+      const today = toIsoDate(new Date());
+      const db = mutate((db) => {
+        for (const record of db.trips) autoCloseIfStale(record.trip, today);
+        return db;
+      });
+      // A room the owner actually confirmed done (Feedback #4 — F10) belongs
+      // here too, not only the pre-seeded archive — `db.past` used to be the
+      // only source, so a real trip closed from the paywall never showed up.
+      const fromRooms: PastTrip[] = db.trips
+        .filter((r) => !r.creator && r.trip.status === 'done' && r.trip.startDate && r.trip.endDate)
+        .map((r) => {
+          const { trip } = r;
+          const spentThb = r.expenses.reduce((sum, e) => sum + toThb(e, trip.fxRate), 0);
+          return {
+            id: trip.id,
+            title: trip.title,
+            cities: [...trip.cities],
+            dateLabel: `${thaiRangeLabel(trip.startDate, trip.endDate)} ${parseIsoDate(trip.endDate).getFullYear() + 543}`,
+            endDate: trip.endDate,
+            days: daysBetween(trip.startDate, trip.endDate),
+            places: r.days.reduce((sum, d) => sum + d.items.length, 0),
+            spentThb,
+            cover: trip.cover,
+            color: trip.color,
+            country: trip.country,
+            memberIds: r.members.map((m) => m.id),
+          };
+        });
       return delay(
-        clone(db.past)
+        [...fromRooms, ...clone(db.past)]
           .map((trip) => ({ ...trip, characterIds: facesOf(db, trip) }))
           .sort((a, b) => b.endDate.localeCompare(a.endDate)),
       );
@@ -1016,9 +1074,15 @@ export const mockRepo: RoveRepo = {
         mutate((db) => {
           const record = tripRecord(db, tripId);
           record.stepOverrides ??= {};
-          if (status === 'skipped') record.stepOverrides[step] = 'skipped';
+          if (status === 'skipped' || status === 'confirmed') record.stepOverrides[step] = status;
           else delete record.stepOverrides[step];
-          log(record, db.user.id, status === 'skipped' ? `ข้ามขั้น ${step}` : `เอาขั้น ${step} กลับมา`);
+          const verb =
+            status === 'skipped'
+              ? `ข้ามขั้น ${step}`
+              : status === 'confirmed'
+                ? `ทำเครื่องหมายเรียบร้อยที่ขั้น ${step}`
+                : `เอาขั้น ${step} กลับมา`;
+          log(record, db.user.id, verb);
           return clone(record.stepOverrides);
         }),
         120,

@@ -78,11 +78,15 @@ type Trip struct {
 	StartedWith datatypes.JSON `gorm:"type:json" json:"started_with"`
 }
 
-// Step statuses a member can set by hand (Feedback #2 — D-11 / D-12). The
-// other two — "todo" and "done" — are derived from the room's own tables and
-// never stored; "check" likewise. Only a deliberate skip is a fact worth a row.
+// Step statuses a member can set by hand (Feedback #2 — D-11/D-12; Feedback #4
+// — D-26). The other two — "todo" and "done" — are derived from the room's own
+// tables and never stored; "check" likewise, UNLESS a group manually confirms
+// a step that has no way to reach 100% on its own (dates typed in but never
+// locked through the calendar, a plan with a wish nobody ever covers) — that
+// declaration is `StepConfirmed`, read back as `done`.
 const (
-	StepSkipped = "skipped"
+	StepSkipped   = "skipped"
+	StepConfirmed = "confirmed"
 )
 
 // TripStepOverride records that the group decided a step of the checklist does

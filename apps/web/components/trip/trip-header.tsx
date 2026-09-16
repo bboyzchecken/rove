@@ -11,8 +11,9 @@ import { ButtonLink } from '@/components/ui/button';
 import { CharacterStack } from '@/components/ui/character-avatar';
 import { useAddDream, useDreams, useMe } from '@/features/auth/queries';
 import { useTripOverview } from '@/features/trip/queries';
+import type { TripPhase } from '@/lib/data';
 import { countryName } from '@/lib/data/countries';
-import { thaiRangeLabel, toIsoDate } from '@/lib/data/domain';
+import { thaiRangeLabel, toIsoDate, tripPhase } from '@/lib/data/domain';
 import { tripColorClasses } from '@/lib/trip-color';
 import { cn } from '@/lib/utils';
 
@@ -29,10 +30,13 @@ import { cn } from '@/lib/utils';
  * ที่อยากไปสักวัน from here in one tap, which is how a plan that will not
  * happen this year stops being a room that nags and becomes a wish that waits.
  */
-const STATUS_LABEL: Record<string, string> = {
+/** Feedback #4 — F9/F10: the badge now reads `phase`, not the raw `status`
+ *  that never grew an "ongoing" or "awaiting_end" of its own. */
+const PHASE_LABEL: Record<TripPhase, string> = {
   planning: 'กำลังวางแพลน',
   ready: 'พร้อมเดินทาง',
   ongoing: 'กำลังเที่ยว',
+  awaiting_end: 'รอยืนยันจบทริป',
   done: 'จบทริปแล้ว',
 };
 
@@ -62,8 +66,10 @@ export function TripHeader({ tripId }: { tripId: string }) {
   const { trip, members, locked } = data;
   const hasDates = Boolean(trip.startDate && trip.endDate);
   const colors = tripColorClasses(trip.color);
+  const phase = hasDates ? tripPhase(trip.status, trip.startDate, trip.endDate) : 'planning';
   // Trip Mode is offered from the day before departure until the day after the
-  // trip ends (W10.6). Any earlier and it is a screen with nothing to say.
+  // trip ends (W10.6) — a wider window than "ongoing" on purpose, so a group
+  // can preview it before the owner has pressed พร้อมไปแล้ว.
   const today = toIsoDate(new Date());
   const travelling =
     hasDates && today >= addDaysIso(trip.startDate, -1) && today <= addDaysIso(trip.endDate, 1);
@@ -77,7 +83,7 @@ export function TripHeader({ tripId }: { tripId: string }) {
 
   const statusPill = (
     <Badge tone="ink" size="md">
-      {STATUS_LABEL[trip.status] ?? 'กำลังวางแพลน'}
+      {PHASE_LABEL[phase]}
     </Badge>
   );
 
