@@ -7,8 +7,11 @@ import {
   Gauge,
   MapPin,
   MessageSquareQuote,
+  Percent,
   Receipt,
+  ShieldCheck,
   Users,
+  Waypoints,
 } from 'lucide-react';
 
 import { RoveMark } from '@/components/brand/rove-mark';
@@ -45,6 +48,10 @@ const NAV = [
   { href: '/admin/users', label: 'ผู้ใช้', icon: Users },
   { href: '/admin/leads', label: 'คิวเอเจนต์', icon: MessageSquareQuote },
   { href: '/admin/payouts', label: 'จ่ายครีเอเตอร์', icon: Receipt },
+  { href: '/admin/kyc', label: 'ยืนยันตัวตน', icon: ShieldCheck },
+  // Feedback #4 — F12 / D-30.
+  { href: '/admin/trace', label: 'ไล่ที่มาแต้ม/รายได้', icon: Waypoints },
+  { href: '/admin/economy', label: 'ตั้งค่าส่วนแบ่ง', icon: Percent },
 ] as const;
 
 /**
@@ -56,7 +63,13 @@ const NAV = [
  * it says what this console is going to be, and refuses to pretend the screens
  * are one click away. M27 turns them on.
  */
-const READY = new Set<string>(['/admin']);
+const READY = new Set<string>([
+  '/admin',
+  '/admin/payouts',
+  '/admin/kyc',
+  '/admin/trace',
+  '/admin/economy',
+]);
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

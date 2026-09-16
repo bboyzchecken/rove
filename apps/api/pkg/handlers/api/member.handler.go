@@ -139,12 +139,27 @@ func (s *Server) handleJoinTrip(c echo.Context) error {
 		// The referral pays out on the first trip joined, not on sign-up: an
 		// account that never joins anything is not worth points (§6.5).
 		if user.ReferredBy != nil && *user.ReferredBy != "" {
-			_ = s.points.Add(ctx, &models.UserPoints{
-				UserID: *user.ReferredBy,
-				Delta:  domain.PointsPerReferral,
-				Reason: models.PointsReasonReferral,
-				Note:   name + " เข้าร่วมทริปแรก",
-				TripID: &invite.TripID,
+			s.record(ctx, &models.LedgerEntry{
+				Source: &models.ValueSource{
+					Kind:        models.SourceReferralJoin,
+					ActorUserID: &userID,
+					SubjectType: models.SubjectUser,
+					SubjectID:   userID,
+					TripID:      &invite.TripID,
+					Snapshot: snapshot(map[string]any{
+						"joined":   s.personSnap(ctx, userID),
+						"referrer": s.personSnap(ctx, *user.ReferredBy),
+						"invite":   map[string]any{"id": invite.ID, "trip_id": invite.TripID},
+						"points":   domain.PointsPerReferral,
+					}),
+				},
+				Points: []models.UserPoints{{
+					UserID: *user.ReferredBy,
+					Delta:  domain.PointsPerReferral,
+					Reason: models.PointsReasonReferral,
+					Note:   name + " เข้าร่วมทริปแรก",
+					TripID: &invite.TripID,
+				}},
 			})
 		}
 	}

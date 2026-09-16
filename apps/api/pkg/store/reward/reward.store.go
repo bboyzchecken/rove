@@ -53,12 +53,32 @@ func (s *discountStore) ListForUser(ctx context.Context, userID string) ([]model
 func (s *discountStore) Claim(ctx context.Context, codeID string, at time.Time) (bool, error) {
 	res := s.db.WithContext(ctx).
 		Model(&models.DiscountCode{}).
-		Where("id = ? AND used_at IS NULL", codeID).
+		Where("id = ? AND used_at IS NULL AND voided_at IS NULL", codeID).
 		Update("used_at", at)
 	if res.Error != nil {
 		return false, res.Error
 	}
 	return res.RowsAffected == 1, nil
+}
+
+func (s *discountStore) Void(ctx context.Context, codeID string, at time.Time) (bool, error) {
+	res := s.db.WithContext(ctx).
+		Model(&models.DiscountCode{}).
+		Where("id = ? AND used_at IS NULL AND voided_at IS NULL", codeID).
+		Update("voided_at", at)
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected == 1, nil
+}
+
+func (s *discountStore) ByIDs(ctx context.Context, ids []string) ([]models.DiscountCode, error) {
+	var out []models.DiscountCode
+	if len(ids) == 0 {
+		return out, nil
+	}
+	err := s.db.WithContext(ctx).Where("id IN ?", ids).Find(&out).Error
+	return out, err
 }
 
 func (s *discountStore) Attach(ctx context.Context, codeID, orderID string) error {
@@ -76,13 +96,6 @@ func (s *discountStore) Release(ctx context.Context, codeID string) error {
 }
 
 /* ---------------------------------------------------------- earnings ----- */
-
-func (s *earningStore) Create(ctx context.Context, earning *models.CreatorEarning) error {
-	if earning.OccurredAt.IsZero() {
-		earning.OccurredAt = time.Now().UTC()
-	}
-	return s.db.WithContext(ctx).Create(earning).Error
-}
 
 func (s *earningStore) ListForUser(ctx context.Context, userID string, limit int) ([]models.CreatorEarning, error) {
 	if limit <= 0 {
@@ -122,38 +135,17 @@ func (s *earningStore) TotalsForUser(ctx context.Context, userID string) (models
 			totals.PendingTHB = row.Total
 		case models.EarningPayable:
 			totals.PayableTHB = row.Total
+		case models.EarningInPayout:
+			totals.InPayoutTHB = row.Total
 		case models.EarningPaid:
 			totals.PaidTHB = row.Total
+		case models.EarningExpired:
+			totals.ExpiredTHB = row.Total
 		}
 	}
 	return totals, nil
 }
 
-func (s *earningStore) ListPayable(ctx context.Context, from, to time.Time) ([]models.CreatorEarning, error) {
-	var out []models.CreatorEarning
-	err := s.db.WithContext(ctx).
-		Where("status = ? AND occurred_at >= ? AND occurred_at < ?", models.EarningPayable, from, to).
-		Order("user_id ASC, occurred_at ASC").
-		Find(&out).Error
-	return out, err
-}
-
-// AttachToPayout settles a batch. All of it or none of it: a payout row that
-// claims twelve earnings and moved nine is worse than a failed transfer.
-func (s *earningStore) AttachToPayout(ctx context.Context, payoutID string, earningIDs []string, at time.Time) error {
-	if len(earningIDs) == 0 {
-		return nil
-	}
-	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		return tx.Model(&models.CreatorEarning{}).
-			Where("id IN ? AND status = ?", earningIDs, models.EarningPayable).
-			Updates(map[string]any{
-				"status":     models.EarningPaid,
-				"payout_id":  payoutID,
-				"updated_at": at,
-			}).Error
-	})
-}
 
 /* ----------------------------------------------------------- payouts ----- */
 

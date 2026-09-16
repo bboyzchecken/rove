@@ -62,13 +62,13 @@ export const PLANS: SubscriptionPlan[] = [
   {
     id: TRIP_PASS_PLAN_ID,
     name: 'Trip Pass',
-    tagline: 'ปลดล็อกทริปนี้ทั้งใบ — จองผ่าน ROVE แล้วได้คืนเต็มจำนวน',
+    tagline: `ปลดล็อกทริปนี้ทั้งใบ — จองผ่าน ROVE แล้วคืนสูงสุด ฿${TRIP_PASS_PRICE_THB}`,
     priceThb: TRIP_PASS_PRICE_THB,
     interval: 'trip',
     perks: [
       'ให้ AI ร่างและปรับแพลนได้ไม่จำกัดในทริปนี้',
       'ใครในห้องซื้อก็ปลดล็อกให้ทั้งทริป',
-      `จองผ่าน ROVE แล้วคืนให้เต็ม ฿${TRIP_PASS_PRICE_THB}`,
+      `คืนสูงสุด ฿${TRIP_PASS_PRICE_THB} เมื่อพาร์ตเนอร์ยืนยันการจอง`,
       `หารกัน 4 คน = ฿${splitPerPersonThb(4)} ต่อคน`,
     ],
     includedDraftsPerPeriod: UNLIMITED_DRAFTS,

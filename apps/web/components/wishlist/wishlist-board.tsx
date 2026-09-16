@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { AlertCircle, Check, CircleDashed, Plus, Trash2 } from 'lucide-react';
 
 import { EmptyState } from '@/components/common/empty-state';
+import { ItemSheet } from '@/components/editor/item-sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -11,9 +13,10 @@ import { CharacterAvatar } from '@/components/ui/character-avatar';
 import { FieldLabel, Input, Textarea } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
 import { useMe } from '@/features/auth/queries';
-import { useTripMembers } from '@/features/trip/queries';
+import { usePlanDays } from '@/features/plan/queries';
+import { useTrip, useTripMembers } from '@/features/trip/queries';
 import { useAddWish, useRemoveWish, useWishlist } from '@/features/wishlist/queries';
-import type { CoverageState, WishKind } from '@/lib/data';
+import type { CoverageState, WishKind, WishlistItem } from '@/lib/data';
 import { cn } from '@/lib/utils';
 
 import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
@@ -43,11 +46,14 @@ export function WishlistBoard({ tripId }: { tripId: string }) {
   const { data: items = [], isLoading } = useWishlist(tripId);
   const { data: members = [] } = useTripMembers(tripId);
   const { data: me } = useMe();
+  const { data: trip } = useTrip(tripId);
+  const { data: days = [] } = usePlanDays(tripId);
   const removeWish = useRemoveWish(tripId);
 
   const [memberFilter, setMemberFilter] = useState<string>('all');
   const [kindFilter, setKindFilter] = useState<WishKind | 'all'>('all');
   const [adding, setAdding] = useState(false);
+  const [addingToPlan, setAddingToPlan] = useState<WishlistItem | null>(null);
 
   const visible = items.filter(
     (w) =>
@@ -56,6 +62,23 @@ export function WishlistBoard({ tripId }: { tripId: string }) {
   );
 
   const isOwner = members.find((m) => m.id === me?.id)?.role === 'owner';
+  // D-10: the "+ ใส่ลงแพลน" button, disabled while the plan is locked (D-11 —
+  // reuses the same `status === 'ready'` frozen check `plan-screen.tsx` shows a
+  // lock banner for, since F9's own PlanUnfrozen wiring hasn't landed yet).
+  const canEdit = members.find((m) => m.id === me?.id)?.role !== 'viewer';
+  const frozen = trip?.status === 'ready';
+
+  // Where each covered wish actually lives in the plan — "อยู่ในแพลนแล้ว" alone
+  // told the tester nothing (Feedback #4 — D-10's source quote).
+  const planLocation = useMemo(() => {
+    const map = new Map<string, { dayId: string; dayIndex: number; start: string }>();
+    for (const day of days) {
+      for (const planItem of day.items) {
+        map.set(planItem.id, { dayId: day.id, dayIndex: day.index, start: planItem.start });
+      }
+    }
+    return map;
+  }, [days]);
 
   return (
     <div className="space-y-4">
@@ -131,18 +154,48 @@ export function WishlistBoard({ tripId }: { tripId: string }) {
                     <p className="text-muted mt-1.5 text-xs leading-relaxed">{item.note}</p>
                   ) : null}
 
-                  <div
-                    className={cn(
-                      'mt-2 flex items-center gap-1.5 text-[11px] font-medium',
-                      cov.className,
-                    )}
-                  >
-                    <CovIcon className="size-3.5" strokeWidth={2.5} />
-                    {cov.label}
-                    {item.itemId ? (
-                      <span className="text-muted font-normal">· ดูในแพลน</span>
-                    ) : null}
-                  </div>
+                  {item.itemId && planLocation.has(item.itemId) ? (
+                    <Link
+                      href={
+                        `/t/${tripId}/plan?day=${planLocation.get(item.itemId)!.dayId}&item=${item.itemId}` as never
+                      }
+                      className="text-success mt-2 flex items-center gap-1.5 text-[11px] font-medium hover:underline"
+                    >
+                      <CovIcon className="size-3.5" strokeWidth={2.5} />
+                      อยู่ในแพลน · วัน {planLocation.get(item.itemId)!.dayIndex} ·{' '}
+                      {planLocation.get(item.itemId)!.start} →
+                    </Link>
+                  ) : (
+                    <div
+                      className={cn(
+                        'mt-2 flex items-center gap-1.5 text-[11px] font-medium',
+                        cov.className,
+                      )}
+                    >
+                      <CovIcon className="size-3.5" strokeWidth={2.5} />
+                      {cov.label}
+                    </div>
+                  )}
+
+                  {!item.itemId && item.kind !== 'avoid' && canEdit ? (
+                    days.length === 0 ? (
+                      <Link
+                        href={`/t/${tripId}/plan` as never}
+                        className="text-primary mt-1.5 inline-block text-[11px] font-medium hover:underline"
+                      >
+                        ให้ AI ร่างแพลน
+                      </Link>
+                    ) : (
+                      <button
+                        onClick={() => setAddingToPlan(item)}
+                        disabled={frozen}
+                        title={frozen ? 'ปลดล็อคแพลนก่อน' : undefined}
+                        className="text-primary mt-1.5 inline-flex items-center gap-1 text-[11px] font-medium hover:underline disabled:text-muted disabled:no-underline disabled:opacity-60"
+                      >
+                        <Plus className="size-3" /> ใส่ลงแพลน
+                      </button>
+                    )
+                  ) : null}
                 </div>
 
                 {mine || isOwner ? (
@@ -173,6 +226,16 @@ export function WishlistBoard({ tripId }: { tripId: string }) {
       </Button>
 
       <AddWishDialog tripId={tripId} open={adding} onClose={() => setAdding(false)} />
+
+      <ItemSheet
+        tripId={tripId}
+        days={days}
+        dayId={days[0]?.id ?? ''}
+        item={null}
+        initialTitle={addingToPlan?.title}
+        open={Boolean(addingToPlan)}
+        onClose={() => setAddingToPlan(null)}
+      />
     </div>
   );
 }

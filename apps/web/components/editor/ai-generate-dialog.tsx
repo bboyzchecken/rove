@@ -333,10 +333,10 @@ export function AiGenerateDialog({
               <Sparkles className="size-4" />
               {buyPass.isPending
                 ? 'กำลังดำเนินการ…'
-                : `ปลดล็อก ${formatMoney(passPrice, 'THB')} — ได้คืนถ้าจองผ่าน ROVE`}
+                : `ปลดล็อก ${formatMoney(passPrice, 'THB')} — คืนสูงสุดเท่ากันเมื่อจองผ่าน ROVE`}
             </Button>
             <p className="text-muted mt-2 text-center text-[11px] leading-relaxed">
-              คืนเป็นเครดิตเต็มจำนวนเมื่อมีการจองผ่าน ROVE จากทริปนี้ · คืนหนึ่งครั้งต่อทริป
+              คืนเป็นเครดิตสูงสุด {formatMoney(passPrice, 'THB')} เมื่อพาร์ตเนอร์ยืนยันการจองจากทริปนี้ · คืนหนึ่งครั้งต่อทริป
             </p>
 
             <Card accent="feature" className="mt-3 p-4">
@@ -346,7 +346,7 @@ export function AiGenerateDialog({
                   <p className="text-ink text-sm font-medium">สะสมแต้มไว้ลดค่า Trip Pass</p>
                   <p className="text-muted mt-1 text-xs leading-relaxed">
                     ชวนเพื่อนมาใช้ ROVE ได้ {POINTS_PER_REFERRAL} แต้มต่อคน
-                    และได้อีกทุกครั้งที่มีคนจองตามทริปที่คุณเปิดสาธารณะไว้ ·
+                    และได้อีกทุกครั้งที่มีคนคัดลอกทริปที่คุณเปิดสาธารณะไว้ ·
                     ตอนนี้การแลกแต้มเป็นโค้ดส่วนลดปิดปรับปรุงอยู่ แต้มที่สะสมไว้ไม่หายไปไหน
                   </p>
                 </div>

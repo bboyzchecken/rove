@@ -45,6 +45,8 @@ func TestOutsiderCannotReachAnyTripRoute(t *testing.T) {
 		{"trip recap", http.MethodGet, base + "/recap", nil},
 		{"trip update", http.MethodPatch, base, map[string]any{"title": "hijacked"}},
 		{"trip delete", http.MethodDelete, base, nil},
+		{"trip archive", http.MethodPost, base + "/archive", nil},
+		{"trip restore", http.MethodPost, base + "/restore", nil},
 		{"visibility", http.MethodPatch, base + "/visibility", map[string]any{"visibility": "public"}},
 		{"share", http.MethodGet, base + "/share", nil},
 		{"clone", http.MethodPost, base + "/clone", nil},
@@ -82,6 +84,7 @@ func TestOutsiderCannotReachAnyTripRoute(t *testing.T) {
 		{"votes", http.MethodGet, base + "/votes", nil},
 
 		{"bookings", http.MethodGet, base + "/bookings", nil},
+		{"archived bookings", http.MethodGet, base + "/bookings/archived", nil},
 		{"export", http.MethodGet, base + "/export", nil},
 		{"events stream", http.MethodGet, base + "/events", nil},
 
@@ -213,6 +216,8 @@ func TestEditorCannotDoOwnerActions(t *testing.T) {
 		{"publish the trip", http.MethodPatch, base + "/visibility", map[string]any{"visibility": "public"}},
 		{"invite someone", http.MethodPost, base + "/invites", map[string]any{}},
 		{"delete the trip", http.MethodDelete, base, nil},
+		{"archive the trip", http.MethodPost, base + "/archive", nil},
+		{"restore the trip", http.MethodPost, base + "/restore", nil},
 	}
 
 	for _, tc := range ownerOnly {
@@ -230,6 +235,14 @@ func TestNonAdminCannotReachAdminRoutes(t *testing.T) {
 		"/api/v1/admin/stats",
 		"/api/v1/admin/poi",
 		"/api/v1/admin/characters",
+		"/api/v1/admin/trace?type=user&q=x",
+		"/api/v1/admin/flags",
+		"/api/v1/admin/settings/economy",
+		"/api/v1/admin/audit",
+		"/api/v1/admin/payouts",
+		"/api/v1/admin/payouts/earnings",
+		"/api/v1/admin/kyc",
+		"/api/v1/admin/payout-accounts/pending",
 	} {
 		t.Run(path, func(t *testing.T) {
 			h.Request(http.MethodGet, path, userToken, nil).ExpectStatus(http.StatusForbidden)

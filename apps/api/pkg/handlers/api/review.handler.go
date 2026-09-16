@@ -165,16 +165,13 @@ func (s *Server) handleDeleteReview(c echo.Context) error {
 
 /* ---------------------------------------------------------------- shared -- */
 
-// tripIsOver is the one definition of "post-trip" the whole feature uses: the
-// end date has passed, or the room was archived early.
+// tripIsOver is the one definition of "post-trip" the whole feature uses
+// (Feedback #4 — F10/D-15): the owner confirmed it, full stop. The end date
+// used to be enough on its own, which meant a group still finishing up their
+// last day of expenses could be told a trip they had not confirmed was
+// somehow already reviewable.
 func tripIsOver(trip models.Trip) bool {
-	if trip.Status == models.TripStatusDone {
-		return true
-	}
-	if trip.EndDate == nil {
-		return false
-	}
-	return trip.EndDate.Before(time.Now().UTC().Truncate(24 * time.Hour))
+	return trip.Status == models.TripStatusDone
 }
 
 // summariseReviews is the in-memory twin of ReviewStore.SummaryByTrips, used

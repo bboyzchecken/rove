@@ -8,9 +8,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { FieldLabel, Input, Select, Textarea, fieldClass } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
+import { TimeField } from '@/components/ui/time-field';
 import { useAddItem, usePoiSearch, useRemoveItem, useUpdateItem } from '@/features/plan/queries';
 import { useMoveItem } from '@/features/plan/queries';
 import type { ItemType, PlanDay, PlanItem } from '@/lib/data';
+import { shiftEndTimeOnStartChange } from '@/lib/date-range';
 import { cn } from '@/lib/utils';
 
 /**
@@ -37,6 +39,9 @@ export function ItemSheet(props: {
   dayId: string;
   /** null = adding a new item. */
   item: PlanItem | null;
+  /** Prefills the title when adding — e.g. "+ ใส่ลงแพลน" from a wishlist card
+   *  (Feedback #4 — F8/D-10) already knows what the person wants to call it. */
+  initialTitle?: string;
   open: boolean;
   onClose: () => void;
 }) {
@@ -51,6 +56,7 @@ function ItemForm({
   days,
   dayId,
   item,
+  initialTitle,
   open,
   onClose,
 }: {
@@ -58,6 +64,7 @@ function ItemForm({
   days: PlanDay[];
   dayId: string;
   item: PlanItem | null;
+  initialTitle?: string;
   open: boolean;
   onClose: () => void;
 }) {
@@ -66,7 +73,7 @@ function ItemForm({
   const removeItem = useRemoveItem(tripId);
   const moveItem = useMoveItem(tripId);
 
-  const [title, setTitle] = useState(item?.title ?? '');
+  const [title, setTitle] = useState(item?.title ?? initialTitle ?? '');
   const [type, setType] = useState<ItemType>(item?.type ?? 'poi');
   const [start, setStart] = useState(item?.start ?? '09:00');
   const [end, setEnd] = useState(item?.end ?? '');
@@ -204,24 +211,22 @@ function ItemForm({
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <label className="block">
-            <FieldLabel>เริ่ม</FieldLabel>
-            <Input
-              type="time"
-              value={start}
-              onChange={(e) => setStart(e.target.value)}
-              className={cn(fieldClass, 'nums')}
-            />
-          </label>
-          <label className="block">
-            <FieldLabel>จบ (ไม่ใส่ก็ได้)</FieldLabel>
-            <Input
-              type="time"
-              value={end}
-              onChange={(e) => setEnd(e.target.value)}
-              className={cn(fieldClass, 'nums')}
-            />
-          </label>
+          <TimeField
+            label="เริ่ม"
+            value={start}
+            onChange={(hhmm) => {
+              const next = shiftEndTimeOnStartChange(start, end, hhmm);
+              setStart(next.start);
+              setEnd(next.end);
+            }}
+            clearable={false}
+          />
+          <TimeField
+            label="จบ (ไม่ใส่ก็ได้)"
+            value={end}
+            min={start || undefined}
+            onChange={setEnd}
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-2">

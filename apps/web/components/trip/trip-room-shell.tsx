@@ -2,9 +2,13 @@
 
 import { useSelectedLayoutSegment } from 'next/navigation';
 
+import { EmptyState } from '@/components/common/empty-state';
 import { TripHeader } from '@/components/trip/trip-header';
 import { TripRealtime } from '@/components/trip/trip-realtime';
 import { TripTabs } from '@/components/trip/trip-tabs';
+import { ButtonLink } from '@/components/ui/button';
+import { useTripOverview } from '@/features/trip/queries';
+import { ApiError } from '@/lib/api-client';
 import { tripFeature } from '@/lib/feature';
 
 /**
@@ -32,6 +36,27 @@ export function TripRoomShell({
 }) {
   const segment = useSelectedLayoutSegment();
   const feature = tripFeature(segment);
+  const { error } = useTripOverview(tripId);
+
+  // A member following an old link into a trip its owner archived (Feedback
+  // #4 — D-31): every trip route answers 410, so say so once instead of ten
+  // tabs of failed requests.
+  if (error instanceof ApiError && error.isGone) {
+    return (
+      <div className="px-4 py-10">
+        <EmptyState
+          image="/brand/empty/empty-plan.webp"
+          title="ทริปนี้ถูกเก็บเข้าคลังแล้ว"
+          hint="เจ้าของทริปเก็บทริปนี้ไว้ ถ้ากู้คืนเมื่อไหร่ ทริปจะกลับมาอยู่ในหน้าทริปของทุกคน"
+          action={
+            <ButtonLink href="/home" size="sm">
+              กลับหน้าแรก
+            </ButtonLink>
+          }
+        />
+      </div>
+    );
+  }
 
   // Trip Mode still needs the attribute even without the chrome — it is a
   // screen in the room, and dropping it here would leave the route neutral.

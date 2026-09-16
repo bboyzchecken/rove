@@ -40,6 +40,9 @@ type Service interface {
 	// URL returns something a browser can GET for a while: a presigned R2 URL,
 	// or a plain /uploads path in local mode.
 	URL(ctx context.Context, bucket, key string) (string, error)
+	// SignedURL is URL with a chosen lifetime — ID cards are opened for
+	// minutes, not days (F11 — PDPA).
+	SignedURL(ctx context.Context, bucket, key string, ttl time.Duration) (string, error)
 	Delete(ctx context.Context, bucket, key string) error
 	// Configured reports whether a real bucket is behind this service.
 	Configured() bool
@@ -108,10 +111,14 @@ func (s *r2Service) Put(ctx context.Context, bucket, key string, body io.Reader,
 }
 
 func (s *r2Service) URL(ctx context.Context, bucket, key string) (string, error) {
+	return s.SignedURL(ctx, bucket, key, presignTTL)
+}
+
+func (s *r2Service) SignedURL(ctx context.Context, bucket, key string, ttl time.Duration) (string, error) {
 	out, err := s.presigner.PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
-	}, s3.WithPresignExpires(presignTTL))
+	}, s3.WithPresignExpires(ttl))
 	if err != nil {
 		return "", err
 	}
@@ -166,6 +173,12 @@ func (s *localService) Put(_ context.Context, bucket, key string, body io.Reader
 
 func (s *localService) URL(_ context.Context, bucket, key string) (string, error) {
 	return s.cfg.AppBaseURL + "/uploads/" + bucket + "/" + key, nil
+}
+
+// SignedURL in local mode is the plain path: dev and UAT have no private
+// bucket to sign against.
+func (s *localService) SignedURL(ctx context.Context, bucket, key string, _ time.Duration) (string, error) {
+	return s.URL(ctx, bucket, key)
 }
 
 func (s *localService) Delete(_ context.Context, bucket, key string) error {

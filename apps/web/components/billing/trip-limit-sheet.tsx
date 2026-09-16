@@ -89,7 +89,7 @@ export function TripLimitSheet({
               <p className="font-display text-ink font-medium">Trip Pass ฿{allowance.priceThb}</p>
               <p className="text-ink mt-0.5 text-xs leading-relaxed">
                 ปลดล็อกทริปที่วางอยู่ทั้งใบ — วางแผนทริปใหม่ควบคู่ได้ทันที
-                ให้ AI ร่างแพลนได้ไม่จำกัด และจองผ่าน ROVE แล้วได้คืนเต็มจำนวน
+                ให้ AI ร่างแพลนได้ไม่จำกัด และคืนสูงสุด ฿{allowance.priceThb} เมื่อพาร์ตเนอร์ยืนยันการจองผ่าน ROVE
               </p>
               <ButtonLink href="/pricing" size="sm" className="mt-3">
                 ซื้อ Trip Pass ฿{allowance.priceThb} <ArrowRight className="size-3.5" />

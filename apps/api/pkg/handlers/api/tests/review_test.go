@@ -31,7 +31,9 @@ type reviewListResponse struct {
 	CanReview bool `json:"can_review"`
 }
 
-// finish moves a trip into the past so it can be reviewed.
+// finish moves a trip into the past and confirms it done, so it can be
+// reviewed — Feedback #4 (F10/D-15) made "over" mean the owner said so, not
+// just that the calendar moved on.
 func finish(h *testsupport.Harness, trip *models.Trip) {
 	h.T.Helper()
 
@@ -39,6 +41,7 @@ func finish(h *testsupport.Harness, trip *models.Trip) {
 	start := end.AddDate(0, 0, -4)
 	trip.StartDate = &start
 	trip.EndDate = &end
+	trip.Status = models.TripStatusDone
 	if err := h.DB.Save(trip).Error; err != nil {
 		h.T.Fatalf("finish trip: %v", err)
 	}

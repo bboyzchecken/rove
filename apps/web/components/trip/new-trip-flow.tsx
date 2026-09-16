@@ -8,7 +8,6 @@ import {
   BedDouble,
   CalendarDays,
   Check,
-  ClipboardPaste,
   MapPin,
   Plane,
   Plus,
@@ -31,15 +30,15 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
 import { DateField } from '@/components/ui/date-field';
-import { Field, Input, Textarea, fieldClass } from '@/components/ui/field';
+import { Field, Input } from '@/components/ui/field';
 import { useCharacters, useMe, useUpdateMe } from '@/features/auth/queries';
 import { useCreateTrip, useTripAllowance } from '@/features/trip/queries';
-import { track } from '@/lib/analytics';
 import { ApiError } from '@/lib/api-client';
 import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
 import { repo } from '@/lib/data';
 import type { Airport, StartedWith, TripAllowance } from '@/lib/data';
-import { addDays, daysBetween, isIsoDate, thaiRangeLabel } from '@/lib/data/domain';
+import { daysBetween, isIsoDate, thaiRangeLabel } from '@/lib/data/domain';
+import { shiftEndOnStartChange } from '@/lib/date-range';
 import { cn } from '@/lib/utils';
 
 /**
@@ -75,7 +74,7 @@ const HAVE: { key: StartedWith; icon: typeof CalendarDays; title: string; hint: 
     key: 'flights',
     icon: Plane,
     title: 'จองไฟลท์แล้ว',
-    hint: 'มีตั๋วในมือ — วางข้อความจากอีเมลตั๋วได้เลย',
+    hint: 'มีตั๋วในมือแล้ว ใส่เที่ยวบินเองได้เลย',
   },
   {
     key: 'stay',
@@ -111,11 +110,6 @@ function newStay(patch: Partial<DraftStay> = {}): DraftStay {
   };
 }
 
-const SAMPLE_TICKET = `Thai Airways — Booking confirmed
-TG 682  BKK 23:59 → NRT 08:05  04 Dec 2026
-TG 677  NRT 14:35 → BKK 22:05  10 Dec 2026
-Passengers: 4`;
-
 export function NewTripFlow() {
   const router = useRouter();
   const params = useSearchParams();
@@ -138,14 +132,14 @@ export function NewTripFlow() {
   ]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  // Feedback #4 D-2: moving the start past a chosen end shifts the end
+  // forward to keep the same length, and this says so once rather than
+  // leaving it looking like the date changed itself.
+  const [datesShifted, setDatesShifted] = useState(false);
   const [destination, setDestination] = useState<Airport | null>(null);
   const [stays, setStays] = useState<DraftStay[]>(() => [newStay()]);
   const [party, setParty] = useState(1);
   const [character, setCharacter] = useState<string | null>(null);
-  const [ticket, setTicket] = useState('');
-  const [pasting, setPasting] = useState(false);
-  const [parsing, setParsing] = useState(false);
-  const [ticketNote, setTicketNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // The paywall (D-10): known before the first tap, and answered in a sheet
@@ -223,43 +217,6 @@ export function NewTripFlow() {
     setHave((current) =>
       current.includes(key) ? current.filter((k) => k !== key) : [...current, key],
     );
-  }
-
-  /** The paste shortcut: the same legs, typed by the airline instead of by you. */
-  async function readTicket(text: string) {
-    setTicket(text);
-    setTicketNote(null);
-    if (text.trim().length < 40) return;
-
-    setParsing(true);
-    try {
-      const parsed = await repo.trips.parseTicket(text);
-      if (parsed.flights.length === 0) {
-        setTicketNote(
-          'อ่านเที่ยวบินไม่ออก — ใส่เองด้านล่างได้เลย หรือวางเฉพาะบรรทัดที่มีรหัสเที่ยวบิน',
-        );
-        return;
-      }
-
-      setLegs(
-        parsed.flights.map((flight, index) =>
-          newLeg(index === 0 ? 'out' : index === parsed.flights.length - 1 ? 'back' : 'inter', {
-            from: flight.from,
-            to: flight.to,
-            depDate: flight.date,
-            depTime: flight.time,
-            flightNo: flight.code,
-          }),
-        ),
-      );
-      // A ticket says how many are flying; the stepper still starts at one
-      // (D-8) and only moves when the ticket actually says so.
-      if (parsed.partySize) setParty(parsed.partySize);
-      setTicketNote(`อ่านได้ ${parsed.flights.length} เที่ยวบิน — ตรวจแล้วแก้ตรงไหนก็ได้`);
-      track('route_built', { legs: parsed.flights.length, countries: 0, source: 'ticket' });
-    } finally {
-      setParsing(false);
-    }
   }
 
   function whereLabel() {
@@ -507,42 +464,8 @@ export function NewTripFlow() {
                 routing ? '' : 'md:max-w-2xl',
               )}
             >
-              {/* Pasting a ticket fills the same legs, so it lives under them. */}
               {routing ? (
                 <div>
-                  <button
-                    onClick={() => setPasting((v) => !v)}
-                    className="text-primary inline-flex items-center gap-1.5 text-xs font-medium"
-                  >
-                    <ClipboardPaste className="size-3.5" />
-                    {pasting ? 'ซ่อนช่องวางตั๋ว' : 'มีอีเมลตั๋วอยู่แล้ว? วางมาเลย'}
-                  </button>
-
-                  {pasting ? (
-                    <div className="mt-2 space-y-2">
-                      <Textarea
-                        value={ticket}
-                        onChange={(e) => void readTicket(e.target.value)}
-                        rows={5}
-                        placeholder="วางอีเมลยืนยันตั๋ว หรือข้อความจากสายการบินได้เลย"
-                        className={cn(fieldClass, 'nums text-xs')}
-                      />
-                      <Button
-                        variant="soft"
-                        size="sm"
-                        onClick={() => void readTicket(SAMPLE_TICKET)}
-                        disabled={parsing}
-                      >
-                        {parsing ? 'กำลังอ่าน…' : 'ใส่ตัวอย่างให้ดู'}
-                      </Button>
-                      {ticketNote ? (
-                        <Card accent="feature" className="p-3">
-                          <p className="text-ink text-xs">{ticketNote}</p>
-                        </Card>
-                      ) : null}
-                    </div>
-                  ) : null}
-
                   {has('dates') ? (
                     <p className="text-muted mt-3 text-[11px]">
                       วันเดินทางมาจากวันบินที่ใส่ไว้ ไม่ต้องใส่ซ้ำ
@@ -559,8 +482,10 @@ export function NewTripFlow() {
                       label="ไปวันที่"
                       value={startDate}
                       onChange={(iso) => {
-                        setStartDate(iso);
-                        if (iso && endDate && iso > endDate) setEndDate(addDays(iso, 4));
+                        const next = shiftEndOnStartChange(startDate, endDate, iso);
+                        setStartDate(next.start);
+                        setEndDate(next.end);
+                        setDatesShifted(next.shifted);
                       }}
                     />
                     <DateField
@@ -575,6 +500,7 @@ export function NewTripFlow() {
                   {hasTypedDates ? (
                     <p className="text-muted mt-2 text-xs">
                       {nights + 1} วัน {nights} คืน · {thaiRangeLabel(startDate, endDate)}
+                      {datesShifted ? ' · เลื่อนวันกลับตามให้แล้ว (ระยะทริปเท่าเดิม)' : ''}
                     </p>
                   ) : (
                     <p className="text-muted mt-2 text-xs">ใส่เป็น วัน/เดือน/ปี ค.ศ.</p>
@@ -649,13 +575,10 @@ export function NewTripFlow() {
                             value={stay.checkIn}
                             min={tripStart || undefined}
                             max={tripEnd || undefined}
-                            onChange={(iso) =>
-                              updateStay(stay.id, {
-                                checkIn: iso,
-                                checkOut:
-                                  iso && stay.checkOut && iso > stay.checkOut ? '' : stay.checkOut,
-                              })
-                            }
+                            onChange={(iso) => {
+                              const next = shiftEndOnStartChange(stay.checkIn, stay.checkOut, iso, 1);
+                              updateStay(stay.id, { checkIn: next.start, checkOut: next.end });
+                            }}
                           />
                           <DateField
                             label="เช็คเอาต์"

@@ -74,18 +74,3 @@ type ItemDiff struct {
 	Reason   string         `json:"reason"`
 }
 
-// ParsedTicket backs the "paste your ticket" entry point (M1).
-type ParsedTicket struct {
-	Flights []struct {
-		Direction  string `json:"direction"`
-		Airline    string `json:"airline"`
-		FlightNo   string `json:"flight_no"`
-		DepAirport string `json:"dep_airport"`
-		ArrAirport string `json:"arr_airport"`
-		DepAt      string `json:"dep_at"`
-		ArrAt      string `json:"arr_at"`
-	} `json:"flights"`
-	SuggestedTitle string `json:"suggested_title"`
-	StartDate      string `json:"start_date"`
-	EndDate        string `json:"end_date"`
-}

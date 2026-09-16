@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 
-import { Check } from 'lucide-react';
+import { Archive, Check } from 'lucide-react';
 
+import { TripArchiveSheet } from '@/components/trip/trip-archive-sheet';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel, Input, fieldClass } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
@@ -11,6 +12,7 @@ import { useMe } from '@/features/auth/queries';
 import { useTripOverview, useUpdateTrip } from '@/features/trip/queries';
 import type { Trip, TripColor, UpdateTripInput } from '@/lib/data';
 import { daysBetween } from '@/lib/data/domain';
+import { shiftEndOnStartChange } from '@/lib/date-range';
 import { TRIP_COLORS, TRIP_COLOR_LABEL, tripColorClasses } from '@/lib/trip-color';
 import { cn } from '@/lib/utils';
 
@@ -40,9 +42,14 @@ export function TripFrameDialog({
   const [title, setTitle] = useState(trip.title);
   const [startDate, setStartDate] = useState(trip.startDate);
   const [endDate, setEndDate] = useState(trip.endDate);
+  // Feedback #4 D-2: moving the start past the end shifts the end forward
+  // instead of leaving a range that ends before it starts — said once here so
+  // it does not read like the date silently changed itself.
+  const [datesShifted, setDatesShifted] = useState(false);
   const [partySize, setPartySize] = useState(trip.partySize);
   const [budget, setBudget] = useState(trip.budgetPerPersonThb);
   const [cities, setCities] = useState(trip.cities.join(', '));
+  const [archiving, setArchiving] = useState(false);
 
   const nights = startDate && endDate ? Math.max(0, daysBetween(startDate, endDate) - 1) : 0;
   const hasRoute = (trip.route?.flights.length ?? 0) > 0;
@@ -64,6 +71,11 @@ export function TripFrameDialog({
     }
     await update.mutateAsync(patch);
     onClose();
+  }
+
+  // The confirm replaces this sheet rather than stacking a second one on it.
+  if (archiving) {
+    return <TripArchiveSheet tripId={tripId} title={trip.title} onClose={() => setArchiving(false)} />;
   }
 
   return (
@@ -120,7 +132,16 @@ export function TripFrameDialog({
         ) : null}
 
         <div className="grid grid-cols-2 gap-2">
-          <DateField label="ไปวันที่" value={startDate} onChange={setStartDate} />
+          <DateField
+            label="ไปวันที่"
+            value={startDate}
+            onChange={(iso) => {
+              const next = shiftEndOnStartChange(startDate, endDate, iso);
+              setStartDate(next.start);
+              setEndDate(next.end);
+              setDatesShifted(next.shifted);
+            }}
+          />
           <DateField
             label="กลับวันที่"
             value={endDate}
@@ -131,6 +152,7 @@ export function TripFrameDialog({
         {startDate && endDate ? (
           <p className="text-muted -mt-1 text-[11px]">
             {nights + 1} วัน {nights} คืน
+            {datesShifted ? ' · เลื่อนวันกลับตามให้แล้ว (ระยะทริปเท่าเดิม)' : ''}
           </p>
         ) : null}
 
@@ -174,6 +196,23 @@ export function TripFrameDialog({
             />
           </Field>
         </div>
+
+        {/* Owner only, same as the API (Feedback #4 — D-31). */}
+        {isOwner ? (
+          <div className="border-border border-t pt-3.5">
+            <button
+              type="button"
+              onClick={() => setArchiving(true)}
+              className="text-muted hover:text-ink inline-flex items-center gap-1.5 text-xs font-medium transition"
+            >
+              <Archive className="size-3.5" />
+              เก็บเข้าคลัง
+            </button>
+            <span className="text-muted mt-1 block text-[11px]">
+              ซ่อนทริปจากทุกคนในห้อง กู้คืนได้จากโปรไฟล์
+            </span>
+          </div>
+        ) : null}
       </div>
     </Sheet>
   );

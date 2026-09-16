@@ -312,9 +312,10 @@ function AddExpenseForm({
                           : [...participants, member.id],
                       )
                     }
+                    aria-pressed={on}
                     className={cn(
                       'flex items-center gap-1.5 rounded-full py-1 pr-3 pl-1 text-xs font-medium transition',
-                      on ? 'bg-primary/12 text-primary' : 'bg-surface text-muted opacity-60',
+                      on ? 'bg-ink text-bg' : 'bg-surface text-muted',
                     )}
                   >
                     <CharacterAvatar characterId={member.characterId} size="xs" />

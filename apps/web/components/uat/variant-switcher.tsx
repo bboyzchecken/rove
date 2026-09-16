@@ -43,6 +43,9 @@ export function VariantSwitcher() {
   if (!UAT_VARIANTS_ENABLED) return null;
   // Trip Mode is the one screen that gets the whole viewport (W10.6).
   if (pathname.endsWith('/now')) return null;
+  // The print page (Feedback #4 — F3) is a paper layout with no chrome — a
+  // fixed button here would print itself onto the page.
+  if (pathname.endsWith('/print')) return null;
 
   // The keys that matter on THIS screen come first; the rest stay reachable
   // below a divider so a tester can set everything up in one place.

@@ -153,25 +153,36 @@ func buildPrintableHTML(trip models.Trip, days []models.PlanDay, byDay map[strin
 	b.WriteString(`<!doctype html><html lang="th"><head><meta charset="utf-8">`)
 	fmt.Fprintf(&b, `<title>%s — ROVE</title>`, html.EscapeString(trip.Title))
 	b.WriteString(`<meta name="viewport" content="width=device-width,initial-scale=1">`)
+	// D-4: this was cutting a card in half mid-line — `.foot{position:fixed}`
+	// printed on top of the last line of every page, and nothing here told
+	// the browser to keep a day's heading or an item together. `break-inside`
+	// on `.item` and `.day` plus `break-before:page` between days (not before
+	// the first) fixes both without a layout rewrite. The web print page at
+	// `/t/:id/print` (Feedback #4 — F3) is the primary path now; this stays
+	// for anyone holding an old link.
 	b.WriteString(`<style>
 :root{color-scheme:light}
+@page{size:A4;margin:14mm}
 body{font-family:system-ui,-apple-system,"Noto Sans Thai",sans-serif;color:#3D2B24;background:#fff;margin:0;padding:32px;line-height:1.6}
 .wrap{max-width:720px;margin:0 auto}
 h1{font-size:26px;margin:0 0 4px;letter-spacing:-.3px}
 .sub{color:#6B5B4E;font-size:14px;margin:0 0 28px}
-h2{font-size:15px;margin:28px 0 8px;padding-bottom:6px;border-bottom:1px solid #eee}
-.item{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid #f5f5f5}
+.day{break-inside:avoid-page}
+.day + .day{break-before:page}
+h2{font-size:15px;margin:28px 0 8px;padding-bottom:6px;border-bottom:1px solid #eee;break-after:avoid}
+.item{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid #f5f5f5;break-inside:avoid;orphans:3;widows:3}
 .time{width:52px;flex:none;font-variant-numeric:tabular-nums;font-size:13px;color:#6B5B4E}
 .title{font-weight:600;font-size:14px}
 .meta{color:#6B5B4E;font-size:12px}
 .foot{margin-top:36px;color:#6B5B4E;font-size:12px;border-top:1px solid #eee;padding-top:12px}
-@media print{body{padding:0}.foot{position:fixed;bottom:0}}
+@media print{body{padding:0}}
 </style></head><body><div class="wrap">`)
 
 	fmt.Fprintf(&b, `<h1>%s</h1>`, html.EscapeString(trip.Title))
 	fmt.Fprintf(&b, `<p class="sub">%s</p>`, html.EscapeString(dates))
 
 	for _, day := range days {
+		b.WriteString(`<div class="day">`)
 		fmt.Fprintf(&b, `<h2>%s · %s</h2>`, html.EscapeString(day.Label), html.EscapeString(day.City))
 		for _, item := range byDay[day.ID] {
 			meta := item.Area
@@ -189,6 +200,7 @@ h2{font-size:15px;margin:28px 0 8px;padding-bottom:6px;border-bottom:1px solid #
 			}
 			b.WriteString(`</div></div>`)
 		}
+		b.WriteString(`</div>`)
 	}
 
 	b.WriteString(`<p class="foot">พิมพ์จาก ROVE · ค่าใช้จ่ายจริงของกลุ่มไม่ถูกรวมในไฟล์นี้</p>`)

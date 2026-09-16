@@ -153,11 +153,17 @@ export function derivedStatus(overview: TripOverview, step: StepKey): Exclude<St
   }
 }
 
-/** The status the room shows for a step: what it derives, unless the group skipped it. */
+/**
+ * The status the room shows for a step: what it derives, unless the group
+ * overrode it — skipped it (D-12), or confirmed it done by hand (Feedback #4
+ * — D-26) because it had no way to reach 100% on its own.
+ */
 export function stepStatus(overview: TripOverview, step: StepKey): StepStatus {
   const derived = derivedStatus(overview, step);
   if (derived === 'done') return 'done';
-  return overview.stepOverrides[step] === 'skipped' ? 'skipped' : derived;
+  const override = overview.stepOverrides[step];
+  if (override === 'confirmed') return 'done';
+  return override === 'skipped' ? 'skipped' : derived;
 }
 
 /**
@@ -183,15 +189,26 @@ export function orderedSteps(startedWith: StartedWith[] = []): StepInfo[] {
   ];
 }
 
-/** The pieces the checklist header prints: "พร้อม 40% · เหลืออีก 3 อย่าง". */
+/**
+ * The pieces the checklist header prints: "พร้อม 40% · เหลืออีก 3 อย่าง".
+ *
+ * Feedback #4 — F9: "during"-phase steps (ค่าใช้จ่ายจริง, รูปเข้าทริป) never
+ * count here, at any call site — they cannot be finished before the trip
+ * even starts, so counting them in the pre-travel percentage is what made a
+ * fully-prepared trip read "67% · เหลืออีก 2" forever and never invite the
+ * owner to press พร้อมไปแล้ว. They still render as their own rows in the
+ * checklist (`orderedSteps` keeps them); this only excludes them from % and
+ * from "ขั้นต่อไป".
+ */
 export function progressSummary(overview: TripOverview, steps: StepInfo[] = orderedSteps(overview.trip.startedWith)) {
-  const statuses = steps.map((step) => stepStatus(overview, step.key));
+  const preTravel = steps.filter((step) => step.phase !== 'during');
+  const statuses = preTravel.map((step) => stepStatus(overview, step.key));
   const counted = statuses.filter((s) => s !== 'skipped');
   const done = counted.filter((s) => s === 'done').length;
   const percent = counted.length === 0 ? 100 : Math.round((done / counted.length) * 100);
   const remaining = counted.length - done;
-  const next = steps.find((step) => stepStatus(overview, step.key) === 'todo')
-    ?? steps.find((step) => stepStatus(overview, step.key) === 'check');
+  const next = preTravel.find((step) => stepStatus(overview, step.key) === 'todo')
+    ?? preTravel.find((step) => stepStatus(overview, step.key) === 'check');
   return { percent, done, remaining, total: counted.length, next };
 }
 

@@ -2,6 +2,7 @@ package tests
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -170,7 +171,81 @@ func TestDiscountCodeIsSingleUseAndOnlyMine(t *testing.T) {
 
 /* --------------------------------------------- revenue share (A12.11) ---- */
 
+// confirmBookingViaPartner is how every test simulates a real booking going
+// through, now that the manual "จองแล้ว" toggle awards nothing on its own
+// (Feedback #4 D-24): click through to the partner (A12.1/A12.2), then have
+// that partner post back that it converted (A12.6). Shared by the billing
+// tests (the refund) and the ones here (the creator's share).
+func confirmBookingViaPartner(t *testing.T, h *testsupport.Harness, tripID, bookingID, token string, amountTHB float64) {
+	t.Helper()
+
+	var link struct {
+		URL string `json:"url"`
+	}
+	h.Request(http.MethodPost, "/api/v1/trips/"+tripID+"/bookings/"+bookingID+"/link", token, nil).
+		ExpectStatus(http.StatusOK).Decode(&link)
+	clickID := strings.TrimPrefix(link.URL, h.Config.AppBaseURL+"/go/")
+
+	h.RequestWithHeaders(http.MethodPost, "/webhooks/affiliate/agoda",
+		map[string]string{"X-Rove-Signature": h.Config.AffiliateWebhookSecret},
+		map[string]any{"tracking_id": clickID, "status": "confirmed", "amount_thb": amountTHB},
+	).ExpectStatus(http.StatusOK)
+}
+
+// TestConfirmedBookingWritesTheCreatorTheirShare covers the *only* door that
+// pays a creator anything (Feedback #4 D-24): a partner postback, not the
+// group ticking "จองแล้ว" by hand. See
+// TestManualBookingToggleAwardsNothing for the other half of that rule.
 func TestConfirmedBookingWritesTheCreatorTheirShare(t *testing.T) {
+	h := testsupport.New(t)
+	creator, creatorToken := h.User("creator")
+	follower, followerToken := h.User("follower")
+
+	source := h.Trip(creator, "โตเกียวต้นฉบับ")
+	copyTrip := h.Trip(follower, "โตเกียวตามรอย")
+	copyTrip.SourceCreatorID = &creator.ID
+	copyTrip.SourceTripID = &source.ID
+	if err := h.DB.Save(copyTrip).Error; err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	booking := &models.Booking{
+		TripID: copyTrip.ID, Kind: models.BookingStay, Title: "โรงแรมชินจูกุ",
+		Partner: "agoda", Status: models.BookingIdea,
+	}
+	if err := h.DB.Create(booking).Error; err != nil {
+		t.Fatalf("booking: %v", err)
+	}
+
+	confirmBookingViaPartner(t, h, copyTrip.ID, booking.ID, followerToken, 48_000)
+
+	var out earningsResponse
+	h.Request(http.MethodGet, "/api/v1/users/me/earnings", creatorToken, nil).
+		ExpectStatus(http.StatusOK).Decode(&out)
+
+	if len(out.Entries) != 1 {
+		t.Fatalf("entries = %+v, want one", out.Entries)
+	}
+	entry := out.Entries[0]
+	// Four people at ฿12,000 is ฿48,000; Agoda pays 5% and nobody reported a
+	// commission, so it is estimated from that; the creator takes the default
+	// 15% of it (D-30).
+	if entry.CommissionTHB != 2400 || entry.AmountTHB != 360 {
+		t.Errorf("entry = %+v, want ฿2,400 commission and ฿360 share", entry)
+	}
+	if !entry.Estimated {
+		t.Error("nobody reported this commission — it must be flagged as an estimate")
+	}
+	if out.Totals.PendingTHB != 360 || out.SharePercent != 15 {
+		t.Errorf("totals = %+v share = %d", out.Totals, out.SharePercent)
+	}
+}
+
+// TestManualBookingToggleAwardsNothing is Feedback #4 D-24: a group ticking
+// "จองแล้ว" themselves — even off and back on, which used to mint the award a
+// second time — proves nothing about whether a partner actually confirmed the
+// booking, so it must not pay the creator or credit the Trip Pass.
+func TestManualBookingToggleAwardsNothing(t *testing.T) {
 	h := testsupport.New(t)
 	creator, creatorToken := h.User("creator")
 	follower, followerToken := h.User("follower")
@@ -192,26 +267,27 @@ func TestConfirmedBookingWritesTheCreatorTheirShare(t *testing.T) {
 		t.Fatalf("booking: %v", err)
 	}
 
-	h.Request(http.MethodPatch, "/api/v1/trips/"+copyTrip.ID+"/bookings/"+booking.ID, followerToken,
-		map[string]any{"status": models.BookingBooked}).ExpectStatus(http.StatusOK)
+	for i := 0; i < 2; i++ {
+		h.Request(http.MethodPatch, "/api/v1/trips/"+copyTrip.ID+"/bookings/"+booking.ID, followerToken,
+			map[string]any{"status": models.BookingIdea}).ExpectStatus(http.StatusOK)
+		h.Request(http.MethodPatch, "/api/v1/trips/"+copyTrip.ID+"/bookings/"+booking.ID, followerToken,
+			map[string]any{"status": models.BookingBooked}).ExpectStatus(http.StatusOK)
+	}
 
-	var out earningsResponse
+	var earnings earningsResponse
 	h.Request(http.MethodGet, "/api/v1/users/me/earnings", creatorToken, nil).
-		ExpectStatus(http.StatusOK).Decode(&out)
+		ExpectStatus(http.StatusOK).Decode(&earnings)
+	if len(earnings.Entries) != 0 || earnings.Totals.PendingTHB != 0 {
+		t.Fatalf("earnings = %+v, want none", earnings)
+	}
 
-	if len(out.Entries) != 1 {
-		t.Fatalf("entries = %+v, want one", out.Entries)
+	var points struct {
+		Balance int `json:"balance"`
 	}
-	entry := out.Entries[0]
-	// Four people at ฿12,000 is ฿48,000; Agoda pays 5%; the creator takes 30%.
-	if entry.CommissionTHB != 2400 || entry.AmountTHB != 720 {
-		t.Errorf("entry = %+v, want ฿2,400 commission and ฿720 share", entry)
-	}
-	if !entry.Estimated {
-		t.Error("nobody reported this commission — it must be flagged as an estimate")
-	}
-	if out.Totals.PendingTHB != 720 || out.SharePercent != 30 {
-		t.Errorf("totals = %+v share = %d", out.Totals, out.SharePercent)
+	h.Request(http.MethodGet, "/api/v1/users/me/points", creatorToken, nil).
+		ExpectStatus(http.StatusOK).Decode(&points)
+	if points.Balance != 0 {
+		t.Fatalf("creator points = %d, want 0", points.Balance)
 	}
 }
 

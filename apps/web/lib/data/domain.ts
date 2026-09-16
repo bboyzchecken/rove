@@ -12,6 +12,8 @@ import type {
   PlanItem,
   Settlement,
   TripConflict,
+  TripPhase,
+  TripStatus,
   VariantMetrics,
   WishlistItem,
 } from './types';
@@ -59,6 +61,37 @@ export function isIsoDate(value: string | null | undefined): value is string {
 /** `parseIsoDate` for callers that can act on "no date" rather than on 1970. */
 export function parseIsoDateOrNull(iso: string | null | undefined): Date | null {
   return isIsoDate(iso) ? parseIsoDate(iso) : null;
+}
+
+/* ------------------------------------------------------------ trip phase -- */
+
+/**
+ * The room's calendar lifecycle (Feedback #4 — F9/F10, D-27/D-28).
+ *
+ * `status` alone says whether the plan is locked; this layers the travel
+ * dates on top so the header badge, the redirect into Trip Mode, and the
+ * end-of-trip card all read from ONE place — the trip-header's old ad hoc
+ * `[start-1, end+1]` window and the home screen's date-based upcoming/past
+ * split were each computing a version of this independently and disagreeing
+ * with each other and with `status`.
+ *
+ * ISO date strings compare correctly with plain `<`/`>=`, so this never
+ * parses to a `Date`. `today` defaults to the caller's own clock (D-9's "ใช้
+ * ปฏิทินของเครื่องผู้ใช้"); pass it explicitly in tests.
+ */
+export function tripPhase(
+  status: TripStatus,
+  startDate: string,
+  endDate: string,
+  today: string = toIsoDate(new Date()),
+): TripPhase {
+  if (status === 'done') return 'done';
+  if (!isIsoDate(startDate) || !isIsoDate(endDate)) return 'planning';
+  if (today > endDate) return 'awaiting_end';
+  // D-27: arriving without the owner having pressed "พร้อมไปแล้ว" does not
+  // count as ongoing — the room still reads as "planning" until they do.
+  if (status === 'ready') return today >= startDate ? 'ongoing' : 'ready';
+  return 'planning';
 }
 
 /* ---------------------------------------------------- dd/mm/yyyy (D-7) ---- */

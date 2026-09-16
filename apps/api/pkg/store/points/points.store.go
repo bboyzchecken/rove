@@ -4,7 +4,6 @@ package points
 
 import (
 	"context"
-	"time"
 
 	"go.uber.org/fx"
 	"gorm.io/gorm"
@@ -17,13 +16,6 @@ type store struct{ db *gorm.DB }
 func New(db *gorm.DB) models.PointsStore { return &store{db: db} }
 
 var Module = fx.Module("store.points", fx.Provide(New))
-
-func (s *store) Add(ctx context.Context, entry *models.UserPoints) error {
-	if entry.OccurredAt.IsZero() {
-		entry.OccurredAt = time.Now().UTC()
-	}
-	return s.db.WithContext(ctx).Create(entry).Error
-}
 
 func (s *store) Balance(ctx context.Context, userID string) (int, error) {
 	var total *int

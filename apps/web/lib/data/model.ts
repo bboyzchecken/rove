@@ -17,7 +17,28 @@ export type WishKind = 'must' | 'nice' | 'avoid';
 export type CoverageState = 'covered' | 'partial' | 'uncovered';
 export type ItemType = 'poi' | 'meal' | 'transport' | 'stay' | 'free' | 'flight';
 export type ExpenseScope = 'shared' | 'personal';
-export type TripStatus = 'planning' | 'ready' | 'ongoing' | 'done';
+/**
+ * Whether the plan is locked (Feedback #4 — F9/F10 fix-list §4). `ongoing` used
+ * to sit in this union with nothing that ever produced it — the room had a
+ * date-based lifecycle nobody's code implemented. See `TripPhase` for that.
+ */
+export type TripStatus = 'planning' | 'ready' | 'done';
+
+/**
+ * The room's calendar lifecycle (Feedback #4 — F9/F10): `status` alone answers
+ * "is the plan locked", not "where is this trip today". `tripPhase()` in
+ * `lib/data/domain.ts` (Go twin: none yet — see D-28's auto-close sweep,
+ * the only backend consumer so far) derives this from `status` + the travel
+ * dates, never stored.
+ *
+ *   planning      before the trip, plan still open
+ *   ready         before the trip, owner pressed "พร้อมไปแล้ว" (status=ready)
+ *   ongoing       inside the travel dates AND status=ready (D-27 — arriving
+ *                 without pressing ready first does NOT count as ongoing)
+ *   awaiting_end  past the return date, nobody has confirmed the trip is done
+ *   done          owner confirmed
+ */
+export type TripPhase = 'planning' | 'ready' | 'ongoing' | 'awaiting_end' | 'done';
 
 /** One of the six brand pairs, by name (Feedback #2 — D-3). See lib/trip-color. */
 export type TripColor = 'blue' | 'pink' | 'yellow' | 'green' | 'orange' | 'purple';

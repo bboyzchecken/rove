@@ -16,8 +16,6 @@ import type { PointsEntry } from '../../types';
 export const POINTS_PER_PUBLISH = 500;
 /** What someone copying your published plan pays (`domain.PointsPerClone`). */
 export const POINTS_PER_CLONE = 260;
-/** What a confirmed booking from your plan pays (`domain.PointsPerBooking`). */
-export const POINTS_PER_BOOKING = 480;
 /** What an invited friend joining their first trip pays. */
 export const POINTS_PER_REFERRAL = 150;
 /** What one extra AI draft costs (`domain.PointsPerAIDraft`). */
@@ -33,7 +31,9 @@ export const POINTS_PER_AI_DRAFT = 300;
 export const POINTS_LEDGER: PointsEntry[] = [
   entry('rd-1', -400, 'redeem', 'แลกเป็นโค้ดส่วนลด ฿50', null, '2026-08-18T10:12:00.000Z'),
   entry('pt-1', POINTS_PER_CLONE, 'trip_cloned', 'มีคนคัดลอกทริป', 'demo', '2026-08-14T21:40:00.000Z'),
-  entry('pt-2', POINTS_PER_BOOKING, 'booking_confirmed', 'มีคนจองที่พักจากทริปนี้', 'demo', '2026-08-12T09:22:00.000Z'),
+  // Written before Feedback #4 D-30 removed points per booking — kept as history,
+  // which is what the admin trace shows as a legacy row.
+  entry('pt-2', 480, 'booking_confirmed', 'มีคนจองที่พักจากทริปนี้', 'demo', '2026-08-12T09:22:00.000Z'),
   entry('pt-3', POINTS_PER_CLONE, 'trip_cloned', 'มีคนคัดลอกทริป', 'demo', '2026-08-09T18:05:00.000Z'),
   entry('ai-1', -POINTS_PER_AI_DRAFT, 'ai_draft', 'ร่างแพลนด้วย AI เพิ่ม 1 ครั้ง', 'demo', '2026-08-07T14:31:00.000Z'),
   entry('pt-4', POINTS_PER_CLONE, 'trip_cloned', 'มีคนคัดลอกทริป', 'demo', '2026-08-02T11:58:00.000Z'),

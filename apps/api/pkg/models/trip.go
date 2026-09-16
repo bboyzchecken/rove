@@ -63,6 +63,11 @@ type Trip struct {
 	// explore is ordered by this, not by updated_at, so a plan edited last
 	// night does not jump to the top of "new".
 	PublishedAt *time.Time `json:"published_at"`
+	// เก็บเข้าคลัง (Feedback #4 D-18, D-31): hidden from every list and closed
+	// to the room until its owner restores it. Never a delete — a trip that
+	// produced points or money has to stay traceable.
+	ArchivedAt *time.Time `gorm:"index" json:"archived_at"`
+	ArchivedBy *string    `gorm:"type:char(36)" json:"archived_by"`
 
 	// The trip's own colour (Feedback #2 — D-3, brand spec §2.7): one of
 	// domain.TripColors by name, picked at random on create and changed only by
@@ -78,11 +83,15 @@ type Trip struct {
 	StartedWith datatypes.JSON `gorm:"type:json" json:"started_with"`
 }
 
-// Step statuses a member can set by hand (Feedback #2 — D-11 / D-12). The
-// other two — "todo" and "done" — are derived from the room's own tables and
-// never stored; "check" likewise. Only a deliberate skip is a fact worth a row.
+// Step statuses a member can set by hand (Feedback #2 — D-11/D-12; Feedback #4
+// — D-26). The other two — "todo" and "done" — are derived from the room's own
+// tables and never stored; "check" likewise, UNLESS a group manually confirms
+// a step that has no way to reach 100% on its own (dates typed in but never
+// locked through the calendar, a plan with a wish nobody ever covers) — that
+// declaration is `StepConfirmed`, read back as `done`.
 const (
-	StepSkipped = "skipped"
+	StepSkipped   = "skipped"
+	StepConfirmed = "confirmed"
 )
 
 // TripStepOverride records that the group decided a step of the checklist does
@@ -188,6 +197,10 @@ type TripStore interface {
 	// returns ids rather than a count because the caller has to subtract the
 	// ones that already have a pass.
 	ActiveOwnedIDs(ctx context.Context, userID string) ([]string, error)
+	// ListArchivedOwned is the owner's คลังทริป (D-31).
+	ListArchivedOwned(ctx context.Context, userID string) ([]Trip, error)
+	SetArchived(ctx context.Context, tripID string, at *time.Time, by *string) error
+	IsArchived(ctx context.Context, tripID string) (bool, error)
 	// TitlesByIDs resolves a set of trip ids to their titles in one query, so a
 	// points ledger can name its rows instead of printing UUIDs (A23.1).
 	TitlesByIDs(ctx context.Context, ids []string) (map[string]string, error)

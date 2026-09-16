@@ -27,7 +27,9 @@ func (s *Server) registerTripRoutes(g *echo.Group) {
 	g.GET("/:tripId/overview", s.handleTripOverview, s.TripRoleMiddleware(models.TripRoleViewer))
 	g.GET("/:tripId/recap", s.handleTripRecap, s.TripRoleMiddleware(models.TripRoleViewer))
 	g.PATCH("/:tripId", s.handleUpdateTrip, s.TripRoleMiddleware(models.TripRoleEditor))
-	g.DELETE("/:tripId", s.handleDeleteTrip, s.TripRoleMiddleware(models.TripRoleOwner))
+	g.DELETE("/:tripId", s.handleDeleteTrip, s.ArchivedTripOwner())
+	g.POST("/:tripId/archive", s.handleArchiveTrip, s.TripRoleMiddleware(models.TripRoleOwner))
+	g.POST("/:tripId/restore", s.handleRestoreTrip, s.ArchivedTripOwner())
 	g.POST("/:tripId/clone", s.handleCloneTrip, s.TripRoleMiddleware(models.TripRoleViewer))
 	g.GET("/:tripId/share", s.handleShareState, s.TripRoleMiddleware(models.TripRoleViewer))
 	g.PATCH("/:tripId/visibility", s.handleSetVisibility, s.TripRoleMiddleware(models.TripRoleOwner))
@@ -198,6 +200,10 @@ func (s *Server) handleCreateTrip(c echo.Context) error {
 		now := time.Now().UTC()
 		trip.FxRate = &rate
 		trip.FxRateAt = &now
+	}
+
+	if !datesInOrder(trip.StartDate, trip.EndDate) {
+		return request.BadRequest(c, "วันกลับต้องไม่ก่อนวันไป")
 	}
 
 	if err := s.trips.Create(ctx, trip); err != nil {
@@ -429,19 +435,16 @@ func (s *Server) handleUpdateTrip(c echo.Context) error {
 		trip.Color = *req.Color
 	}
 
+	if !datesInOrder(trip.StartDate, trip.EndDate) {
+		return request.BadRequest(c, "วันกลับต้องไม่ก่อนวันไป")
+	}
+
 	if err := s.trips.Update(ctx, trip); err != nil {
 		return request.Internal(c, "บันทึกไม่สำเร็จ")
 	}
 
 	s.track(c, tripID, "แก้กรอบทริป", events.TypeTripUpdated, "trip", tripID)
 	return c.JSON(http.StatusOK, s.withRoute(ctx, toTripDTO(*trip), tripID))
-}
-
-func (s *Server) handleDeleteTrip(c echo.Context) error {
-	if err := s.trips.Delete(c.Request().Context(), request.TripID(c)); err != nil {
-		return request.Internal(c, "ลบทริปไม่สำเร็จ")
-	}
-	return c.NoContent(http.StatusNoContent)
 }
 
 // handleCloneTrip copies the frame and the itinerary, never the money: expenses
@@ -476,6 +479,9 @@ func (s *Server) cloneTripForUser(ctx contextT, source *models.Trip, userID stri
 	copyTrip.SourceTripID = &source.ID
 	copyTrip.SourceCreatorID = &source.OwnerID
 	copyTrip.CloneCount = 0
+	copyTrip.ArchivedAt = nil
+	copyTrip.ArchivedBy = nil
+	copyTrip.PublishedAt = nil
 	copyTrip.ViewCount = 0
 	copyTrip.CreatedAt = time.Time{}
 	copyTrip.UpdatedAt = time.Time{}
@@ -532,14 +538,32 @@ func (s *Server) cloneTripForUser(ctx contextT, source *models.Trip, userID stri
 
 	_ = s.trips.BumpCloneCount(ctx, source.ID)
 
-	// Points for the creator whose trip was worth copying (§6.5).
+	// Points for the creator whose trip was worth copying (§6.5). The clone
+	// event is also the root a later booking on the copy chains back to (F12).
 	if source.OwnerID != userID {
-		_ = s.points.Add(ctx, &models.UserPoints{
-			UserID: source.OwnerID,
-			Delta:  domain.PointsPerClone,
-			Reason: models.PointsReasonClone,
-			Note:   "มีคนคัดลอกทริป \"" + source.Title + "\"",
-			TripID: &source.ID,
+		s.record(ctx, &models.LedgerEntry{
+			Source: &models.ValueSource{
+				Kind:        models.SourceClone,
+				ActorUserID: &userID,
+				SubjectType: models.SubjectTrip,
+				SubjectID:   copyTrip.ID,
+				TripID:      &source.ID,
+				OtherTripID: &copyTrip.ID,
+				Snapshot: snapshot(map[string]any{
+					"source_trip": tripSnap(source),
+					"creator":     s.personSnap(ctx, source.OwnerID),
+					"cloned_by":   s.personSnap(ctx, userID),
+					"copy_trip":   map[string]any{"id": copyTrip.ID, "title": copyTrip.Title},
+					"points":      domain.PointsPerClone,
+				}),
+			},
+			Points: []models.UserPoints{{
+				UserID: source.OwnerID,
+				Delta:  domain.PointsPerClone,
+				Reason: models.PointsReasonClone,
+				Note:   "มีคนคัดลอกทริป \"" + source.Title + "\"",
+				TripID: &source.ID,
+			}},
 		})
 	}
 
@@ -727,18 +751,34 @@ func (s *Server) handleSetVisibility(c echo.Context) error {
 			slug := str.Slugify(trip.Title) + "-" + str.RandomToken(6)
 			trip.Slug = &slug
 			// "มาใหม่" is ordered by this (D-18) — set once, on first publish.
+			// It also gates the points: going private clears the slug, so
+			// keying the award on the slug paid it again on every re-publish.
 			if trip.PublishedAt == nil {
 				trip.PublishedAt = ptrTime(time.Now().UTC())
-			}
 
-			// First publish is worth points (§6.5).
-			_ = s.points.Add(ctx, &models.UserPoints{
-				UserID: trip.OwnerID,
-				Delta:  domain.PointsPerPublish,
-				Reason: models.PointsReasonPublish,
-				Note:   "เปิดทริป \"" + trip.Title + "\" เป็นสาธารณะ",
-				TripID: &trip.ID,
-			})
+				userID := request.UserID(c)
+				s.record(ctx, &models.LedgerEntry{
+					Source: &models.ValueSource{
+						Kind:        models.SourcePublish,
+						ActorUserID: &userID,
+						SubjectType: models.SubjectTrip,
+						SubjectID:   trip.ID,
+						TripID:      &trip.ID,
+						Snapshot: snapshot(map[string]any{
+							"trip":   tripSnap(trip),
+							"owner":  s.personSnap(ctx, trip.OwnerID),
+							"points": domain.PointsPerPublish,
+						}),
+					},
+					Points: []models.UserPoints{{
+						UserID: trip.OwnerID,
+						Delta:  domain.PointsPerPublish,
+						Reason: models.PointsReasonPublish,
+						Note:   "เปิดทริป \"" + trip.Title + "\" เป็นสาธารณะ",
+						TripID: &trip.ID,
+					}},
+				})
+			}
 		}
 	}
 

@@ -37,12 +37,6 @@ func (s *Server) registerAIRoutes(g *echo.Group) {
 	g.POST("/:tripId/pass", s.handleBuyTripPass, edit)
 }
 
-// registerAIPublicRoutes holds the one AI endpoint that is not trip-scoped:
-// reading a pasted ticket happens *before* a trip exists (M1 — A1.2).
-func (s *Server) registerAIPublicRoutes(g *echo.Group) {
-	g.POST("/ai/parse-ticket", s.handleParseTicket, s.JwtMiddleware)
-}
-
 func (s *Server) handleAICredits(c echo.Context) error {
 	ctx := c.Request().Context()
 	tripID := request.TripID(c)
@@ -461,60 +455,6 @@ func (s *Server) handleBuyTripPass(c echo.Context) error {
 	out.Order = &dto
 
 	s.track(c, tripID, "ปลดล็อกทริปด้วย Trip Pass", "", "ai_job", tripID)
-	return c.JSON(http.StatusOK, out)
-}
-
-/* ---------------------------------------------------------- parse ticket -- */
-
-type parseTicketRequest struct {
-	Text string `json:"text" validate:"required"`
-}
-
-func (s *Server) handleParseTicket(c echo.Context) error {
-	var req parseTicketRequest
-	if err := request.BindAndValidate(c, &req); err != nil {
-		return err
-	}
-
-	ctx, cancel := contextWithTimeout(c, 30*time.Second)
-	defer cancel()
-
-	parsed, err := s.pipeline.ParseTicket(ctx, req.Text)
-	if err != nil {
-		return request.Internal(c, "อ่านตั๋วไม่สำเร็จ")
-	}
-
-	out := parsedTicketDTO{
-		Flights:   make([]parsedTicketFlightDTO, 0, len(parsed.Flights)),
-		Cities:    ai.TicketCities(parsed),
-		Simulated: s.cfg.UseStubs() || s.cfg.Anthropic.ApiKey == "",
-	}
-	for _, f := range parsed.Flights {
-		flight := parsedTicketFlightDTO{
-			Code:      f.FlightNo,
-			From:      f.DepAirport,
-			To:        f.ArrAirport,
-			Direction: f.Direction,
-		}
-		if len(f.DepAt) >= 10 {
-			flight.Date = f.DepAt[:10]
-		}
-		if len(f.DepAt) >= 16 {
-			t := f.DepAt[11:16]
-			flight.Time = &t
-		}
-		out.Flights = append(out.Flights, flight)
-	}
-	if parsed.StartDate != "" {
-		out.StartDate = &parsed.StartDate
-	}
-	if parsed.EndDate != "" {
-		out.EndDate = &parsed.EndDate
-	}
-	if size := ai.TicketPartySize(req.Text); size > 0 {
-		out.PartySize = &size
-	}
-
 	return c.JSON(http.StatusOK, out)
 }
 

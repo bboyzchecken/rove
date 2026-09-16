@@ -34,10 +34,25 @@ func (s *store) Get(ctx context.Context, tripID, bookingID string) (*models.Book
 func (s *store) ListByTrip(ctx context.Context, tripID string) ([]models.Booking, error) {
 	var out []models.Booking
 	err := s.db.WithContext(ctx).
-		Where("trip_id = ?", tripID).
+		Where("trip_id = ? AND archived_at IS NULL", tripID).
 		Order("created_at ASC").
 		Find(&out).Error
 	return out, err
+}
+
+func (s *store) ListArchived(ctx context.Context, tripID string) ([]models.Booking, error) {
+	var out []models.Booking
+	err := s.db.WithContext(ctx).
+		Where("trip_id = ? AND archived_at IS NOT NULL", tripID).
+		Order("archived_at DESC").
+		Find(&out).Error
+	return out, err
+}
+
+func (s *store) SetArchived(ctx context.Context, tripID, bookingID string, at *time.Time, by *string) error {
+	return s.db.WithContext(ctx).Model(&models.Booking{}).
+		Where("trip_id = ? AND id = ?", tripID, bookingID).
+		Updates(map[string]any{"archived_at": at, "archived_by": by}).Error
 }
 
 func (s *store) Update(ctx context.Context, b *models.Booking) error {
@@ -71,10 +86,18 @@ func (s *store) GetClick(ctx context.Context, clickID string) (*models.BookingCl
 	return &c, nil
 }
 
-func (s *store) ConfirmClick(ctx context.Context, clickID string, at time.Time) error {
-	return s.db.WithContext(ctx).Model(&models.BookingClick{}).
-		Where("id = ?", clickID).
-		Update("confirmed_at", at).Error
+func (s *store) ConfirmClick(ctx context.Context, clickID string, at time.Time) (bool, error) {
+	res := s.db.WithContext(ctx).Model(&models.BookingClick{}).
+		Where("id = ? AND confirmed_at IS NULL", clickID).
+		Update("confirmed_at", at)
+	return res.RowsAffected == 1, res.Error
+}
+
+func (s *store) CancelClick(ctx context.Context, clickID string, at time.Time) (bool, error) {
+	res := s.db.WithContext(ctx).Model(&models.BookingClick{}).
+		Where("id = ? AND confirmed_at IS NOT NULL AND cancelled_at IS NULL", clickID).
+		Update("cancelled_at", at)
+	return res.RowsAffected == 1, res.Error
 }
 
 func (s *store) CountClicks(ctx context.Context, since time.Time) (int64, error) {

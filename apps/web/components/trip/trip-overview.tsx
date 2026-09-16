@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ChevronRight, Share2, Sparkles, UserPlus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Check, ChevronRight, Lock, Share2, Sparkles, UserPlus } from 'lucide-react';
 
 import { SectionHeader, Stat } from '@/components/common/section';
 import { InviteDialog } from '@/components/trip/invite-dialog';
@@ -17,12 +18,14 @@ import { CharacterAvatar } from '@/components/ui/character-avatar';
 import { Progress } from '@/components/ui/progress';
 import { useVariant } from '@/components/uat/variant-provider';
 import { useMe } from '@/features/auth/queries';
-import { useBudget } from '@/features/plan/queries';
-import { useTripOverview } from '@/features/trip/queries';
-import type { Member } from '@/lib/data';
+import { useBudget, useFreezePlan } from '@/features/plan/queries';
+import { useConfirmTripDone, useTripOverview } from '@/features/trip/queries';
+import type { Member, Trip } from '@/lib/data';
 import { DEFAULT_CHARACTER_ID } from '@/lib/catalog/characters';
-import { thaiRangeLabel, toIsoDate } from '@/lib/data/domain';
+import { daysBetween, thaiRangeLabel, toIsoDate, tripPhase } from '@/lib/data/domain';
 import { formatMoney } from '@/lib/format';
+import { progressSummary } from '@/lib/trip-progress';
+import { hasViewedRoom } from '@/lib/trip-mode';
 import { cn } from '@/lib/utils';
 
 /**
@@ -41,13 +44,36 @@ import { cn } from '@/lib/utils';
  * asked for on both pages ("สวยแล้ว แต่ขอเป็นแยกช่องและสีทุกอัน").
  */
 export function TripOverview({ tripId }: { tripId: string }) {
+  const router = useRouter();
   const { data, isLoading } = useTripOverview(tripId);
   const { data: me } = useMe();
   const { data: budget } = useBudget(tripId);
   const variant = useVariant('trip-tabs');
+  const freeze = useFreezePlan(tripId);
+  const confirmDone = useConfirmTripDone();
   const [inviting, setInviting] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [editing, setEditing] = useState(false);
+  // Collapsed by default once ready (D-12) — expands on tap, not per row.
+  const [checklistOpen, setChecklistOpen] = useState(false);
+
+  // Computed ahead of the loading guard below so the hooks that follow run on
+  // every render — a hook after an early `return` breaks the Rules of Hooks
+  // the moment `isLoading` flips.
+  const previewTrip = data?.trip;
+  const phase =
+    previewTrip && previewTrip.startDate && previewTrip.endDate
+      ? tripPhase(previewTrip.status, previewTrip.startDate, previewTrip.endDate)
+      : 'planning';
+
+  // Feedback #4 — D-13: opening an ongoing trip's room goes straight into Trip
+  // Mode, unless this browser already chose "ดูทั้งห้อง" this session.
+  useEffect(() => {
+    if (phase === 'ongoing' && !hasViewedRoom(tripId)) {
+      router.replace(`/t/${tripId}/now` as never);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, tripId]);
 
   if (isLoading || !data) {
     return (
@@ -64,7 +90,10 @@ export function TripOverview({ tripId }: { tripId: string }) {
   const countries = route?.countries ?? [];
   // A viewer may read the route but not touch it — the same rule the API keeps.
   const canEdit = members.find((m) => m.id === me?.id)?.role !== 'viewer';
+  const isOwner = members.find((m) => m.id === me?.id)?.role === 'owner';
   const hasDates = Boolean(trip.startDate && trip.endDate);
+  const summary = progressSummary(data);
+  const collapsedChecklist = phase === 'ready' || phase === 'ongoing';
 
   /**
    * A room whose trip is over but which somebody is still working in — see
@@ -75,17 +104,50 @@ export function TripOverview({ tripId }: { tripId: string }) {
 
   return (
     <div className="space-y-7 pt-1">
+      {/* ------------------------------------------------- กลับถึงบ้านแล้ว?
+          Feedback #4 — F10/D-15/D-16: the trip does not end itself; this is
+          the nudge, and only the owner can confirm it. */}
+      {phase === 'awaiting_end' ? (
+        <EndOfTripCard
+          isOwner={isOwner}
+          pending={confirmDone.isPending}
+          onConfirm={() => confirmDone.mutate(tripId)}
+          onPostpone={() => setEditing(true)}
+        />
+      ) : null}
+
       {/* ------------------------------------------- finished, still edited */}
       {ended && editedSinceEnd ? <NextTripCard tripId={tripId} surface="room" /> : null}
 
-      {/* ---------------------------------------------------- checklist */}
-      <TripChecklist
-        tripId={tripId}
-        overview={data}
-        onInvite={() => setInviting(true)}
-        asPage={variant === 'c'}
-        className={variant === 'c' ? 'pt-3' : undefined}
-      />
+      {/* --------------------------------------------- พร้อมไปแล้ว nudge
+          F9/D-11: the system invites the owner to press it once every
+          pre-travel step is done — it does not press it for them. */}
+      {phase === 'planning' && isOwner && summary.total > 0 && summary.remaining === 0 ? (
+        <ReadyNudgeCard pending={freeze.isPending} onFreeze={() => freeze.mutate(true)} />
+      ) : null}
+
+      {/* ---------------------------------------------------- checklist
+          Ready/ongoing collapses it behind a countdown card (D-12) — full
+          list opens back up on tap, same TripChecklist underneath. */}
+      {collapsedChecklist ? (
+        <ReadyCountdownCard
+          trip={trip}
+          phase={phase}
+          summary={summary}
+          open={checklistOpen}
+          onToggle={() => setChecklistOpen((v) => !v)}
+        />
+      ) : null}
+
+      {!collapsedChecklist || checklistOpen ? (
+        <TripChecklist
+          tripId={tripId}
+          overview={data}
+          onInvite={() => setInviting(true)}
+          asPage={variant === 'c'}
+          className={variant === 'c' ? 'pt-3' : undefined}
+        />
+      ) : null}
 
       {/* ------------------------------------------------------- frame
           Four stats, four colours (F3.5). */}
@@ -257,6 +319,123 @@ export function TripOverview({ tripId }: { tripId: string }) {
         onClose={() => setEditing(false)}
       />
     </div>
+  );
+}
+
+/* ---------------------------------------------------------- end of trip -- */
+
+/**
+ * "กลับถึงบ้านแล้วใช่ไหม?" (Feedback #4 — F10/D-15/D-16).
+ *
+ * The trip does not close itself past the return date — D-16 was explicit
+ * that a missed flight or a late group should not find a new screen waiting
+ * for them, so this is an invitation the owner can ignore for as long as they
+ * like; the room stays fully open (D-16) until they act on it.
+ */
+function EndOfTripCard({
+  isOwner,
+  pending,
+  onConfirm,
+  onPostpone,
+}: {
+  isOwner: boolean;
+  pending: boolean;
+  onConfirm: () => void;
+  onPostpone: () => void;
+}) {
+  return (
+    <Card accent="feature" className="p-4">
+      <p className="font-display text-ink font-medium">กลับถึงบ้านแล้วใช่ไหม?</p>
+      <p className="text-ink/80 mt-1 text-xs leading-relaxed">
+        {isOwner
+          ? 'กดจบทริปเพื่อเก็บห้องนี้ไว้เป็นบันทึก — ไม่มีอะไรถูกลบ เปิดกลับมาแก้ได้เสมอ'
+          : 'รอหัวห้องกดยืนยันจบทริป — ระหว่างนี้ยังเปิดดูและแก้ไขได้ตามปกติ'}
+      </p>
+      {isOwner ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button size="sm" onClick={onConfirm} disabled={pending}>
+            <Check className="size-3.5" /> จบทริป
+          </Button>
+          <Button size="sm" variant="outline" onClick={onPostpone} disabled={pending}>
+            ยังไม่กลับ — เลื่อนวันกลับ
+          </Button>
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
+/* ------------------------------------------------------------- พร้อมไปแล้ว -- */
+
+/** F9/D-11: shown only once there is nothing left to check before departure. */
+function ReadyNudgeCard({ pending, onFreeze }: { pending: boolean; onFreeze: () => void }) {
+  return (
+    <Card accent="feature" className="flex flex-wrap items-center justify-between gap-3 p-4">
+      <div>
+        <p className="font-display text-ink font-medium">ครบทุกขั้นก่อนไปแล้ว</p>
+        <p className="text-ink/80 mt-0.5 text-xs">
+          กด &ldquo;พร้อมไปแล้ว&rdquo; เพื่อล็อกแพลนก่อนออกเดินทาง
+        </p>
+      </div>
+      <Button size="sm" onClick={onFreeze} disabled={pending}>
+        <Lock className="size-3.5" /> พร้อมไปแล้ว
+      </Button>
+    </Card>
+  );
+}
+
+/* ---------------------------------------------------------- ready/ongoing -- */
+
+/**
+ * F9/D-12: a ready or ongoing room leads with a countdown, not the checklist —
+ * everything before departure is already settled. Tapping the bar underneath
+ * is the only way back into the full list.
+ */
+function ReadyCountdownCard({
+  trip,
+  phase,
+  summary,
+  open,
+  onToggle,
+}: {
+  trip: Trip;
+  phase: 'ready' | 'ongoing';
+  summary: ReturnType<typeof progressSummary>;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const daysUntil = daysBetween(toIsoDate(new Date()), trip.startDate) - 1;
+
+  return (
+    <Card accent="countdown" className="p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-display text-ink text-lg font-medium">
+            {phase === 'ongoing'
+              ? 'กำลังเที่ยวอยู่ตอนนี้'
+              : daysUntil <= 0
+                ? 'ถึงวันเดินทางแล้ว'
+                : `อีก ${daysUntil} วันก็ได้ไปแล้ว`}
+          </p>
+          <p className="text-ink/70 nums mt-0.5 text-xs">
+            {thaiRangeLabel(trip.startDate, trip.endDate)}
+            {trip.cities.length > 0 ? ` · ${trip.cities.join(' · ')}` : ''}
+          </p>
+        </div>
+        <span className="bg-bg/70 text-ink flex size-9 shrink-0 items-center justify-center rounded-full">
+          <Lock className="size-4" />
+        </span>
+      </div>
+
+      <button
+        type="button"
+        onClick={onToggle}
+        className="bg-bg/50 text-ink hover:bg-bg/70 mt-3 flex w-full items-center justify-between rounded-2xl px-3.5 py-2.5 text-xs font-medium transition"
+      >
+        เช็คลิสต์ก่อนไป · {summary.remaining === 0 ? 'ครบแล้ว ✓' : `เหลืออีก ${summary.remaining} อย่าง`}
+        <ChevronRight className={cn('size-4 transition-transform', open && 'rotate-90')} />
+      </button>
+    </Card>
   );
 }
 

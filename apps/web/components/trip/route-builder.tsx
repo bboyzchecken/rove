@@ -220,6 +220,10 @@ export function RouteBuilder({
             <DateField
               label={leg.mode === 'ground' ? 'เดินทางวันที่' : 'บินวันที่'}
               value={leg.depDate}
+              // A leg cannot leave before the one before it lands (Feedback #4
+              // D-1) — chained to the *previous* leg in the list, the same
+              // adjacency `patch` already uses for the airport it lands at.
+              min={legs[index - 1]?.arrDate || legs[index - 1]?.depDate || undefined}
               onChange={(iso) => patch(leg.key, { depDate: iso })}
             />
             <Field label="ถึงกี่โมง (ใส่ทีหลังได้)">

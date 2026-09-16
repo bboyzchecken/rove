@@ -91,6 +91,9 @@ func (s *Server) handleCreateItem(c echo.Context) error {
 	if req.Booked != nil {
 		item.Booked = *req.Booked
 	}
+	if !clockTimesInOrder(item.StartTime, item.EndTime) {
+		return request.BadRequest(c, "เวลาจบต้องไม่ก่อนเวลาเริ่ม")
+	}
 
 	index := -1
 	if req.Index != nil {
@@ -170,6 +173,9 @@ func (s *Server) handleUpdateItem(c echo.Context) error {
 	}
 	if req.Booked != nil {
 		item.Booked = *req.Booked
+	}
+	if !clockTimesInOrder(item.StartTime, item.EndTime) {
+		return request.BadRequest(c, "เวลาจบต้องไม่ก่อนเวลาเริ่ม")
 	}
 
 	if err := s.plans.UpdateItem(ctx, item); err != nil {

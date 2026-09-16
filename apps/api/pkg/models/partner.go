@@ -39,12 +39,15 @@ type DiscountCode struct {
 	// Set the moment it is applied to an order; a code is single-use.
 	UsedAt    *time.Time `json:"used_at"`
 	UsedOrder *string    `gorm:"type:char(36)" json:"used_order_id"`
+	// Set when the booking a credit was issued for is cancelled before the
+	// code was spent (F12 §5 ข้อ 7).
+	VoidedAt *time.Time `json:"voided_at"`
 }
 
 func (DiscountCode) TableName() string { return "discount_codes" }
 
 func (d DiscountCode) Usable(at time.Time) bool {
-	return d.UsedAt == nil && at.Before(d.ExpiresAt)
+	return d.UsedAt == nil && d.VoidedAt == nil && at.Before(d.ExpiresAt)
 }
 
 /* ------------------------------------------- creator revenue share (A12.11) */
@@ -52,9 +55,12 @@ func (d DiscountCode) Usable(at time.Time) bool {
 // Earning statuses. `pending` is a booking a partner has confirmed but not yet
 // paid us for; `payable` is money we have and owe on; `paid` is settled.
 const (
-	EarningPending = "pending"
-	EarningPayable = "payable"
-	EarningPaid    = "paid"
+	EarningPending   = "pending"
+	EarningPayable   = "payable"
+	EarningInPayout  = "in_payout"
+	EarningPaid      = "paid"
+	EarningReversed  = "reversed"
+	EarningExpired   = "expired"
 )
 
 // CreatorEarning is one line of what a published plan earned its creator.
@@ -81,14 +87,20 @@ type CreatorEarning struct {
 	Status     string    `gorm:"type:varchar(12);not null;default:'pending'" json:"status"`
 	OccurredAt time.Time `gorm:"not null;index" json:"occurred_at"`
 	PayoutID   *string   `gorm:"type:char(36);index" json:"payout_id"`
+
+	SourceID   *string `gorm:"type:char(36);index" json:"source_id"`
+	ReversesID *string `gorm:"type:char(36);index" json:"reverses_id"`
 }
 
 func (CreatorEarning) TableName() string { return "creator_earnings" }
 
-// Payout statuses.
+// Payout statuses. `pending` is a transfer owed from a closed cycle.
 const (
-	PayoutDraft = "draft"
-	PayoutPaid  = "paid"
+	PayoutDraft   = "draft"
+	PayoutPending = "pending"
+	PayoutPaid    = "paid"
+	// A payout whose earnings could not be moved into it — kept, never paid.
+	PayoutVoid = "void"
 )
 
 // Payout is one transfer to one creator for one period.
@@ -102,16 +114,35 @@ type Payout struct {
 	Status       string     `gorm:"type:varchar(12);not null;default:'draft'" json:"status"`
 	Note         string     `gorm:"type:varchar(255)" json:"note"`
 	PaidAt       *time.Time `json:"paid_at"`
+
+	// Cycle-based payouts (F11 — D-21). Older monthly rows have none of these.
+	CycleID *string `gorm:"type:char(36);index" json:"cycle_id"`
+	// The account as it was on the day of transfer — a later change of bank
+	// must not rewrite where past money went.
+	AccountID    *string `gorm:"type:char(36)" json:"account_id"`
+	AccountKind  string  `gorm:"type:varchar(12)" json:"account_kind"`
+	BankCode     string  `gorm:"type:varchar(20)" json:"bank_code"`
+	AccountLast4 string  `gorm:"type:varchar(4)" json:"account_last4"`
+	AccountName  string  `gorm:"type:varchar(200)" json:"account_name"`
+	TransferRef  string  `gorm:"type:varchar(120)" json:"transfer_ref"`
+	SlipKey      string  `gorm:"type:varchar(255)" json:"slip_key"`
+	PaidBy       *string `gorm:"type:char(36)" json:"paid_by"`
+	// Withholding tax is reserved, not decided (O-8): nil until an accountant
+	// sets the rule.
+	WHTPercent   *float64 `gorm:"type:decimal(5,2)" json:"wht_percent"`
+	WHTAmountTHB *float64 `gorm:"type:decimal(12,2)" json:"wht_amount_thb"`
 }
 
 func (Payout) TableName() string { return "payouts" }
 
 // EarningTotals is the creator-facing summary.
 type EarningTotals struct {
-	PendingTHB float64 `json:"pending_thb"`
-	PayableTHB float64 `json:"payable_thb"`
-	PaidTHB    float64 `json:"paid_thb"`
-	Count      int     `json:"count"`
+	PendingTHB  float64 `json:"pending_thb"`
+	PayableTHB  float64 `json:"payable_thb"`
+	InPayoutTHB float64 `json:"in_payout_thb"`
+	PaidTHB     float64 `json:"paid_thb"`
+	ExpiredTHB  float64 `json:"expired_thb"`
+	Count       int     `json:"count"`
 }
 
 /* ---------------------------------------------- agent lead handoff (A12.12) */
@@ -176,17 +207,16 @@ type DiscountStore interface {
 	// failed to write. A code somebody paid points for must not evaporate
 	// because of a database error.
 	Release(ctx context.Context, codeID string) error
+	// Void retires an unspent code. False when it was already spent or voided.
+	Void(ctx context.Context, codeID string, at time.Time) (bool, error)
+	ByIDs(ctx context.Context, ids []string) ([]DiscountCode, error)
 }
 
+// EarningStore reads creator earnings. Rows are written by LedgerStore.Record
+// and change status only through LedgerStore.TransitionEarning (D-19).
 type EarningStore interface {
-	Create(ctx context.Context, earning *CreatorEarning) error
 	ListForUser(ctx context.Context, userID string, limit int) ([]CreatorEarning, error)
 	TotalsForUser(ctx context.Context, userID string) (EarningTotals, error)
-	// ListPayable feeds the payout report: everything owed in a period,
-	// grouped by creator by the caller.
-	ListPayable(ctx context.Context, from, to time.Time) ([]CreatorEarning, error)
-	// AttachToPayout marks the given earnings paid in one transaction.
-	AttachToPayout(ctx context.Context, payoutID string, earningIDs []string, at time.Time) error
 }
 
 type PayoutStore interface {

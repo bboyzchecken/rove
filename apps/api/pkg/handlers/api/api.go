@@ -24,6 +24,7 @@ import (
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
 	fxsvc "github.com/bboyzchecken/rove/apps/api/pkg/services/fx"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/notify"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/sms"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/places"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/storage"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/weather"
@@ -67,6 +68,11 @@ type ServerParams struct {
 	Payouts       models.PayoutStore
 	Leads         models.LeadStore
 	Steps         models.TripStepStore
+	Ledger        models.LedgerStore
+	Settings      models.SettingsStore
+	Audit         models.AuditStore
+	KYC           models.KYCStore
+	Cycles        models.PayoutCycleStore
 
 	Hub       events.Hub
 	FX        fxsvc.Service
@@ -79,6 +85,7 @@ type ServerParams struct {
 	Storage   storage.Service
 	Notify    notify.Service
 	Email     email.Service
+	SMS       sms.Service
 }
 
 type Server struct {
@@ -115,6 +122,11 @@ type Server struct {
 	payouts       models.PayoutStore
 	leads         models.LeadStore
 	steps         models.TripStepStore
+	ledger        models.LedgerStore
+	settings      models.SettingsStore
+	audit         models.AuditStore
+	kyc           models.KYCStore
+	cycles        models.PayoutCycleStore
 
 	hub       events.Hub
 	fx        fxsvc.Service
@@ -127,6 +139,7 @@ type Server struct {
 	storage   storage.Service
 	notify    notify.Service
 	email     email.Service
+	sms       sms.Service
 
 	cookieName string
 }
@@ -170,6 +183,12 @@ func NewServer(p ServerParams) *Server {
 		payouts:       p.Payouts,
 		leads:         p.Leads,
 		steps:         p.Steps,
+		ledger:        p.Ledger,
+		settings:      p.Settings,
+		audit:         p.Audit,
+		kyc:           p.KYC,
+		cycles:        p.Cycles,
+		sms:           p.SMS,
 		hub:           p.Hub,
 		fx:            p.FX,
 		airports:      p.Airports,
@@ -259,7 +278,6 @@ func (s *Server) registerRoutes() {
 	s.registerStatsRoutes(v1)    // A24.1 / A24.2 — platform social proof
 	s.registerPOIRoutes(v1)      // A4.2
 	s.registerAirportRoutes(v1)  // A1.3 — worldwide airport search
-	s.registerAIPublicRoutes(v1) // A1.2 — reading a ticket happens before a trip
 
 	// --- trip-scoped ---------------------------------------------------------
 	// Every route below carries :tripId and is guarded by TripRoleMiddleware.

@@ -29,6 +29,8 @@ export const queryKeys = {
   tripAllowance: () => ['trips', 'allowance'] as const,
   tripsUpcoming: () => ['trips', 'upcoming'] as const,
   tripsPast: () => ['trips', 'past'] as const,
+  /** The owner's คลังทริป (Feedback #4 — D-31). Under ['trips'] so any list change refreshes it. */
+  tripArchive: () => ['trips', 'archive'] as const,
   stats: () => ['stats'] as const,
 
   airports: (query: string) => ['airports', query] as const,
@@ -62,6 +64,7 @@ export const queryKeys = {
   polls: (tripId: string) => ['trip', tripId, 'polls'] as const,
   bookings: (tripId: string) => ['trip', tripId, 'bookings'] as const,
   bookingOffers: (tripId: string, kind: string) => ['trip', tripId, 'bookings', 'offers', kind] as const,
+  bookingsArchived: (tripId: string) => ['trip', tripId, 'bookings', 'archived'] as const,
 
   comments: (tripId: string, targetType: string, targetId: string) =>
     ['trip', tripId, 'comments', targetType, targetId] as const,
@@ -77,6 +80,8 @@ export const queryKeys = {
   /** Points out and money owed (M22). Both belong to a person, not a trip. */
   redemptions: () => ['me', 'redemptions'] as const,
   earnings: () => ['me', 'earnings'] as const,
+  /** เปิดรับรายได้ (Feedback #4 — F11). */
+  verification: () => ['me', 'verification'] as const,
   /**
    * Where the points came from, and who followed the plans that earned them
    * (M23). Under ['me'] with the rest: a ledger belongs to a person, and a
@@ -95,6 +100,18 @@ export const queryKeys = {
   /** The diff a copy would apply — keyed by the frame it was asked for. */
   adaptPreview: (tokenOrSlug: string, input: string) =>
     ['adapt-preview', tokenOrSlug, input] as const,
+
+  /** The evidence chain console (Feedback #4 — F12). Admin-only, never trip-scoped. */
+  adminTrace: (type: string, query: string) => ['admin', 'trace', type, query] as const,
+  adminFlags: (openOnly: boolean) => ['admin', 'flags', openOnly] as const,
+  adminEconomy: () => ['admin', 'economy'] as const,
+  adminAudit: (targetType = '', targetId = '') => ['admin', 'audit', targetType, targetId] as const,
+  adminPayouts: () => ['admin', 'payouts'] as const,
+  adminPayoutEarnings: (status: string) => ['admin', 'payouts', 'earnings', status] as const,
+  adminCycle: (cycleId: string) => ['admin', 'payouts', 'cycles', cycleId] as const,
+  adminKycQueue: (status: string) => ['admin', 'kyc', status] as const,
+  adminKycDetail: (id: string) => ['admin', 'kyc', 'detail', id] as const,
+  adminPendingAccounts: () => ['admin', 'kyc', 'accounts'] as const,
 
   poiSearch: (q: string, city?: string) => ['poi', 'search', q, city ?? ''] as const,
 

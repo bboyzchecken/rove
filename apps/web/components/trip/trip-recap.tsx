@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   CalendarCheck,
   Check,
@@ -10,6 +11,7 @@ import {
   Globe,
   Lightbulb,
   MapPin,
+  RotateCcw,
   Sparkles,
   Ticket,
   ThumbsUp,
@@ -25,7 +27,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CharacterStack } from '@/components/ui/character-avatar';
 import { Input, fieldClass } from '@/components/ui/field';
-import { useSetVisibility, useTripRecap } from '@/features/trip/queries';
+import { useMe } from '@/features/auth/queries';
+import { useReopenTrip, useSetVisibility, useTripRecap } from '@/features/trip/queries';
 import { track } from '@/lib/analytics';
 import type { RecapDecisionKind } from '@/lib/data';
 import { formatMoney } from '@/lib/format';
@@ -76,8 +79,11 @@ const SPEND_ACCENT = [
 ] as const;
 
 export function TripRecapScreen({ tripId }: { tripId: string }) {
+  const router = useRouter();
   const { data: recap, isLoading } = useTripRecap(tripId);
+  const { data: me } = useMe();
   const setVisibility = useSetVisibility(tripId);
+  const reopen = useReopenTrip();
   const [copied, setCopied] = useState(false);
 
   const decisionCount = recap?.decisions.length ?? 0;
@@ -105,6 +111,12 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
   const spendTotal = recap.spending.reduce((sum, line) => sum + line.amountThb, 0);
   const perPerson =
     recap.members.length > 0 ? Math.round(recap.spentThb / recap.members.length) : recap.spentThb;
+  const isOwner = recap.members.find((m) => m.id === me?.id)?.role === 'owner';
+
+  function reopenTrip() {
+    // Feedback #4 — F10/D-15: "เผื่อกดผิด" — back to planning, nothing lost.
+    reopen.mutate(tripId, { onSuccess: () => router.push(`/t/${tripId}` as never) });
+  }
 
   async function copyPublicUrl() {
     if (!publicUrl) return;
@@ -140,9 +152,22 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
               </Badge>
             ) : null}
           </div>
-          <h1 className="font-display text-ink text-2xl font-medium tracking-tight">
-            {recap.title}
-          </h1>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <h1 className="font-display text-ink text-2xl font-medium tracking-tight">
+              {recap.title}
+            </h1>
+            {isOwner ? (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={reopen.isPending}
+                onClick={reopenTrip}
+              >
+                <RotateCcw className="size-3.5" />
+                {reopen.isPending ? 'กำลังเปิด…' : 'เปิดทริปอีกครั้ง'}
+              </Button>
+            ) : null}
+          </div>
           <p className="text-muted mt-1 text-sm">
             {recap.dateLabel}
             {recap.cities.length > 0 ? ` · ${recap.cities.join(' · ')}` : ''}
@@ -170,7 +195,7 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
           <Card accent="feature" className="p-4">
             <p className="font-display text-ink font-medium">ทริปนี้เปิดสาธารณะอยู่</p>
             <p className="text-muted mt-1 text-xs">
-              ทุกครั้งที่มีคนก๊อปแพลนนี้ไปแล้วจองตาม คุณได้แต้มเพิ่ม —
+              ทุกครั้งที่มีคนก๊อปแพลนนี้ไป คุณได้แต้มเพิ่ม —
               เอาไปเป็นส่วนลดตอนจองทริปหน้าได้
             </p>
             {publicUrl ? (
@@ -202,7 +227,7 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
                   เปิดทริปนี้เป็นสาธารณะ รับ {recap.pointsPerPublish.toLocaleString('th-TH')} แต้ม
                 </p>
                 <p className="text-muted mt-1 text-xs">
-                  ทริปที่ไปมาแล้วคือทริปที่คนอื่นอยากตามรอยที่สุด — พอมีคนก๊อปไปแล้วจองตาม
+                  ทริปที่ไปมาแล้วคือทริปที่คนอื่นอยากตามรอยที่สุด — พอมีคนก๊อปไป
                   คุณได้แต้มเพิ่มอีก และแต้มใช้เป็นส่วนลดตอนจองทริปของตัวเองได้
                 </p>
                 <p className="text-muted mt-1 text-[11px]">

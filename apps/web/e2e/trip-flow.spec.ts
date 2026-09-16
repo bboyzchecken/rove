@@ -54,19 +54,6 @@ test('what the group already has is asked for first, and nothing is prefilled', 
   await expect(page.getByPlaceholder('ชื่อโรงแรม หรือย่านที่พัก')).toBeVisible();
 });
 
-test('a pasted ticket fills in the route', async ({ page }) => {
-  // The ticket door folded into the route door (M1): pasting is a shortcut that
-  // fills the same legs someone would otherwise type.
-  await page.goto('/new?from=ticket');
-
-  await page.getByRole('button', { name: /วางมาเลย/ }).click();
-  await page.getByRole('button', { name: /ใส่ตัวอย่างให้ดู/ }).click();
-
-  await expect(page.getByText(/อ่านได้ 2 เที่ยวบิน/)).toBeVisible();
-  await expect(page.getByText('ทริปนี้จะเป็นแบบนี้')).toBeVisible();
-  await expect(page.getByText(/7 วัน 6 คืน/)).toBeVisible();
-});
-
 /** The picker only answers once React owns the field, so open it first. */
 async function pickAirport(page: Page, index: number, query: string, option: RegExp) {
   const field = page.getByPlaceholder('ค้นหาสนามบินทั่วโลก — รหัส เมือง หรือประเทศ').nth(index);

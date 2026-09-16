@@ -5,9 +5,12 @@ import Link from 'next/link';
 import {
   AtSign,
   Award,
+  BadgeCheck,
+  Banknote,
   Bell,
   BarChart3,
   CheckCheck,
+  Hourglass,
   Sparkles,
   Undo2,
   UserCheck,
@@ -33,6 +36,12 @@ const KIND_ICON: Record<NotificationKind, typeof Bell> = {
   plan_ready: Sparkles,
   points: Award,
   refund: Undo2,
+  // Money coming back to the booker — same gesture as the Trip Pass refund.
+  credit: Undo2,
+  // Money matters live in the inbox only (Feedback #4 — D-42).
+  kyc: BadgeCheck,
+  payout_paid: Banknote,
+  earning_expiring: Hourglass,
 };
 
 export function InboxBell({ className }: { className?: string }) {

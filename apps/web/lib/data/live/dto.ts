@@ -104,7 +104,17 @@ export interface MemberDto {
 
 export interface NotificationDto {
   id: string;
-  kind: 'mention' | 'assigned' | 'poll_opened' | 'plan_ready' | 'points' | 'refund';
+  kind:
+    | 'mention'
+    | 'assigned'
+    | 'poll_opened'
+    | 'plan_ready'
+    | 'points'
+    | 'refund'
+    | 'credit'
+    | 'kyc'
+    | 'payout_paid'
+    | 'earning_expiring';
   title: string;
   body: string;
   link: string;
@@ -171,6 +181,7 @@ export interface PublicCreatorDto {
   name: string;
   handle: string | null;
   character_id: string;
+  verified?: boolean;
 }
 
 export interface PublicTripDto {
@@ -203,6 +214,7 @@ export interface RedemptionListDto {
 }
 
 export interface EarningDto {
+  id: string;
   trip_id: string;
   partner: string;
   booking_value_thb: number;
@@ -210,25 +222,43 @@ export interface EarningDto {
   share_percent: number;
   amount_thb: number;
   estimated: boolean;
-  status: 'pending' | 'payable' | 'paid';
+  status: 'pending' | 'payable' | 'in_payout' | 'paid' | 'reversed' | 'expired';
   occurred_at: string;
+  expires_at: string | null;
 }
 
 export interface PayoutDto {
+  id: string;
   period_start: string;
   period_end: string;
   amount_thb: number;
   earning_count: number;
-  status: 'draft' | 'paid';
+  status: 'pending' | 'paid';
   paid_at: string | null;
+  due_date: string | null;
+  bank_code: string;
+  account_last4: string;
+  transfer_ref: string;
+  slip_url: string | null;
 }
 
 export interface EarningsDto {
-  totals: { pending_thb: number; payable_thb: number; paid_thb: number; count: number };
+  totals: {
+    pending_thb: number;
+    payable_thb: number;
+    in_payout_thb?: number;
+    paid_thb: number;
+    expired_thb?: number;
+    count: number;
+  };
   share_percent: number;
   minimum_payout_thb: number;
-  entries: EarningDto[];
-  payouts: PayoutDto[];
+  verified?: boolean;
+  verification_status?: string;
+  next_cycle?: { cutoff_date: string; due_date: string } | null;
+  held?: { amount_thb: number; count: number; earliest_expiry: string } | null;
+  entries: EarningDto[] | null;
+  payouts: PayoutDto[] | null;
 }
 
 export interface LeadDto {
@@ -329,6 +359,7 @@ export interface CreatorProfileDto {
   total_clones: number;
   points_earned: number;
   trips: ExploreTripDto[];
+  verified?: boolean;
 }
 
 /* -------------------------------------------------------- variants (M6) -- */
@@ -397,6 +428,7 @@ export interface MeDto {
   home_currency: string;
   role: 'user' | 'admin';
   points: number;
+  verified?: boolean;
 }
 
 export interface AvailabilityEntryDto {
@@ -582,6 +614,8 @@ export interface BookingDto {
   booked_by: string | null;
   confirmation_code: string | null;
   note: string | null;
+  tied?: boolean;
+  archived_at?: string | null;
 }
 
 export interface CommentDto {
@@ -870,28 +904,286 @@ export interface AdminStatsDto {
   commit: string;
 }
 
+/** GET /users/me/archive — see apps/api/pkg/handlers/api/archive.handler.go. */
+export interface ArchivedTripDto extends TripDto {
+  archived_at: string;
+  can_delete: boolean;
+}
+
+/* ------------------------------------ evidence chain (admin_ledger.handler) */
+
+export interface TraceTripDto {
+  id: string;
+  title: string;
+  archived: boolean;
+  missing: boolean;
+}
+
+export interface TracePointsDto {
+  id: string;
+  user_id: string;
+  delta: number;
+  reason: string;
+  note: string;
+  reverses_id: string | null;
+  occurred_at: string;
+}
+
+export interface TraceEarningDto {
+  id: string;
+  user_id: string;
+  amount_thb: number;
+  share_percent: number;
+  status: string;
+  reverses_id: string | null;
+  occurred_at: string;
+  events:
+    | {
+        from: string;
+        to: string;
+        actor_id: string | null;
+        reason: string;
+        ref: string;
+        occurred_at: string;
+      }[]
+    | null;
+}
+
+export interface TraceCodeDto {
+  id: string;
+  code: string;
+  user_id: string;
+  amount_thb: number;
+  used_at: string | null;
+  voided_at: string | null;
+}
+
+export interface LedgerFlagDto {
+  id: string;
+  subject_type: string;
+  subject_id: string;
+  reason: string;
+  created_at: string;
+  resolved_at: string | null;
+  resolution: string;
+}
+
+export interface TraceNodeDto {
+  id: string;
+  kind: string;
+  parent_id: string | null;
+  actor_user_id: string | null;
+  subject_type: string;
+  subject_id: string;
+  booking_id: string | null;
+  snapshot: Record<string, unknown> | null;
+  occurred_at: string;
+  matched: boolean;
+  legacy: boolean;
+  trips: TraceTripDto[] | null;
+  points: TracePointsDto[] | null;
+  earnings: TraceEarningDto[] | null;
+  codes: TraceCodeDto[] | null;
+  flags: LedgerFlagDto[] | null;
+}
+
+export interface TraceDto {
+  type: string;
+  query: string;
+  nodes: TraceNodeDto[] | null;
+}
+
+export interface EconomySettingsDto {
+  creator_share_percent: number;
+  booker_credit_percent: number;
+  default_creator_share_percent: number;
+  default_booker_credit_percent: number;
+  max_creator_share_percent: number;
+  max_booker_credit_percent: number;
+}
+
+export interface AdminAuditDto {
+  id: string;
+  actor_id: string;
+  actor_name: string;
+  action: string;
+  target_type: string;
+  target_id: string;
+  reason: string;
+  before: unknown;
+  after: unknown;
+  occurred_at: string;
+}
+
+/* ------------------------------- verification & payouts (kyc.handler.go) */
+
+export interface PayoutAccountDto {
+  id: string;
+  kind: 'bank' | 'promptpay';
+  bank_code: string;
+  number_last4: string;
+  account_name: string;
+  status: 'pending' | 'verified' | 'rejected' | 'replaced';
+  reject_reason: string;
+}
+
+export interface VerificationDto {
+  status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'revoked';
+  legal_type: 'individual' | 'juristic';
+  legal_name: string;
+  phone: string;
+  phone_verified: boolean;
+  email: string;
+  email_verified: boolean;
+  id_number_last4: string;
+  has_id_card: boolean;
+  has_selfie: boolean;
+  account: PayoutAccountDto | null;
+  steps: { basic: boolean; identity: boolean; documents: boolean; account: boolean };
+  editable_steps: string[] | null;
+  rejected_steps: string[] | null;
+  reject_reason: string;
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  verified: boolean;
+  verified_at: string | null;
+}
+
+export interface OtpSentDto {
+  channel: 'phone' | 'email';
+  expires_at: string;
+  dev_code?: string;
+}
+
+export interface PayoutCycleDto {
+  id: string;
+  cutoff_date: string;
+  original_cutoff: string;
+  due_date: string;
+  status: 'open' | 'closed';
+  moved_reason: string;
+  closed_at: string | null;
+  payout_count: number;
+  paid_count: number;
+  total_thb: number;
+  overdue: boolean;
+}
+
+export interface PayoutsOverviewDto {
+  anchor_date: string | null;
+  minimum_payout_thb: number;
+  next_cycle: PayoutCycleDto | null;
+  cycles: PayoutCycleDto[] | null;
+  pending_count: number;
+  pending_thb: number;
+  ready:
+    | {
+        user_id: string;
+        name: string;
+        handle: string;
+        amount_thb: number;
+        earning_count: number;
+        verified: boolean;
+        account_verified: boolean;
+        below_minimum: boolean;
+        will_be_paid: boolean;
+      }[]
+    | null;
+  held_thb: number;
+  kyc_queue: number;
+  account_queue: number;
+  open_flags: number;
+}
+
+export interface AdminEarningDto {
+  id: string;
+  user_id: string;
+  name: string;
+  trip_id: string;
+  partner: string;
+  booking_value_thb: number;
+  commission_thb: number;
+  amount_thb: number;
+  estimated: boolean;
+  status: EarningDto['status'];
+  occurred_at: string;
+}
+
+export interface AdminPayoutDto {
+  id: string;
+  user_id: string;
+  name: string;
+  handle: string;
+  amount_thb: number;
+  earning_count: number;
+  status: 'pending' | 'paid';
+  account_kind: string;
+  bank_code: string;
+  account_last4: string;
+  account_name: string;
+  account_number: string;
+  transfer_ref: string;
+  slip_url: string | null;
+  paid_at: string | null;
+}
+
+export interface CycleDetailDto {
+  cycle: PayoutCycleDto;
+  payouts: AdminPayoutDto[] | null;
+}
+
+export interface KycQueueRowDto {
+  id: string;
+  user_id: string;
+  name: string;
+  handle: string;
+  status: VerificationDto['status'];
+  legal_type: 'individual' | 'juristic';
+  legal_name: string;
+  account_name: string;
+  submitted_at: string | null;
+  shared_accounts: number;
+}
+
+export interface SharedUserDto {
+  id: string;
+  name?: string;
+  handle?: string;
+}
+
+export interface AdminPayoutAccountDto extends PayoutAccountDto {
+  number: string;
+  shared_with: SharedUserDto[] | null;
+}
+
+export interface KycDetailDto extends KycQueueRowDto {
+  phone: string;
+  phone_verified: boolean;
+  email: string;
+  email_verified: boolean;
+  id_number: string;
+  id_card_url: string | null;
+  selfie_url: string | null;
+  account: AdminPayoutAccountDto | null;
+  rejected_steps: string[] | null;
+  reject_reason: string;
+  reviewed_at: string | null;
+  history: AdminAuditDto[] | null;
+}
+
+export interface PendingAccountDto extends AdminPayoutAccountDto {
+  user_id: string;
+  name: string;
+  legal_name: string;
+  created_at: string;
+}
+
 /** GET /meta/mode — see apps/api/pkg/handlers/api/mode.handler.go. */
 export interface ModeDto {
   live: boolean;
   stubbed: string[];
   dev_login: boolean;
   env: string;
-}
-
-export interface ParsedTicketDto {
-  flights: {
-    code: string;
-    from: string;
-    to: string;
-    date: string;
-    time: string | null;
-    direction: 'out' | 'back';
-  }[];
-  start_date: string | null;
-  end_date: string | null;
-  party_size: number | null;
-  cities: string[] | null;
-  simulated: boolean;
 }
 
 export interface InviteDto {

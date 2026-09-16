@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Copy, Eye, Search, Sparkles, Star } from 'lucide-react';
 
+import { VerifiedBadge } from '@/components/profile/verified-badge';
 import { Flower, Spiral } from '@/components/brand/doodle';
 import { HeroCanvas, heroNavCtaClass } from '@/components/brand/hero-canvas';
 import { BrowseShell } from '@/components/common/browse-shell';
@@ -296,6 +297,7 @@ function ExploreCard({ trip }: { trip: ExploreTrip }) {
           <span className="flex min-w-0 items-center gap-1.5">
             <CharacterAvatar characterId={trip.creator.characterId} size="xs" />
             <span className="text-muted truncate text-[11px]">{trip.creator.name}</span>
+            {trip.creator.verified ? <VerifiedBadge compact /> : null}
           </span>
           <span className="text-muted flex shrink-0 items-center gap-2.5 text-[11px]">
             <span className="flex items-center gap-0.5" title="ยอดดู">

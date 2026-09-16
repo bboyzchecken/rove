@@ -7,10 +7,13 @@ import { ChevronRight, Pencil, Sparkles } from 'lucide-react';
 import { ModeLine } from '@/components/common/mode-banner';
 import { AudienceCard } from '@/components/profile/audience-card';
 import { CreatorEarningsCard } from '@/components/profile/creator-earnings';
+import { CreatorVerificationCard } from '@/components/profile/creator-verification-card';
+import { VerifiedBadge } from '@/components/profile/verified-badge';
 import { SectionHeader, Stat } from '@/components/common/section';
 import { CharacterPicker } from '@/components/profile/character-picker';
 import { ProfileEditSheet } from '@/components/profile/profile-edit-sheet';
 import { ProfileMenu } from '@/components/profile/profile-menu';
+import { TripArchiveSection } from '@/components/profile/trip-archive';
 import { ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CharacterAvatar } from '@/components/ui/character-avatar';
@@ -41,6 +44,7 @@ export function ProfileScreen() {
             {me?.name ?? '—'}
           </h1>
           <p className="text-muted truncate text-sm">{subtitleOf(me)}</p>
+          {me?.verified ? <VerifiedBadge className="mt-1.5" /> : null}
         </div>
         <button
           type="button"
@@ -81,6 +85,9 @@ export function ProfileScreen() {
         (docs/phase-6-points-economy.md) — คอมโพเนนต์ยังอยู่ที่
         components/profile/points-redeem.tsx ไม่ได้ลบทิ้ง
       */}
+      {/* Always here, verified or not (Feedback #4 — D-37). */}
+      <CreatorVerificationCard />
+
       <CreatorEarningsCard />
 
       {/*
@@ -125,6 +132,9 @@ export function ProfileScreen() {
           </ButtonLink>
         </Card>
       </section>
+
+      {/* archive (Feedback #4 — D-31) ----------------------------------- */}
+      <TripArchiveSection />
 
       {/* menu ---------------------------------------------------------- */}
       <section>

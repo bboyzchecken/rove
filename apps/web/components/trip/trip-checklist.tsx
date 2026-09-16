@@ -44,9 +44,31 @@ export function TripChecklist({
 }) {
   const setStep = useSetStepStatus(tripId);
   const steps = orderedSteps(overview.trip.startedWith);
+  // Feedback #4 — F9: "during"-phase steps (expense, photos) cannot be done
+  // before the trip starts, so they get their own ungated group instead of
+  // holding the pre-travel percentage hostage (see progressSummary).
+  const preTravelSteps = steps.filter((step) => step.phase !== 'during');
+  const duringSteps = steps.filter((step) => step.phase === 'during');
   const summary = progressSummary(overview, steps);
 
   const Wrapper = asPage ? 'div' : Card;
+
+  function rowFor(step: StepInfo) {
+    const status = stepStatus(overview, step.key);
+    return (
+      <StepRow
+        key={step.key}
+        tripId={tripId}
+        step={step}
+        status={status}
+        asPage={asPage}
+        onInvite={onInvite}
+        onSkip={() => setStep.mutate({ step: step.key, status: 'skipped' })}
+        onRestore={() => setStep.mutate({ step: step.key, status: 'todo' })}
+        onConfirm={() => setStep.mutate({ step: step.key, status: 'confirmed' })}
+      />
+    );
+  }
 
   return (
     <Wrapper
@@ -67,22 +89,17 @@ export function TripChecklist({
       <Progress value={summary.percent / 100} tone="ink" />
 
       <ul className={cn('mt-3', asPage ? 'space-y-2' : 'space-y-1.5')}>
-        {steps.map((step) => {
-          const status = stepStatus(overview, step.key);
-          return (
-            <StepRow
-              key={step.key}
-              tripId={tripId}
-              step={step}
-              status={status}
-              asPage={asPage}
-              onInvite={onInvite}
-              onSkip={() => setStep.mutate({ step: step.key, status: 'skipped' })}
-              onRestore={() => setStep.mutate({ step: step.key, status: 'todo' })}
-            />
-          );
-        })}
+        {preTravelSteps.map(rowFor)}
       </ul>
+
+      {duringSteps.length > 0 ? (
+        <>
+          <p className="text-muted mt-4 mb-1.5 text-[11px] font-medium">
+            ระหว่างทริป — ไม่รวมในเปอร์เซ็นต์
+          </p>
+          <ul className={cn(asPage ? 'space-y-2' : 'space-y-1.5')}>{duringSteps.map(rowFor)}</ul>
+        </>
+      ) : null}
     </Wrapper>
   );
 }
@@ -95,6 +112,7 @@ function StepRow({
   onInvite,
   onSkip,
   onRestore,
+  onConfirm,
 }: {
   tripId: string;
   step: StepInfo;
@@ -103,6 +121,7 @@ function StepRow({
   onInvite: () => void;
   onSkip: () => void;
   onRestore: () => void;
+  onConfirm: () => void;
 }) {
   const href = `/t/${tripId}${step.segment ? `/${step.segment}` : ''}`;
   const isInvite = step.key === 'invite';
@@ -178,6 +197,19 @@ function StepRow({
           <div className="mt-0.5">
             <StatusChip status={status} />
           </div>
+        ) : null}
+        {/* Feedback #4 — D-26: a check step with no other way to reach 100%
+            (dates typed in but never locked, a plan that leaves a wish
+            uncovered on purpose) gets a manual "close this out" escape hatch,
+            quiet enough not to compete with the main ตรวจดู action. */}
+        {status === 'check' && !step.skippable ? (
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="text-muted hover:text-ink mt-0.5 block text-[11px] underline-offset-2 hover:underline"
+          >
+            เรียบร้อยแล้ว — ไม่ต้องตรวจอีก
+          </button>
         ) : null}
       </div>
 

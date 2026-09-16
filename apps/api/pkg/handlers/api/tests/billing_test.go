@@ -285,9 +285,7 @@ func TestPassIsRefundedOnceHoweverManyBookings(t *testing.T) {
 			ExpectStatus(http.StatusCreated).
 			Decode(&booking)
 
-		h.Request(http.MethodPatch, "/api/v1/trips/"+trip.ID+"/bookings/"+booking.ID, token,
-			map[string]any{"status": models.BookingBooked}).
-			ExpectStatus(http.StatusOK)
+		confirmBookingViaPartner(t, h, trip.ID, booking.ID, token, 12_000)
 	}
 
 	// The pass is marked refunded, exactly once.
@@ -302,20 +300,32 @@ func TestPassIsRefundedOnceHoweverManyBookings(t *testing.T) {
 		t.Error("refunded order has no refund date")
 	}
 
-	// And exactly one credit was issued for it, worth what was actually paid.
-	var codes []models.DiscountCode
-	if err := h.DB.Where("user_id = ?", alice.ID).Find(&codes).Error; err != nil {
-		t.Fatalf("load codes: %v", err)
+	// And exactly one refund credit was issued for it. A ฿12,000 Agoda stay
+	// earns ฿600, which covers the whole ฿299 after cost of sale (D-30), so the
+	// refund is the full pass. Every other code alice holds is a booker credit.
+	var refunds []models.ValueSource
+	if err := h.DB.Where("kind = ? AND trip_id = ?", models.SourceTripPassRefund, trip.ID).Find(&refunds).Error; err != nil {
+		t.Fatalf("load refund sources: %v", err)
 	}
-	if len(codes) != 1 {
-		t.Fatalf("issued %d refund credits for one trip, want 1", len(codes))
+	if len(refunds) != 1 {
+		t.Fatalf("issued %d refund credits for one trip, want 1", len(refunds))
 	}
-	if codes[0].AmountTHB != float64(domain.TripPassPriceTHB) {
-		t.Errorf("credit = %.2f, want %d", codes[0].AmountTHB, domain.TripPassPriceTHB)
+	var refund models.DiscountCode
+	if err := h.DB.Where("id = ?", refunds[0].SubjectID).First(&refund).Error; err != nil {
+		t.Fatalf("load refund code: %v", err)
 	}
-	if codes[0].PointsSpent != 0 {
+	if refund.AmountTHB != float64(domain.TripPassPriceTHB) {
+		t.Errorf("credit = %.2f, want %d", refund.AmountTHB, domain.TripPassPriceTHB)
+	}
+	if refund.PointsSpent != 0 {
 		t.Errorf("refund credit records %d points spent — it is money back, not loyalty",
-			codes[0].PointsSpent)
+			refund.PointsSpent)
+	}
+
+	var bookerCredits int64
+	h.DB.Model(&models.ValueSource{}).Where("kind = ? AND trip_id = ?", models.SourceBookerCredit, trip.ID).Count(&bookerCredits)
+	if bookerCredits != 3 {
+		t.Errorf("booker credits = %d, want one per confirmed booking", bookerCredits)
 	}
 }
 
@@ -336,9 +346,7 @@ func TestRefundedPassStillUnlocksTheTrip(t *testing.T) {
 		map[string]any{"title": "โรงแรม", "partner": "agoda", "kind": models.BookingStay}).
 		ExpectStatus(http.StatusCreated).
 		Decode(&booking)
-	h.Request(http.MethodPatch, "/api/v1/trips/"+trip.ID+"/bookings/"+booking.ID, token,
-		map[string]any{"status": models.BookingBooked}).
-		ExpectStatus(http.StatusOK)
+	confirmBookingViaPartner(t, h, trip.ID, booking.ID, token, 12_000)
 
 	var credits passBody
 	h.Request(http.MethodGet, "/api/v1/trips/"+trip.ID+"/ai/credits", token, nil).
@@ -363,16 +371,21 @@ func TestBookingWithoutAPassRefundsNothing(t *testing.T) {
 		map[string]any{"title": "โรงแรม", "partner": "agoda", "kind": models.BookingStay}).
 		ExpectStatus(http.StatusCreated).
 		Decode(&booking)
-	h.Request(http.MethodPatch, "/api/v1/trips/"+trip.ID+"/bookings/"+booking.ID, token,
-		map[string]any{"status": models.BookingBooked}).
-		ExpectStatus(http.StatusOK)
+	confirmBookingViaPartner(t, h, trip.ID, booking.ID, token, 12_000)
 
-	var codes int64
-	if err := h.DB.Model(&models.DiscountCode{}).Where("user_id = ?", alice.ID).Count(&codes).Error; err != nil {
-		t.Fatalf("count codes: %v", err)
+	var refunds int64
+	h.DB.Model(&models.ValueSource{}).Where("kind = ?", models.SourceTripPassRefund).Count(&refunds)
+	if refunds != 0 {
+		t.Errorf("minted %d refunds for a trip that was never paid for", refunds)
 	}
-	if codes != 0 {
-		t.Errorf("minted %d credits for a trip that was never paid for", codes)
+
+	// The booker still gets their share of what is left (D-30): ฿600
+	// commission − ฿2 AI on a free trip, 8% of that.
+	var codes []models.DiscountCode
+	h.DB.Where("user_id = ?", alice.ID).Find(&codes)
+	if len(codes) != 1 || codes[0].AmountTHB != domain.SplitCommission(domain.SplitInput{CommissionTHB: 600},
+		domain.Economy{CreatorSharePercent: 15, BookerCreditPercent: 8}).BookerCreditTHB {
+		t.Errorf("codes = %+v, want exactly the booker credit", codes)
 	}
 }
 
