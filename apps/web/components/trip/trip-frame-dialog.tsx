@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 
-import { Check } from 'lucide-react';
+import { Archive, Check } from 'lucide-react';
 
+import { TripArchiveSheet } from '@/components/trip/trip-archive-sheet';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel, Input, fieldClass } from '@/components/ui/field';
 import { Sheet } from '@/components/ui/sheet';
@@ -48,6 +49,7 @@ export function TripFrameDialog({
   const [partySize, setPartySize] = useState(trip.partySize);
   const [budget, setBudget] = useState(trip.budgetPerPersonThb);
   const [cities, setCities] = useState(trip.cities.join(', '));
+  const [archiving, setArchiving] = useState(false);
 
   const nights = startDate && endDate ? Math.max(0, daysBetween(startDate, endDate) - 1) : 0;
   const hasRoute = (trip.route?.flights.length ?? 0) > 0;
@@ -69,6 +71,11 @@ export function TripFrameDialog({
     }
     await update.mutateAsync(patch);
     onClose();
+  }
+
+  // The confirm replaces this sheet rather than stacking a second one on it.
+  if (archiving) {
+    return <TripArchiveSheet tripId={tripId} title={trip.title} onClose={() => setArchiving(false)} />;
   }
 
   return (
@@ -189,6 +196,23 @@ export function TripFrameDialog({
             />
           </Field>
         </div>
+
+        {/* Owner only, same as the API (Feedback #4 — D-31). */}
+        {isOwner ? (
+          <div className="border-border border-t pt-3.5">
+            <button
+              type="button"
+              onClick={() => setArchiving(true)}
+              className="text-muted hover:text-ink inline-flex items-center gap-1.5 text-xs font-medium transition"
+            >
+              <Archive className="size-3.5" />
+              เก็บเข้าคลัง
+            </button>
+            <span className="text-muted mt-1 block text-[11px]">
+              ซ่อนทริปจากทุกคนในห้อง กู้คืนได้จากโปรไฟล์
+            </span>
+          </div>
+        ) : null}
       </div>
     </Sheet>
   );

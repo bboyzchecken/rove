@@ -35,7 +35,7 @@ func (s *store) ListForUser(ctx context.Context, userID string, limit, offset in
 	q := s.db.WithContext(ctx).
 		Model(&models.Trip{}).
 		Joins("JOIN trip_members tm ON tm.trip_id = trips.id").
-		Where("tm.user_id = ?", userID)
+		Where("tm.user_id = ? AND trips.archived_at IS NULL", userID)
 
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
@@ -57,7 +57,7 @@ func (s *store) Delete(ctx context.Context, tripID string) error {
 
 func (s *store) GetBySlug(ctx context.Context, slug string) (*models.Trip, error) {
 	var t models.Trip
-	if err := s.db.WithContext(ctx).Where("slug = ?", slug).First(&t).Error; err != nil {
+	if err := s.db.WithContext(ctx).Where("slug = ? AND archived_at IS NULL", slug).First(&t).Error; err != nil {
 		return nil, err
 	}
 	return &t, nil
@@ -65,7 +65,7 @@ func (s *store) GetBySlug(ctx context.Context, slug string) (*models.Trip, error
 
 func (s *store) GetByShareToken(ctx context.Context, token string) (*models.Trip, error) {
 	var t models.Trip
-	if err := s.db.WithContext(ctx).Where("share_token = ?", token).First(&t).Error; err != nil {
+	if err := s.db.WithContext(ctx).Where("share_token = ? AND archived_at IS NULL", token).First(&t).Error; err != nil {
 		return nil, err
 	}
 	return &t, nil
@@ -207,7 +207,7 @@ func (s *store) ListPublic(ctx context.Context, f models.ExploreFilter) ([]model
 	}
 
 	q := s.db.WithContext(ctx).Model(&models.Trip{}).
-		Where("visibility = ?", models.VisibilityPublic)
+		Where("visibility = ? AND trips.archived_at IS NULL", models.VisibilityPublic)
 
 	if f.Country != "" {
 		q = q.Where("trips.destination_country = ?", f.Country)
@@ -267,7 +267,7 @@ const MaxCreatorTrips = 48
 func (s *store) ListPublicByOwner(ctx context.Context, ownerID string) ([]models.Trip, error) {
 	var out []models.Trip
 	err := s.db.WithContext(ctx).
-		Where("owner_id = ? AND visibility = ?", ownerID, models.VisibilityPublic).
+		Where("owner_id = ? AND visibility = ? AND archived_at IS NULL", ownerID, models.VisibilityPublic).
 		Order("updated_at DESC").
 		Limit(MaxCreatorTrips).
 		Find(&out).Error
@@ -283,7 +283,31 @@ func (s *store) ActiveOwnedIDs(ctx context.Context, userID string) ([]string, er
 	var ids []string
 	err := s.db.WithContext(ctx).
 		Model(&models.Trip{}).
-		Where("owner_id = ? AND status <> ?", userID, models.TripStatusDone).
+		// An archived trip frees its slot (D-34), the same as a finished one.
+		Where("owner_id = ? AND status <> ? AND archived_at IS NULL", userID, models.TripStatusDone).
 		Pluck("id", &ids).Error
 	return ids, err
+}
+
+func (s *store) IsArchived(ctx context.Context, tripID string) (bool, error) {
+	var count int64
+	err := s.db.WithContext(ctx).Model(&models.Trip{}).
+		Where("id = ? AND archived_at IS NOT NULL", tripID).
+		Count(&count).Error
+	return count > 0, err
+}
+
+func (s *store) ListArchivedOwned(ctx context.Context, userID string) ([]models.Trip, error) {
+	var out []models.Trip
+	err := s.db.WithContext(ctx).
+		Where("owner_id = ? AND archived_at IS NOT NULL", userID).
+		Order("archived_at DESC").
+		Find(&out).Error
+	return out, err
+}
+
+func (s *store) SetArchived(ctx context.Context, tripID string, at *time.Time, by *string) error {
+	return s.db.WithContext(ctx).Model(&models.Trip{}).
+		Where("id = ?", tripID).
+		Updates(map[string]any{"archived_at": at, "archived_by": by}).Error
 }

@@ -1,5 +1,24 @@
 import type {
   ActivityEvent,
+  AdminAuditEntry,
+  AdminEarning,
+  CycleDetail,
+  KycDetail,
+  KycQueueRow,
+  OtpSent,
+  PayoutCycle,
+  PayoutsOverview,
+  PendingAccountChange,
+  Verification,
+  VerificationAccountInput,
+  VerificationBasicInput,
+  VerificationStatus,
+  ArchivedTrip,
+  EconomySettings,
+  LedgerAdjustInput,
+  LedgerFlag,
+  TraceResult,
+  TraceType,
   AdaptDiff,
   AdaptInput,
   AdminStats,
@@ -122,6 +141,7 @@ export interface RoveRepo {
   community: CommunityRepo;
   reviews: ReviewRepo;
   rewards: RewardRepo;
+  verification: VerificationRepo;
   leads: LeadRepo;
   profile: ProfileRepo;
   admin: AdminRepo;
@@ -162,7 +182,20 @@ export interface TripRepo {
   overview(tripId: string): Promise<TripOverview>;
   create(input: CreateTripInput): Promise<Trip>;
   update(tripId: string, patch: UpdateTripInput): Promise<Trip>;
+  /**
+   * Owner only. Hides the trip from everyone in the room and closes its public
+   * and link shares (Feedback #4 — D-31, D-33). Every trip route then answers 410.
+   */
+  archive(tripId: string): Promise<void>;
+  /** Back out of the คลัง — private, never republished (D-33). */
+  restore(tripId: string): Promise<void>;
+  /**
+   * Permanent. Only an archived trip that never produced points or money;
+   * anything else is a 409 carrying `{archivable, tied}` (D-32).
+   */
   remove(tripId: string): Promise<void>;
+  /** My คลังทริป (D-31). */
+  archived(): Promise<ArchivedTrip[]>;
   clone(tripId: string): Promise<Trip>;
   /** The legs of a trip, plus everything derived from them (M1 — A1.3). */
   route(tripId: string): Promise<TripRoute>;
@@ -298,7 +331,11 @@ export interface BookingRepo {
   offers(tripId: string, kind: BookingKind): Promise<BookingEntry[]>;
   save(tripId: string, input: Omit<BookingEntry, 'id'>): Promise<BookingEntry>;
   setStatus(tripId: string, bookingId: string, status: BookingStatus): Promise<BookingEntry>;
+  /** A `tied` booking is a 409 `{archivable, tied}` — archive it instead (D-41). */
   remove(tripId: string, bookingId: string): Promise<void>;
+  archived(tripId: string): Promise<BookingEntry[]>;
+  archive(tripId: string, bookingId: string): Promise<void>;
+  restore(tripId: string, bookingId: string): Promise<void>;
 }
 
 export interface CollabRepo {
@@ -480,6 +517,26 @@ export interface RewardRepo {
   audience(): Promise<AudienceSummary>;
 }
 
+/**
+ * เปิดรับรายได้ — creator verification (Feedback #4 — F11, D-22, D-23, D-37 … D-39).
+ *
+ * Every write returns the whole verification, so the screen never has to guess
+ * which steps opened or closed. A step outside `editableSteps` is a 409.
+ */
+export interface VerificationRepo {
+  /** Starts a draft the first time it is read. */
+  get(): Promise<Verification>;
+  saveBasic(input: VerificationBasicInput): Promise<Verification>;
+  /** 429 when asked again within a minute. */
+  sendOtp(channel: 'phone' | 'email'): Promise<OtpSent>;
+  verifyOtp(channel: 'phone' | 'email', code: string): Promise<Verification>;
+  /** 13 digits with a valid checksum; 409 when another account already used it. */
+  saveIdentity(idNumber: string): Promise<Verification>;
+  uploadDocuments(files: { idCard?: File; selfie?: File }): Promise<Verification>;
+  saveAccount(input: VerificationAccountInput): Promise<Verification>;
+  submit(): Promise<Verification>;
+}
+
 /** Handing a trip to a partner agent (A12.12). */
 export interface LeadRepo {
   list(tripId: string): Promise<AgentLead[]>;
@@ -493,6 +550,48 @@ export interface PoiRepo {
 
 export interface AdminRepo {
   stats(): Promise<AdminStats>;
+
+  /* ---- evidence chain (Feedback #4 — F12) ---- */
+
+  /** Up to the root and down to everything it caused. 400 when nothing matches. */
+  trace(type: TraceType, query: string): Promise<TraceResult>;
+  /** Writes an admin_adjustment plus the reversing row; reason is required (D-20). */
+  adjust(input: LedgerAdjustInput): Promise<{ sourceId: string }>;
+  flags(openOnly: boolean): Promise<LedgerFlag[]>;
+  /** 409 when someone already resolved it. */
+  resolveFlag(flagId: string, resolution: string): Promise<void>;
+  economy(): Promise<EconomySettings>;
+  setEconomy(input: {
+    creatorSharePercent: number;
+    bookerCreditPercent: number;
+    reason?: string;
+  }): Promise<EconomySettings>;
+  audit(filter?: { targetType?: string; targetId?: string }): Promise<AdminAuditEntry[]>;
+
+  /* ---- payout cycles (Feedback #4 — D-21, D-35, D-40) ---- */
+
+  payouts(): Promise<PayoutsOverview>;
+  /** A Tuesday, not in the past; 409 once any cycle exists. */
+  setPayoutAnchor(anchorDate: string, reason?: string): Promise<PayoutsOverview>;
+  payoutEarnings(filter?: { status?: string; partner?: string }): Promise<AdminEarning[]>;
+  /** "The partner paid us": pending → payable. */
+  reconcile(earningIds: string[], statementRef: string): Promise<{ moved: number }>;
+  cycle(cycleId: string): Promise<CycleDetail>;
+  /** Earlier only, never in the past, reason required. */
+  moveCycle(cycleId: string, cutoffDate: string, reason: string): Promise<PayoutCycle>;
+  closeCycle(cycleId: string): Promise<CycleDetail>;
+  markPaid(payoutId: string, input: { transferRef: string; slip?: File }): Promise<{ status: string }>;
+
+  /* ---- creator verification review (D-23, D-39) ---- */
+
+  kycQueue(status?: VerificationStatus): Promise<KycQueueRow[]>;
+  kycDetail(verificationId: string): Promise<KycDetail>;
+  approveKyc(verificationId: string): Promise<void>;
+  rejectKyc(verificationId: string, steps: string[], reason: string): Promise<void>;
+  revokeKyc(verificationId: string, reason: string): Promise<void>;
+  pendingAccounts(): Promise<PendingAccountChange[]>;
+  verifyAccount(accountId: string): Promise<void>;
+  rejectAccount(accountId: string, reason: string): Promise<void>;
 }
 
 /**

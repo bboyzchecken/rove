@@ -88,16 +88,16 @@ export function AiCreditPanel({ tripId, onStart }: { tripId: string; onStart: ()
 
           <p className="text-muted mt-2 text-[11px] leading-relaxed">
             {hasPass ? (
-              'จองผ่าน ROVE แล้วเราคืนค่า Trip Pass ให้เต็มจำนวน'
+              `คืนค่า Trip Pass สูงสุด ${formatMoney(passPrice, 'THB')} เมื่อพาร์ตเนอร์ยืนยันการจองผ่าน ROVE`
             ) : freeLeft > 0 ? (
               <>
                 หลังใช้สิทธิ์ฟรีหมด ปลดล็อกทั้งทริป{' '}
-                <span className="nums">{formatMoney(passPrice, 'THB')}</span> — ได้คืนเต็มจำนวนถ้าจองผ่าน ROVE
+                <span className="nums">{formatMoney(passPrice, 'THB')}</span> — คืนสูงสุดเท่ากันเมื่อพาร์ตเนอร์ยืนยันการจอง
               </>
             ) : (
               <>
                 หารกันในทริปแล้วคนละ <span className="nums">{formatMoney(perPerson, 'THB')}</span> ·
-                จองผ่าน ROVE แล้วได้คืนเต็มจำนวน
+                คืนสูงสุด <span className="nums">{formatMoney(passPrice, 'THB')}</span> เมื่อพาร์ตเนอร์ยืนยันการจอง
               </>
             )}
           </p>

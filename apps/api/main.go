@@ -29,6 +29,7 @@ import (
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
 	fxsvc "github.com/bboyzchecken/rove/apps/api/pkg/services/fx"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/notify"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/sms"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/places"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/storage"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/weather"
@@ -49,6 +50,8 @@ import (
 	pointsstore "github.com/bboyzchecken/rove/apps/api/pkg/store/points"
 	leadstore "github.com/bboyzchecken/rove/apps/api/pkg/store/lead"
 	progressstore "github.com/bboyzchecken/rove/apps/api/pkg/store/progress"
+	ledgerstore "github.com/bboyzchecken/rove/apps/api/pkg/store/ledger"
+	kycstore "github.com/bboyzchecken/rove/apps/api/pkg/store/kyc"
 	reviewstore "github.com/bboyzchecken/rove/apps/api/pkg/store/review"
 	rewardstore "github.com/bboyzchecken/rove/apps/api/pkg/store/reward"
 	prepstore "github.com/bboyzchecken/rove/apps/api/pkg/store/prep"
@@ -149,6 +152,7 @@ func loadConfig() core.Config {
 			ImageBucket:    viper.GetString("R2_IMAGE_BUCKET"),
 			DocumentBucket: viper.GetString("R2_DOCUMENT_BUCKET"),
 			PhotoBucket:    viper.GetString("R2_PHOTO_BUCKET"),
+			KYCBucket:      viper.GetString("R2_KYC_BUCKET"),
 		},
 		Anthropic: core.AnthropicConfig{
 			ApiKey:          viper.GetString("ANTHROPIC_API_KEY"),
@@ -180,6 +184,7 @@ func loadConfig() core.Config {
 			"airalo":     viper.GetString("AFFILIATE_AIRALO_ID"),
 		},
 		AffiliateWebhookSecret: viper.GetString("AFFILIATE_WEBHOOK_SECRET"),
+		KYCEncryptionKey:       viper.GetString("KYC_ENCRYPTION_KEY"),
 
 		Role: orString(viper.GetString("ROVE_ROLE"), ai.RoleAll),
 
@@ -238,6 +243,8 @@ func storeModules() fx.Option {
 		rewardstore.Module,
 		leadstore.Module,
 		progressstore.Module,
+		ledgerstore.Module,
+		kycstore.Module,
 	)
 }
 
@@ -255,6 +262,7 @@ func serviceModules() fx.Option {
 		affiliate.Module,
 		storage.Module,
 		notify.Module,
+		sms.Module,
 		email.Module,
 		ai.Module,
 		ai.RunnerModule,

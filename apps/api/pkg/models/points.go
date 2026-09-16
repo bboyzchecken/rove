@@ -32,6 +32,12 @@ type UserPoints struct {
 	Note      string     `gorm:"type:varchar(255)" json:"note"`
 	TripID    *string    `gorm:"type:char(36);index" json:"trip_id"`
 	OccurredAt time.Time `gorm:"not null" json:"occurred_at"`
+	// The event that produced this row (F12). Required for every new row;
+	// only the legacy backfill ever wrote one without it.
+	SourceID *string `gorm:"type:char(36);index" json:"source_id"`
+	// Set on a row that undoes another one, instead of editing it (D-19).
+	ReversesID *string `gorm:"type:char(36);index" json:"reverses_id"`
+	ActorID    *string `gorm:"type:char(36)" json:"actor_id"`
 }
 
 func (UserPoints) TableName() string { return "user_points" }
@@ -54,8 +60,9 @@ type PointsByTrip struct {
 	Points int
 }
 
+// PointsStore reads the ledger. Writes go through LedgerStore.Record, which
+// ties every row to the event that produced it.
 type PointsStore interface {
-	Add(ctx context.Context, entry *UserPoints) error
 	Balance(ctx context.Context, userID string) (int, error)
 	List(ctx context.Context, userID string, limit int) ([]UserPoints, error)
 	// ListPage walks the whole ledger a page at a time (A23.1). A nil cursor

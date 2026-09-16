@@ -16,6 +16,20 @@ import type {
 import type {
   ActivityDto,
   AdaptCloneDto,
+  AdminAuditDto,
+  AdminEarningDto,
+  CycleDetailDto,
+  KycDetailDto,
+  KycQueueRowDto,
+  OtpSentDto,
+  PayoutCycleDto,
+  PayoutsOverviewDto,
+  PendingAccountDto,
+  VerificationDto,
+  ArchivedTripDto,
+  EconomySettingsDto,
+  LedgerFlagDto,
+  TraceDto,
   DiscountCodeDto,
   EarningsDto,
   LeadDto,
@@ -80,6 +94,20 @@ import type {
 } from './dto';
 import {
   fromBooking,
+  toAdminAudit,
+  toAdminEarning,
+  toCycleDetail,
+  toKycDetail,
+  toKycQueueRow,
+  toOtpSent,
+  toPayoutCycle,
+  toPayoutsOverview,
+  toPendingAccount,
+  toVerification,
+  toArchivedTrip,
+  toEconomySettings,
+  toLedgerFlag,
+  toTraceResult,
   toAdaptDiff,
   toAudienceSummary,
   toDiscountCode,
@@ -166,6 +194,7 @@ function toMe(dto: MeDto): CurrentUser {
     homeCurrency: dto.home_currency,
     isAdmin: dto.role === 'admin',
     points: dto.points,
+    verified: dto.verified ?? false,
   };
 }
 
@@ -286,8 +315,17 @@ export const liveRepo: RoveRepo = {
       });
       return toTrip(dto);
     },
+    async archive(tripId) {
+      await api.post<void>(`/trips/${tripId}/archive`);
+    },
+    async restore(tripId) {
+      await api.post<void>(`/trips/${tripId}/restore`);
+    },
     async remove(tripId) {
       await api.delete<void>(`/trips/${tripId}`);
+    },
+    async archived() {
+      return (await api.get<ArchivedTripDto[]>('/users/me/archive')).map(toArchivedTrip);
     },
     async clone(tripId) {
       return toTrip(await api.post<TripDto>(`/trips/${tripId}/clone`));
@@ -639,6 +677,15 @@ export const liveRepo: RoveRepo = {
     async remove(tripId, bookingId) {
       await api.delete<void>(`/trips/${tripId}/bookings/${bookingId}`);
     },
+    async archived(tripId) {
+      return (await api.get<BookingDto[]>(`/trips/${tripId}/bookings/archived`)).map(toBooking);
+    },
+    async archive(tripId, bookingId) {
+      await api.post<void>(`/trips/${tripId}/bookings/${bookingId}/archive`);
+    },
+    async restore(tripId, bookingId) {
+      await api.post<void>(`/trips/${tripId}/bookings/${bookingId}/restore`);
+    },
   },
 
   /* ------------------------------------------------------------ collab -- */
@@ -889,6 +936,55 @@ export const liveRepo: RoveRepo = {
   },
 
   /* ----------------------------- points out, money owed (M22) -- */
+  /* ------------------------------------------------------ verification -- */
+  verification: {
+    async get() {
+      return toVerification(await api.get<VerificationDto>('/users/me/verification'));
+    },
+    async saveBasic(input) {
+      return toVerification(
+        await api.put<VerificationDto>('/users/me/verification/basic', {
+          legal_type: input.legalType,
+          legal_name: input.legalName,
+          phone: input.phone,
+          email: input.email,
+        }),
+      );
+    },
+    async sendOtp(channel) {
+      return toOtpSent(await api.post<OtpSentDto>('/users/me/verification/otp', { channel }));
+    },
+    async verifyOtp(channel, code) {
+      return toVerification(
+        await api.post<VerificationDto>('/users/me/verification/otp/verify', { channel, code }),
+      );
+    },
+    async saveIdentity(idNumber) {
+      return toVerification(
+        await api.put<VerificationDto>('/users/me/verification/identity', { id_number: idNumber }),
+      );
+    },
+    async uploadDocuments(files) {
+      const form = new FormData();
+      if (files.idCard) form.append('id_card', files.idCard);
+      if (files.selfie) form.append('selfie', files.selfie);
+      return toVerification(await api.upload<VerificationDto>('/users/me/verification/documents', form));
+    },
+    async saveAccount(input) {
+      return toVerification(
+        await api.put<VerificationDto>('/users/me/verification/account', {
+          kind: input.kind,
+          bank_code: input.kind === 'bank' ? input.bankCode : undefined,
+          account_number: input.accountNumber,
+          account_name: input.accountName,
+        }),
+      );
+    },
+    async submit() {
+      return toVerification(await api.post<VerificationDto>('/users/me/verification/submit'));
+    },
+  },
+
   rewards: {
     async redemptions() {
       return toRedemptionBoard(await api.get<RedemptionListDto>('/users/me/points/redemptions'));
@@ -1097,6 +1193,119 @@ export const liveRepo: RoveRepo = {
         stubbed: (dto.stubbed ?? []) as AdminStats['stubbed'],
         commit: dto.commit,
       };
+    },
+
+    async trace(type, query) {
+      return toTraceResult(await api.get<TraceDto>('/admin/trace', { searchParams: { type, q: query } }));
+    },
+    async adjust(input) {
+      const dto = await api.post<{ source_id: string }>('/admin/ledger/adjust', {
+        target_type: input.targetType,
+        target_id: input.targetId,
+        amount: input.amount,
+        reason: input.reason,
+        reference: input.reference || undefined,
+        flag_id: input.flagId || undefined,
+      });
+      return { sourceId: dto.source_id };
+    },
+    async flags(openOnly) {
+      const dto = await api.get<LedgerFlagDto[]>('/admin/flags', {
+        searchParams: { open: openOnly ? 1 : 0 },
+      });
+      return dto.map(toLedgerFlag);
+    },
+    async resolveFlag(flagId, resolution) {
+      await api.post<void>(`/admin/flags/${flagId}/resolve`, { resolution });
+    },
+    async economy() {
+      return toEconomySettings(await api.get<EconomySettingsDto>('/admin/settings/economy'));
+    },
+    async setEconomy(input) {
+      const dto = await api.put<EconomySettingsDto>('/admin/settings/economy', {
+        creator_share_percent: input.creatorSharePercent,
+        booker_credit_percent: input.bookerCreditPercent,
+        reason: input.reason || undefined,
+      });
+      return toEconomySettings(dto);
+    },
+    async audit(filter) {
+      const dto = await api.get<AdminAuditDto[]>('/admin/audit', {
+        searchParams: { target_type: filter?.targetType, target_id: filter?.targetId },
+      });
+      return dto.map(toAdminAudit);
+    },
+
+    async payouts() {
+      return toPayoutsOverview(await api.get<PayoutsOverviewDto>('/admin/payouts'));
+    },
+    async setPayoutAnchor(anchorDate, reason) {
+      return toPayoutsOverview(
+        await api.put<PayoutsOverviewDto>('/admin/payouts/anchor', {
+          anchor_date: anchorDate,
+          reason: reason || undefined,
+        }),
+      );
+    },
+    async payoutEarnings(filter) {
+      const dto = await api.get<AdminEarningDto[]>('/admin/payouts/earnings', {
+        searchParams: { status: filter?.status, partner: filter?.partner || undefined },
+      });
+      return dto.map(toAdminEarning);
+    },
+    async reconcile(earningIds, statementRef) {
+      return api.post<{ moved: number }>('/admin/payouts/reconcile', {
+        earning_ids: earningIds,
+        statement_ref: statementRef,
+      });
+    },
+    async cycle(cycleId) {
+      return toCycleDetail(await api.get<CycleDetailDto>(`/admin/payouts/cycles/${cycleId}`));
+    },
+    async moveCycle(cycleId, cutoffDate, reason) {
+      return toPayoutCycle(
+        await api.post<PayoutCycleDto>(`/admin/payouts/cycles/${cycleId}/move`, {
+          cutoff_date: cutoffDate,
+          reason,
+        }),
+      );
+    },
+    async closeCycle(cycleId) {
+      return toCycleDetail(await api.post<CycleDetailDto>(`/admin/payouts/cycles/${cycleId}/close`));
+    },
+    async markPaid(payoutId, input) {
+      const form = new FormData();
+      form.append('transfer_ref', input.transferRef);
+      if (input.slip) form.append('slip', input.slip);
+      return api.upload<{ status: string }>(`/admin/payouts/${payoutId}/paid`, form);
+    },
+
+    async kycQueue(status) {
+      const dto = await api.get<KycQueueRowDto[]>('/admin/kyc', {
+        searchParams: { status: status ?? 'submitted' },
+      });
+      return dto.map(toKycQueueRow);
+    },
+    async kycDetail(verificationId) {
+      return toKycDetail(await api.get<KycDetailDto>(`/admin/kyc/${verificationId}`));
+    },
+    async approveKyc(verificationId) {
+      await api.post<void>(`/admin/kyc/${verificationId}/approve`);
+    },
+    async rejectKyc(verificationId, steps, reason) {
+      await api.post<void>(`/admin/kyc/${verificationId}/reject`, { steps, reason });
+    },
+    async revokeKyc(verificationId, reason) {
+      await api.post<void>(`/admin/kyc/${verificationId}/revoke`, { reason });
+    },
+    async pendingAccounts() {
+      return (await api.get<PendingAccountDto[]>('/admin/payout-accounts/pending')).map(toPendingAccount);
+    },
+    async verifyAccount(accountId) {
+      await api.post<void>(`/admin/payout-accounts/${accountId}/verify`);
+    },
+    async rejectAccount(accountId, reason) {
+      await api.post<void>(`/admin/payout-accounts/${accountId}/reject`, { reason });
     },
   },
 

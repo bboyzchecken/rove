@@ -59,6 +59,10 @@ type Config struct {
 	// webhook is not enabled and answers 404.
 	AffiliateWebhookSecret string
 
+	// Seals ID and bank numbers (F11). Required in production; elsewhere a key
+	// is derived from JwtSecret so UAT can run without one.
+	KYCEncryptionKey string
+
 	// Where an agent handoff goes (A12.12). Both empty means the lead is still
 	// stored and the screen says nobody was messaged — a saved request with an
 	// honest label beats a form that pretends.
@@ -99,6 +103,9 @@ type R2Config struct {
 	ImageBucket    string
 	DocumentBucket string
 	PhotoBucket    string
+	// KYCBucket holds ID cards, selfies and transfer slips — private, never
+	// shared with the photo bucket (F11 — PDPA).
+	KYCBucket string
 }
 
 type AnthropicConfig struct {

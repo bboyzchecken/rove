@@ -117,11 +117,22 @@ func (s *Server) handleRedeemPoints(c echo.Context) error {
 		return request.BadRequest(c, "แต้มไม่พอ")
 	}
 
-	if err := s.points.Add(ctx, &models.UserPoints{
-		UserID: userID,
-		Delta:  -cost,
-		Reason: models.PointsReasonRedeem,
-		Note:   "แลกเป็นโค้ดส่วนลด",
+	if err := s.ledger.Record(ctx, &models.LedgerEntry{
+		Source: &models.ValueSource{
+			Kind:        models.SourceRedeem,
+			ActorUserID: &userID,
+			SubjectType: models.SubjectUser,
+			SubjectID:   userID,
+			Snapshot: snapshot(map[string]any{
+				"user": s.personSnap(ctx, userID), "points": cost, "amount_thb": req.AmountTHB,
+			}),
+		},
+		Points: []models.UserPoints{{
+			UserID: userID,
+			Delta:  -cost,
+			Reason: models.PointsReasonRedeem,
+			Note:   "แลกเป็นโค้ดส่วนลด",
+		}},
 	}); err != nil {
 		return request.Internal(c, "หักแต้มไม่สำเร็จ")
 	}
@@ -216,6 +227,7 @@ func toDiscountDTO(code models.DiscountCode) discountCodeDTO {
 /* ------------------------------------------- creator revenue share (A12.11) */
 
 type earningDTO struct {
+	ID              string  `json:"id"`
 	TripID          string  `json:"trip_id"`
 	Partner         string  `json:"partner"`
 	BookingValueTHB float64 `json:"booking_value_thb"`
@@ -225,23 +237,48 @@ type earningDTO struct {
 	Estimated       bool    `json:"estimated"`
 	Status          string  `json:"status"`
 	OccurredAt      string  `json:"occurred_at"`
+	// Set while the creator is unverified: the day this line runs out (D-35).
+	ExpiresAt *string `json:"expires_at"`
 }
 
 type payoutDTO struct {
+	ID           string  `json:"id"`
 	PeriodStart  string  `json:"period_start"`
 	PeriodEnd    string  `json:"period_end"`
 	AmountTHB    float64 `json:"amount_thb"`
 	EarningCount int     `json:"earning_count"`
 	Status       string  `json:"status"`
 	PaidAt       *string `json:"paid_at"`
+	DueDate      *string `json:"due_date"`
+	BankCode     string  `json:"bank_code"`
+	AccountLast4 string  `json:"account_last4"`
+	TransferRef  string  `json:"transfer_ref"`
+	SlipURL      *string `json:"slip_url"`
+}
+
+type nextCycleDTO struct {
+	CutoffDate string `json:"cutoff_date"`
+	DueDate    string `json:"due_date"`
+}
+
+type heldDTO struct {
+	AmountTHB      float64 `json:"amount_thb"`
+	Count          int     `json:"count"`
+	EarliestExpiry string  `json:"earliest_expiry"`
 }
 
 type earningsDTO struct {
 	Totals           models.EarningTotals `json:"totals"`
 	SharePercent     int                  `json:"share_percent"`
 	MinimumPayoutTHB float64              `json:"minimum_payout_thb"`
-	Entries          []earningDTO         `json:"entries"`
-	Payouts          []payoutDTO          `json:"payouts"`
+	// Getting paid (F11): whether this person can be, when the next transfer
+	// would go out, and what is waiting on them to verify.
+	Verified           bool          `json:"verified"`
+	VerificationStatus string        `json:"verification_status"`
+	NextCycle          *nextCycleDTO `json:"next_cycle"`
+	Held               *heldDTO      `json:"held"`
+	Entries            []earningDTO  `json:"entries"`
+	Payouts            []payoutDTO   `json:"payouts"`
 }
 
 // handleMyEarnings is the creator's own statement: what their published plans
@@ -249,6 +286,8 @@ type earningsDTO struct {
 func (s *Server) handleMyEarnings(c echo.Context) error {
 	ctx := c.Request().Context()
 	userID := request.UserID(c)
+
+	s.sweepHeldEarnings(ctx, userID)
 
 	totals, err := s.earnings.TotalsForUser(ctx, userID)
 	if err != nil {
@@ -259,19 +298,65 @@ func (s *Server) handleMyEarnings(c echo.Context) error {
 		return request.Internal(c, "โหลดรายได้ไม่สำเร็จ")
 	}
 	payouts, _ := s.payouts.ListForUser(ctx, userID)
+	user, err := s.users.GetByID(ctx, userID)
+	if err != nil {
+		return request.Internal(c, "โหลดรายได้ไม่สำเร็จ")
+	}
 
 	out := earningsDTO{
-		Totals:           totals,
-		SharePercent:     domain.CreatorSharePercent,
-		MinimumPayoutTHB: domain.MinimumPayoutTHB,
-		Entries:          make([]earningDTO, 0, len(entries)),
-		Payouts:          make([]payoutDTO, 0, len(payouts)),
+		Totals:             totals,
+		SharePercent:       s.economy(ctx).CreatorSharePercent,
+		MinimumPayoutTHB:   domain.MinimumPayoutTHB,
+		Verified:           user.VerifiedAt != nil,
+		VerificationStatus: "none",
+		Entries:            make([]earningDTO, 0, len(entries)),
+		Payouts:            make([]payoutDTO, 0, len(payouts)),
 	}
+	if v, err := s.kyc.GetByUser(ctx, userID); err == nil && v != nil {
+		out.VerificationStatus = v.Status
+	}
+	if cycle, err := s.ensureCycles(ctx); err == nil && cycle != nil {
+		out.NextCycle = &nextCycleDTO{
+			CutoffDate: cycle.CutoffDate.Format(dateLayout), DueDate: cycle.DueDate.Format(dateLayout),
+		}
+	}
+
 	for _, entry := range entries {
-		out.Entries = append(out.Entries, toEarningDTO(entry))
+		dto := toEarningDTO(entry)
+		held := !out.Verified && entry.AmountTHB > 0 &&
+			(entry.Status == models.EarningPending || entry.Status == models.EarningPayable)
+		if held {
+			expires := entry.OccurredAt.AddDate(0, 0, domain.HeldEarningDays)
+			v := expires.Format(dateLayout)
+			dto.ExpiresAt = &v
+			if out.Held == nil {
+				out.Held = &heldDTO{EarliestExpiry: v}
+			}
+			out.Held.AmountTHB = round2(out.Held.AmountTHB + entry.AmountTHB)
+			out.Held.Count++
+			if v < out.Held.EarliestExpiry {
+				out.Held.EarliestExpiry = v
+			}
+		}
+		out.Entries = append(out.Entries, dto)
 	}
 	for _, payout := range payouts {
-		out.Payouts = append(out.Payouts, toPayoutDTO(payout))
+		if payout.Status == models.PayoutVoid {
+			continue
+		}
+		dto := toPayoutDTO(payout)
+		if payout.CycleID != nil {
+			if cycle, err := s.cycles.Get(ctx, *payout.CycleID); err == nil {
+				due := cycle.DueDate.Format(dateLayout)
+				dto.DueDate = &due
+			}
+		}
+		if payout.SlipKey != "" {
+			if url, err := s.storage.SignedURL(ctx, s.kycBucket(), payout.SlipKey, domain.KYCImageURLLifetime); err == nil {
+				dto.SlipURL = &url
+			}
+		}
+		out.Payouts = append(out.Payouts, dto)
 	}
 
 	return c.JSON(http.StatusOK, out)
@@ -279,6 +364,7 @@ func (s *Server) handleMyEarnings(c echo.Context) error {
 
 func toEarningDTO(e models.CreatorEarning) earningDTO {
 	return earningDTO{
+		ID:              e.ID,
 		TripID:          e.TripID,
 		Partner:         partnerName(e.Partner),
 		BookingValueTHB: e.BookingValueTHB,
@@ -293,6 +379,10 @@ func toEarningDTO(e models.CreatorEarning) earningDTO {
 
 func toPayoutDTO(p models.Payout) payoutDTO {
 	dto := payoutDTO{
+		ID:           p.ID,
+		BankCode:     p.BankCode,
+		AccountLast4: p.AccountLast4,
+		TransferRef:  p.TransferRef,
 		PeriodStart:  p.PeriodStart.UTC().Format("2006-01-02"),
 		PeriodEnd:    p.PeriodEnd.UTC().Format("2006-01-02"),
 		AmountTHB:    p.AmountTHB,
@@ -306,41 +396,3 @@ func toPayoutDTO(p models.Payout) payoutDTO {
 	return dto
 }
 
-// recordCreatorEarning writes the revenue-share line for a confirmed booking.
-//
-// Called from the same two places that award points (A12.6): the partner
-// postback and the manual "จองแล้ว" stand-in. The click id is unique on the
-// table, so a partner retrying a webhook cannot accrue twice.
-func (s *Server) recordCreatorEarning(
-	ctx contextT,
-	creatorID, tripID, partner string,
-	clickID *string,
-	bookingValueTHB, reportedCommission float64,
-	hasCommission bool,
-) {
-	if creatorID == "" {
-		return
-	}
-
-	commission, estimated := domain.CommissionTHB(partner, bookingValueTHB, reportedCommission, hasCommission)
-	amount := domain.CreatorShareTHB(commission)
-	if amount <= 0 {
-		// Nothing to owe. The points award still happened; this ledger only
-		// carries money.
-		return
-	}
-
-	_ = s.earnings.Create(ctx, &models.CreatorEarning{
-		UserID:          creatorID,
-		TripID:          tripID,
-		ClickID:         clickID,
-		Partner:         partner,
-		BookingValueTHB: bookingValueTHB,
-		CommissionTHB:   commission,
-		SharePercent:    domain.CreatorSharePercent,
-		AmountTHB:       amount,
-		Estimated:       estimated,
-		Status:          models.EarningPending,
-		OccurredAt:      time.Now().UTC(),
-	})
-}

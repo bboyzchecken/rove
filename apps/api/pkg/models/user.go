@@ -1,6 +1,9 @@
 package models
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // Auth providers.
 const (
@@ -31,6 +34,8 @@ type User struct {
 	Provider     string  `gorm:"type:varchar(20);not null;default:'password'" json:"provider"`
 	ProviderUID  string  `gorm:"type:varchar(120);index" json:"provider_uid"`
 	Role         string  `gorm:"type:varchar(20);not null;default:'user'" json:"role"`
+	// ยืนยันตัวตนแล้ว (D-37): set when an admin approves the creator's KYC.
+	VerifiedAt *time.Time `json:"verified_at"`
 	Status       string  `gorm:"type:varchar(20);not null;default:'active'" json:"status"`
 	IsCreator    bool    `gorm:"not null;default:false" json:"is_creator"`
 	Locale       string  `gorm:"type:varchar(10);not null;default:'th'" json:"locale"`

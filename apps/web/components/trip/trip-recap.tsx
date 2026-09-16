@@ -195,7 +195,7 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
           <Card accent="feature" className="p-4">
             <p className="font-display text-ink font-medium">ทริปนี้เปิดสาธารณะอยู่</p>
             <p className="text-muted mt-1 text-xs">
-              ทุกครั้งที่มีคนก๊อปแพลนนี้ไปแล้วจองตาม คุณได้แต้มเพิ่ม —
+              ทุกครั้งที่มีคนก๊อปแพลนนี้ไป คุณได้แต้มเพิ่ม —
               เอาไปเป็นส่วนลดตอนจองทริปหน้าได้
             </p>
             {publicUrl ? (
@@ -227,7 +227,7 @@ export function TripRecapScreen({ tripId }: { tripId: string }) {
                   เปิดทริปนี้เป็นสาธารณะ รับ {recap.pointsPerPublish.toLocaleString('th-TH')} แต้ม
                 </p>
                 <p className="text-muted mt-1 text-xs">
-                  ทริปที่ไปมาแล้วคือทริปที่คนอื่นอยากตามรอยที่สุด — พอมีคนก๊อปไปแล้วจองตาม
+                  ทริปที่ไปมาแล้วคือทริปที่คนอื่นอยากตามรอยที่สุด — พอมีคนก๊อปไป
                   คุณได้แต้มเพิ่มอีก และแต้มใช้เป็นส่วนลดตอนจองทริปของตัวเองได้
                 </p>
                 <p className="text-muted mt-1 text-[11px]">

@@ -13,6 +13,10 @@ const (
 	NotifyPlanReady  = "plan_ready"  // the AI draft you started finished
 	NotifyPoints     = "points"      // your public trip earned something
 	NotifyRefund     = "refund"      // the Trip Pass came back (M26 — A26.4)
+	NotifyCredit     = "credit"      // a booker's credit from a confirmed booking (D-30)
+	NotifyKYC        = "kyc"         // verification approved or needs a fix (D-42)
+	NotifyPayoutPaid = "payout_paid" // a transfer went out (D-42)
+	NotifyExpiring   = "earning_expiring" // held income runs out soon (D-35)
 )
 
 // Notification is one thing that happened *to one person*.

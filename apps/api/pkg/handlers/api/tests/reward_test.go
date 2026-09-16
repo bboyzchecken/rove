@@ -228,14 +228,15 @@ func TestConfirmedBookingWritesTheCreatorTheirShare(t *testing.T) {
 	}
 	entry := out.Entries[0]
 	// Four people at ฿12,000 is ฿48,000; Agoda pays 5% and nobody reported a
-	// commission, so it is estimated from that; the creator takes 30% of it.
-	if entry.CommissionTHB != 2400 || entry.AmountTHB != 720 {
-		t.Errorf("entry = %+v, want ฿2,400 commission and ฿720 share", entry)
+	// commission, so it is estimated from that; the creator takes the default
+	// 15% of it (D-30).
+	if entry.CommissionTHB != 2400 || entry.AmountTHB != 360 {
+		t.Errorf("entry = %+v, want ฿2,400 commission and ฿360 share", entry)
 	}
 	if !entry.Estimated {
 		t.Error("nobody reported this commission — it must be flagged as an estimate")
 	}
-	if out.Totals.PendingTHB != 720 || out.SharePercent != 30 {
+	if out.Totals.PendingTHB != 360 || out.SharePercent != 15 {
 		t.Errorf("totals = %+v share = %d", out.Totals, out.SharePercent)
 	}
 }

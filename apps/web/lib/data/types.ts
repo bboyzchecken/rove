@@ -71,6 +71,8 @@ export interface CurrentUser {
   isAdmin: boolean;
   /** Points balance (Phase 2 spends it; Phase 1 just carries it). */
   points: number;
+  /** Passed creator verification — the "ยืนยันตัวตนแล้ว" badge (Feedback #4 — D-37). */
+  verified?: boolean;
 }
 
 export type AuthProvider = 'line' | 'google' | 'demo';
@@ -252,6 +254,9 @@ export interface BookingEntry {
   bookedBy?: string;
   confirmationCode?: string;
   note?: string;
+  /** A partner confirmed it, so points or money trace back here — archive only (Feedback #4 — D-41). */
+  tied?: boolean;
+  archivedAt?: string | null;
 }
 
 /* --------------------------------------------------------- collaboration -- */
@@ -456,7 +461,14 @@ export type NotificationKind =
   | 'plan_ready'
   | 'points'
   /** The Trip Pass came back because the trip produced a booking (M26). */
-  | 'refund';
+  | 'refund'
+  /** A booker credit code was issued for a confirmed booking (Feedback #4 — D-30). */
+  | 'credit'
+  /** Verification approved, needs a fix, revoked, or a payout account checked (D-42). */
+  | 'kyc'
+  | 'payout_paid'
+  /** Held income is within 14 days of expiring (D-35). */
+  | 'earning_expiring';
 
 /**
  * One thing that happened *to you*. Distinct from an ActivityEvent, which is
@@ -597,6 +609,8 @@ export interface PublicCreator {
   name: string;
   handle: string | null;
   characterId: string;
+  /** D-37 badge. */
+  verified?: boolean;
 }
 
 /** What /s/:token and /p/:slug render. Never contains expenses (W16.5). */
@@ -766,6 +780,8 @@ export interface CreatorProfile {
   totalClones: number;
   pointsEarned: number;
   trips: ExploreTrip[];
+  /** D-37 badge. */
+  verified?: boolean;
 }
 
 export interface ShareState {
@@ -921,6 +937,151 @@ export interface MoveItemInput {
 }
 
 export type CreateItemInput = Omit<PlanItem, 'id'> & { dayId: string; index?: number };
+
+/** A trip in the owner's คลังทริป (Feedback #4 — D-31, D-32). */
+export interface ArchivedTrip extends Trip {
+  archivedAt: string;
+  /** False once the trip produced points or money — it can only be restored. */
+  canDelete: boolean;
+}
+
+/* ------------------------------------------ evidence chain (Feedback #4 F12) */
+
+export type TraceType = 'user' | 'points' | 'earning' | 'booking' | 'click' | 'trip' | 'code' | 'source';
+
+export type ValueSourceKind =
+  | 'publish'
+  | 'clone'
+  | 'booking_click'
+  | 'partner_confirmed'
+  | 'partner_cancelled'
+  | 'partner_paid'
+  | 'referral_join'
+  | 'trip_pass_purchase'
+  | 'trip_pass_refund'
+  | 'booker_credit'
+  | 'redeem'
+  | 'admin_adjustment'
+  | 'earning_expired'
+  | 'legacy';
+
+export type EarningStatus = 'pending' | 'payable' | 'in_payout' | 'paid' | 'reversed' | 'expired';
+
+export interface TraceTripRef {
+  id: string;
+  title: string;
+  archived: boolean;
+  missing: boolean;
+}
+
+export interface TracePoints {
+  id: string;
+  userId: string;
+  delta: number;
+  reason: string;
+  note: string;
+  reversesId: string | null;
+  occurredAt: string;
+}
+
+export interface TraceEarningEvent {
+  from: string;
+  to: string;
+  actorId: string | null;
+  reason: string;
+  ref: string;
+  occurredAt: string;
+}
+
+export interface TraceEarning {
+  id: string;
+  userId: string;
+  amountThb: number;
+  sharePercent: number;
+  status: EarningStatus | string;
+  reversesId: string | null;
+  occurredAt: string;
+  events: TraceEarningEvent[];
+}
+
+export interface TraceCode {
+  id: string;
+  code: string;
+  userId: string;
+  amountThb: number;
+  usedAt: string | null;
+  voidedAt: string | null;
+}
+
+export interface LedgerFlag {
+  id: string;
+  subjectType: string;
+  subjectId: string;
+  reason: string;
+  createdAt: string;
+  resolvedAt: string | null;
+  resolution: string;
+}
+
+/** One real event that may have produced points or money, with what it held at the time (D-17). */
+export interface TraceNode {
+  id: string;
+  kind: ValueSourceKind | string;
+  parentId: string | null;
+  actorUserId: string | null;
+  subjectType: string;
+  subjectId: string;
+  bookingId: string | null;
+  snapshot: Record<string, unknown>;
+  occurredAt: string;
+  /** This node is what the search hit, not an ancestor or descendant of it. */
+  matched: boolean;
+  /** Backfilled from rows written before the evidence chain existed. */
+  legacy: boolean;
+  trips: TraceTripRef[];
+  points: TracePoints[];
+  earnings: TraceEarning[];
+  codes: TraceCode[];
+  flags: LedgerFlag[];
+}
+
+export interface TraceResult {
+  type: TraceType;
+  query: string;
+  nodes: TraceNode[];
+}
+
+export interface LedgerAdjustInput {
+  targetType: 'points' | 'earning';
+  targetId: string;
+  /** Signed; whole numbers for points. */
+  amount: number;
+  reason: string;
+  reference?: string;
+  flagId?: string;
+}
+
+export interface EconomySettings {
+  creatorSharePercent: number;
+  bookerCreditPercent: number;
+  defaultCreatorSharePercent: number;
+  defaultBookerCreditPercent: number;
+  maxCreatorSharePercent: number;
+  maxBookerCreditPercent: number;
+}
+
+export interface AdminAuditEntry {
+  id: string;
+  actorId: string;
+  actorName: string;
+  action: string;
+  targetType: string;
+  targetId: string;
+  reason: string;
+  before: unknown;
+  after: unknown;
+  occurredAt: string;
+}
 
 /** What the admin screen shows (M13 — A13.2). */
 export interface AdminStats {
@@ -1143,7 +1304,16 @@ export interface RedemptionBoard {
  * Not points: this is money a partner owes, in baht. `estimated` means the
  * commission was derived from a rate table rather than reported.
  */
+export type CreatorEarningStatus =
+  | 'pending'
+  | 'payable'
+  | 'in_payout'
+  | 'paid'
+  | 'reversed'
+  | 'expired';
+
 export interface CreatorEarning {
+  id: string;
   tripId: string;
   partner: string;
   bookingValueThb: number;
@@ -1151,30 +1321,234 @@ export interface CreatorEarning {
   sharePercent: number;
   amountThb: number;
   estimated: boolean;
-  status: 'pending' | 'payable' | 'paid';
+  status: CreatorEarningStatus;
   occurredAt: string;
+  /** Set while the creator is unverified: the day this line expires (D-35). */
+  expiresAt: string | null;
 }
 
+/** One transfer to the creator (Feedback #4 — F11). */
 export interface CreatorPayout {
+  id: string;
   periodStart: string;
   periodEnd: string;
   amountThb: number;
   earningCount: number;
-  status: 'draft' | 'paid';
+  status: 'pending' | 'paid';
   paidAt: string | null;
+  dueDate: string | null;
+  bankCode: string;
+  accountLast4: string;
+  transferRef: string;
+  slipUrl: string | null;
 }
+
+export type VerificationStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'revoked';
 
 export interface EarningsStatement {
   totals: {
     pendingThb: number;
     payableThb: number;
+    inPayoutThb: number;
     paidThb: number;
+    expiredThb: number;
     count: number;
   };
   sharePercent: number;
   minimumPayoutThb: number;
+  verified: boolean;
+  verificationStatus: VerificationStatus | 'none';
+  /** YYYY-MM-DD; null until an admin sets the first Tuesday (D-40). */
+  nextCycle: { cutoffDate: string; dueDate: string } | null;
+  /** Income waiting on verification (D-35). */
+  held: { amountThb: number; count: number; earliestExpiry: string } | null;
   entries: CreatorEarning[];
   payouts: CreatorPayout[];
+}
+
+/* ------------------------------------ creator verification (Feedback #4 F11) */
+
+export type KycStepKey = 'basic' | 'identity' | 'documents' | 'account';
+
+export interface PayoutAccount {
+  id: string;
+  kind: 'bank' | 'promptpay';
+  bankCode: string;
+  numberLast4: string;
+  accountName: string;
+  status: 'pending' | 'verified' | 'rejected' | 'replaced';
+  rejectReason: string;
+}
+
+export interface Verification {
+  status: VerificationStatus;
+  legalType: 'individual' | 'juristic';
+  legalName: string;
+  phone: string;
+  phoneVerified: boolean;
+  email: string;
+  emailVerified: boolean;
+  idNumberLast4: string;
+  hasIdCard: boolean;
+  hasSelfie: boolean;
+  account: PayoutAccount | null;
+  steps: Record<KycStepKey, boolean>;
+  editableSteps: KycStepKey[];
+  rejectedSteps: KycStepKey[];
+  rejectReason: string;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  verified: boolean;
+  verifiedAt: string | null;
+}
+
+export interface VerificationBasicInput {
+  legalType: 'individual' | 'juristic';
+  legalName: string;
+  phone: string;
+  email: string;
+}
+
+export interface VerificationAccountInput {
+  kind: 'bank' | 'promptpay';
+  bankCode: string;
+  accountNumber: string;
+  accountName: string;
+}
+
+export interface OtpSent {
+  channel: 'phone' | 'email';
+  expiresAt: string;
+  /** Only outside production while SMS is a stub (D-29). */
+  devCode: string | null;
+}
+
+/* ------------------------------------------ payouts admin (Feedback #4 F11) */
+
+export interface PayoutCycle {
+  id: string;
+  cutoffDate: string;
+  originalCutoff: string;
+  dueDate: string;
+  status: 'open' | 'closed';
+  movedReason: string;
+  closedAt: string | null;
+  payoutCount: number;
+  paidCount: number;
+  totalThb: number;
+  /** Closed with a transfer still unpaid past its due date. */
+  overdue: boolean;
+}
+
+export interface ReadyCreator {
+  userId: string;
+  name: string;
+  handle: string;
+  amountThb: number;
+  earningCount: number;
+  verified: boolean;
+  accountVerified: boolean;
+  belowMinimum: boolean;
+  willBePaid: boolean;
+}
+
+export interface PayoutsOverview {
+  anchorDate: string | null;
+  minimumPayoutThb: number;
+  nextCycle: PayoutCycle | null;
+  cycles: PayoutCycle[];
+  pendingCount: number;
+  pendingThb: number;
+  ready: ReadyCreator[];
+  heldThb: number;
+  kycQueue: number;
+  accountQueue: number;
+  openFlags: number;
+}
+
+export interface AdminEarning {
+  id: string;
+  userId: string;
+  name: string;
+  tripId: string;
+  partner: string;
+  bookingValueThb: number;
+  commissionThb: number;
+  amountThb: number;
+  estimated: boolean;
+  status: CreatorEarningStatus;
+  occurredAt: string;
+}
+
+export interface AdminPayout {
+  id: string;
+  userId: string;
+  name: string;
+  handle: string;
+  amountThb: number;
+  earningCount: number;
+  status: 'pending' | 'paid';
+  accountKind: 'bank' | 'promptpay' | string;
+  bankCode: string;
+  accountLast4: string;
+  accountName: string;
+  /** Full number, only while the transfer is owed. */
+  accountNumber: string;
+  transferRef: string;
+  slipUrl: string | null;
+  paidAt: string | null;
+}
+
+export interface CycleDetail {
+  cycle: PayoutCycle;
+  payouts: AdminPayout[];
+}
+
+export interface KycQueueRow {
+  id: string;
+  userId: string;
+  name: string;
+  handle: string;
+  status: VerificationStatus;
+  legalType: 'individual' | 'juristic';
+  legalName: string;
+  accountName: string;
+  submittedAt: string | null;
+  /** Other users paid into the same account — a fraud flag (F11 กันโกง). */
+  sharedAccounts: number;
+}
+
+export interface SharedAccountUser {
+  id: string;
+  name: string;
+  handle: string;
+}
+
+export interface AdminPayoutAccount extends PayoutAccount {
+  number: string;
+  sharedWith: SharedAccountUser[];
+}
+
+export interface KycDetail extends KycQueueRow {
+  phone: string;
+  phoneVerified: boolean;
+  email: string;
+  emailVerified: boolean;
+  idNumber: string;
+  idCardUrl: string | null;
+  selfieUrl: string | null;
+  account: AdminPayoutAccount | null;
+  rejectedSteps: KycStepKey[];
+  rejectReason: string;
+  reviewedAt: string | null;
+  history: AdminAuditEntry[];
+}
+
+export interface PendingAccountChange extends AdminPayoutAccount {
+  userId: string;
+  name: string;
+  legalName: string;
+  createdAt: string;
 }
 
 /* --------------------------------------- agent lead handoff (A12.12) ----- */

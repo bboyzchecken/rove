@@ -29,18 +29,22 @@ func (s *Server) registerBookingRoutes(g *echo.Group) {
 	g.GET("/:tripId/bookings/offers", s.handleBookingOffers, view)
 	g.POST("/:tripId/bookings", s.handleCreateBooking, edit)
 	g.PATCH("/:tripId/bookings/:bookingId", s.handleUpdateBooking, edit)
+	g.GET("/:tripId/bookings/archived", s.handleListArchivedBookings, view)
 	g.DELETE("/:tripId/bookings/:bookingId", s.handleDeleteBooking, edit)
+	g.POST("/:tripId/bookings/:bookingId/archive", s.handleArchiveBooking, edit)
+	g.POST("/:tripId/bookings/:bookingId/restore", s.handleRestoreBooking, edit)
 	g.POST("/:tripId/bookings/:bookingId/link", s.handleBookingLink, view)
 }
 
 func (s *Server) handleListBookings(c echo.Context) error {
-	bookings, err := s.bookings.ListByTrip(c.Request().Context(), request.TripID(c))
+	ctx := c.Request().Context()
+	bookings, err := s.bookings.ListByTrip(ctx, request.TripID(c))
 	if err != nil {
 		return request.Internal(c, "โหลดการจองไม่สำเร็จ")
 	}
-	out := make([]bookingDTO, 0, len(bookings))
-	for _, b := range bookings {
-		out = append(out, toBookingDTO(b))
+	out, err := s.bookingDTOs(ctx, bookings)
+	if err != nil {
+		return request.Internal(c, "โหลดการจองไม่สำเร็จ")
 	}
 	return c.JSON(http.StatusOK, out)
 }
@@ -193,12 +197,28 @@ func (s *Server) handleUpdateBooking(c echo.Context) error {
 	// toggle could be flipped off and back on to mint rewards without a real
 	// booking behind them.
 	s.track(c, tripID, "", events.TypeBookingChanged, "booking", booking.ID)
-	return c.JSON(http.StatusOK, toBookingDTO(*booking))
+	out, err := s.bookingDTOs(ctx, []models.Booking{*booking})
+	if err != nil || len(out) == 0 {
+		return c.JSON(http.StatusOK, toBookingDTO(*booking))
+	}
+	return c.JSON(http.StatusOK, out[0])
 }
 
 func (s *Server) handleDeleteBooking(c echo.Context) error {
 	ctx := c.Request().Context()
 	tripID := request.TripID(c)
+
+	tied, err := s.ledger.TiedBookingIDs(ctx, []string{c.Param("bookingId")})
+	if err != nil {
+		return request.Internal(c, "ตรวจประวัติรายได้ไม่สำเร็จ")
+	}
+	if tied[c.Param("bookingId")] {
+		return c.JSON(http.StatusConflict, archiveConflictDTO{
+			Error:      "การจองนี้พาร์ตเนอร์ยืนยันแล้ว ลบไม่ได้ เก็บเข้าคลังแทน",
+			Archivable: true,
+			Tied:       true,
+		})
+	}
 
 	if err := s.bookings.Delete(ctx, tripID, c.Param("bookingId")); err != nil {
 		return request.Internal(c, "ลบไม่สำเร็จ")
@@ -224,6 +244,7 @@ func (s *Server) handleBookingLink(c echo.Context) error {
 		Partner:   booking.Partner,
 		TargetURL: booking.URL,
 		ItemID:    booking.ItemID,
+		BookingID: &booking.ID,
 		ClickedAt: time.Now().UTC(),
 	}
 	// A trip that was copied from someone else's public plan credits them when
@@ -278,9 +299,9 @@ type affiliateWebhookRequest struct {
 	CommissionTHB *float64 `json:"commission_thb"`
 }
 
-// handleAffiliateWebhook is the confirmation side of A12.6: a partner tells us
-// a tracked click converted, the click is marked confirmed once, and the
-// source creator earns their points. Guarded by a shared secret; without one
+// handleAffiliateWebhook is the partner side of A12.6: a tracked click was
+// confirmed (the booking pays out, F12 chain + D-30 split) or cancelled (what it
+// paid is reversed or flagged). Guarded by a shared secret; without one
 // configured the route answers 404 — an unconfigured webhook must not exist.
 //
 // This is now the *only* door that awards anything for a booking (Feedback #4
@@ -301,98 +322,239 @@ func (s *Server) handleAffiliateWebhook(c echo.Context) error {
 	if err := request.BindAndValidate(c, &req); err != nil {
 		return err
 	}
-	if req.Status != "" && req.Status != "confirmed" {
-		// Cancellations and pendings are acknowledged but change nothing yet.
+
+	switch req.Status {
+	case "", "confirmed":
+		return s.confirmPartnerBooking(c, req)
+	case "cancelled":
+		return s.cancelPartnerBooking(c, req)
+	default:
+		// Pendings are acknowledged and change nothing.
 		return c.NoContent(http.StatusAccepted)
 	}
+}
 
+// confirmPartnerBooking is the chain D-17 asks for, written in order: the click
+// (with the clone it came from as its parent), the confirmation, then every
+// payout the confirmation produced, each pointing back at it. The amounts come
+// from domain.SplitCommission (D-30) and are copied into the snapshot, so a
+// later change to the percentages never rewrites what this booking paid.
+func (s *Server) confirmPartnerBooking(c echo.Context, req affiliateWebhookRequest) error {
 	ctx := c.Request().Context()
 	click, err := s.bookings.GetClick(ctx, req.TrackingID)
 	if err != nil {
 		return request.NotFound(c, "ไม่พบ tracking id นี้")
 	}
-	if click.ConfirmedAt != nil {
+
+	now := time.Now().UTC()
+	won, err := s.bookings.ConfirmClick(ctx, click.ID, now)
+	if err != nil {
+		return request.Internal(c, "บันทึกไม่สำเร็จ")
+	}
+	if !won {
 		// Partners retry webhooks; a second confirm must not pay twice.
 		return c.NoContent(http.StatusOK)
 	}
 
-	if err := s.bookings.ConfirmClick(ctx, click.ID, time.Now().UTC()); err != nil {
+	trip, _ := s.trips.GetByID(ctx, click.TripID)
+	pass, err := s.billing.TripPass(ctx, click.TripID)
+	if err != nil {
+		logger.L().WithError(err).Error("read trip pass for split")
+	}
+
+	commission, estimated := domain.CommissionTHB(
+		click.Partner, req.AmountTHB, derefFloat(req.CommissionTHB), req.CommissionTHB != nil,
+	)
+	creatorID := ""
+	if click.SourceCreatorID != nil {
+		creatorID = *click.SourceCreatorID
+	}
+	in := domain.SplitInput{CommissionTHB: commission, HasSourceCreator: creatorID != ""}
+	if pass != nil && pass.TotalTHB > 0 {
+		in.PassTotalTHB = pass.TotalTHB
+		in.PassRefundable = pass.Status == domain.OrderPaid
+	}
+	eco := s.economy(ctx)
+	split := domain.SplitCommission(in, eco)
+
+	var otherTrip *string
+	if trip != nil {
+		otherTrip = trip.SourceTripID
+	}
+
+	clickSource := &models.ValueSource{
+		Kind:        models.SourceBookingClick,
+		ActorUserID: strOrNil(click.UserID),
+		SubjectType: models.SubjectBookingClick,
+		SubjectID:   click.ID,
+		TripID:      &click.TripID,
+		OtherTripID: otherTrip,
+		BookingID:   click.BookingID,
+		Snapshot: snapshot(map[string]any{
+			"clicked_by": s.personSnap(ctx, click.UserID),
+			"partner":    click.Partner,
+			"tracking_id": click.ID,
+			"target_url": click.TargetURL,
+			"trip":       tripSnap(trip),
+			"clicked_at": click.ClickedAt.UTC().Format(time.RFC3339),
+		}),
+		OccurredAt: click.ClickedAt,
+	}
+	if clone, err := s.ledger.CloneSourceForCopy(ctx, click.TripID); err == nil && clone != nil {
+		clickSource.ParentID = &clone.ID
+	}
+	if !s.record(ctx, &models.LedgerEntry{Source: clickSource}) {
+		return request.Internal(c, "บันทึกหลักฐานไม่สำเร็จ")
+	}
+
+	confirmed := &models.ValueSource{
+		Kind:        models.SourcePartnerConfirmed,
+		ParentID:    &clickSource.ID,
+		SubjectType: models.SubjectBookingClick,
+		SubjectID:   click.ID,
+		TripID:      &click.TripID,
+		OtherTripID: otherTrip,
+		BookingID:   click.BookingID,
+		Snapshot: snapshot(map[string]any{
+			"partner":           click.Partner,
+			"tracking_id":       click.ID,
+			"booking_value_thb": req.AmountTHB,
+			"commission_thb":    commission,
+			"commission_estimated": estimated,
+			"split":             split,
+			"economy":           eco,
+			"creator":           s.personSnap(ctx, creatorID),
+		}),
+		OccurredAt: now,
+	}
+	entry := &models.LedgerEntry{Source: confirmed}
+	if creatorID != "" && split.CreatorShareTHB > 0 {
+		entry.Earnings = []models.CreatorEarning{{
+			UserID:          creatorID,
+			TripID:          click.TripID,
+			ClickID:         &click.ID,
+			Partner:         click.Partner,
+			BookingValueTHB: req.AmountTHB,
+			CommissionTHB:   commission,
+			SharePercent:    split.CreatorPercent,
+			AmountTHB:       split.CreatorShareTHB,
+			Estimated:       estimated,
+			Status:          models.EarningPending,
+		}}
+	}
+	if !s.record(ctx, entry) {
+		return request.Internal(c, "บันทึกหลักฐานไม่สำเร็จ")
+	}
+
+	if split.TripPassRefundTHB > 0 && pass != nil {
+		s.refundTripPass(ctx, pass, split.TripPassRefundTHB, confirmed)
+	}
+	if split.BookerCreditTHB > 0 && click.UserID != "" {
+		s.issueBookerCredit(ctx, click, split.BookerCreditTHB, confirmed)
+	}
+	return c.NoContent(http.StatusOK)
+}
+
+// cancelPartnerBooking undoes what a confirmation paid, without editing it.
+// An earning not yet paid out is reversed; one already in a transfer, or a
+// credit already spent, is flagged for an admin to decide (D-36).
+func (s *Server) cancelPartnerBooking(c echo.Context, req affiliateWebhookRequest) error {
+	ctx := c.Request().Context()
+	click, err := s.bookings.GetClick(ctx, req.TrackingID)
+	if err != nil {
+		return request.NotFound(c, "ไม่พบ tracking id นี้")
+	}
+	confirmed, err := s.ledger.LatestSource(ctx, models.SourcePartnerConfirmed, click.ID)
+	if err != nil {
+		return request.Internal(c, "อ่านหลักฐานไม่สำเร็จ")
+	}
+	if confirmed == nil {
+		// Never confirmed — nothing was paid, nothing to undo.
+		return c.NoContent(http.StatusAccepted)
+	}
+
+	now := time.Now().UTC()
+	won, err := s.bookings.CancelClick(ctx, click.ID, now)
+	if err != nil {
 		return request.Internal(c, "บันทึกไม่สำเร็จ")
 	}
-
-	// A confirmed booking is what the Trip Pass was promised against, whichever
-	// door the confirmation came through (M26 — A26.4).
-	s.refundTripPass(ctx, click.TripID)
-
-	if click.SourceCreatorID != nil && *click.SourceCreatorID != "" {
-		_ = s.points.Add(ctx, &models.UserPoints{
-			UserID: *click.SourceCreatorID,
-			Delta:  domain.PointsPerBooking,
-			Reason: models.PointsReasonBooking,
-			Note:   "มีคนจองสำเร็จจากทริปที่คุณเปิดสาธารณะ (" + click.Partner + ")",
-			TripID: &click.TripID,
-		})
-
-		// Points are the loyalty score; this is the money (A12.11). The click
-		// id is unique on the ledger, so a retried webhook cannot accrue twice.
-		commission := 0.0
-		if req.CommissionTHB != nil {
-			commission = *req.CommissionTHB
-		}
-		s.recordCreatorEarning(
-			ctx, *click.SourceCreatorID, click.TripID, click.Partner, &click.ID,
-			req.AmountTHB, commission, req.CommissionTHB != nil,
-		)
+	if !won {
+		return c.NoContent(http.StatusOK)
 	}
 
+	cancelled := &models.ValueSource{
+		Kind:        models.SourcePartnerCancelled,
+		ParentID:    &confirmed.ID,
+		SubjectType: models.SubjectBookingClick,
+		SubjectID:   click.ID,
+		TripID:      confirmed.TripID,
+		OtherTripID: confirmed.OtherTripID,
+		BookingID:   confirmed.BookingID,
+		Snapshot: snapshot(map[string]any{
+			"partner": click.Partner, "tracking_id": click.ID, "reported_amount_thb": req.AmountTHB,
+		}),
+		OccurredAt: now,
+	}
+	if !s.record(ctx, &models.LedgerEntry{Source: cancelled}) {
+		return request.Internal(c, "บันทึกหลักฐานไม่สำเร็จ")
+	}
+
+	flag := func(subjectType, subjectID, reason string) {
+		if err := s.ledger.AddFlag(ctx, &models.LedgerFlag{
+			SourceID: cancelled.ID, SubjectType: subjectType, SubjectID: subjectID, Reason: reason,
+		}); err != nil {
+			logger.L().WithError(err).Error("write ledger flag")
+		}
+	}
+
+	earnings, _ := s.ledger.EarningsBySources(ctx, []string{confirmed.ID})
+	for _, earning := range earnings {
+		reversed, err := s.ledger.TransitionEarning(ctx, earning.ID,
+			[]string{models.EarningPending, models.EarningPayable}, models.EarningReversed,
+			nil, "พาร์ตเนอร์ยกเลิกการจอง", cancelled.ID)
+		if err != nil {
+			logger.L().WithError(err).Error("reverse earning")
+			continue
+		}
+		if !reversed && earning.Status != models.EarningReversed && earning.Status != models.EarningExpired {
+			flag(models.SubjectEarning, earning.ID, "การจองถูกยกเลิกหลังรายได้เข้ารอบโอนหรือโอนไปแล้ว")
+		}
+	}
+
+	credits, _ := s.ledger.ChildSources(ctx, []string{confirmed.ID})
+	for _, credit := range credits {
+		if credit.SubjectType != models.SubjectDiscountCode {
+			continue
+		}
+		voided, err := s.discounts.Void(ctx, credit.SubjectID, now)
+		if err != nil {
+			logger.L().WithError(err).Error("void credit code")
+			continue
+		}
+		if !voided {
+			flag(models.SubjectDiscountCode, credit.SubjectID, "เครดิตจากการจองนี้ถูกใช้ไปแล้วก่อนพาร์ตเนอร์ยกเลิก")
+		}
+	}
 	return c.NoContent(http.StatusOK)
 }
 
 // refundTripPass pays the Trip Pass back once the trip produces a booking
-// (M26 — A26.4).
-//
-// This is the sentence the whole price structure rests on: "จองผ่านเรา แล้วไม่
-// ต้องจ่ายค่าวางแผน". A commission on a booking is worth ฿1,200–1,700, so
-// handing ฿299 back is not generosity, it is buying the booking — and the
-// paywall stops being a thing standing between us and the larger revenue.
-//
-// Once per trip however many bookings it produces, and that is not enforced by
-// remembering we already paid: the UPDATE only matches a pass that is still
-// `paid`, so two partner postbacks arriving together cannot both win.
+// (M26 — A26.4), now capped at what the booking actually left over (D-30):
+// min(pass, commission − cost of sale). Once per trip however many bookings it
+// produces — the UPDATE only matches a pass that is still `paid`, so two
+// postbacks arriving together cannot both win.
 //
 // The credit is a discount code rather than a reversal at a gateway because
-// there is no gateway yet (§16). It is the one form of "money back" this
-// product can honour today, and it is honoured against the next trip.
-//
-// Best effort, like the points award beside it: a booking that was confirmed
-// must not be un-confirmed because the refund could not be written. What that
-// costs is a support ticket with a receipt behind it, which is recoverable —
-// the failure is logged loudly for exactly that reason.
-func (s *Server) refundTripPass(ctx contextT, tripID string) {
-	pass, err := s.billing.TripPass(ctx, tripID)
-	if err != nil {
-		logger.L().WithError(err).Error("read trip pass for refund")
-		return
-	}
-	if pass == nil {
-		return
-	}
-	// Nothing was actually charged — a fully discounted pass costs ฿0, and
-	// refunding zero would mint a worthless code and a receipt that reads as if
-	// money moved twice.
-	if pass.TotalTHB <= 0 {
-		return
-	}
-
+// there is no gateway yet (§16). Best effort: a confirmed booking must not be
+// un-confirmed because the refund could not be written.
+func (s *Server) refundTripPass(ctx contextT, pass *models.Order, amountTHB float64, parent *models.ValueSource) {
 	now := time.Now().UTC()
 	credit := &models.DiscountCode{
 		UserID:    pass.UserID,
 		Code:      domain.NewDiscountCode(),
 		Scope:     models.DiscountScopeTripPass,
-		AmountTHB: pass.TotalTHB,
-		// No points were burned for this one. It is money coming back, not
-		// loyalty being spent, and counting it as points spent would overstate
-		// what the points economy has paid out.
+		AmountTHB: amountTHB,
+		// Money coming back, not loyalty being spent.
 		PointsSpent: 0,
 		ExpiresAt:   now.Add(domain.DiscountValidity),
 	}
@@ -403,23 +565,85 @@ func (s *Server) refundTripPass(ctx contextT, tripID string) {
 		return
 	}
 	if !won {
-		// Already refunded on an earlier booking. Nothing to say.
 		return
 	}
 
-	// A refund nobody is told about is a refund nobody spends. Written straight
-	// to the inbox rather than through notifyOne, which skips a notification
-	// addressed to whoever caused it — and here that person is usually the buyer
-	// ticking their own booking as done.
+	s.record(ctx, &models.LedgerEntry{Source: &models.ValueSource{
+		Kind:        models.SourceTripPassRefund,
+		ParentID:    &parent.ID,
+		ActorUserID: nil,
+		SubjectType: models.SubjectDiscountCode,
+		SubjectID:   credit.ID,
+		TripID:      parent.TripID,
+		OtherTripID: parent.OtherTripID,
+		BookingID:   parent.BookingID,
+		Snapshot: snapshot(map[string]any{
+			"order_id": pass.ID, "pass_total_thb": pass.TotalTHB, "credit_thb": amountTHB,
+			"code": credit.Code, "buyer": s.personSnap(ctx, pass.UserID), "trip_title": pass.TripTitle,
+		}),
+		OccurredAt: now,
+	}})
+
+	tripID := parent.TripID
 	_ = s.notifications.Create(ctx, &models.Notification{
 		UserID: pass.UserID,
-		TripID: &tripID,
+		TripID: tripID,
 		Kind:   models.NotifyRefund,
-		Title:  fmt.Sprintf("คืนค่า Trip Pass ฿%.0f ให้แล้ว", pass.TotalTHB),
+		Title:  fmt.Sprintf("คืนค่า Trip Pass ฿%.2f ให้แล้ว", amountTHB),
 		Body: fmt.Sprintf("ทริป%s มีการจองผ่าน ROVE — โค้ด %s ใช้เป็นส่วนลดทริปหน้าได้",
 			pass.TripTitle, credit.Code),
 		Link: "/billing/" + pass.ID,
 	})
+}
+
+// issueBookerCredit is the new "เครดิตคืนผู้จอง" (D-30): a share of what is left
+// after every other payout, to the person who followed the link and booked.
+func (s *Server) issueBookerCredit(ctx contextT, click *models.BookingClick, amountTHB float64, parent *models.ValueSource) {
+	now := time.Now().UTC()
+	credit := &models.DiscountCode{
+		UserID:      click.UserID,
+		Code:        domain.NewDiscountCode(),
+		Scope:       models.DiscountScopeTripPass,
+		AmountTHB:   amountTHB,
+		PointsSpent: 0,
+		ExpiresAt:   now.Add(domain.DiscountValidity),
+	}
+	if err := s.discounts.Create(ctx, credit); err != nil {
+		logger.L().WithError(err).Error("issue booker credit")
+		return
+	}
+
+	s.record(ctx, &models.LedgerEntry{Source: &models.ValueSource{
+		Kind:        models.SourceBookerCredit,
+		ParentID:    &parent.ID,
+		ActorUserID: &click.UserID,
+		SubjectType: models.SubjectDiscountCode,
+		SubjectID:   credit.ID,
+		TripID:      parent.TripID,
+		OtherTripID: parent.OtherTripID,
+		BookingID:   parent.BookingID,
+		Snapshot: snapshot(map[string]any{
+			"booker": s.personSnap(ctx, click.UserID), "credit_thb": amountTHB, "code": credit.Code,
+			"partner": click.Partner,
+		}),
+		OccurredAt: now,
+	}})
+
+	_ = s.notifications.Create(ctx, &models.Notification{
+		UserID: click.UserID,
+		TripID: &click.TripID,
+		Kind:   models.NotifyCredit,
+		Title:  fmt.Sprintf("ได้เครดิตคืน ฿%.2f จากการจอง", amountTHB),
+		Body:   fmt.Sprintf("พาร์ตเนอร์ยืนยันการจองแล้ว — โค้ด %s ใช้เป็นส่วนลด Trip Pass ได้", credit.Code),
+		Link:   "/points",
+	})
+}
+
+func derefFloat(v *float64) float64 {
+	if v == nil {
+		return 0
+	}
+	return *v
 }
 
 func partnerName(key string) string {

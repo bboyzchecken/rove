@@ -29,6 +29,8 @@ func (s *Server) registerUserRoutes(g *echo.Group) {
 	s.registerInboxRoutes(me) // A9.2 — the inbox belongs to a person, not a trip
 	me.GET("/trips/upcoming", s.handleUpcomingTrips)
 	me.GET("/trips/past", s.handlePastTrips)
+	me.GET("/archive", s.handleMyArchive) // คลังทริป (Feedback #4 — D-31)
+	s.registerVerificationRoutes(me) // เปิดรับรายได้ (Feedback #4 — F11)
 	// Feedback #2 — D-10: whether the next trip would hit the free-tier wall,
 	// so the entry flow can say so on its first screen rather than after the
 	// last one. Under /users/me because it is a fact about the account, and

@@ -29,6 +29,8 @@ func (s *Server) registerAdminRoutes(g *echo.Group) {
 	g.POST("/discount-codes", s.handleAdminIssueDiscountCode)
 	// The partner economy's ops screens (A12.11 / A12.12).
 	s.registerPayoutRoutes(g)
+	// The evidence chain behind points and money (Feedback #4 — F12).
+	s.registerAdminLedgerRoutes(g)
 }
 
 type adminStatsDTO struct {

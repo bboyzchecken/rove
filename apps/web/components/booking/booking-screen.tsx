@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, ExternalLink, Plus, Trash2 } from 'lucide-react';
+import { Archive, Check, ExternalLink, Plus, Trash2 } from 'lucide-react';
 
 import { AgentHandoffCard } from '@/components/booking/agent-handoff';
 import { SectionHeader } from '@/components/common/section';
@@ -9,14 +9,19 @@ import { EmptyState } from '@/components/common/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Sheet } from '@/components/ui/sheet';
 import {
+  useArchiveBooking,
+  useArchivedBookings,
   useBookingOffers,
   useBookings,
   useRemoveBooking,
+  useRestoreBooking,
   useSaveBooking,
   useSetBookingStatus,
 } from '@/features/prep/queries';
-import type { BookingKind, BookingStatus } from '@/lib/data';
+import { ApiError } from '@/lib/api-client';
+import type { BookingEntry, BookingKind, BookingStatus } from '@/lib/data';
 import { formatMoney } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -51,6 +56,22 @@ export function BookingScreen({ tripId }: { tripId: string }) {
   const save = useSaveBooking(tripId);
   const setStatus = useSetBookingStatus(tripId);
   const remove = useRemoveBooking(tripId);
+  const archive = useArchiveBooking(tripId);
+  const { data: archived = [] } = useArchivedBookings(tripId);
+  const [showArchived, setShowArchived] = useState(false);
+  // A delete the API refused because the booking turned out to be tied — the
+  // row did not know yet (D-41), so offer the archive it asks for.
+  const [refused, setRefused] = useState<{ entry: BookingEntry; message: string } | null>(null);
+
+  function removeOrOfferArchive(entry: BookingEntry) {
+    remove.mutate(entry.id, {
+      onError: (error) => {
+        if (error instanceof ApiError && error.archiveConflict?.archivable) {
+          setRefused({ entry, message: error.message });
+        }
+      },
+    });
+  }
 
   return (
     <div className="space-y-6">
@@ -98,13 +119,26 @@ export function BookingScreen({ tripId }: { tripId: string }) {
                       <Check className="size-3.5" /> จองแล้ว
                     </Button>
                   ) : null}
-                  <button
-                    aria-label={`ลบ ${entry.title}`}
-                    onClick={() => remove.mutate(entry.id)}
-                    className="text-muted hover:text-danger flex size-8 items-center justify-center rounded-full"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
+                  {/* Partner-confirmed: points or money trace back here, so it
+                      can only be put away (Feedback #4 — D-18, D-41). */}
+                  {entry.tied ? (
+                    <button
+                      aria-label={`เก็บ ${entry.title} เข้าคลัง`}
+                      onClick={() => archive.mutate(entry.id)}
+                      disabled={archive.isPending}
+                      className="text-muted hover:text-ink inline-flex h-8 items-center gap-1 rounded-full px-2 text-[11px] font-medium transition disabled:opacity-50"
+                    >
+                      <Archive className="size-3.5" /> เก็บเข้าคลัง
+                    </button>
+                  ) : (
+                    <button
+                      aria-label={`ลบ ${entry.title}`}
+                      onClick={() => removeOrOfferArchive(entry)}
+                      className="text-muted hover:text-danger flex size-8 items-center justify-center rounded-full"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -175,6 +209,99 @@ export function BookingScreen({ tripId }: { tripId: string }) {
 
       {/* When links are not what the group wants (M22 — A12.12). */}
       <AgentHandoffCard tripId={tripId} />
+
+      {archived.length > 0 ? (
+        <button
+          type="button"
+          onClick={() => setShowArchived(true)}
+          className="text-muted hover:text-ink mx-auto flex items-center gap-1.5 text-xs font-medium transition"
+        >
+          <Archive className="size-3.5" />
+          เก็บเข้าคลัง ({archived.length})
+        </button>
+      ) : null}
+
+      {showArchived ? (
+        <ArchivedBookingsSheet
+          tripId={tripId}
+          entries={archived}
+          onClose={() => setShowArchived(false)}
+        />
+      ) : null}
+
+      {refused ? (
+        <Sheet
+          open
+          onClose={() => setRefused(null)}
+          title="ลบการจองนี้ไม่ได้"
+          description={refused.entry.title}
+          footer={
+            <div className="flex flex-col gap-2">
+              <Button
+                block
+                disabled={archive.isPending}
+                onClick={() =>
+                  archive.mutate(refused.entry.id, { onSuccess: () => setRefused(null) })
+                }
+              >
+                <Archive className="size-4" /> เก็บเข้าคลัง
+              </Button>
+              <Button block variant="soft" onClick={() => setRefused(null)}>
+                ยกเลิก
+              </Button>
+            </div>
+          }
+        >
+          <p className="text-ink text-sm leading-relaxed">{refused.message}</p>
+        </Sheet>
+      ) : null}
     </div>
+  );
+}
+
+function ArchivedBookingsSheet({
+  tripId,
+  entries,
+  onClose,
+}: {
+  tripId: string;
+  entries: BookingEntry[];
+  onClose: () => void;
+}) {
+  const restore = useRestoreBooking(tripId);
+
+  return (
+    <Sheet
+      open
+      onClose={onClose}
+      title={`เก็บเข้าคลัง (${entries.length})`}
+      description="การจองที่เก็บไว้ ไม่แสดงในรายการ กู้คืนได้ตลอด"
+    >
+      {entries.length === 0 ? (
+        <p className="text-muted py-4 text-center text-sm">ไม่มีการจองในคลังแล้ว</p>
+      ) : (
+        <div className="divide-border divide-y">
+          {entries.map((entry) => (
+            <div key={entry.id} className="flex items-center gap-3 py-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-ink text-sm font-medium">{entry.title}</p>
+                <p className="text-muted mt-0.5 text-[11px]">
+                  {entry.partner}
+                  {entry.confirmationCode ? ` · เลขที่จอง ${entry.confirmationCode}` : ''}
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="soft"
+                disabled={restore.isPending && restore.variables === entry.id}
+                onClick={() => restore.mutate(entry.id)}
+              >
+                กู้คืน
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </Sheet>
   );
 }

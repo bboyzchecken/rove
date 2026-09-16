@@ -11,16 +11,18 @@ import {
   WISHLIST,
 } from './seed/trip';
 import { CURRENT_USER, DREAMS, PAST_TRIPS, POINTS_LEDGER, UPCOMING, YEAR_STATS } from './seed/user';
+import { ApiError } from '@/lib/api-client';
 import { DEMO_PUBLIC_SLUG } from '@/lib/demo-trip';
 import { colorFromId } from '@/lib/trip-color';
 
 import { AI_PAY_CHANNELS, FREE_SUBSCRIPTION, seedOrders } from './billing';
+import type { MockLedger } from './ledger';
+import type { MockPayoutState } from './payouts';
 
 import type {
   ActivityEvent,
   AgentLead,
   DiscountCode,
-  EarningsStatement,
   AvailabilityEntry,
   BookingEntry,
   BudgetLine,
@@ -159,6 +161,8 @@ export interface TripRecord {
    * nobody in this browser. A record without one is the demo user's own.
    */
   creator?: { name: string; handle: string; characterId: string };
+  /** In the owner's คลังทริป (Feedback #4 — D-31); every trip route answers 410. */
+  archivedAt?: string | null;
 }
 
 export interface MockDb {
@@ -187,12 +191,22 @@ export interface MockDb {
    * never a column.
    */
   pointsLedger: PointsEntry[];
-  /** What this user's published plans have earned them (M22 — A12.11). */
-  earnings: EarningsStatement;
+  /**
+   * Creator verification, earnings for every creator, payout cycles
+   * (Feedback #4 — F11). Optional and seeded on first read by `payoutStateOf`;
+   * it replaces the old static `earnings` statement.
+   */
+  payoutState?: MockPayoutState;
   /** Trips the user finished — the profile timeline reads these as-is. */
   past: typeof PAST_TRIPS;
   upcoming: typeof UPCOMING;
   stats: typeof YEAR_STATS;
+  /**
+   * The evidence chain behind the admin trace (Feedback #4 — F12). Optional
+   * and seeded on first read by `ledgerOf`, so a stored blob from before it
+   * existed still loads.
+   */
+  ledger?: MockLedger;
 }
 
 /* ------------------------------------------------------------------ seed -- */
@@ -328,7 +342,23 @@ function seedDemoTrip(): TripRecord {
     prep: [],
     prepNote: '',
     versions: [],
-    bookings: [],
+    // One booking a partner already confirmed, so UAT meets the archive-only
+    // row (Feedback #4 — D-41). The earnings seed below pays out from it.
+    bookings: [
+      {
+        id: 'bk-agoda-shinjuku',
+        kind: 'stay',
+        title: 'Shinjuku Granbell Hotel — ห้องคู่ 2 เตียง',
+        partner: 'Agoda',
+        url: 'https://www.agoda.com/',
+        status: 'booked',
+        pricePerPersonThb: 2_400,
+        bookedBy: 'm1',
+        confirmationCode: 'AG-583920',
+        tied: true,
+        archivedAt: null,
+      },
+    ],
     photos: [],
     documents: [],
     polls: [],
@@ -663,82 +693,9 @@ export function seedDb(): MockDb {
     notifications: [],
     discountCodes: [],
     pointsLedger: structuredClone(POINTS_LEDGER),
-    // Seeded with one settled month and one still owing, so the creator
-    // statement has something to be a statement of.
-    earnings: seedEarnings(),
     past: structuredClone(PAST_TRIPS),
     upcoming: structuredClone(UPCOMING),
     stats: structuredClone(YEAR_STATS),
-  };
-}
-
-/**
- * A creator statement worth looking at (M22 — A12.11).
- *
- * The numbers follow the same arithmetic the API uses: a partner commission,
- * 30% of it to the creator, and an `estimated` flag on anything accrued from a
- * rate table rather than reported.
- */
-function seedEarnings(): EarningsStatement {
-  const entries = [
-    {
-      tripId: 'demo',
-      partner: 'Agoda',
-      bookingValueThb: 48_000,
-      commissionThb: 2_400,
-      sharePercent: 30,
-      amountThb: 720,
-      estimated: true,
-      status: 'payable' as const,
-      occurredAt: '2026-08-12T09:20:00.000Z',
-    },
-    {
-      tripId: 'demo',
-      partner: 'Klook',
-      bookingValueThb: 9_600,
-      commissionThb: 480,
-      sharePercent: 30,
-      amountThb: 144,
-      estimated: false,
-      status: 'payable' as const,
-      occurredAt: '2026-08-03T14:05:00.000Z',
-    },
-    {
-      tripId: 'demo',
-      partner: 'Booking.com',
-      bookingValueThb: 62_000,
-      commissionThb: 2_480,
-      sharePercent: 30,
-      amountThb: 744,
-      estimated: false,
-      status: 'paid' as const,
-      occurredAt: '2026-07-18T11:40:00.000Z',
-    },
-  ];
-
-  const sum = (status: string) =>
-    entries.filter((e) => e.status === status).reduce((n, e) => n + e.amountThb, 0);
-
-  return {
-    totals: {
-      pendingThb: sum('pending'),
-      payableThb: sum('payable'),
-      paidThb: sum('paid'),
-      count: entries.length,
-    },
-    sharePercent: 30,
-    minimumPayoutThb: 300,
-    entries,
-    payouts: [
-      {
-        periodStart: '2026-07-01',
-        periodEnd: '2026-07-31',
-        amountThb: 744,
-        earningCount: 1,
-        status: 'paid',
-        paidAt: '2026-08-05T03:00:00.000Z',
-      },
-    ],
   };
 }
 
@@ -819,6 +776,8 @@ export function resetDb() {
 
 export function tripRecord(db: MockDb, tripId: string): TripRecord {
   const found = db.trips.find((t) => t.trip.id === tripId);
+  // The same 410 the API's trip middleware returns (Feedback #4 — D-31).
+  if (found?.archivedAt) throw new ApiError(410, 'ทริปนี้ถูกเก็บเข้าคลังแล้ว');
   if (found) return found;
   // A UAT tester can land on any id (a shared link, a stale bookmark). Rather
   // than 404 in a demo, clone the demo trip under that id.

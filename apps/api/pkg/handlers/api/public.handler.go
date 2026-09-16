@@ -45,6 +45,8 @@ type publicCreatorDTO struct {
 	Name        string  `json:"name"`
 	Handle      *string `json:"handle"`
 	CharacterID string  `json:"character_id"`
+	// ยืนยันตัวตนแล้ว (D-37) — on /p/, explore cards and the creator page.
+	Verified bool `json:"verified"`
 }
 
 type publicTripDTO struct {
@@ -80,6 +82,7 @@ func toPublicCreatorDTO(owner models.User) publicCreatorDTO {
 		Name:        owner.DisplayName,
 		Handle:      owner.Handle,
 		CharacterID: characterOf(owner),
+		Verified:    owner.VerifiedAt != nil,
 	}
 }
 
@@ -463,6 +466,7 @@ type creatorProfileDTO struct {
 	Name         string           `json:"name"`
 	Handle       string           `json:"handle"`
 	CharacterID  string           `json:"character_id"`
+	Verified     bool             `json:"verified"`
 	PublicTrips  int              `json:"public_trips"`
 	TotalViews   int              `json:"total_views"`
 	TotalClones  int              `json:"total_clones"`
@@ -491,6 +495,7 @@ func (s *Server) handleCreatorProfile(c echo.Context) error {
 		Name:        user.DisplayName,
 		Handle:      handle,
 		CharacterID: characterOf(*user),
+		Verified:    user.VerifiedAt != nil,
 		Trips:       make([]exploreTripDTO, 0, len(trips)),
 	}
 	// Every card on this page belongs to the person the page is about, and that

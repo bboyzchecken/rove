@@ -95,12 +95,3 @@ func TestCommissionFallsBackConservatively(t *testing.T) {
 		t.Error("the fallback rate should be no higher than a known partner's")
 	}
 }
-
-func TestCreatorShareIsThirtyPercentOfTheCommission(t *testing.T) {
-	if got := CreatorShareTHB(500); got != 150 {
-		t.Fatalf("share of 500 = %v, want 150", got)
-	}
-	if got := CreatorShareTHB(0); got != 0 {
-		t.Fatalf("share of nothing = %v, want 0", got)
-	}
-}

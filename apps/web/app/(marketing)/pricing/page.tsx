@@ -16,7 +16,7 @@ import { TRIP_PASS_PRICE_THB, FREE_DRAFTS_PER_TRIP } from '@/lib/catalog/plans';
 export const metadata = {
   title: 'ราคา',
   description:
-    'วางแผนทริปกับเพื่อนได้ฟรี · ปลดล็อกทั้งทริป ฿299 และได้คืนเต็มจำนวนเมื่อจองผ่าน ROVE',
+    'วางแผนทริปกับเพื่อนได้ฟรี · ปลดล็อกทั้งทริป ฿299 และคืนสูงสุด ฿299 เมื่อพาร์ตเนอร์ยืนยันการจองผ่าน ROVE',
 };
 
 /**
@@ -25,13 +25,13 @@ export const metadata = {
  * It answers three questions in the order people ask them: can I use this
  * without paying, what happens when I hit the wall, and why should I believe
  * the refund. The last one is why the page exists as prose rather than as
- * three cards alone — a full refund sounds like a catch until you can see how
+ * three cards alone — a refund sounds like a catch until you can see how
  * we get paid instead, and the honest answer is short enough to print.
  */
 const FAQ = [
   {
     q: 'คืนเงินยังไง แล้วได้จริงไหม',
-    a: `เมื่อมีการจองผ่านลิงก์ของ ROVE จากทริปที่ปลดล็อกไว้ ระบบจะคืนค่า Trip Pass ฿${TRIP_PASS_PRICE_THB} เป็นเครดิตเต็มจำนวนให้อัตโนมัติ ไม่ต้องทักหาใคร คืนหนึ่งครั้งต่อทริป ต่อให้ทริปนั้นจองหลายรายการ`,
+    a: `เมื่อพาร์ตเนอร์ยืนยันการจองที่จองผ่านลิงก์ของ ROVE จากทริปที่ปลดล็อกไว้ ระบบจะคืนค่า Trip Pass เป็นเครดิตสูงสุด ฿${TRIP_PASS_PRICE_THB} ให้อัตโนมัติ (ยอดคืนขึ้นกับค่าคอมที่พาร์ตเนอร์จ่าย) ไม่ต้องทักหาใคร คืนหนึ่งครั้งต่อทริป ต่อให้ทริปนั้นจองหลายรายการ`,
   },
   {
     q: 'ทำไมถึงคืนให้ได้',
@@ -43,7 +43,7 @@ const FAQ = [
   },
   {
     q: 'จ่ายคนเดียวแต่ไปกันหลายคน',
-    a: 'Trip Pass เป็นของทริป ไม่ใช่ของคน ใครในห้องจ่ายก็ปลดล็อกให้ทุกคนในทริปนั้น จะหารกันเองทีหลังก็ได้ — และถ้าได้เงินคืน ก็คืนเต็มจำนวนให้คนที่จ่าย',
+    a: 'Trip Pass เป็นของทริป ไม่ใช่ของคน ใครในห้องจ่ายก็ปลดล็อกให้ทุกคนในทริปนั้น จะหารกันเองทีหลังก็ได้ — และถ้าได้คืน ก็คืนเป็นเครดิตให้คนที่จ่าย',
   },
   {
     q: 'มีค่าใช้จ่ายรายเดือนไหม',
@@ -58,7 +58,7 @@ const FAQ = [
  */
 const HERO_TAGS = [
   { label: 'ฟรีทั้งห้อง', tone: 'journal' },
-  { label: 'คืนเต็มจำนวน', tone: 'ink' },
+  { label: `คืนสูงสุด ฿${TRIP_PASS_PRICE_THB}`, tone: 'ink' },
   { label: 'ไม่มีรายเดือน', tone: 'documents' },
   { label: 'จ่ายเป็นทริป', tone: 'countdown' },
   { label: 'ไม่ต้องใส่บัตร', tone: 'itinerary' },

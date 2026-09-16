@@ -112,6 +112,17 @@ func (s *Server) IsAdmin(next echo.HandlerFunc) echo.HandlerFunc {
 //
 // minRole is one of models.TripRoleViewer / TripRoleEditor / TripRoleOwner.
 func (s *Server) TripRoleMiddleware(minRole string) echo.MiddlewareFunc {
+	return s.tripRoleMiddleware(minRole, false)
+}
+
+// ArchivedTripOwner is the owner check for the few routes that act on a trip in
+// the คลัง — restoring it or deleting it for good (D-31, D-32). Every other
+// route answers 410 for an archived trip, so the room behaves as closed.
+func (s *Server) ArchivedTripOwner() echo.MiddlewareFunc {
+	return s.tripRoleMiddleware(models.TripRoleOwner, true)
+}
+
+func (s *Server) tripRoleMiddleware(minRole string, allowArchived bool) echo.MiddlewareFunc {
 	required, ok := models.TripRoleRank[minRole]
 	if !ok {
 		panic("TripRoleMiddleware: unknown role " + minRole)
@@ -135,6 +146,15 @@ func (s *Server) TripRoleMiddleware(minRole string) echo.MiddlewareFunc {
 			}
 			if models.TripRoleRank[m.Role] < required {
 				return request.Forbidden(c, "insufficient trip role")
+			}
+			if !allowArchived {
+				archived, err := s.trips.IsArchived(c.Request().Context(), tripID)
+				if err != nil {
+					return request.Internal(c, "อ่านทริปไม่สำเร็จ")
+				}
+				if archived {
+					return request.Error(c, http.StatusGone, "ทริปนี้ถูกเก็บเข้าคลังแล้ว")
+				}
 			}
 
 			c.Set(request.CtxTripID, tripID)

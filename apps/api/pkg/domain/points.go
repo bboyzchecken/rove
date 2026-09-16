@@ -15,9 +15,6 @@ package domain
 const (
 	// PointsPerReferral is paid when someone you invited joins their first trip.
 	PointsPerReferral = 150
-	// PointsPerBooking is paid when a booking is confirmed from a trip you
-	// published — the only revenue-linked award.
-	PointsPerBooking = 480
 	// PointsPerClone is paid when someone copies your public trip.
 	PointsPerClone = 260
 	// PointsPerPublish is a one-off for opening your first trip to the public.

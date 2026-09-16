@@ -343,6 +343,48 @@ func Migrate(db *gorm.DB) error {
 				return tx.Migrator().DropColumn(&models.Trip{}, "published_at")
 			},
 		},
+		{
+			// Feedback #4 — F12: the evidence chain. New tables for sources,
+			// earning status history, flags, audit and settings; ledger rows
+			// learn where they came from; trips and bookings can be archived.
+			// Every existing points/earnings row gets a `legacy` source so the
+			// trace page can say plainly that the history before this is thin.
+			ID: "202609160000_evidence_chain",
+			Migrate: func(tx *gorm.DB) error {
+				if err := tx.AutoMigrate(
+					&models.ValueSource{}, &models.EarningEvent{}, &models.LedgerFlag{},
+					&models.AdminAuditLog{}, &models.AppSetting{},
+					&models.UserPoints{}, &models.CreatorEarning{}, &models.DiscountCode{},
+					&models.Trip{}, &models.Booking{}, &models.BookingClick{},
+				); err != nil {
+					return err
+				}
+				return BackfillLegacySources(tx)
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return tx.Migrator().DropTable(
+					"app_settings", "admin_audit_logs", "ledger_flags", "earning_events", "value_sources",
+				)
+			},
+		},
+		{
+			// Feedback #4 — F11: payout cycles, creator verification, payout
+			// accounts, OTP codes, expiry notices; payouts learn their cycle and
+			// the account they went to; users carry the verified badge.
+			ID: "202609160001_payouts_kyc",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.AutoMigrate(
+					&models.PayoutCycle{}, &models.CreatorVerification{}, &models.PayoutAccount{},
+					&models.OTPChallenge{}, &models.EarningNotice{},
+					&models.Payout{}, &models.User{},
+				)
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return tx.Migrator().DropTable(
+					"earning_notices", "otp_challenges", "payout_accounts", "creator_verifications", "payout_cycles",
+				)
+			},
+		},
 	})
 
 	return m.Migrate()

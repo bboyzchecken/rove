@@ -119,10 +119,6 @@ func ApplyDiscount(subtotalTHB, discountTHB float64) (total, applied float64) {
 
 /* ------------------------------------------- creator revenue share (A12.11) */
 
-// CreatorSharePercent is the cut of the commission that goes to the person
-// whose published plan produced the booking (§6.5).
-const CreatorSharePercent = 30
-
 // partnerCommissionRate is what each partner pays us, as a fraction of the
 // booking value. Used ONLY when a postback does not carry the commission —
 // every earning derived this way is flagged `estimated`, and the payout report
@@ -160,14 +156,6 @@ func CommissionTHB(partner string, bookingValueTHB, reported float64, hasReporte
 		rate = DefaultCommissionRate
 	}
 	return round2(bookingValueTHB * rate), true
-}
-
-// CreatorShareTHB is the creator's cut of a commission, to the satang.
-func CreatorShareTHB(commissionTHB float64) float64 {
-	if commissionTHB <= 0 {
-		return 0
-	}
-	return round2(commissionTHB * float64(CreatorSharePercent) / 100)
 }
 
 // MinimumPayoutTHB is the floor a balance has to reach before a transfer is

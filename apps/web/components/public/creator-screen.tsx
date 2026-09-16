@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Copy, Eye, Sparkles } from 'lucide-react';
 
+import { VerifiedBadge } from '@/components/profile/verified-badge';
 import { BrowseShell } from '@/components/common/browse-shell';
 import { SectionHeader, Stat } from '@/components/common/section';
 import { TripCover } from '@/components/trip/trip-cover';
@@ -62,6 +63,7 @@ export function CreatorScreen({ handle, signedIn }: { handle: string; signedIn: 
               {creator.name}
             </h1>
             <p className="text-muted text-sm">@{creator.handle}</p>
+            {creator.verified ? <VerifiedBadge className="mt-1.5" /> : null}
           </div>
         </div>
 
@@ -118,7 +120,7 @@ export function CreatorScreen({ handle, signedIn }: { handle: string; signedIn: 
           อยากมีหน้าแบบนี้ของตัวเองไหม
         </p>
         <p className="text-muted mt-1 text-xs leading-relaxed">
-          เปิดทริปที่ไปมาแล้วเป็นสาธารณะ — ทุกครั้งที่มีคนตามรอยหรือกดจองจากแพลนของคุณ คุณได้แต้มไว้แลกส่วนลด
+          เปิดทริปที่ไปมาแล้วเป็นสาธารณะ — ทุกครั้งที่มีคนคัดลอกแพลนของคุณ คุณได้แต้มไว้แลกส่วนลด
         </p>
         <ButtonLink href="/new" size="sm" className="mt-3">
           เริ่มทริปของฉัน

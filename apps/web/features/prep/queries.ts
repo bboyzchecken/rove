@@ -144,3 +144,33 @@ export function useRemoveBooking(tripId: string) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.bookings(tripId) }),
   });
 }
+
+/* ------------------------------------ archived bookings (Feedback #4 — D-41) -- */
+
+export function useArchivedBookings(tripId: string) {
+  return useQuery({
+    queryKey: queryKeys.bookingsArchived(tripId),
+    queryFn: () => repo.booking.archived(tripId),
+    enabled: Boolean(tripId),
+  });
+}
+
+function useBookingArchiveMutation(tripId: string, action: 'archive' | 'restore') {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (bookingId: string) => repo.booking[action](tripId, bookingId),
+    onSuccess: () => {
+      // The prefix covers the archived list too.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.bookings(tripId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.tripOverview(tripId) });
+    },
+  });
+}
+
+export function useArchiveBooking(tripId: string) {
+  return useBookingArchiveMutation(tripId, 'archive');
+}
+
+export function useRestoreBooking(tripId: string) {
+  return useBookingArchiveMutation(tripId, 'restore');
+}

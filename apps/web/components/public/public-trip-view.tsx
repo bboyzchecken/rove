@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bus, Car, Copy, Eye, EyeOff, Footprints, TrainFront, Wand2 } from 'lucide-react';
 
+import { VerifiedBadge } from '@/components/profile/verified-badge';
 import { BrowseShell } from '@/components/common/browse-shell';
 import { AdaptDialog } from '@/components/public/adapt-dialog';
 import { ReviewLine, ReviewSummaryLine } from '@/components/trip/trip-review';
@@ -126,6 +127,7 @@ export function PublicTripView({
             <span className="text-muted text-xs">
               โดย <span className="text-ink font-medium">{creator.name}</span>
             </span>
+            {creator.verified ? <VerifiedBadge compact /> : null}
           </Link>
         ) : (
           <span className="flex items-center gap-2">
@@ -133,6 +135,7 @@ export function PublicTripView({
             <span className="text-muted text-xs">
               โดย <span className="text-ink font-medium">{creator.name}</span>
             </span>
+            {creator.verified ? <VerifiedBadge compact /> : null}
           </span>
         )}
 

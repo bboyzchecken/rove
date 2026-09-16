@@ -5,7 +5,26 @@ import { tripColorOf } from '@/lib/trip-color';
 import type {
   ActivityEvent,
   AdaptDiff,
+  AdminAuditEntry,
+  AdminEarning,
+  AdminPayoutAccount,
+  CycleDetail,
+  KycDetail,
+  KycQueueRow,
+  KycStepKey,
+  OtpSent,
+  PayoutAccount,
+  PayoutCycle,
+  PayoutsOverview,
+  PendingAccountChange,
+  Verification,
   AgentLead,
+  ArchivedTrip,
+  EconomySettings,
+  LedgerFlag,
+  TraceNode,
+  TraceResult,
+  TraceType,
   DiscountCode,
   EarningsStatement,
   RedemptionBoard,
@@ -76,6 +95,23 @@ import type {
 import type {
   ActivityDto,
   AdaptDiffDto,
+  AdminAuditDto,
+  AdminEarningDto,
+  AdminPayoutAccountDto,
+  CycleDetailDto,
+  KycDetailDto,
+  KycQueueRowDto,
+  OtpSentDto,
+  PayoutAccountDto,
+  PayoutCycleDto,
+  PayoutsOverviewDto,
+  PendingAccountDto,
+  VerificationDto,
+  ArchivedTripDto,
+  EconomySettingsDto,
+  LedgerFlagDto,
+  TraceDto,
+  TraceNodeDto,
   DiscountCodeDto,
   EarningsDto,
   LeadDto,
@@ -602,6 +638,7 @@ export function toPublicCreator(dto: PublicCreatorDto): PublicCreator {
     name: dto.name,
     handle: dto.handle,
     characterId: dto.character_id || DEFAULT_CHARACTER_ID,
+    verified: dto.verified ?? false,
   };
 }
 
@@ -654,12 +691,27 @@ export function toEarningsStatement(dto: EarningsDto): EarningsStatement {
     totals: {
       pendingThb: dto.totals?.pending_thb ?? 0,
       payableThb: dto.totals?.payable_thb ?? 0,
+      inPayoutThb: dto.totals?.in_payout_thb ?? 0,
       paidThb: dto.totals?.paid_thb ?? 0,
+      expiredThb: dto.totals?.expired_thb ?? 0,
       count: dto.totals?.count ?? 0,
     },
     sharePercent: dto.share_percent,
     minimumPayoutThb: dto.minimum_payout_thb,
+    verified: dto.verified ?? false,
+    verificationStatus: (dto.verification_status ?? 'none') as EarningsStatement['verificationStatus'],
+    nextCycle: dto.next_cycle
+      ? { cutoffDate: dto.next_cycle.cutoff_date, dueDate: dto.next_cycle.due_date }
+      : null,
+    held: dto.held
+      ? {
+          amountThb: dto.held.amount_thb,
+          count: dto.held.count,
+          earliestExpiry: dto.held.earliest_expiry,
+        }
+      : null,
     entries: (dto.entries ?? []).map((entry) => ({
+      id: entry.id,
       tripId: entry.trip_id,
       partner: entry.partner,
       bookingValueThb: entry.booking_value_thb,
@@ -669,14 +721,21 @@ export function toEarningsStatement(dto: EarningsDto): EarningsStatement {
       estimated: entry.estimated,
       status: entry.status,
       occurredAt: entry.occurred_at,
+      expiresAt: entry.expires_at ?? null,
     })),
     payouts: (dto.payouts ?? []).map((payout) => ({
+      id: payout.id,
       periodStart: payout.period_start,
       periodEnd: payout.period_end,
       amountThb: payout.amount_thb,
       earningCount: payout.earning_count,
       status: payout.status,
       paidAt: payout.paid_at,
+      dueDate: payout.due_date ?? null,
+      bankCode: payout.bank_code ?? '',
+      accountLast4: payout.account_last4 ?? '',
+      transferRef: payout.transfer_ref ?? '',
+      slipUrl: payout.slip_url ?? null,
     })),
   };
 }
@@ -755,6 +814,7 @@ function toAdaptTotals(dto: AdaptTotalsDto): AdaptTotals {
 
 export function toCreatorProfile(dto: CreatorProfileDto): CreatorProfile {
   return {
+    verified: dto.verified ?? false,
     name: dto.name,
     handle: dto.handle,
     characterId: dto.character_id || DEFAULT_CHARACTER_ID,
@@ -939,6 +999,8 @@ export function toBooking(dto: BookingDto): BookingEntry {
     bookedBy: dto.booked_by ?? undefined,
     confirmationCode: dto.confirmation_code ?? undefined,
     note: dto.note ?? undefined,
+    tied: dto.tied ?? false,
+    archivedAt: dto.archived_at ?? null,
   };
 }
 
@@ -1304,6 +1366,292 @@ export function toPublicReview(dto: PublicReviewDto): PublicReview {
     actualBudgetPerPerson: dto.actual_budget_per_person ?? 0,
     name: dto.name,
     characterId: dto.character_id || DEFAULT_CHARACTER_ID,
+    createdAt: dto.created_at,
+  };
+}
+
+/* ---------------------------------------- archive & evidence chain (F12) -- */
+
+export function toArchivedTrip(dto: ArchivedTripDto): ArchivedTrip {
+  return { ...toTrip(dto), archivedAt: dto.archived_at, canDelete: dto.can_delete };
+}
+
+export function toLedgerFlag(dto: LedgerFlagDto): LedgerFlag {
+  return {
+    id: dto.id,
+    subjectType: dto.subject_type,
+    subjectId: dto.subject_id,
+    reason: dto.reason,
+    createdAt: dto.created_at,
+    resolvedAt: dto.resolved_at,
+    resolution: dto.resolution,
+  };
+}
+
+function toTraceNode(dto: TraceNodeDto): TraceNode {
+  return {
+    id: dto.id,
+    kind: dto.kind,
+    parentId: dto.parent_id,
+    actorUserId: dto.actor_user_id,
+    subjectType: dto.subject_type,
+    subjectId: dto.subject_id,
+    bookingId: dto.booking_id,
+    snapshot: dto.snapshot ?? {},
+    occurredAt: dto.occurred_at,
+    matched: dto.matched,
+    legacy: dto.legacy,
+    trips: dto.trips ?? [],
+    points: (dto.points ?? []).map((row) => ({
+      id: row.id,
+      userId: row.user_id,
+      delta: row.delta,
+      reason: row.reason,
+      note: row.note,
+      reversesId: row.reverses_id,
+      occurredAt: row.occurred_at,
+    })),
+    earnings: (dto.earnings ?? []).map((row) => ({
+      id: row.id,
+      userId: row.user_id,
+      amountThb: row.amount_thb,
+      sharePercent: row.share_percent,
+      status: row.status,
+      reversesId: row.reverses_id,
+      occurredAt: row.occurred_at,
+      events: (row.events ?? []).map((event) => ({
+        from: event.from,
+        to: event.to,
+        actorId: event.actor_id,
+        reason: event.reason,
+        ref: event.ref,
+        occurredAt: event.occurred_at,
+      })),
+    })),
+    codes: (dto.codes ?? []).map((row) => ({
+      id: row.id,
+      code: row.code,
+      userId: row.user_id,
+      amountThb: row.amount_thb,
+      usedAt: row.used_at,
+      voidedAt: row.voided_at,
+    })),
+    flags: (dto.flags ?? []).map(toLedgerFlag),
+  };
+}
+
+export function toTraceResult(dto: TraceDto): TraceResult {
+  return {
+    type: dto.type as TraceType,
+    query: dto.query,
+    nodes: (dto.nodes ?? []).map(toTraceNode),
+  };
+}
+
+export function toEconomySettings(dto: EconomySettingsDto): EconomySettings {
+  return {
+    creatorSharePercent: dto.creator_share_percent,
+    bookerCreditPercent: dto.booker_credit_percent,
+    defaultCreatorSharePercent: dto.default_creator_share_percent,
+    defaultBookerCreditPercent: dto.default_booker_credit_percent,
+    maxCreatorSharePercent: dto.max_creator_share_percent,
+    maxBookerCreditPercent: dto.max_booker_credit_percent,
+  };
+}
+
+export function toAdminAudit(dto: AdminAuditDto): AdminAuditEntry {
+  return {
+    id: dto.id,
+    actorId: dto.actor_id,
+    actorName: dto.actor_name,
+    action: dto.action,
+    targetType: dto.target_type,
+    targetId: dto.target_id,
+    reason: dto.reason,
+    before: dto.before,
+    after: dto.after,
+    occurredAt: dto.occurred_at,
+  };
+}
+
+/* ------------------------------------- verification & payouts (F11) ----- */
+
+const STEP_KEYS: KycStepKey[] = ['basic', 'identity', 'documents', 'account'];
+const toSteps = (raw: string[] | null | undefined) =>
+  (raw ?? []).filter((step): step is KycStepKey => STEP_KEYS.includes(step as KycStepKey));
+
+export function toPayoutAccount(dto: PayoutAccountDto): PayoutAccount {
+  return {
+    id: dto.id,
+    kind: dto.kind,
+    bankCode: dto.bank_code,
+    numberLast4: dto.number_last4,
+    accountName: dto.account_name,
+    status: dto.status,
+    rejectReason: dto.reject_reason ?? '',
+  };
+}
+
+export function toVerification(dto: VerificationDto): Verification {
+  return {
+    status: dto.status,
+    legalType: dto.legal_type,
+    legalName: dto.legal_name,
+    phone: dto.phone,
+    phoneVerified: dto.phone_verified,
+    email: dto.email,
+    emailVerified: dto.email_verified,
+    idNumberLast4: dto.id_number_last4,
+    hasIdCard: dto.has_id_card,
+    hasSelfie: dto.has_selfie,
+    account: dto.account ? toPayoutAccount(dto.account) : null,
+    steps: { ...dto.steps },
+    editableSteps: toSteps(dto.editable_steps),
+    rejectedSteps: toSteps(dto.rejected_steps),
+    rejectReason: dto.reject_reason ?? '',
+    submittedAt: dto.submitted_at,
+    reviewedAt: dto.reviewed_at,
+    verified: dto.verified,
+    verifiedAt: dto.verified_at,
+  };
+}
+
+export function toOtpSent(dto: OtpSentDto): OtpSent {
+  return { channel: dto.channel, expiresAt: dto.expires_at, devCode: dto.dev_code || null };
+}
+
+export function toPayoutCycle(dto: PayoutCycleDto): PayoutCycle {
+  return {
+    id: dto.id,
+    cutoffDate: dto.cutoff_date,
+    originalCutoff: dto.original_cutoff,
+    dueDate: dto.due_date,
+    status: dto.status,
+    movedReason: dto.moved_reason ?? '',
+    closedAt: dto.closed_at,
+    payoutCount: dto.payout_count,
+    paidCount: dto.paid_count,
+    totalThb: dto.total_thb,
+    overdue: dto.overdue,
+  };
+}
+
+export function toPayoutsOverview(dto: PayoutsOverviewDto): PayoutsOverview {
+  return {
+    anchorDate: dto.anchor_date,
+    minimumPayoutThb: dto.minimum_payout_thb,
+    nextCycle: dto.next_cycle ? toPayoutCycle(dto.next_cycle) : null,
+    cycles: (dto.cycles ?? []).map(toPayoutCycle),
+    pendingCount: dto.pending_count,
+    pendingThb: dto.pending_thb,
+    ready: (dto.ready ?? []).map((row) => ({
+      userId: row.user_id,
+      name: row.name,
+      handle: row.handle,
+      amountThb: row.amount_thb,
+      earningCount: row.earning_count,
+      verified: row.verified,
+      accountVerified: row.account_verified,
+      belowMinimum: row.below_minimum,
+      willBePaid: row.will_be_paid,
+    })),
+    heldThb: dto.held_thb,
+    kycQueue: dto.kyc_queue,
+    accountQueue: dto.account_queue,
+    openFlags: dto.open_flags,
+  };
+}
+
+export function toAdminEarning(dto: AdminEarningDto): AdminEarning {
+  return {
+    id: dto.id,
+    userId: dto.user_id,
+    name: dto.name,
+    tripId: dto.trip_id,
+    partner: dto.partner,
+    bookingValueThb: dto.booking_value_thb,
+    commissionThb: dto.commission_thb,
+    amountThb: dto.amount_thb,
+    estimated: dto.estimated,
+    status: dto.status,
+    occurredAt: dto.occurred_at,
+  };
+}
+
+export function toCycleDetail(dto: CycleDetailDto): CycleDetail {
+  return {
+    cycle: toPayoutCycle(dto.cycle),
+    payouts: (dto.payouts ?? []).map((p) => ({
+      id: p.id,
+      userId: p.user_id,
+      name: p.name,
+      handle: p.handle,
+      amountThb: p.amount_thb,
+      earningCount: p.earning_count,
+      status: p.status,
+      accountKind: p.account_kind,
+      bankCode: p.bank_code,
+      accountLast4: p.account_last4,
+      accountName: p.account_name,
+      accountNumber: p.account_number ?? '',
+      transferRef: p.transfer_ref ?? '',
+      slipUrl: p.slip_url,
+      paidAt: p.paid_at,
+    })),
+  };
+}
+
+export function toKycQueueRow(dto: KycQueueRowDto): KycQueueRow {
+  return {
+    id: dto.id,
+    userId: dto.user_id,
+    name: dto.name,
+    handle: dto.handle,
+    status: dto.status,
+    legalType: dto.legal_type,
+    legalName: dto.legal_name,
+    accountName: dto.account_name,
+    submittedAt: dto.submitted_at,
+    sharedAccounts: dto.shared_accounts,
+  };
+}
+
+function toAdminPayoutAccount(dto: AdminPayoutAccountDto): AdminPayoutAccount {
+  return {
+    ...toPayoutAccount(dto),
+    number: dto.number,
+    sharedWith: (dto.shared_with ?? []).map((u) => ({
+      id: u.id,
+      name: u.name ?? '',
+      handle: u.handle ?? '',
+    })),
+  };
+}
+
+export function toKycDetail(dto: KycDetailDto): KycDetail {
+  return {
+    ...toKycQueueRow(dto),
+    phone: dto.phone,
+    phoneVerified: dto.phone_verified,
+    email: dto.email,
+    emailVerified: dto.email_verified,
+    idNumber: dto.id_number,
+    idCardUrl: dto.id_card_url,
+    selfieUrl: dto.selfie_url,
+    account: dto.account ? toAdminPayoutAccount(dto.account) : null,
+    rejectedSteps: toSteps(dto.rejected_steps),
+    rejectReason: dto.reject_reason ?? '',
+    reviewedAt: dto.reviewed_at,
+    history: (dto.history ?? []).map(toAdminAudit),
+  };
+}
+
+export function toPendingAccount(dto: PendingAccountDto): PendingAccountChange {
+  return {
+    ...toAdminPayoutAccount(dto),
+    userId: dto.user_id,
+    name: dto.name,
+    legalName: dto.legal_name,
     createdAt: dto.created_at,
   };
 }

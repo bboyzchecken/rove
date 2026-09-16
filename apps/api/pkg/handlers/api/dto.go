@@ -16,6 +16,14 @@ import (
 
 /* ------------------------------------------------------------------ util -- */
 
+func timeString(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	v := t.UTC().Format(time.RFC3339)
+	return &v
+}
+
 func dateString(t *time.Time) *string {
 	if t == nil {
 		return nil
@@ -176,6 +184,8 @@ type meDTO struct {
 	HomeCurrency string  `json:"home_currency"`
 	Role         string  `json:"role"`
 	Points       int     `json:"points"`
+	// ยืนยันตัวตนแล้ว (D-37).
+	Verified bool `json:"verified"`
 }
 
 func toMeDTO(u models.User, points int) meDTO {
@@ -192,6 +202,7 @@ func toMeDTO(u models.User, points int) meDTO {
 		HomeCurrency: u.HomeCurrency,
 		Role:         u.Role,
 		Points:       points,
+		Verified:     u.VerifiedAt != nil,
 	}
 }
 
@@ -435,6 +446,9 @@ type bookingDTO struct {
 	BookedBy          *string  `json:"booked_by"`
 	ConfirmationCode  *string  `json:"confirmation_code"`
 	Note              *string  `json:"note"`
+	// A partner confirmation points at it — it can be archived, not deleted.
+	Tied       bool    `json:"tied"`
+	ArchivedAt *string `json:"archived_at"`
 }
 
 func toBookingDTO(b models.Booking) bookingDTO {

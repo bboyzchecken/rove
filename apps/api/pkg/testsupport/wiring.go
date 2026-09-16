@@ -27,6 +27,7 @@ import (
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/events"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/email"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/notify"
+	"github.com/bboyzchecken/rove/apps/api/pkg/services/sms"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/places"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/storage"
 	"github.com/bboyzchecken/rove/apps/api/pkg/services/weather"
@@ -46,6 +47,8 @@ import (
 	poistore "github.com/bboyzchecken/rove/apps/api/pkg/store/poi"
 	pointsstore "github.com/bboyzchecken/rove/apps/api/pkg/store/points"
 	leadstore "github.com/bboyzchecken/rove/apps/api/pkg/store/lead"
+	kycstore "github.com/bboyzchecken/rove/apps/api/pkg/store/kyc"
+	ledgerstore "github.com/bboyzchecken/rove/apps/api/pkg/store/ledger"
 	progressstore "github.com/bboyzchecken/rove/apps/api/pkg/store/progress"
 	reviewstore "github.com/bboyzchecken/rove/apps/api/pkg/store/review"
 	rewardstore "github.com/bboyzchecken/rove/apps/api/pkg/store/reward"
@@ -72,10 +75,16 @@ var allModels = []any{
 	&models.Notification{}, &models.Poll{}, &models.TripReview{},
 	&models.DiscountCode{}, &models.CreatorEarning{}, &models.Payout{}, &models.AgentLead{},
 	&models.TripStepOverride{}, &models.TripViewDaily{},
+	&models.ValueSource{}, &models.EarningEvent{}, &models.LedgerFlag{},
+	&models.AdminAuditLog{}, &models.AppSetting{},
+	&models.PayoutCycle{}, &models.CreatorVerification{}, &models.PayoutAccount{},
+	&models.OTPChallenge{}, &models.EarningNotice{},
 }
 
 // allTables is the drop order — children before parents.
 var allTables = []string{
+	"earning_notices", "otp_challenges", "payout_accounts", "creator_verifications", "payout_cycles",
+	"app_settings", "admin_audit_logs", "ledger_flags", "earning_events", "value_sources",
 	"trip_step_overrides", "trip_view_daily",
 	"agent_leads", "payouts", "creator_earnings", "discount_codes",
 	"trip_reviews", "polls", "notifications", "trip_documents", "trip_photos",
@@ -128,6 +137,11 @@ func newParams(cfg core.Config, db *gorm.DB) handlers.ServerParams {
 		Payouts:       rewardstore.NewPayoutStore(db),
 		Leads:         leadstore.New(db),
 		Steps:         progressstore.New(db),
+		Ledger:        ledgerstore.New(db),
+		Settings:      ledgerstore.NewSettingsStore(db),
+		Audit:         ledgerstore.NewAuditStore(db),
+		KYC:           kycstore.New(db),
+		Cycles:        kycstore.NewCycleStore(db),
 
 		Hub: stubHub{},
 		// The airport index is embedded data with no I/O — the real one is the
@@ -145,6 +159,7 @@ func newParams(cfg core.Config, db *gorm.DB) handlers.ServerParams {
 		// The stub logs what it would have sent, which is the production
 		// behaviour until a transport is configured.
 		Email: email.New(cfg),
+		SMS:   sms.New(cfg),
 	}
 }
 

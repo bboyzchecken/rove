@@ -282,11 +282,50 @@ export function useSetStepStatus(tripId: string) {
   });
 }
 
+/* ------------------------------------------ คลังทริป (Feedback #4 — D-31) -- */
+
+export function useArchivedTrips() {
+  return useQuery({ queryKey: queryKeys.tripArchive(), queryFn: () => repo.trips.archived() });
+}
+
+export function useArchiveTrip() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (tripId: string) => repo.trips.archive(tripId),
+    onSuccess: (_void, tripId) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.trips() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.stats() });
+      // Marked stale but not refetched: the room is still on screen until the
+      // caller navigates away, and refetching now would flash the 410 state.
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.trip(tripId),
+        refetchType: 'none',
+      });
+    },
+  });
+}
+
+export function useRestoreTrip() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (tripId: string) => repo.trips.restore(tripId),
+    onSuccess: (_void, tripId) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.trips() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.stats() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.trip(tripId) });
+    },
+  });
+}
+
+/** Permanent — only for an archived trip with `canDelete` (D-32). */
 export function useDeleteTrip() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (tripId: string) => repo.trips.remove(tripId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.trips() }),
+    onSuccess: (_void, tripId) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.trips() });
+      queryClient.removeQueries({ queryKey: queryKeys.trip(tripId) });
+    },
   });
 }
 

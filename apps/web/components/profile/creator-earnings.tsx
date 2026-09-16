@@ -1,11 +1,14 @@
 'use client';
 
-import { Info, TrendingUp } from 'lucide-react';
+import Link from 'next/link';
+import { CalendarClock, ChevronRight, Info, TrendingUp } from 'lucide-react';
 
 import { SectionHeader } from '@/components/common/section';
 import { Card } from '@/components/ui/card';
 import { useEarnings } from '@/features/rewards/queries';
-import { formatMoney } from '@/lib/format';
+import { accountLabel } from '@/lib/catalog/banks';
+import { formatMoney, formatThaiDate } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
 /**
  * รายได้จากแพลนสาธารณะ (M22 — A12.11).
@@ -31,6 +34,7 @@ export function CreatorEarningsCard() {
 
   const { totals } = statement;
   const belowMinimum = totals.payableThb > 0 && totals.payableThb < statement.minimumPayoutThb;
+  const short = (iso: string) => formatThaiDate(iso, { year: undefined });
 
   return (
     <section>
@@ -43,34 +47,72 @@ export function CreatorEarningsCard() {
         </p>
 
         <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-          <Figure label="รอยืนยัน" amount={totals.pendingThb} />
+          <Figure label="รอพาร์ตเนอร์จ่าย" amount={totals.pendingThb} />
           <Figure label="รอโอน" amount={totals.payableThb} />
           <Figure label="โอนแล้ว" amount={totals.paidThb} />
         </div>
+        {totals.inPayoutThb > 0 || totals.expiredThb > 0 ? (
+          <p className="text-muted nums mt-2 text-center text-[11px]">
+            {totals.inPayoutThb > 0 ? `อยู่ในรอบโอน ${formatMoney(totals.inPayoutThb, 'THB')}` : ''}
+            {totals.inPayoutThb > 0 && totals.expiredThb > 0 ? ' · ' : ''}
+            {totals.expiredThb > 0 ? `หมดอายุ ${formatMoney(totals.expiredThb, 'THB')}` : ''}
+          </p>
+        ) : null}
 
-        {belowMinimum ? (
+        {/* D-21: when the next transfer goes out. */}
+        {statement.nextCycle && statement.verified ? (
+          <p className="text-ink mt-3 flex items-start gap-1.5 text-xs">
+            <CalendarClock className="mt-px size-3.5 shrink-0" />
+            <span className="nums">
+              รอบถัดไป {formatThaiDate(statement.nextCycle.cutoffDate, { year: undefined, weekday: 'short' })} ·
+              โอนภายใน {short(statement.nextCycle.dueDate)}
+            </span>
+          </p>
+        ) : null}
+
+        {/* D-35: income waiting on verification, and when it runs out. */}
+        {statement.held ? (
+          <div className="bg-orange-light rounded-brand-sm mt-3 p-3">
+            <p className="text-ink nums text-xs font-medium">
+              รายได้ {formatMoney(statement.held.amountThb, 'THB')} รอยืนยันตัวตน · หมดอายุ{' '}
+              {formatThaiDate(statement.held.earliestExpiry)}
+            </p>
+            <Link
+              href={'/profile/verify' as never}
+              className="text-ink mt-1 inline-flex items-center gap-1 text-[11px] font-medium underline-offset-2 hover:underline"
+            >
+              ยืนยันตัวตนเพื่อรับรายได้ <ChevronRight className="size-3" />
+            </Link>
+          </div>
+        ) : null}
+
+        {belowMinimum && statement.verified ? (
           <p className="text-muted mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed">
             <Info className="mt-px size-3.5 shrink-0" />
-            ยอดรอโอนยังไม่ถึงขั้นต่ำ {formatMoney(statement.minimumPayoutThb, 'THB')} — ทบไปเดือนถัดไป
+            ยอดรอโอนยังไม่ถึงขั้นต่ำ {formatMoney(statement.minimumPayoutThb, 'THB')} — ทบไปรอบถัดไป
           </p>
         ) : null}
       </Card>
 
       <Card className="divide-border mt-3 divide-y">
-        {statement.entries.slice(0, 8).map((entry, i) => (
-          <div key={`${entry.occurredAt}-${i}`} className="flex items-center gap-3 p-3.5">
+        {statement.entries.slice(0, 8).map((entry) => (
+          <div key={entry.id} className="flex items-center gap-3 p-3.5">
             <div className="min-w-0 flex-1">
               <p className="text-ink text-sm font-medium">{entry.partner}</p>
               <p className="text-muted text-[11px]">
-                {new Date(entry.occurredAt).toLocaleDateString('th-TH', {
-                  day: 'numeric',
-                  month: 'short',
-                })}{' '}
-                · ค่าคอม {formatMoney(entry.commissionThb, 'THB')}
-                {entry.estimated ? ' (ประมาณการ)' : ''}
+                {short(entry.occurredAt)} · {EARNING_STATUS[entry.status] ?? entry.status}
+                {entry.estimated ? ' · ประมาณการ' : ''}
+                {entry.expiresAt ? ` · หมดอายุ ${short(entry.expiresAt)}` : ''}
               </p>
             </div>
-            <span className="text-ink nums shrink-0 text-sm font-medium">
+            <span
+              className={cn(
+                'nums shrink-0 text-sm font-medium',
+                entry.status === 'reversed' || entry.status === 'expired'
+                  ? 'text-muted line-through'
+                  : 'text-ink',
+              )}
+            >
               {formatMoney(entry.amountThb, 'THB')}
             </span>
           </div>
@@ -78,14 +120,60 @@ export function CreatorEarningsCard() {
       </Card>
 
       {statement.payouts.length > 0 ? (
-        <p className="text-muted mt-2 text-[11px]">
-          โอนล่าสุด {formatMoney(statement.payouts[0]?.amountThb ?? 0, 'THB')} ·{' '}
-          {statement.payouts[0]?.periodStart} ถึง {statement.payouts[0]?.periodEnd}
-        </p>
+        <>
+          <p className="section-label mt-4 mb-2">ประวัติการโอน</p>
+          <Card className="divide-border divide-y">
+            {statement.payouts.map((payout) => (
+              <div key={payout.id} className="flex items-start gap-3 p-3.5">
+                <div className="min-w-0 flex-1">
+                  <p className="text-ink text-sm font-medium">
+                    {payout.status === 'paid' && payout.paidAt
+                      ? `โอนแล้ว ${short(payout.paidAt)}`
+                      : payout.dueDate
+                        ? `รอโอน · ภายใน ${short(payout.dueDate)}`
+                        : 'รอโอน'}
+                  </p>
+                  <p className="text-muted nums text-[11px]">
+                    {[
+                      payout.accountLast4
+                        ? accountLabel(payout.bankCode ? 'bank' : 'promptpay', payout.bankCode, payout.accountLast4)
+                        : '',
+                      payout.transferRef ? `อ้างอิง ${payout.transferRef}` : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' · ') || `${short(payout.periodStart)} – ${short(payout.periodEnd)}`}
+                  </p>
+                  {payout.slipUrl ? (
+                    <a
+                      href={payout.slipUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-ink mt-0.5 inline-block text-[11px] font-medium underline underline-offset-2"
+                    >
+                      ดูสลิป
+                    </a>
+                  ) : null}
+                </div>
+                <span className="text-ink nums shrink-0 text-sm font-medium">
+                  {formatMoney(payout.amountThb, 'THB')}
+                </span>
+              </div>
+            ))}
+          </Card>
+        </>
       ) : null}
     </section>
   );
 }
+
+const EARNING_STATUS: Record<string, string> = {
+  pending: 'รอพาร์ตเนอร์จ่าย',
+  payable: 'รอโอน',
+  in_payout: 'อยู่ในรอบโอน',
+  paid: 'โอนแล้ว',
+  reversed: 'กลับรายการ',
+  expired: 'หมดอายุ',
+};
 
 function Figure({ label, amount }: { label: string; amount: number }) {
   return (

@@ -73,6 +73,16 @@ import type {
 } from '../types';
 import { buildOrder, FREE_ACTIVE_TRIPS, PLANS } from './billing';
 import { BOOKING_OFFERS, POIS, prepTemplateFor, rankDestinations } from './catalog';
+import * as payouts from './payouts';
+import {
+  adjustIn,
+  economyOf,
+  ledgerOf,
+  resolveFlag,
+  setEconomyIn,
+  traceIn,
+  tripTied,
+} from './ledger';
 import {
   AI_META,
   loadDb,
@@ -221,9 +231,16 @@ function creatorOf(db: MockDb, record: TripRecord) {
       name: record.creator.name,
       handle: record.creator.handle,
       characterId: record.creator.characterId,
+      // Looked up rather than seeded on the record, so a stored blob gets badges too (D-37).
+      verified: payouts.creatorVerified(db, record.creator.handle),
     };
   }
-  return { name: db.user.name, handle: db.user.handle || null, characterId: db.user.characterId };
+  return {
+    name: db.user.name,
+    handle: db.user.handle || null,
+    characterId: db.user.characterId,
+    verified: Boolean(db.user.verified),
+  };
 }
 
 function exploreOf(db: MockDb, record: TripRecord) {
@@ -633,6 +650,8 @@ function allowanceOf(db: MockDb): TripAllowance {
   const open = db.trips.filter(
     (record) =>
       !record.creator &&
+      // Feedback #4 — D-34: a trip in the คลัง does not hold the free slot.
+      !record.archivedAt &&
       record.role === 'owner' &&
       record.trip.status !== 'done' &&
       !record.ai.hasPass,
@@ -646,6 +665,21 @@ function allowanceOf(db: MockDb): TripAllowance {
     limit: FREE_ACTIVE_TRIPS,
     priceThb: AI_CREDITS.passPriceThb,
   };
+}
+
+/** A ~480px JPEG data URL, or '' where the browser cannot decode (tests) — the admin view then shows a sample. */
+async function thumbnailDataUrl(file: File): Promise<string> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, 480 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext('2d')?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.7);
+  } catch {
+    return '';
+  }
 }
 
 /* ------------------------------------------------------------------ repo -- */
@@ -695,7 +729,7 @@ export const mockRepo: RoveRepo = {
   trips: {
     async list() {
       const db = loadDb();
-      const out: TripSummary[] = db.trips.map((record) => ({
+      const out: TripSummary[] = db.trips.filter((record) => !record.archivedAt).map((record) => ({
         ...clone(record.trip),
         role: record.role,
         memberIds: record.members.map((m) => m.id),
@@ -767,7 +801,7 @@ export const mockRepo: RoveRepo = {
               planDays: record.days.length,
               planItems,
               membersWithoutWishlist: withoutWishlist,
-              bookings: record.bookings.filter((b) => b.status === 'booked').length,
+              bookings: record.bookings.filter((b) => b.status === 'booked' && !b.archivedAt).length,
               openPrep: record.prep.filter((p) => !p.done).length,
               prepTasks: record.prep.length,
               documents: record.documents.length,
@@ -922,11 +956,67 @@ export const mockRepo: RoveRepo = {
       );
     },
 
+    async archive(tripId) {
+      mutate((db) => {
+        const record = tripRecord(db, tripId);
+        if (record.role !== 'owner') {
+          throw new ApiError(403, 'เฉพาะเจ้าของทริปเก็บเข้าคลังได้');
+        }
+        // D-33: every way in from outside closes; restoring does not reopen it.
+        record.share = {
+          ...record.share,
+          visibility: 'private',
+          shareToken: null,
+          shareUrl: null,
+          publicSlug: null,
+        };
+        record.archivedAt = nowIso();
+        log(record, db.user.id, 'เก็บทริปเข้าคลัง');
+      });
+      return delay(undefined);
+    },
+
+    async restore(tripId) {
+      mutate((db) => {
+        const record = db.trips.find((t) => t.trip.id === tripId);
+        if (!record) throw new ApiError(404, 'ไม่พบทริป');
+        record.archivedAt = null;
+        log(record, db.user.id, 'กู้คืนทริปจากคลัง');
+      });
+      return delay(undefined);
+    },
+
     async remove(tripId) {
       mutate((db) => {
+        const record = db.trips.find((t) => t.trip.id === tripId);
+        if (!record) throw new ApiError(404, 'ไม่พบทริป');
+        const archived = Boolean(record.archivedAt);
+        if (tripTied(db, tripId) || payouts.tripHasEarnings(db, tripId)) {
+          const error = 'ทริปนี้เคยทำให้เกิดแต้มหรือรายได้ ลบไม่ได้ เก็บเข้าคลังแทน';
+          throw new ApiError(409, error, { error, archivable: !archived, tied: true });
+        }
+        if (!archived) {
+          const error = 'เก็บทริปเข้าคลังก่อน แล้วค่อยลบถาวรจากคลัง';
+          throw new ApiError(409, error, { error, archivable: true, tied: false });
+        }
         db.trips = db.trips.filter((t) => t.trip.id !== tripId);
       });
       return delay(undefined);
+    },
+
+    async archived() {
+      return delay(
+        mutate((db) =>
+          db.trips
+            .filter((record) => record.archivedAt && record.role === 'owner')
+            .sort((a, b) => (b.archivedAt ?? '').localeCompare(a.archivedAt ?? ''))
+            .map((record) => ({
+              ...clone(record.trip),
+              archivedAt: record.archivedAt ?? '',
+              canDelete: !tripTied(db, record.trip.id) && !payouts.tripHasEarnings(db, record.trip.id),
+            })),
+        ),
+      );
     },
 
     async clone(tripId) {
@@ -995,9 +1085,15 @@ export const mockRepo: RoveRepo = {
       // Feedback #4 — F10/D-15/D-16: "current" means not yet confirmed done,
       // not "dates not yet over" — a group still closing out their last day
       // should not lose the room to the past-trips list on their own.
+      const archivedIds = new Set(db.trips.filter((r) => r.archivedAt).map((r) => r.trip.id));
       const fromRooms = db.trips
         .filter(
-          (r) => !r.creator && r.trip.startDate && r.trip.endDate && r.trip.status !== 'done',
+          (r) =>
+            !r.creator &&
+            !r.archivedAt &&
+            r.trip.startDate &&
+            r.trip.endDate &&
+            r.trip.status !== 'done',
         )
         .map((r) => ({
           id: r.trip.id,
@@ -1014,7 +1110,9 @@ export const mockRepo: RoveRepo = {
           weather: db.upcoming.find((u) => u.id === r.trip.id)?.weather,
         }));
       const seeded = clone(db.upcoming)
-        .filter((u) => !fromRooms.some((r) => r.id === u.id) && u.endDate >= today)
+        .filter(
+          (u) => !fromRooms.some((r) => r.id === u.id) && !archivedIds.has(u.id) && u.endDate >= today,
+        )
         .map((trip) => ({ ...trip, daysUntil: daysUntil(trip.startDate), characterIds: facesOf(db, trip) }));
       return delay(
         [...fromRooms, ...seeded].sort((a, b) => a.startDate.localeCompare(b.startDate)),
@@ -1029,8 +1127,16 @@ export const mockRepo: RoveRepo = {
       // A room the owner actually confirmed done (Feedback #4 — F10) belongs
       // here too, not only the pre-seeded archive — `db.past` used to be the
       // only source, so a real trip closed from the paywall never showed up.
+      const archivedIds = new Set(db.trips.filter((r) => r.archivedAt).map((r) => r.trip.id));
       const fromRooms: PastTrip[] = db.trips
-        .filter((r) => !r.creator && r.trip.status === 'done' && r.trip.startDate && r.trip.endDate)
+        .filter(
+          (r) =>
+            !r.creator &&
+            !r.archivedAt &&
+            r.trip.status === 'done' &&
+            r.trip.startDate &&
+            r.trip.endDate,
+        )
         .map((r) => {
           const { trip } = r;
           const spentThb = r.expenses.reduce((sum, e) => sum + toThb(e, trip.fxRate), 0);
@@ -1050,7 +1156,7 @@ export const mockRepo: RoveRepo = {
           };
         });
       return delay(
-        [...fromRooms, ...clone(db.past)]
+        [...fromRooms, ...clone(db.past).filter((trip) => !archivedIds.has(trip.id))]
           .map((trip) => ({ ...trip, characterIds: facesOf(db, trip) }))
           .sort((a, b) => b.endDate.localeCompare(a.endDate)),
       );
@@ -1836,7 +1942,9 @@ export const mockRepo: RoveRepo = {
   /* ----------------------------------------------------------- booking -- */
   booking: {
     async list(tripId) {
-      return delay(mutate((db) => clone(tripRecord(db, tripId).bookings)));
+      return delay(
+        mutate((db) => clone(tripRecord(db, tripId).bookings.filter((b) => !b.archivedAt))),
+      );
     },
 
     async offers(_tripId, kind) {
@@ -1875,7 +1983,38 @@ export const mockRepo: RoveRepo = {
     async remove(tripId, bookingId) {
       mutate((db) => {
         const record = tripRecord(db, tripId);
+        if (record.bookings.find((b) => b.id === bookingId)?.tied) {
+          const error = 'การจองนี้พาร์ตเนอร์ยืนยันแล้ว ลบไม่ได้ เก็บเข้าคลังแทน';
+          throw new ApiError(409, error, { error, archivable: true, tied: true });
+        }
         record.bookings = record.bookings.filter((b) => b.id !== bookingId);
+      });
+      return delay(undefined);
+    },
+
+    async archived(tripId) {
+      return delay(
+        mutate((db) => clone(tripRecord(db, tripId).bookings.filter((b) => b.archivedAt))),
+      );
+    },
+
+    async archive(tripId, bookingId) {
+      mutate((db) => {
+        const record = tripRecord(db, tripId);
+        const entry = record.bookings.find((b) => b.id === bookingId);
+        if (!entry) throw new ApiError(404, 'ไม่พบการจองนี้');
+        entry.archivedAt = nowIso();
+        log(record, db.user.id, `เก็บการจอง "${entry.title}" เข้าคลัง`);
+      });
+      return delay(undefined);
+    },
+
+    async restore(tripId, bookingId) {
+      mutate((db) => {
+        const record = tripRecord(db, tripId);
+        const entry = record.bookings.find((b) => b.id === bookingId);
+        if (!entry) throw new ApiError(404, 'ไม่พบการจองนี้');
+        entry.archivedAt = null;
       });
       return delay(undefined);
     },
@@ -2340,6 +2479,7 @@ export const mockRepo: RoveRepo = {
 
       return delay({
         ...identity,
+        verified: payouts.creatorVerified(db, handle),
         publicTrips: records.length,
         totalViews: records.reduce((sum, r) => sum + r.share.viewCount, 0),
         totalClones: records.reduce((sum, r) => sum + r.share.cloneCount, 0),
@@ -2510,6 +2650,41 @@ export const mockRepo: RoveRepo = {
     },
   },
 
+  /* ------------------------------ verification (Feedback #4 F11) -- */
+  verification: {
+    async get() {
+      return delay(mutate((db) => payouts.getVerification(db)));
+    },
+    async saveBasic(input) {
+      return delay(mutate((db) => payouts.saveBasic(db, input)));
+    },
+    async sendOtp(channel) {
+      return delay(mutate((db) => payouts.sendOtp(db, channel)), 300);
+    },
+    async verifyOtp(channel, code) {
+      return delay(mutate((db) => payouts.verifyOtp(db, channel, code)));
+    },
+    async saveIdentity(idNumber) {
+      return delay(mutate((db) => payouts.saveIdentity(db, idNumber)));
+    },
+    async uploadDocuments(files) {
+      payouts.checkDocumentFiles(files);
+      // No bucket in mock mode: a small thumbnail survives a reload in
+      // localStorage where the original would blow the quota.
+      const urls = {
+        idCard: files.idCard ? await thumbnailDataUrl(files.idCard) : undefined,
+        selfie: files.selfie ? await thumbnailDataUrl(files.selfie) : undefined,
+      };
+      return delay(mutate((db) => payouts.saveDocuments(db, urls)), 400);
+    },
+    async saveAccount(input) {
+      return delay(mutate((db) => payouts.saveAccount(db, input)));
+    },
+    async submit() {
+      return delay(mutate((db) => payouts.submitVerification(db)), 300);
+    },
+  },
+
   /* ----------------------------- points out, money owed (M22) -- */
   rewards: {
     async redemptions() {
@@ -2556,8 +2731,12 @@ export const mockRepo: RoveRepo = {
     },
 
     async earnings() {
-      const db = loadDb();
-      return delay(clone(db.earnings));
+      // Reading the statement sweeps held income and opens the next cycle, as on the API.
+      return delay(
+        mutate((db) =>
+          clone(payouts.earningsStatement(db, ledgerOf(db).economy.creatorSharePercent)),
+        ),
+      );
     },
 
     /* ------------------------------- where the points came from (M23) -- */
@@ -3003,6 +3182,122 @@ export const mockRepo: RoveRepo = {
         stubbed: [...MOCK_STUBBED],
         commit: 'local',
       });
+    },
+
+    async trace(type, query) {
+      return delay(mutate((db) => traceIn(ledgerOf(db), type, query)), 180);
+    },
+
+    async adjust(input) {
+      return delay(
+        mutate((db) => {
+          const { sourceId, ownPoints } = adjustIn(ledgerOf(db), db.user, input);
+          if (input.targetType === 'earning') {
+            // A full reversal flips the traced row; the payout table follows it.
+            const traced = ledgerOf(db)
+              .nodes.flatMap((n) => n.earnings)
+              .find((e) => e.id === input.targetId);
+            const row = payouts.payoutStateOf(db).earnings.find((e) => e.id === input.targetId);
+            if (traced?.status === 'reversed' && row) row.status = 'reversed';
+          }
+          // The seeded chain pays the demo user; keep their own ledger in step.
+          if (ownPoints) addPoints(db, ownPoints.delta, 'adjustment', input.reason.trim(), ownPoints.tripId);
+          return { sourceId };
+        }),
+      );
+    },
+
+    async flags(openOnly) {
+      return delay(
+        mutate((db) =>
+          clone(ledgerOf(db).flags.filter((flag) => !openOnly || !flag.resolvedAt)).sort((a, b) =>
+            b.createdAt.localeCompare(a.createdAt),
+          ),
+        ),
+      );
+    },
+
+    async resolveFlag(flagId, resolution) {
+      mutate((db) => resolveFlag(ledgerOf(db), db.user, flagId, resolution));
+      return delay(undefined);
+    },
+
+    async economy() {
+      return delay(mutate((db) => economyOf(ledgerOf(db))));
+    },
+
+    async setEconomy(input) {
+      return delay(mutate((db) => setEconomyIn(ledgerOf(db), db.user, input)));
+    },
+
+    async audit(filter) {
+      return delay(
+        mutate((db) =>
+          clone(
+            ledgerOf(db).audit.filter(
+              (row) =>
+                (!filter?.targetType || row.targetType === filter.targetType) &&
+                (!filter?.targetId || row.targetId === filter.targetId),
+            ),
+          ),
+        ),
+      );
+    },
+
+    async payouts() {
+      return delay(mutate((db) => clone(payouts.payoutsOverview(db))));
+    },
+    async setPayoutAnchor(anchorDate) {
+      return delay(mutate((db) => clone(payouts.setAnchor(db, anchorDate))));
+    },
+    async payoutEarnings(filter) {
+      return delay(mutate((db) => payouts.adminEarnings(db, filter?.status, filter?.partner)));
+    },
+    async reconcile(earningIds, statementRef) {
+      return delay(mutate((db) => payouts.reconcile(db, earningIds, statementRef)));
+    },
+    async cycle(cycleId) {
+      return delay(mutate((db) => clone(payouts.cycleDetail(db, cycleId))));
+    },
+    async moveCycle(cycleId, cutoffDate, reason) {
+      return delay(mutate((db) => payouts.moveCycle(db, cycleId, cutoffDate, reason)));
+    },
+    async closeCycle(cycleId) {
+      return delay(mutate((db) => clone(payouts.closeCycle(db, cycleId))), 300);
+    },
+    async markPaid(payoutId, input) {
+      const slip = input.slip && typeof URL !== 'undefined' ? URL.createObjectURL(input.slip) : null;
+      return delay(mutate((db) => payouts.markPaid(db, payoutId, input.transferRef, slip)));
+    },
+
+    async kycQueue(status) {
+      return delay(mutate((db) => payouts.kycQueue(db, status)));
+    },
+    async kycDetail(verificationId) {
+      return delay(mutate((db) => payouts.kycDetail(db, verificationId)));
+    },
+    async approveKyc(verificationId) {
+      mutate((db) => payouts.approveKyc(db, verificationId));
+      return delay(undefined);
+    },
+    async rejectKyc(verificationId, steps, reason) {
+      mutate((db) => payouts.rejectKyc(db, verificationId, steps, reason));
+      return delay(undefined);
+    },
+    async revokeKyc(verificationId, reason) {
+      mutate((db) => payouts.revokeKyc(db, verificationId, reason));
+      return delay(undefined);
+    },
+    async pendingAccounts() {
+      return delay(mutate((db) => payouts.pendingAccountChanges(db)));
+    },
+    async verifyAccount(accountId) {
+      mutate((db) => payouts.verifyAccount(db, accountId));
+      return delay(undefined);
+    },
+    async rejectAccount(accountId, reason) {
+      mutate((db) => payouts.rejectAccount(db, accountId, reason));
+      return delay(undefined);
     },
   },
 

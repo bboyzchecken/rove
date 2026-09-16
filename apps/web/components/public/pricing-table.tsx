@@ -102,7 +102,7 @@ export function PricingTable() {
                   )}
                 >
                   <RotateCcw className={cn('mt-px size-3.5 shrink-0', mark)} aria-hidden="true" />
-                  <span>จองผ่าน ROVE แล้วคืนให้เต็มจำนวน — เท่ากับไม่ได้จ่ายค่าวางแผนเลย</span>
+                  <span>คืนสูงสุด ฿{plan.priceThb} เมื่อพาร์ตเนอร์ยืนยันการจองผ่าน ROVE</span>
                 </p>
                 <p className={cn('mt-2 flex items-start gap-2 text-[11px] leading-relaxed', body)}>
                   <Users className="mt-px size-3.5 shrink-0" aria-hidden="true" />

@@ -40,6 +40,22 @@ export class ApiError extends Error {
   get isNotFound() {
     return this.status === 404;
   }
+  /** The trip was put in the คลัง (Feedback #4 — D-31). */
+  get isGone() {
+    return this.status === 410;
+  }
+
+  /**
+   * A delete refused because the thing is, or must first go, in the คลัง
+   * (Feedback #4 — D-18): `{archivable, tied}` on a 409.
+   */
+  get archiveConflict(): { archivable: boolean; tied: boolean } | null {
+    const body = this.payload;
+    if (this.status !== 409 || !body || typeof body !== 'object') return null;
+    const { archivable, tied } = body as { archivable?: unknown; tied?: unknown };
+    if (typeof archivable !== 'boolean') return null;
+    return { archivable, tied: tied === true };
+  }
 }
 
 const isServer = typeof window === 'undefined';
