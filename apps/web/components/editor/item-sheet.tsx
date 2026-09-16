@@ -39,6 +39,9 @@ export function ItemSheet(props: {
   dayId: string;
   /** null = adding a new item. */
   item: PlanItem | null;
+  /** Prefills the title when adding — e.g. "+ ใส่ลงแพลน" from a wishlist card
+   *  (Feedback #4 — F8/D-10) already knows what the person wants to call it. */
+  initialTitle?: string;
   open: boolean;
   onClose: () => void;
 }) {
@@ -53,6 +56,7 @@ function ItemForm({
   days,
   dayId,
   item,
+  initialTitle,
   open,
   onClose,
 }: {
@@ -60,6 +64,7 @@ function ItemForm({
   days: PlanDay[];
   dayId: string;
   item: PlanItem | null;
+  initialTitle?: string;
   open: boolean;
   onClose: () => void;
 }) {
@@ -68,7 +73,7 @@ function ItemForm({
   const removeItem = useRemoveItem(tripId);
   const moveItem = useMoveItem(tripId);
 
-  const [title, setTitle] = useState(item?.title ?? '');
+  const [title, setTitle] = useState(item?.title ?? initialTitle ?? '');
   const [type, setType] = useState<ItemType>(item?.type ?? 'poi');
   const [start, setStart] = useState(item?.start ?? '09:00');
   const [end, setEnd] = useState(item?.end ?? '');

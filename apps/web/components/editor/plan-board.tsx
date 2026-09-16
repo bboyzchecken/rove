@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   closestCenter,
   DndContext,
@@ -54,8 +55,6 @@ import {
   useUndoPlan,
 } from '@/features/plan/queries';
 import { useSaveBooking } from '@/features/prep/queries';
-import { env } from '@/lib/env';
-import { isMockMode } from '@/lib/data';
 import { useTripMembers } from '@/features/trip/queries';
 import type { ItemType, Member, PlanItem } from '@/lib/data';
 import { formatMoney } from '@/lib/format';
@@ -100,7 +99,14 @@ export function PlanBoard({ tripId, fxRate }: { tripId: string; fxRate: number }
   const undo = useUndoPlan(tripId);
   const saveBooking = useSaveBooking(tripId);
 
-  const [dayId, setDayId] = useState<string | null>(null);
+  // A wishlist card's "อยู่ในแพลน · วัน N · HH:MM →" link (Feedback #4 — F8/D-10)
+  // lands here as `?day=&item=` — read once on mount, not on every render, so a
+  // day tab clicked afterward isn't fought back to the linked day.
+  const searchParams = useSearchParams();
+  const [dayId, setDayId] = useState<string | null>(() => searchParams.get('day'));
+  const [highlightItemId, setHighlightItemId] = useState<string | null>(() =>
+    searchParams.get('item'),
+  );
   const [view, setView] = useState<'timeline' | 'map'>('timeline');
   const [generating, setGenerating] = useState(false);
   const [showWhy, setShowWhy] = useState(false);
@@ -110,6 +116,16 @@ export function PlanBoard({ tripId, fxRate }: { tripId: string; fxRate: number }
 
   // No effect seeds this: "no day chosen yet" simply means the first one.
   const day = days.find((d) => d.id === dayId) ?? days[0];
+
+  useEffect(() => {
+    if (!highlightItemId || !day) return;
+    document
+      .getElementById(`plan-item-${highlightItemId}`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const timer = setTimeout(() => setHighlightItemId(null), 2000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightItemId, day?.id]);
 
   const sensors = useSensors(
     // A short drag threshold keeps a tap on the card from becoming a drag,
@@ -295,6 +311,7 @@ export function PlanBoard({ tripId, fxRate }: { tripId: string; fxRate: number }
                         item={item}
                         members={members}
                         fxRate={fxRate}
+                        highlighted={item.id === highlightItemId}
                         onEdit={() => setEditing(item)}
                         onBook={() => {
                           // Saving it as an idea first is what makes the
@@ -347,16 +364,11 @@ export function PlanBoard({ tripId, fxRate }: { tripId: string; fxRate: number }
   );
 }
 
-// The printable itinerary is the export endpoint's HTML in a new tab. Mock mode
-// has no API to ask, so it falls back to the browser's own print dialog.
+// The printable itinerary is its own page in this app (Feedback #4 — F3/D-4),
+// reached through repo so it works in mock and live alike — no more split
+// between a live-only export endpoint and mock's whole-app window.print().
 function openPrintable(tripId: string) {
-  if (isMockMode) {
-    window.print();
-    return;
-  }
-  const url = new URL(`/api/v1/trips/${tripId}/export`, env.apiUrl);
-  url.searchParams.set('format', 'html');
-  window.open(url.toString(), '_blank', 'noopener');
+  window.open(`/t/${tripId}/print`, '_blank', 'noopener');
 }
 
 const ACTION_LABEL: Record<string, string> = {
@@ -451,6 +463,7 @@ function SortableTimelineCard({
   item,
   members,
   fxRate,
+  highlighted,
   onEdit,
   onBook,
 }: {
@@ -458,6 +471,7 @@ function SortableTimelineCard({
   item: PlanItem;
   members: Member[];
   fxRate: number;
+  highlighted?: boolean;
   onEdit: () => void;
   onBook: () => void;
 }) {
@@ -468,6 +482,7 @@ function SortableTimelineCard({
 
   return (
     <div
+      id={`plan-item-${item.id}`}
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn('flex gap-3', isDragging && 'relative z-10 opacity-90')}
@@ -483,7 +498,13 @@ function SortableTimelineCard({
         <span className="bg-surface mt-1 w-px flex-1" />
       </div>
 
-      <Card className={cn('mb-2 min-w-0 flex-1 p-3.5', isDragging && 'ring-ink ring-2')}>
+      <Card
+        className={cn(
+          'mb-2 min-w-0 flex-1 p-3.5',
+          isDragging && 'ring-ink ring-2',
+          highlighted && 'ring-primary ring-2',
+        )}
+      >
         <div className="flex items-start gap-2">
           <button onClick={onEdit} className="min-w-0 flex-1 text-left">
             <p className="text-ink text-sm font-medium">{item.title}</p>
